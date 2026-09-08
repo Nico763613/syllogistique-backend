@@ -1,0 +1,833 @@
+// LOGI-FLEET MANAGER — Schéma de base de données
+// PostgreSQL + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ORGANISATION / MULTI-SITE
+// ============================================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  address   String?
+  phone     String?
+  email     String?
+  logoUrl   String?  @map("logo_url")
+  currency  String   @default("GNF")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sites     Site[]
+  users     User[]
+  settings  Setting[]
+
+  @@map("organizations")
+}
+
+model Site {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  name           String
+  location       String?
+  description    String?
+  status         SiteStatus @default(ACTIVE)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  vehicles       Vehicle[]
+  drivers        Driver[]
+  trips          Trip[]
+  fuelTransactions FuelTransaction[]
+  inventoryItems InventoryItem[]
+  stockMovements StockMovement[]
+  attendances    DriverAttendance[]
+  users          User[]
+  customers      Customer[]
+  purchaseOrders PurchaseOrder[]
+  salesOrders    SalesOrder[]
+  purchaseInvoices PurchaseInvoice[]
+  salesInvoices  SalesInvoice[]
+
+  @@index([organizationId])
+  @@map("sites")
+}
+
+enum SiteStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ============================================================
+// UTILISATEURS / RÔLES / PERMISSIONS
+// ============================================================
+
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleName @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+enum RoleName {
+  SUPER_ADMIN
+  ADMIN_LOGISTIQUE
+  GESTIONNAIRE_FLOTTE
+  MAGASINIER
+  CHAUFFEUR
+  LECTEUR
+}
+
+model Permission {
+  id    String @id @default(uuid())
+  code  String @unique // ex: "vehicles.create", "stock.out"
+  label String
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  organizationId String    @map("organization_id")
+  siteId         String?   @map("site_id")
+  roleId         String    @map("role_id")
+  firstName      String    @map("first_name")
+  lastName       String    @map("last_name")
+  email          String    @unique
+  phone          String?
+  passwordHash   String    @map("password_hash")
+  status         UserStatus @default(ACTIVE)
+  refreshTokenHash String? @map("refresh_token_hash")
+  lastLoginAt    DateTime? @map("last_login_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  site           Site?        @relation(fields: [siteId], references: [id])
+  role           Role         @relation(fields: [roleId], references: [id])
+  auditLogs      AuditLog[]
+  stockMovements StockMovement[]
+  trips          Trip[]        @relation("TripCreatedBy")
+  attendancesMarked DriverAttendance[] @relation("AttendanceCreatedBy")
+
+  @@index([organizationId])
+  @@index([roleId])
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+// ============================================================
+// CHAUFFEURS
+// ============================================================
+
+model Driver {
+  id                String    @id @default(uuid())
+  siteId            String    @map("site_id")
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  phone             String?
+  licenseNumber     String?   @map("license_number")
+  licenseCategory   String?   @map("license_category")
+  licenseExpiryDate DateTime? @map("license_expiry_date")
+  status            DriverStatus @default(ACTIVE)
+  photoUrl          String?   @map("photo_url")
+  observations      String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  site              Site      @relation(fields: [siteId], references: [id])
+  vehicles          Vehicle[]
+  attendances       DriverAttendance[]
+  trips             Trip[]
+  fuelTransactions  FuelTransaction[]
+
+  @@index([siteId])
+  @@map("drivers")
+}
+
+enum DriverStatus {
+  ACTIVE
+  SUSPENDED
+  INACTIVE
+}
+
+model DriverAttendance {
+  id             String   @id @default(uuid())
+  driverId       String   @map("driver_id")
+  siteId         String   @map("site_id")
+  date           DateTime @db.Date
+  status         AttendanceStatus
+  absenceReason  String?  @map("absence_reason")
+  checkIn        DateTime? @map("check_in")
+  checkOut       DateTime? @map("check_out")
+  createdById    String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  driver         Driver   @relation(fields: [driverId], references: [id])
+  site           Site     @relation(fields: [siteId], references: [id])
+  createdBy      User     @relation("AttendanceCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([driverId, date])
+  @@index([siteId, date])
+  @@map("driver_attendance")
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  SICK
+  LEAVE
+  PERMISSION
+  REST
+  OTHER
+}
+
+// ============================================================
+// VÉHICULES (CAMIONS + VÉHICULES DE SERVICE — table unifiée)
+// ============================================================
+
+model Vehicle {
+  id                 String      @id @default(uuid())
+  siteId             String      @map("site_id")
+  vehicleType        VehicleType @map("vehicle_type")
+  internalNumber     String      @map("internal_number")
+  registrationNumber String      @map("registration_number")
+  brand              String?
+  model              String?
+  year               Int?
+  capacity           String?
+  currentMileage     Int         @default(0) @map("current_mileage")
+  status             VehicleStatus @default(AVAILABLE)
+  assignedDriverId   String?     @map("assigned_driver_id")
+  photoUrl           String?     @map("photo_url")
+  observations       String?
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  deletedAt          DateTime?   @map("deleted_at")
+
+  site               Site        @relation(fields: [siteId], references: [id])
+  assignedDriver     Driver?     @relation(fields: [assignedDriverId], references: [id])
+  trips              Trip[]
+  fuelTransactions   FuelTransaction[]
+  maintenance        Maintenance[]
+  expenses           Expense[]
+  documents          Document[]
+  stockMovements     StockMovement[]
+
+  @@unique([siteId, registrationNumber])
+  @@index([siteId, vehicleType])
+  @@map("vehicles")
+}
+
+enum VehicleType {
+  TRUCK
+  SERVICE_VEHICLE
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ON_MISSION
+  MAINTENANCE
+  IMMOBILIZED
+  OUT_OF_SERVICE
+}
+
+// ============================================================
+// MISSIONS / FICHE DE BORD
+// ============================================================
+
+model Trip {
+  id            String   @id @default(uuid())
+  vehicleId     String   @map("vehicle_id")
+  driverId      String   @map("driver_id")
+  siteId        String   @map("site_id")
+  tripDate      DateTime @db.Date @map("trip_date")
+  startTime     DateTime @map("start_time")
+  endTime       DateTime? @map("end_time")
+  startMileage  Int      @map("start_mileage")
+  endMileage    Int?     @map("end_mileage")
+  distance      Int?     // calculé automatiquement = endMileage - startMileage
+  destination   String?
+  purpose       String?
+  passengerName String?  @map("passenger_name")
+  observations  String?
+  createdById   String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  driver        Driver   @relation(fields: [driverId], references: [id])
+  site          Site     @relation(fields: [siteId], references: [id])
+  createdBy     User     @relation("TripCreatedBy", fields: [createdById], references: [id])
+
+  @@index([siteId, tripDate])
+  @@index([vehicleId])
+  @@map("trips")
+}
+
+// ============================================================
+// CARBURANT
+// ============================================================
+
+model FuelTransaction {
+  id               String   @id @default(uuid())
+  vehicleId        String   @map("vehicle_id")
+  driverId         String?  @map("driver_id")
+  siteId           String   @map("site_id")
+  transactionDate  DateTime @map("transaction_date")
+  mileage          Int
+  quantityLiters   Decimal  @map("quantity_liters") @db.Decimal(10, 2)
+  pricePerLiter    Decimal  @map("price_per_liter") @db.Decimal(10, 2)
+  totalCost        Decimal  @map("total_cost") @db.Decimal(14, 2) // calculé = quantity * price
+  station          String?
+  receiptNumber    String?  @map("receipt_number")
+  receiptImageUrl  String?  @map("receipt_image_url")
+  observations     String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  driver           Driver?  @relation(fields: [driverId], references: [id])
+  site             Site     @relation(fields: [siteId], references: [id])
+
+  @@index([siteId, transactionDate])
+  @@index([vehicleId])
+  @@map("fuel_transactions")
+}
+
+// ============================================================
+// MAINTENANCE
+// ============================================================
+
+model MaintenanceType {
+  id    String @id @default(uuid())
+  code  String @unique // VIDANGE, REVISION, PNEUS, FREINS, BATTERIE, ...
+  label String
+
+  maintenances Maintenance[]
+
+  @@map("maintenance_types")
+}
+
+model Maintenance {
+  id                String   @id @default(uuid())
+  vehicleId         String   @map("vehicle_id")
+  maintenanceTypeId String   @map("maintenance_type_id")
+  maintenanceDate   DateTime @map("maintenance_date")
+  mileage           Int?
+  description       String?
+  supplierId        String?  @map("supplier_id")
+  cost              Decimal? @db.Decimal(14, 2)
+  nextDate          DateTime? @map("next_date")
+  nextMileage       Int?     @map("next_mileage")
+  invoiceNumber     String?  @map("invoice_number")
+  invoiceUrl        String?  @map("invoice_url")
+  status            MaintenanceStatus @default(COMPLETED)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  vehicle           Vehicle  @relation(fields: [vehicleId], references: [id])
+  maintenanceType   MaintenanceType @relation(fields: [maintenanceTypeId], references: [id])
+  supplier          Supplier? @relation(fields: [supplierId], references: [id])
+
+  @@index([vehicleId])
+  @@map("maintenance")
+}
+
+enum MaintenanceStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+// ============================================================
+// STOCKS
+// ============================================================
+
+model StockCategory {
+  id    String @id @default(uuid())
+  name  String @unique
+
+  items InventoryItem[]
+
+  @@map("stock_categories")
+}
+
+model InventoryItem {
+  id               String   @id @default(uuid())
+  siteId           String   @map("site_id")
+  categoryId       String?  @map("category_id")
+  sku              String
+  name             String
+  description      String?
+  brand            String?
+  reference        String?
+  unit             String   @default("unité")
+  currentQuantity  Decimal  @default(0) @map("current_quantity") @db.Decimal(12, 2)
+  minimumQuantity  Decimal  @default(0) @map("minimum_quantity") @db.Decimal(12, 2)
+  maximumQuantity  Decimal? @map("maximum_quantity") @db.Decimal(12, 2)
+  unitPrice        Decimal? @map("unit_price") @db.Decimal(14, 2)
+  location         String?
+  qrCode           String?  @map("qr_code")
+  supplierId       String?  @map("supplier_id")
+  photoUrl         String?  @map("photo_url")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  site             Site     @relation(fields: [siteId], references: [id])
+  category         StockCategory? @relation(fields: [categoryId], references: [id])
+  supplier         Supplier? @relation(fields: [supplierId], references: [id])
+  movements        StockMovement[]
+  purchaseOrderLines PurchaseOrderLine[]
+  salesOrderLines  SalesOrderLine[]
+
+  @@unique([siteId, sku])
+  @@index([siteId])
+  @@map("stock_items")
+}
+
+model StockMovement {
+  id            String   @id @default(uuid())
+  itemId        String   @map("item_id")
+  siteId        String   @map("site_id")
+  movementType  StockMovementType @map("movement_type")
+  quantity      Decimal  @db.Decimal(12, 2)
+  vehicleId     String?  @map("vehicle_id")
+  supplierId    String?  @map("supplier_id")
+  reason        String?
+  reference     String?
+  unitPrice     Decimal? @map("unit_price") @db.Decimal(14, 2)
+  totalValue    Decimal? @map("total_value") @db.Decimal(14, 2)
+  createdById   String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+  site          Site     @relation(fields: [siteId], references: [id])
+  vehicle       Vehicle? @relation(fields: [vehicleId], references: [id])
+  supplier      Supplier? @relation(fields: [supplierId], references: [id])
+  createdBy     User     @relation(fields: [createdById], references: [id])
+
+  @@index([itemId])
+  @@index([siteId, createdAt])
+  @@map("stock_movements")
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  ADJUSTMENT
+  TRANSFER
+}
+
+// ============================================================
+// FOURNISSEURS
+// ============================================================
+
+model Supplier {
+  id           String   @id @default(uuid())
+  name         String
+  contactName  String?  @map("contact_name")
+  phone        String?
+  email        String?
+  address      String?
+  productsSupplied String? @map("products_supplied")
+  observations String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  inventoryItems InventoryItem[]
+  stockMovements StockMovement[]
+  maintenances   Maintenance[]
+  purchaseOrders PurchaseOrder[]
+  purchaseInvoices PurchaseInvoice[]
+
+  @@map("suppliers")
+}
+
+// ============================================================
+// DÉPENSES / DOCUMENTS
+// ============================================================
+
+model Expense {
+  id           String   @id @default(uuid())
+  vehicleId    String?  @map("vehicle_id")
+  category     String   // FUEL, MAINTENANCE, PARTS, TIRES, OTHER
+  amount       Decimal  @db.Decimal(14, 2)
+  expenseDate  DateTime @map("expense_date")
+  description  String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  vehicle      Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@map("expenses")
+}
+
+model Document {
+  id           String   @id @default(uuid())
+  vehicleId    String   @map("vehicle_id")
+  type         String   // CARTE_GRISE, ASSURANCE, VISITE_TECHNIQUE, PERMIS, CONTRAT, FACTURE, AUTRE
+  fileUrl      String   @map("file_url")
+  expiryDate   DateTime? @map("expiry_date")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+
+  @@map("documents")
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  message   String
+  severity  NotificationSeverity @default(INFO)
+  entity    String?
+  entityId  String?  @map("entity_id")
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// ============================================================
+// AUDIT
+// ============================================================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String   // CREATE, UPDATE, DELETE
+  entity    String
+  entityId  String   @map("entity_id")
+  oldValue  Json?    @map("old_value")
+  newValue  Json?    @map("new_value")
+  deviceId  String?  @map("device_id")
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+// ============================================================
+// SYNCHRONISATION OFFLINE
+// ============================================================
+
+model SyncQueueEntry {
+  id          String   @id @default(uuid())
+  entity      String
+  entityId    String   @map("entity_id")
+  operation   String   // CREATE, UPDATE, DELETE
+  payload     Json
+  deviceId    String?  @map("device_id")
+  status      SyncStatus @default(PENDING)
+  retryCount  Int      @default(0) @map("retry_count")
+  lastError   String?  @map("last_error")
+  createdAt   DateTime @default(now()) @map("created_at")
+  syncedAt    DateTime? @map("synced_at")
+
+  @@map("sync_queue")
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SUCCESS
+  FAILED
+}
+
+// ============================================================
+// PARAMÈTRES
+// ============================================================
+
+model Setting {
+  id             String   @id @default(uuid())
+  organizationId String   @map("organization_id")
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, key])
+  @@map("settings")
+}
+
+// ============================================================
+// CLIENTS
+// ============================================================
+
+model Customer {
+  id           String   @id @default(uuid())
+  siteId       String   @map("site_id")
+  name         String
+  contactName  String?  @map("contact_name")
+  phone        String?
+  email        String?
+  address      String?
+  taxNumber    String?  @map("tax_number")
+  creditLimit  Decimal? @map("credit_limit") @db.Decimal(14, 2)
+  observations String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  site         Site     @relation(fields: [siteId], references: [id])
+  salesOrders  SalesOrder[]
+  salesInvoices SalesInvoice[]
+
+  @@index([siteId])
+  @@map("customers")
+}
+
+// ============================================================
+// ACHATS — Bon de commande fournisseur → Réception → Facture → Paiement
+// ============================================================
+
+enum PurchaseOrderStatus {
+  DRAFT
+  CONFIRMED
+  PARTIALLY_RECEIVED
+  RECEIVED
+  INVOICED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id           String   @id @default(uuid())
+  siteId       String   @map("site_id")
+  supplierId   String   @map("supplier_id")
+  reference    String   @unique // ex: BC-2026-0001
+  orderDate    DateTime @map("order_date")
+  expectedDate DateTime? @map("expected_date")
+  status       PurchaseOrderStatus @default(DRAFT)
+  notes        String?
+  attachmentUrl String? @map("attachment_url") // devis / bon de livraison scanné
+  createdById  String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  site         Site     @relation(fields: [siteId], references: [id])
+  supplier     Supplier @relation(fields: [supplierId], references: [id])
+  lines        PurchaseOrderLine[]
+  invoices     PurchaseInvoice[]
+
+  @@index([siteId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String   @id @default(uuid())
+  purchaseOrderId String   @map("purchase_order_id")
+  itemId          String   @map("item_id")
+  quantityOrdered Decimal  @map("quantity_ordered") @db.Decimal(12, 2)
+  quantityReceived Decimal @default(0) @map("quantity_received") @db.Decimal(12, 2)
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(14, 2)
+  lineTotal       Decimal  @map("line_total") @db.Decimal(14, 2) // = quantityOrdered * unitPrice
+
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_lines")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PaymentTerm {
+  CASH
+  CREDIT
+}
+
+model PurchaseInvoice {
+  id             String   @id @default(uuid())
+  siteId         String   @map("site_id")
+  supplierId     String   @map("supplier_id")
+  purchaseOrderId String? @map("purchase_order_id")
+  reference      String   @unique // ex: FA-2026-0001
+  invoiceDate    DateTime @map("invoice_date")
+  dueDate        DateTime? @map("due_date")
+  paymentTerm    PaymentTerm @default(CASH) @map("payment_term")
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(14, 2)
+  amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(14, 2)
+  status         InvoiceStatus @default(UNPAID)
+  attachmentUrl  String?  @map("attachment_url")
+  createdById    String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  site           Site     @relation(fields: [siteId], references: [id])
+  supplier       Supplier @relation(fields: [supplierId], references: [id])
+  purchaseOrder  PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  payments       Payment[]
+
+  @@index([siteId, status])
+  @@map("purchase_invoices")
+}
+
+// ============================================================
+// VENTES — Devis → Bon de commande client → Livraison → Facture → Paiement
+// ============================================================
+
+enum SalesOrderStatus {
+  QUOTE
+  CONFIRMED
+  PARTIALLY_DELIVERED
+  DELIVERED
+  INVOICED
+  CANCELLED
+}
+
+model SalesOrder {
+  id           String   @id @default(uuid())
+  siteId       String   @map("site_id")
+  customerId   String   @map("customer_id")
+  reference    String   @unique // ex: DEV-2026-0001 ou BCC-2026-0001
+  orderDate    DateTime @map("order_date")
+  status       SalesOrderStatus @default(QUOTE)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  taxPercent   Decimal  @default(0) @map("tax_percent") @db.Decimal(5, 2)
+  notes        String?
+  createdById  String   @map("created_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  site         Site     @relation(fields: [siteId], references: [id])
+  customer     Customer @relation(fields: [customerId], references: [id])
+  lines        SalesOrderLine[]
+  invoices     SalesInvoice[]
+
+  @@index([siteId, status])
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id              String   @id @default(uuid())
+  salesOrderId    String   @map("sales_order_id")
+  itemId          String   @map("item_id")
+  quantityOrdered Decimal  @map("quantity_ordered") @db.Decimal(12, 2)
+  quantityDelivered Decimal @default(0) @map("quantity_delivered") @db.Decimal(12, 2)
+  unitPrice       Decimal  @map("unit_price") @db.Decimal(14, 2)
+  lineTotal       Decimal  @map("line_total") @db.Decimal(14, 2)
+
+  salesOrder      SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  item            InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([salesOrderId])
+  @@map("sales_order_lines")
+}
+
+model SalesInvoice {
+  id            String   @id @default(uuid())
+  siteId        String   @map("site_id")
+  customerId    String   @map("customer_id")
+  salesOrderId  String?  @map("sales_order_id")
+  reference     String   @unique // ex: FV-2026-0001
+  invoiceDate   DateTime @map("invoice_date")
+  dueDate       DateTime? @map("due_date")
+  paymentTerm   PaymentTerm @default(CASH) @map("payment_term")
+  subtotal      Decimal  @db.Decimal(14, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  taxAmount     Decimal  @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(14, 2)
+  amountPaid    Decimal  @default(0) @map("amount_paid") @db.Decimal(14, 2)
+  status        InvoiceStatus @default(UNPAID)
+  createdById   String   @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  site          Site     @relation(fields: [siteId], references: [id])
+  customer      Customer @relation(fields: [customerId], references: [id])
+  salesOrder    SalesOrder? @relation(fields: [salesOrderId], references: [id])
+  payments      Payment[]
+
+  @@index([siteId, status])
+  @@map("sales_invoices")
+}
+
+// ============================================================
+// PAIEMENTS (Achats et Ventes)
+// ============================================================
+
+enum PaymentDirection {
+  IN  // encaissement client
+  OUT // décaissement fournisseur
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CHEQUE
+  OTHER
+}
+
+model Payment {
+  id                String   @id @default(uuid())
+  direction         PaymentDirection
+  method            PaymentMethod @default(CASH)
+  amount            Decimal  @db.Decimal(14, 2)
+  paymentDate       DateTime @map("payment_date")
+  reference         String?
+  salesInvoiceId    String?  @map("sales_invoice_id")
+  purchaseInvoiceId String?  @map("purchase_invoice_id")
+  createdById       String   @map("created_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  salesInvoice      SalesInvoice? @relation(fields: [salesInvoiceId], references: [id])
+  purchaseInvoice   PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id])
+
+  @@map("payments")
+}

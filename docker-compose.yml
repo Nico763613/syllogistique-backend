@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: logifleet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: logifleet
+      POSTGRES_PASSWORD: logifleet_pwd
+      POSTGRES_DB: logifleet
+    ports:
+      - "5432:5432"
+    volumes:
+      - logifleet_pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    container_name: logifleet_api
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    command: sh -c "npx prisma migrate deploy && npm run start:prod"
+
+volumes:
+  logifleet_pgdata:
