@@ -25,6 +25,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { QrcodesModule } from './qrcodes/qrcodes.module';
 import { MessagingModule } from './messaging/messaging.module';
 
+import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 
 @Module({
@@ -53,6 +54,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     QrcodesModule,
     MessagingModule,
   ],
+  controllers: [HealthController],
   providers: [
     // Authentification JWT obligatoire sur toutes les routes, sauf @Public()
     { provide: APP_GUARD, useClass: JwtAuthGuard },

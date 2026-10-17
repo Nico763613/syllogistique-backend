@@ -28,8 +28,9 @@ Aucune carte bancaire nécessaire pour aucune de ces étapes. Temps estimé : 10
 3. Sélectionne ton dépôt `syllogistique-backend`
 4. Render détecte automatiquement le fichier `render.yaml` déjà inclus dans le projet et propose de
    créer le service `syllogistique-api`
-5. Avant de valider, Render te demande de renseigner la variable `DATABASE_URL` (marquée `sync: false`)
-   → colle la chaîne de connexion Neon copiée à l'étape 1
+5. Avant de valider, Render te demande de renseigner deux variables (marquées `sync: false`) :
+   - `DATABASE_URL` → colle la chaîne de connexion Neon copiée à l'étape 1
+   - `CORS_ORIGINS` → laisse vide pour l'instant ; tu la renseigneras à l'étape 4 bis (adresse Netlify)
 6. **Apply** → le déploiement démarre (5-10 minutes la première fois)
 7. Une fois terminé, Render affiche l'URL de ton API, du type :
    ```
@@ -64,6 +65,16 @@ iOS) directement depuis le navigateur, sans Play Store ni App Store.
    - **iPhone/iPad (Safari)** : bouton Partager 􀈂 → "Sur l'écran d'accueil"
    - **Windows/macOS (Chrome/Edge)** : icône d'installation dans la barre d'adresse
 
+## Étape 4 bis — Verrouiller l'API sur ton site (sécurité, obligatoire)
+
+Dans Render > ton service > **Environment** > `CORS_ORIGINS` = l'adresse Netlify de l'application
+(ex. `https://syllogistique-xxxx.netlify.app`, sans `/` final). Si tu as plusieurs adresses, sépare-les par
+des virgules. Sauvegarde : Render redéploie. Sans cela, n'importe quel site pourrait appeler ton API.
+
+Contrôle de santé : `https://ton-api.onrender.com/health` doit répondre `{"status":"ok"}`.
+La documentation Swagger (`/docs`) est désactivée en production ; pour la réactiver temporairement :
+variable `ENABLE_DOCS=true`.
+
 ## Étape 5 — Connecter le client à l'API
 
 1. Ouvre ton lien Netlify
@@ -71,7 +82,8 @@ iOS) directement depuis le navigateur, sans Play Store ni App Store.
    - **URL de l'API** : `https://syllogistique-api.onrender.com` (celle de l'étape 3)
    - **Email** : `admin@syllogistique.local`
    - **Mot de passe** : `ChangeMoi123!`
-3. Connecte-toi, puis va dans **Paramètres → change ton mot de passe immédiatement**
+3. Connecte-toi, puis **change IMMÉDIATEMENT le mot de passe** (`ChangeMoi123!` est public : quiconque
+   connaît l'adresse de ton API peut l'essayer). Tu as 5 essais de connexion par minute par adresse IP.
 
 ---
 
