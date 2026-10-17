@@ -13,6 +13,7 @@ RUN apk add --no-cache openssl
 ENV NODE_ENV=production
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 EXPOSE 3000
 CMD ["node", "dist/main"]

@@ -41,6 +41,9 @@ async function bootstrap() {
   // persistant ou à basculer vers un stockage S3-compatible (voir uploads.controller.ts).
   app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/', index: false, dotfiles: 'deny' });
 
+  // Application web SYLLOGISTIQUE (PWA) servie sur /app/ — même adresse que l'API, donc sans CORS.
+  app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/app/', index: 'index.html', dotfiles: 'deny' });
+
   // Documentation Swagger : désactivée en production (ENABLE_DOCS=true pour la réactiver).
   const docsEnabled = process.env.ENABLE_DOCS === 'true' || process.env.NODE_ENV !== 'production';
   if (docsEnabled) {

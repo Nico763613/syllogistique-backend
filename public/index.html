@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SYLLOGISTIQUE — Gestion Logistique &amp; Flotte</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#163A5F">
+<link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SYLLOGISTIQUE">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#163A5F;
+    --navy-dark:#0E2740;
+    --navy-soft:#1F4A75;
+    --gold:#E0A72E;
+    --gold-soft:#F2C568;
+    --bg:#F5F7FA;
+    --card:#FFFFFF;
+    --text:#16233A;
+    --muted:#6B7A8F;
+    --line:#E4E9F0;
+    --danger:#C0392B;
+    --success:#2E8B57;
+    --radius:12px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);}
+  h1,h2,h3,.brand,.kpi-value{font-family:'Sora',sans-serif;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+
+  /* ---------- Route motif (signature) ---------- */
+  .route-rule{
+    height:2px;
+    background-image:repeating-linear-gradient(90deg, var(--gold) 0 10px, transparent 10px 18px);
+    position:relative;
+    margin:4px 0 18px;
+  }
+  .route-rule::after{
+    content:"🚚";
+    position:absolute; right:0; top:-11px;
+    font-size:14px; filter:none;
+  }
+
+  /* ---------- App shell ---------- */
+  #app{display:none;}
+  .shell{display:flex; min-height:100vh;}
+
+  .sidebar{
+    width:240px; background:var(--navy); color:#fff; flex-shrink:0;
+    display:flex; flex-direction:column; padding:24px 0;
+    position:sticky; top:0; height:100vh;
+  }
+  .brand-block{padding:0 20px 18px; border-bottom:1px solid rgba(255,255,255,.12); margin-bottom:10px;}
+  .brand{font-size:19px; font-weight:800; letter-spacing:.5px; color:#fff;}
+  .tagline{font-size:11px; color:var(--gold-soft); margin-top:2px; letter-spacing:.4px; text-transform:uppercase;}
+
+  .nav-item{
+    display:flex; align-items:center; gap:12px; padding:11px 20px;
+    color:#C9D6E8; text-decoration:none; font-size:14px; font-weight:500;
+    cursor:pointer; border-left:3px solid transparent; transition:.15s;
+  }
+  .nav-item:hover{background:rgba(255,255,255,.06); color:#fff;}
+  .nav-item.active{background:rgba(224,167,46,.12); border-left-color:var(--gold); color:#fff;}
+  .nav-icon{width:18px; text-align:center;}
+  .nav-section-label{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,.35); padding:16px 20px 6px;}
+
+  .sidebar-footer{margin-top:auto; padding:14px 20px 0; border-top:1px solid rgba(255,255,255,.12);}
+  .sync-pill{display:flex; align-items:center; gap:8px; font-size:12px; color:#C9D6E8;}
+  .dot{width:8px; height:8px; border-radius:50%; background:var(--success);}
+  .dot.offline{background:var(--danger);}
+  .dot.syncing{background:var(--gold); animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .main{flex:1; min-width:0;}
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 28px; background:#fff; border-bottom:1px solid var(--line);
+    position:sticky; top:0; z-index:5;
+  }
+  .topbar h2{margin:0; font-size:18px;}
+  .user-chip{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);}
+  .user-avatar{width:32px; height:32px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;}
+  .btn-ghost{background:none; border:1px solid var(--line); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); cursor:pointer;}
+  .btn-ghost:hover{border-color:var(--navy); color:var(--navy);}
+
+  .content{padding:24px 28px 60px;}
+
+  /* KPI cards */
+  .kpi-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:16px; margin-bottom:26px;}
+  .kpi-card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; position:relative; overflow:hidden;}
+  .kpi-card::before{content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--gold);}
+  .kpi-label{font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:8px;}
+  .kpi-value{font-size:26px; font-weight:700; color:var(--navy);}
+  .kpi-sub{font-size:12px; color:var(--muted); margin-top:4px;}
+
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:20px 22px; margin-bottom:20px;}
+  .panel h3{margin:0 0 4px; font-size:15px;}
+  .panel .desc{font-size:12px; color:var(--muted); margin-bottom:16px;}
+
+  table{width:100%; border-collapse:collapse; font-size:13px;}
+  th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.4px; color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--line);}
+  td{padding:10px 10px; border-bottom:1px solid var(--line); color:var(--text);}
+  tr:last-child td{border-bottom:none;}
+  .badge{display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600;}
+  .badge.ok{background:#E7F5EC; color:var(--success);}
+  .badge.warn{background:#FCF1DB; color:#9A6A0C;}
+  .badge.bad{background:#FBE9E7; color:var(--danger);}
+  .badge.info{background:#E9EEF6; color:var(--navy);}
+
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  @media (max-width:720px){.grid-2{grid-template-columns:1fr;}}
+  label{display:block; font-size:12px; color:var(--muted); margin:10px 0 4px;}
+  input,select,textarea{
+    width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:8px;
+    font-size:13px; font-family:inherit; background:#fbfcfe;
+  }
+  input:focus,select:focus,textarea:focus{outline:none; border-color:var(--navy-soft);}
+
+  .btn{
+    background:var(--navy); color:#fff; border:none; border-radius:8px; padding:10px 18px;
+    font-size:13px; font-weight:600; cursor:pointer; margin-top:16px;
+  }
+  .btn:hover{background:var(--navy-soft);}
+  .btn.gold{background:var(--gold); color:#1B2A3D;}
+  .btn.gold:hover{background:var(--gold-soft);}
+  .btn.small{padding:6px 12px; font-size:12px; margin-top:0;}
+
+  .empty{padding:30px; text-align:center; color:var(--muted); font-size:13px;}
+  .msg{font-size:12px; margin-top:10px; padding:8px 10px; border-radius:8px;}
+  .msg.err{background:#FBE9E7; color:var(--danger);}
+  .msg.ok{background:#E7F5EC; color:var(--success);}
+
+  /* Login screen */
+  #login-screen{
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 20% 20%, var(--navy-soft), var(--navy) 60%);
+  }
+  .login-card{
+    width:360px; background:#fff; border-radius:16px; padding:32px 30px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+  }
+  .login-brand{text-align:center; margin-bottom:6px;}
+  .login-brand .brand{color:var(--navy); font-size:22px;}
+  .login-brand .tagline{color:var(--gold); font-size:12px;}
+  .login-truck{font-size:30px; text-align:center; margin-bottom:8px;}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+
+  @media (max-width:860px){
+    .sidebar{position:fixed; left:-240px; z-index:20; transition:.2s; box-shadow:0 0 40px rgba(0,0,0,.3);}
+    .sidebar.open{left:0;}
+    .content{padding:18px;}
+    .menu-toggle{display:inline-flex !important;}
+  }
+  .menu-toggle{display:none; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; margin-right:10px;}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-truck">🚚</div>
+    <div class="login-brand">
+      <div class="brand">SYLLOGISTIQUE</div>
+      <div class="tagline">GESTION LOGISTIQUE &amp; FLOTTE</div>
+    </div>
+    <div class="route-rule"></div>
+
+    <label>URL de l'API</label>
+    <input id="api-url" placeholder="https://votre-api.exemple.com" />
+
+    <label>Email</label>
+    <input id="login-email" placeholder="admin@syllogistique.local" />
+
+    <label>Mot de passe</label>
+    <input id="login-password" type="password" placeholder="••••••••" />
+
+    <button class="btn gold" style="width:100%" onclick="login()">Se connecter</button>
+    <div id="login-msg"></div>
+    <button id="install-btn-login" class="btn-ghost" style="display:none; width:100%; margin-top:12px; text-align:center;" onclick="installApp()">⬇ Installer sur cet appareil</button>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-block">
+        <div class="brand">🚚 SYLLOGISTIQUE</div>
+        <div class="tagline">Gestion Logistique &amp; Flotte</div>
+      </div>
+
+      <div class="nav-item active" data-view="dashboard" onclick="go('dashboard')">
+        <span class="nav-icon">🏠</span> Tableau de bord
+      </div>
+
+      <div class="nav-section-label">Flotte</div>
+      <div class="nav-item" data-view="vehicles" onclick="go('vehicles')">
+        <span class="nav-icon">🚛</span> Camions &amp; Véhicules
+      </div>
+      <div class="nav-item" data-view="drivers" onclick="go('drivers')">
+        <span class="nav-icon">👨‍✈️</span> Chauffeurs
+      </div>
+
+      <div class="nav-section-label">Opérations</div>
+      <div class="nav-item" data-view="fuel" onclick="go('fuel')">
+        <span class="nav-icon">⛽</span> Carburant
+      </div>
+      <div class="nav-item" data-view="maintenance" onclick="go('maintenance')">
+        <span class="nav-icon">🔧</span> Maintenance
+      </div>
+      <div class="nav-item" data-view="stock" onclick="go('stock')">
+        <span class="nav-icon">📦</span> Stocks
+      </div>
+
+      <div class="nav-section-label">Système</div>
+      <div class="nav-item" data-view="sync" onclick="go('sync')">
+        <span class="nav-icon">🔄</span> Synchronisation
+      </div>
+      <div class="nav-item" data-view="settings" onclick="go('settings')">
+        <span class="nav-icon">⚙️</span> Paramètres
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="sync-pill"><span class="dot" id="sync-dot"></span> <span id="sync-label">Synchronisé</span></div>
+        <div style="margin-top:10px;"><button class="btn-ghost" style="color:#C9D6E8; border-color:rgba(255,255,255,.2);" onclick="logout()">Déconnexion</button></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <div style="display:flex; align-items:center;">
+          <div class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</div>
+          <h2 id="view-title">Tableau de bord</h2>
+        </div>
+        <div class="user-chip">
+          <button id="install-btn" class="btn-ghost" style="display:none;" onclick="installApp()">⬇ Installer l'application</button>
+          <div class="user-avatar" id="user-initials">SA</div>
+          <div>
+            <div id="user-name" style="color:var(--text); font-weight:600;">—</div>
+            <div id="user-role">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="content" id="view-root"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   SYLLOGISTIQUE — client léger (HTML/JS pur, sans build)
+   Consomme l'API SYLLOGISTIQUE (NestJS + Prisma + PostgreSQL)
+   ============================================================ */
+
+const state = {
+  apiUrl: localStorage.getItem('syllo_api_url') || '',
+  accessToken: localStorage.getItem('syllo_access_token') || '',
+  refreshToken: localStorage.getItem('syllo_refresh_token') || '',
+  user: JSON.parse(localStorage.getItem('syllo_user') || 'null'),
+  siteId: localStorage.getItem('syllo_site_id') || '',
+  view: 'dashboard',
+};
+
+document.getElementById('api-url').value = state.apiUrl || 'https://syllogistique-backend.onrender.com';
+
+async function api(path, options = {}) {
+  const res = await fetch(state.apiUrl.replace(/\/$/, '') + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(state.accessToken ? { Authorization: 'Bearer ' + state.accessToken } : {}),
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.message || 'Erreur API');
+  }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : res.blob();
+}
+
+async function login() {
+  const msg = document.getElementById('login-msg');
+  msg.innerHTML = '';
+  state.apiUrl = document.getElementById('api-url').value.trim();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!state.apiUrl || !email || !password) {
+    msg.innerHTML = '<div class="msg err">Merci de renseigner l\'URL de l\'API, l\'email et le mot de passe.</div>';
+    return;
+  }
+
+  try {
+    localStorage.setItem('syllo_api_url', state.apiUrl);
+    const data = await api('/auth/login', { method: 'POST', body: { email, password } });
+    state.accessToken = data.accessToken;
+    state.refreshToken = data.refreshToken;
+    state.user = data.user;
+    state.siteId = data.user.siteId || '';
+    localStorage.setItem('syllo_access_token', state.accessToken);
+    localStorage.setItem('syllo_refresh_token', state.refreshToken);
+    localStorage.setItem('syllo_user', JSON.stringify(state.user));
+    localStorage.setItem('syllo_site_id', state.siteId);
+    enterApp();
+  } catch (e) {
+    msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  }
+}
+
+function logout() {
+  ['syllo_access_token', 'syllo_refresh_token', 'syllo_user'].forEach((k) => localStorage.removeItem(k));
+  state.accessToken = ''; state.user = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function enterApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const initials = ((state.user.firstName || '?')[0] + (state.user.lastName || '?')[0]).toUpperCase();
+  document.getElementById('user-initials').textContent = initials;
+  document.getElementById('user-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  document.getElementById('user-role').textContent = roleLabel(state.user.role);
+  go('dashboard');
+  updateSyncPill();
+  window.addEventListener('online', updateSyncPill);
+  window.addEventListener('offline', updateSyncPill);
+}
+
+function roleLabel(r) {
+  return {
+    SUPER_ADMIN: 'Super Administrateur', ADMIN_LOGISTIQUE: 'Administrateur Logistique',
+    GESTIONNAIRE_FLOTTE: 'Gestionnaire de flotte', MAGASINIER: 'Magasinier',
+    CHAUFFEUR: 'Chauffeur', LECTEUR: 'Lecteur / Superviseur',
+  }[r] || esc(r);
+}
+
+function updateSyncPill() {
+  const dot = document.getElementById('sync-dot');
+  const label = document.getElementById('sync-label');
+  if (navigator.onLine) { dot.className = 'dot'; label.textContent = 'Synchronisé'; }
+  else { dot.className = 'dot offline'; label.textContent = 'Hors connexion'; }
+}
+
+const titles = {
+  dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks',
+  sync: 'Synchronisation', settings: 'Paramètres',
+};
+
+function go(view) {
+  state.view = view;
+  document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === view));
+  document.getElementById('view-title').textContent = titles[view];
+  document.getElementById('sidebar').classList.remove('open');
+  renderView(view);
+}
+
+function root() { return document.getElementById('view-root'); }
+function fmt(n) { return Number(n || 0).toLocaleString('fr-FR'); }
+// Échappe toute donnée texte avant insertion dans le HTML (protection XSS)
+function esc(v) { return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+/* ---------------- DASHBOARD ---------------- */
+async function renderView(view) {
+  root().innerHTML = '<div class="empty">Chargement…</div>';
+  try {
+    if (view === 'dashboard') return renderDashboard();
+    if (view === 'vehicles') return renderVehicles();
+    if (view === 'drivers') return renderDrivers();
+    if (view === 'fuel') return renderFuel();
+    if (view === 'maintenance') return renderMaintenance();
+    if (view === 'stock') return renderStock();
+    if (view === 'sync') return renderSync();
+    if (view === 'settings') return renderSettings();
+  } catch (e) {
+    root().innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`;
+  }
+}
+
+async function renderDashboard() {
+  const d = await api('/reports/dashboard?siteId=' + state.siteId);
+  root().innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Camions</div><div class="kpi-value mono">${d.fleet.trucks.available}/${d.fleet.trucks.total}</div><div class="kpi-sub">disponibles / total</div></div>
+      <div class="kpi-card"><div class="kpi-label">Véhicules de service</div><div class="kpi-value mono">${d.fleet.serviceVehicles.available}/${d.fleet.serviceVehicles.total}</div><div class="kpi-sub">disponibles / total</div></div>
+      <div class="kpi-card"><div class="kpi-label">En maintenance</div><div class="kpi-value mono">${d.fleet.inMaintenance}</div><div class="kpi-sub">véhicules immobilisés</div></div>
+      <div class="kpi-card"><div class="kpi-label">Missions aujourd'hui</div><div class="kpi-value mono">${d.today.trips}</div><div class="kpi-sub">${fmt(d.today.kilometers)} km parcourus</div></div>
+      <div class="kpi-card"><div class="kpi-label">Carburant aujourd'hui</div><div class="kpi-value mono">${fmt(d.today.fuelLiters)} L</div><div class="kpi-sub">${fmt(d.today.fuelCost)} GNF</div></div>
+      <div class="kpi-card"><div class="kpi-label">Valeur du stock</div><div class="kpi-value mono">${fmt(d.stock.stockValue)}</div><div class="kpi-sub">GNF — ${d.stock.itemsCount} articles</div></div>
+    </div>
+    <div class="panel">
+      <h3>⚠ Alertes</h3>
+      <div class="desc">Articles sous le seuil minimum : <b>${d.stock.belowMinimum}</b></div>
+      <button class="btn small" onclick="go('stock')">Voir le stock</button>
+      <button class="btn small gold" style="margin-left:8px;" onclick="go('maintenance')">Voir la maintenance</button>
+    </div>`;
+}
+
+/* ---------------- VEHICLES ---------------- */
+async function renderVehicles() {
+  const list = await api('/vehicles?siteId=' + state.siteId);
+  const rows = list.map(v => `
+    <tr>
+      <td><b>${esc(v.internalNumber)}</b></td>
+      <td>${v.vehicleType === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</td>
+      <td>${esc(v.registrationNumber)}</td>
+      <td>${esc(v.assignedDriver ? v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName : '—')}</td>
+      <td class="mono">${fmt(v.currentMileage)} km</td>
+      <td>${statusBadge(v.status)}</td>
+    </tr>`).join('') || `<tr><td colspan="6" class="empty">Aucun véhicule enregistré.</td></tr>`;
+
+  root().innerHTML = `
+    <div class="panel">
+      <h3>➕ Ajouter un véhicule</h3>
+      <div class="grid-2">
+        <div><label>Type</label><select id="v-type"><option value="TRUCK">Camion</option><option value="SERVICE_VEHICLE">Véhicule de service</option></select></div>
+        <div><label>N° interne</label><input id="v-internal" placeholder="TRUCK-001" /></div>
+        <div><label>Plaque</label><input id="v-plate" placeholder="RC 1234 A" /></div>
+        <div><label>Marque / Modèle</label><input id="v-brand" placeholder="Toyota Hilux" /></div>
+      </div>
+      <button class="btn gold" onclick="createVehicle()">Enregistrer</button>
+      <div id="v-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>Parc (${list.length})</h3>
+      <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+function statusBadge(s) {
+  const map = { AVAILABLE: ['ok', 'Disponible'], ON_MISSION: ['info', 'En mission'], MAINTENANCE: ['warn', 'Maintenance'], IMMOBILIZED: ['bad', 'Immobilisé'], OUT_OF_SERVICE: ['bad', 'Hors service'] };
+  const [cls, label] = map[s] || ['info', esc(s)];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+async function createVehicle() {
+  const msg = document.getElementById('v-msg');
+  try {
+    await api('/vehicles', { method: 'POST', body: {
+      siteId: state.siteId,
+      vehicleType: document.getElementById('v-type').value,
+      internalNumber: document.getElementById('v-internal').value,
+      registrationNumber: document.getElementById('v-plate').value,
+      brand: document.getElementById('v-brand').value,
+    }});
+    msg.innerHTML = '<div class="msg ok">Véhicule ajouté.</div>';
+    renderVehicles();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- DRIVERS ---------------- */
+async function renderDrivers() {
+  const list = await api('/drivers?siteId=' + state.siteId);
+  const rows = list.map(d => `
+    <tr><td><b>${esc(d.firstName)} ${esc(d.lastName)}</b></td><td>${esc(d.phone || '—')}</td><td>${esc(d.licenseNumber || '—')}</td>
+    <td>${d.licenseExpiryDate ? new Date(d.licenseExpiryDate).toLocaleDateString('fr-FR') : '—'}</td>
+    <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun chauffeur enregistré.</td></tr>`;
+
+  root().innerHTML = `
+    <div class="panel">
+      <h3>➕ Ajouter un chauffeur</h3>
+      <div class="grid-2">
+        <div><label>Prénom</label><input id="d-first" /></div>
+        <div><label>Nom</label><input id="d-last" /></div>
+        <div><label>Téléphone</label><input id="d-phone" /></div>
+        <div><label>N° de permis</label><input id="d-license" /></div>
+      </div>
+      <button class="btn gold" onclick="createDriver()">Enregistrer</button>
+      <div id="d-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>Chauffeurs (${list.length})</h3>
+      <table><thead><tr><th>Nom</th><th>Téléphone</th><th>Permis</th><th>Expiration</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+async function createDriver() {
+  const msg = document.getElementById('d-msg');
+  try {
+    await api('/drivers', { method: 'POST', body: {
+      siteId: state.siteId,
+      firstName: document.getElementById('d-first').value,
+      lastName: document.getElementById('d-last').value,
+      phone: document.getElementById('d-phone').value,
+      licenseNumber: document.getElementById('d-license').value,
+    }});
+    msg.innerHTML = '<div class="msg ok">Chauffeur ajouté.</div>';
+    renderDrivers();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- FUEL ---------------- */
+async function renderFuel() {
+  const [list, vehicles] = await Promise.all([
+    api('/fuel?siteId=' + state.siteId),
+    api('/vehicles?siteId=' + state.siteId),
+  ]);
+  const rows = list.map(f => `
+    <tr><td>${new Date(f.transactionDate).toLocaleDateString('fr-FR')}</td>
+    <td>${esc(f.vehicle.internalNumber)}</td><td class="mono">${fmt(f.quantityLiters)} L</td>
+    <td class="mono">${fmt(f.pricePerLiter)} GNF/L</td><td class="mono">${fmt(f.totalCost)} GNF</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun ravitaillement enregistré.</td></tr>`;
+  const options = vehicles.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('');
+
+  root().innerHTML = `
+    <div class="panel">
+      <h3>⛽ Nouveau ravitaillement</h3>
+      <div class="grid-2">
+        <div><label>Véhicule</label><select id="f-vehicle">${options}</select></div>
+        <div><label>Date</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
+        <div><label>Kilométrage</label><input id="f-mileage" type="number" /></div>
+        <div><label>Litres</label><input id="f-liters" type="number" step="0.01" /></div>
+        <div><label>Prix / litre (GNF, optionnel)</label><input id="f-price" type="number" placeholder="Tarif par défaut si vide" /></div>
+        <div><label>Station</label><input id="f-station" /></div>
+      </div>
+      <button class="btn gold" onclick="createFuel()">Enregistrer</button>
+      <div id="f-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>Historique</h3>
+      <table><thead><tr><th>Date</th><th>Véhicule</th><th>Litres</th><th>Prix/L</th><th>Coût total</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+async function createFuel() {
+  const msg = document.getElementById('f-msg');
+  try {
+    const price = document.getElementById('f-price').value;
+    await api('/fuel', { method: 'POST', body: {
+      siteId: state.siteId,
+      vehicleId: document.getElementById('f-vehicle').value,
+      transactionDate: document.getElementById('f-date').value,
+      mileage: Number(document.getElementById('f-mileage').value),
+      quantityLiters: Number(document.getElementById('f-liters').value),
+      pricePerLiter: price ? Number(price) : undefined,
+      station: document.getElementById('f-station').value,
+    }});
+    msg.innerHTML = '<div class="msg ok">Ravitaillement enregistré — coût calculé automatiquement.</div>';
+    renderFuel();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- MAINTENANCE ---------------- */
+async function renderMaintenance() {
+  const [list, alerts, vehicles] = await Promise.all([
+    api('/maintenance'),
+    api('/maintenance/alerts?siteId=' + state.siteId),
+    api('/vehicles?siteId=' + state.siteId),
+  ]);
+  const alertRows = alerts.map(a => `<div class="msg ${a.level === 'OVERDUE' ? 'err' : 'ok'}" style="margin-bottom:6px;">${a.level === 'OVERDUE' ? '🔴' : '🟠'} ${esc(a.internalNumber)} — entretien ${a.level === 'OVERDUE' ? 'en retard' : 'bientôt dû'}</div>`).join('') || '<div class="desc">Aucune alerte de maintenance.</div>';
+  const rows = list.map(m => `<tr><td>${new Date(m.maintenanceDate).toLocaleDateString('fr-FR')}</td><td>${esc(m.vehicle.internalNumber)}</td><td>${esc(m.maintenanceType.label)}</td><td class="mono">${fmt(m.cost)} GNF</td></tr>`).join('') || `<tr><td colspan="4" class="empty">Aucun entretien enregistré.</td></tr>`;
+  const options = vehicles.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)}</option>`).join('');
+  const types = ['VIDANGE','REVISION','PNEUS','FREINS','BATTERIE','HUILE','FILTRE','SUSPENSION','REPARATION','AUTRE'];
+  const typeOptions = types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+
+  root().innerHTML = `
+    <div class="panel"><h3>⚠ Alertes d'échéance</h3>${alertRows}</div>
+    <div class="panel">
+      <h3>🔧 Nouvel entretien</h3>
+      <div class="grid-2">
+        <div><label>Véhicule</label><select id="m-vehicle">${options}</select></div>
+        <div><label>Type</label><select id="m-type">${typeOptions}</select></div>
+        <div><label>Date</label><input id="m-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
+        <div><label>Coût (GNF)</label><input id="m-cost" type="number" /></div>
+      </div>
+      <button class="btn gold" onclick="createMaintenance()">Enregistrer</button>
+      <div id="m-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>Historique</h3>
+      <table><thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Coût</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+async function createMaintenance() {
+  const msg = document.getElementById('m-msg');
+  try {
+    await api('/maintenance', { method: 'POST', body: {
+      vehicleId: document.getElementById('m-vehicle').value,
+      maintenanceTypeCode: document.getElementById('m-type').value,
+      maintenanceDate: document.getElementById('m-date').value,
+      cost: Number(document.getElementById('m-cost').value) || undefined,
+    }});
+    msg.innerHTML = '<div class="msg ok">Entretien enregistré.</div>';
+    renderMaintenance();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- STOCK ---------------- */
+async function renderStock() {
+  const [items, valuation] = await Promise.all([
+    api('/inventory/items?siteId=' + state.siteId),
+    api('/inventory/valuation?siteId=' + state.siteId),
+  ]);
+  const rows = items.map(i => `
+    <tr><td><b>${esc(i.sku)}</b></td><td>${esc(i.name)}</td>
+    <td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td>
+    <td class="mono">${fmt(i.minimumQuantity)} ${esc(i.unit)}</td>
+    <td>${Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge bad">Sous seuil</span>' : '<span class="badge ok">OK</span>'}</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun article enregistré.</td></tr>`;
+  const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)}</option>`).join('');
+
+  root().innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Articles</div><div class="kpi-value mono">${valuation.totalItems}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Valeur du stock</div><div class="kpi-value mono">${fmt(valuation.totalValue)}</div><div class="kpi-sub">GNF</div></div>
+      <div class="kpi-card"><div class="kpi-label">Sous seuil minimum</div><div class="kpi-value mono">${valuation.belowMinimum}</div></div>
+    </div>
+    <div class="panel">
+      <h3>➕ Nouvel article</h3>
+      <div class="grid-2">
+        <div><label>Code (SKU)</label><input id="i-sku" /></div>
+        <div><label>Désignation</label><input id="i-name" /></div>
+        <div><label>Unité</label><input id="i-unit" placeholder="pièce, litre, kg…" /></div>
+        <div><label>Stock minimum</label><input id="i-min" type="number" /></div>
+      </div>
+      <button class="btn gold" onclick="createItem()">Créer l'article</button>
+      <div id="i-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>↕ Mouvement de stock</h3>
+      <div class="grid-2">
+        <div><label>Article</label><select id="mv-item">${itemOptions}</select></div>
+        <div><label>Quantité</label><input id="mv-qty" type="number" step="0.01" /></div>
+      </div>
+      <button class="btn" onclick="stockMove('in')">➕ Entrée</button>
+      <button class="btn" style="background:var(--danger); margin-left:8px;" onclick="stockMove('out')">➖ Sortie</button>
+      <div id="mv-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>Articles (${items.length})</h3>
+      <table><thead><tr><th>Code</th><th>Désignation</th><th>Stock actuel</th><th>Seuil min.</th><th>État</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+async function createItem() {
+  const msg = document.getElementById('i-msg');
+  try {
+    await api('/inventory/items', { method: 'POST', body: {
+      siteId: state.siteId,
+      sku: document.getElementById('i-sku').value,
+      name: document.getElementById('i-name').value,
+      unit: document.getElementById('i-unit').value || 'pièce',
+      minimumQuantity: Number(document.getElementById('i-min').value) || 0,
+    }});
+    msg.innerHTML = '<div class="msg ok">Article créé.</div>';
+    renderStock();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function stockMove(direction) {
+  const msg = document.getElementById('mv-msg');
+  try {
+    await api('/inventory/movements/' + direction, { method: 'POST', body: {
+      itemId: document.getElementById('mv-item').value,
+      siteId: state.siteId,
+      quantity: Number(document.getElementById('mv-qty').value),
+    }});
+    msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
+    renderStock();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- SYNC ---------------- */
+async function renderSync() {
+  const pending = await api('/sync/pending-count');
+  const log = await api('/sync/log');
+  const rows = log.map(l => `<tr><td>${esc(l.entity)}</td><td>${esc(l.operation)}</td><td>${statusBadge(l.status === 'SUCCESS' ? 'AVAILABLE' : l.status === 'FAILED' ? 'IMMOBILIZED' : 'ON_MISSION')}</td><td>${new Date(l.createdAt).toLocaleString('fr-FR')}</td></tr>`).join('') || `<tr><td colspan="4" class="empty">Aucune opération de synchronisation.</td></tr>`;
+
+  root().innerHTML = `
+    <div class="panel">
+      <h3>🔄 État de la synchronisation</h3>
+      <div class="desc">Cette interface web fonctionne en ligne. Le mode Offline complet (file d'attente locale, synchronisation automatique au retour du réseau) est porté par l'application Flutter mobile/desktop — l'API expose déjà <code>/sync/push</code> pour cela.</div>
+      <div class="kpi-grid" style="margin-top:14px;">
+        <div class="kpi-card"><div class="kpi-label">Opérations en attente</div><div class="kpi-value mono">${pending}</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>Journal de synchronisation</h3>
+      <table><thead><tr><th>Entité</th><th>Opération</th><th>Statut</th><th>Date</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+}
+
+/* ---------------- SETTINGS ---------------- */
+function renderSettings() {
+  root().innerHTML = `
+    <div class="panel">
+      <h3>⚙️ Paramètres de connexion</h3>
+      <label>URL de l'API</label>
+      <input id="s-api" value="${esc(state.apiUrl)}" />
+      <label>Identifiant de site (siteId)</label>
+      <input id="s-site" value="${esc(state.siteId)}" />
+      <button class="btn gold" onclick="saveSettings()">Enregistrer</button>
+      <div id="s-msg"></div>
+    </div>
+    <div class="panel">
+      <h3>Compte</h3>
+      <div class="desc">${esc(state.user.firstName)} ${esc(state.user.lastName)} — ${roleLabel(state.user.role)}</div>
+    </div>`;
+}
+function saveSettings() {
+  state.apiUrl = document.getElementById('s-api').value.trim();
+  state.siteId = document.getElementById('s-site').value.trim();
+  localStorage.setItem('syllo_api_url', state.apiUrl);
+  localStorage.setItem('syllo_site_id', state.siteId);
+  document.getElementById('s-msg').innerHTML = '<div class="msg ok">Paramètres enregistrés.</div>';
+}
+
+/* ---------------- Auto-login si session valide ---------------- */
+if (state.accessToken && state.user) {
+  enterApp();
+}
+
+/* ---------------- PWA : service worker + installation ---------------- */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('install-btn').style.display = 'inline-flex';
+  document.getElementById('install-btn-login').style.display = 'block';
+});
+
+async function installApp() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  document.getElementById('install-btn').style.display = 'none';
+  document.getElementById('install-btn-login').style.display = 'none';
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-btn').style.display = 'none';
+  document.getElementById('install-btn-login').style.display = 'none';
+});
+
+// iOS Safari ne déclenche pas beforeinstallprompt : instructions manuelles
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+if (isIOS && !isStandalone) {
+  const hint = document.getElementById('install-btn-login');
+  hint.style.display = 'block';
+  hint.textContent = '📲 Installer : bouton Partager → "Sur l\'écran d\'accueil"';
+  hint.onclick = null;
+}
+</script>
+</body>
+</html>
