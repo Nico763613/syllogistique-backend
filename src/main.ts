@@ -44,6 +44,9 @@ async function bootstrap() {
   // Application web SYLLOGISTIQUE (PWA) servie sur /app/ — même adresse que l'API, donc sans CORS.
   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/app/', index: 'index.html', dotfiles: 'deny' });
 
+  // Site de vente SYLLOGISTIQUE (page d'accueil, paiement Orange Money, espace abonné) servi sur /site/.
+  app.useStaticAssets(join(__dirname, '..', 'public', 'site'), { prefix: '/site/', index: 'index.html', dotfiles: 'deny' });
+
   // Documentation Swagger : désactivée en production (ENABLE_DOCS=true pour la réactiver).
   const docsEnabled = process.env.ENABLE_DOCS === 'true' || process.env.NODE_ENV !== 'production';
   if (docsEnabled) {
