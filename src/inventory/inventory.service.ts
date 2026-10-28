@@ -124,4 +124,9 @@ export class InventoryService {
     const belowMinimum = items.filter((i) => Number(i.currentQuantity) < Number(i.minimumQuantity)).length;
     return { totalItems: items.length, totalValue, belowMinimum };
   }
+
+  // Catégories de stock pour les formulaires et filtres
+  categories() {
+    return this.prisma.stockCategory.findMany({ orderBy: { name: 'asc' } });
+  }
 }

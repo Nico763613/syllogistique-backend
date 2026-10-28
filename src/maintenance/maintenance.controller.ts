@@ -22,6 +22,11 @@ export class MaintenanceController {
     return this.maintenanceService.findAll({ vehicleId });
   }
 
+  @Get('types')
+  types() {
+    return this.maintenanceService.types();
+  }
+
   @Get('alerts')
   alerts(@Query('siteId') siteId: string) {
     return this.maintenanceService.alerts(siteId);

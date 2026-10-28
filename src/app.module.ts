@@ -24,6 +24,11 @@ import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { QrcodesModule } from './qrcodes/qrcodes.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { SettingsModule } from './settings/settings.module';
+import { SitesModule } from './sites/sites.module';
+import { DocumentsModule } from './documents/documents.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { SearchModule } from './search/search.module';
 
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -53,6 +58,11 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     UploadsModule,
     QrcodesModule,
     MessagingModule,
+    SettingsModule,
+    SitesModule,
+    DocumentsModule,
+    ExpensesModule,
+    SearchModule,
   ],
   controllers: [HealthController],
   providers: [

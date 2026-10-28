@@ -20,6 +20,11 @@ export class InventoryController {
     return this.inventoryService.createItem(dto, actor.userId);
   }
 
+  @Get('categories')
+  categories() {
+    return this.inventoryService.categories();
+  }
+
   @Get('items')
   findAll(
     @Query('siteId') siteId?: string,

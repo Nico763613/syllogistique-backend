@@ -102,4 +102,15 @@ export class UsersService {
     await this.audit.log({ userId: actorId, action: 'DELETE', entity: 'User', entityId: id });
     return { success: true };
   }
+
+  // Réinitialisation du mot de passe par un administrateur (utilisateur qui a oublié le sien).
+  // Les sessions existantes sont invalidées (refresh token supprimé).
+  async resetPassword(id: string, newPassword: string, actorId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable.');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.prisma.user.update({ where: { id }, data: { passwordHash, refreshTokenHash: null } });
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'User', entityId: id, newValue: { passwordReset: true } });
+    return { message: 'Mot de passe réinitialisé. Communiquez-le à l\'utilisateur et demandez-lui de le changer.' };
+  }
 }

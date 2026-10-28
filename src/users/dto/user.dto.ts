@@ -11,6 +11,10 @@ export class CreateUserDto {
   @IsOptional() @IsString() siteId?: string;
 }
 
+export class ResetPasswordDto {
+  @IsString() @MinLength(8) newPassword: string;
+}
+
 export class UpdateUserDto {
   @IsOptional() @IsString() firstName?: string;
   @IsOptional() @IsString() lastName?: string;

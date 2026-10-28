@@ -23,7 +23,14 @@ export class SyncService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
   async push(operations: SyncOperationDto[], actorId: string) {
-    const results: Array<{ entityId: string; entity: string; status: string; serverId?: string; error?: string }> = [];
+    const results: Array<{
+      entityId: string;
+      entity: string;
+      status: string;
+      serverId?: string;
+      error?: string;
+      serverVersion?: unknown;
+    }> = [];
 
     for (const op of operations) {
       const queueEntry = await this.prisma.syncQueueEntry.create({
@@ -52,6 +59,27 @@ export class SyncService {
           },
         });
 
+        // Détection de conflit (§26) : si la fiche a été modifiée sur le serveur après la version
+        // connue du client, on ne l'écrase PAS silencieusement — on la signale pour résolution.
+        if (!alreadySynced && op.operation === 'UPDATE' && op.baseUpdatedAt) {
+          const current = await (this.prisma[modelKey] as any).findUnique({ where: { id: op.entityId } });
+          const base = new Date(op.baseUpdatedAt);
+          if (current?.updatedAt && !isNaN(base.getTime()) && new Date(current.updatedAt) > base) {
+            await this.prisma.syncQueueEntry.update({
+              where: { id: queueEntry.id },
+              data: { status: 'FAILED', lastError: 'CONFLICT : fiche modifiée sur le serveur depuis la dernière synchronisation.' },
+            });
+            results.push({
+              entityId: op.entityId,
+              entity: op.entity,
+              status: 'CONFLICT',
+              error: 'Fiche modifiée par un autre utilisateur — résolution requise.',
+              serverVersion: current,
+            });
+            continue;
+          }
+        }
+
         let serverId: string | undefined;
         if (alreadySynced) {
           serverId = op.entityId;
@@ -62,10 +90,11 @@ export class SyncService {
             serverId = op.entityId;
           } else {
             // CREATE / UPDATE traités comme un upsert générique
+            const { id: _id, createdAt: _c, updatedAt: _u, deletedAt: _d, ...safePayload } = op.payload as any;
             const created = await model.upsert({
               where: { id: op.entityId },
-              create: { id: op.entityId, ...op.payload },
-              update: { ...op.payload },
+              create: { id: op.entityId, ...safePayload },
+              update: { ...safePayload },
             });
             serverId = created.id;
           }
@@ -96,8 +125,9 @@ export class SyncService {
     }
 
     const success = results.filter((r) => r.status === 'SUCCESS').length;
+    const conflicts = results.filter((r) => r.status === 'CONFLICT').length;
     return {
-      summary: `Synchronisation terminée — ${success}/${results.length}`,
+      summary: `Synchronisation terminée — ${success}/${results.length}` + (conflicts ? ` (${conflicts} conflit(s) à résoudre)` : ''),
       results,
     };
   }

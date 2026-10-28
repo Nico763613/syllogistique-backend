@@ -81,4 +81,9 @@ export class MaintenanceService {
       })
       .filter(Boolean);
   }
+
+  // Liste des types d'entretien (vidange, pneus, freins…) pour les formulaires
+  types() {
+    return this.prisma.maintenanceType.findMany({ orderBy: { label: 'asc' } });
+  }
 }

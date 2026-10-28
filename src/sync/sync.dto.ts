@@ -7,6 +7,9 @@ export class SyncOperationDto {
   @IsIn(['CREATE', 'UPDATE', 'DELETE']) operation: 'CREATE' | 'UPDATE' | 'DELETE';
   @IsObject() payload: Record<string, unknown>;
   @IsOptional() @IsString() deviceId?: string;
+  // Date de dernière mise à jour de la fiche telle que le client la connaissait (ISO).
+  // Sert à détecter un conflit si un autre utilisateur l'a modifiée entre-temps (§26).
+  @IsOptional() @IsString() baseUpdatedAt?: string;
 }
 
 export class SyncPushDto {
