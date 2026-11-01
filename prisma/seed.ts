@@ -88,16 +88,11 @@ async function main() {
     });
   }
 
-  // 6. Paramètres tarifs carburant par défaut
+  // 6. Tarif carburant unique (prix à la pompe) — modifiable par l'Administrateur
   await prisma.setting.upsert({
-    where: { organizationId_key: { organizationId: org.id, key: 'TRUCK_FUEL_PRICE' } },
+    where: { organizationId_key: { organizationId: org.id, key: 'FUEL_PRICE_PER_LITER' } },
     update: {},
-    create: { organizationId: org.id, key: 'TRUCK_FUEL_PRICE', value: '10000' },
-  });
-  await prisma.setting.upsert({
-    where: { organizationId_key: { organizationId: org.id, key: 'SERVICE_VEHICLE_FUEL_PRICE' } },
-    update: {},
-    create: { organizationId: org.id, key: 'SERVICE_VEHICLE_FUEL_PRICE', value: '12000' },
+    create: { organizationId: org.id, key: 'FUEL_PRICE_PER_LITER', value: '12000' },
   });
 
   console.log('✅ Seed terminé. Connexion admin : admin@syllogistique.local / ChangeMoi123!');

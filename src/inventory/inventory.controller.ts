@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { InventoryService } from './inventory.service';
-import { CreateInventoryItemDto, StockInDto, StockOutDto } from './dto/inventory.dto';
+import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto } from './dto/inventory.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -49,6 +49,13 @@ export class InventoryController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
   stockOut(@Body() dto: StockOutDto, @CurrentUser() actor: any) {
     return this.inventoryService.stockOut(dto, actor.userId);
+  }
+
+  // Correction d'une erreur de saisie : motif obligatoire, stock recalculé automatiquement
+  @Post('movements/:id/correct')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  correctMovement(@Param('id') id: string, @Body() dto: CorrectStockMovementDto, @CurrentUser() actor: any) {
+    return this.inventoryService.correctMovement(id, dto, actor.userId);
   }
 
   @Get('valuation')

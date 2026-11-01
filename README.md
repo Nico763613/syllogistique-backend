@@ -77,8 +77,8 @@ prisma/
   (utilisateur, ancienne/nouvelle valeur, date).
 - **Validations métier** : kilométrage arrivée < départ refusé, sortie de stock > disponible refusée
   (sauf `allowNegative`), quantités/prix négatifs refusés, véhicule/chauffeur inexistant refusé.
-- **Carburant** : tarif par défaut configurable par organisation (10 000 GNF camions /
-  12 000 GNF véhicules de service), coût calculé automatiquement, statistiques de consommation
+- **Carburant** : tarif unique (prix à la pompe) de 12 000 GNF/L par défaut, modifiable par l'Administrateur
+  avec motif obligatoire ; coût calculé automatiquement avec le tarif en vigueur, statistiques de consommation
   (L/100km, coût/km).
 - **Stocks** : règle `stock final = stock initial + entrées − sorties`, mouvements tracés,
   valorisation du stock, alerte sous seuil minimum.

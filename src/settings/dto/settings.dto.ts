@@ -2,6 +2,8 @@ import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class SetSettingDto {
   @IsString() @MaxLength(200) value: string;
+  // Motif de la modification (obligatoire pour le tarif carburant)
+  @IsOptional() @IsString() @MaxLength(300) reason?: string;
 }
 
 export class UpdateOrganizationDto {

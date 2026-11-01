@@ -1,19 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { CreateFuelTransactionDto } from './dto/fuel.dto';
+import { CreateFuelTransactionDto, CorrectFuelTransactionDto } from './dto/fuel.dto';
+import { currentFuelPrice } from '../common/fuel-price';
 
 @Injectable()
 export class FuelService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
-
-  private async defaultPriceFor(vehicleType: 'TRUCK' | 'SERVICE_VEHICLE', organizationId: string) {
-    const key = vehicleType === 'TRUCK' ? 'TRUCK_FUEL_PRICE' : 'SERVICE_VEHICLE_FUEL_PRICE';
-    const setting = await this.prisma.setting.findUnique({
-      where: { organizationId_key: { organizationId, key } },
-    });
-    return setting ? Number(setting.value) : vehicleType === 'TRUCK' ? 10000 : 12000;
-  }
 
   async create(dto: CreateFuelTransactionDto, actorId: string, organizationId: string) {
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
@@ -21,8 +14,8 @@ export class FuelService {
 
     if (dto.quantityLiters <= 0) throw new BadRequestException('La quantité de carburant doit être positive.');
 
-    const pricePerLiter =
-      dto.pricePerLiter ?? (await this.defaultPriceFor(vehicle.vehicleType, organizationId));
+    // Le tarif central fait foi (modifiable dans Paramètres) : le total se calcule automatiquement.
+    const pricePerLiter = await currentFuelPrice(this.prisma, organizationId);
     const totalCost = Number((dto.quantityLiters * pricePerLiter).toFixed(2));
 
     const tx = await this.prisma.fuelTransaction.create({
@@ -51,6 +44,41 @@ export class FuelService {
     });
 
     return tx;
+  }
+
+  // Correction d'une erreur de saisie : motif obligatoire, ancien/nouveau enregistrés dans le journal.
+  async correct(id: string, dto: CorrectFuelTransactionDto, actorId: string) {
+    const existing = await this.prisma.fuelTransaction.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Ravitaillement introuvable.');
+
+    const quantityLiters = dto.quantityLiters ?? Number(existing.quantityLiters);
+    const pricePerLiter = dto.pricePerLiter ?? Number(existing.pricePerLiter);
+    const totalCost = Number((quantityLiters * pricePerLiter).toFixed(2));
+
+    const updated = await this.prisma.fuelTransaction.update({
+      where: { id },
+      data: {
+        quantityLiters,
+        pricePerLiter,
+        totalCost,
+        ...(dto.mileage !== undefined ? { mileage: dto.mileage } : {}),
+        ...(dto.transactionDate ? { transactionDate: new Date(dto.transactionDate) } : {}),
+        ...(dto.station !== undefined ? { station: dto.station } : {}),
+        ...(dto.receiptNumber !== undefined ? { receiptNumber: dto.receiptNumber } : {}),
+        ...(dto.observations !== undefined ? { observations: dto.observations } : {}),
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'UPDATE',
+      entity: 'FuelTransaction',
+      entityId: id,
+      oldValue: existing,
+      newValue: updated,
+      reason: dto.reason.trim(),
+    });
+    return updated;
   }
 
   findAll(params: { siteId?: string; vehicleId?: string; from?: string; to?: string }) {

@@ -503,10 +503,12 @@ async function createDriver() {
 
 /* ---------------- FUEL ---------------- */
 async function renderFuel() {
-  const [list, vehicles] = await Promise.all([
+  const [list, vehicles, tariff] = await Promise.all([
     api('/fuel?siteId=' + state.siteId),
     api('/vehicles?siteId=' + state.siteId),
+    api('/settings/fuel-price'),
   ]);
+  const canEditPrice = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
   const rows = list.map(f => `
     <tr><td>${new Date(f.transactionDate).toLocaleDateString('fr-FR')}</td>
     <td>${esc(f.vehicle.internalNumber)}</td><td class="mono">${fmt(f.quantityLiters)} L</td>
@@ -515,13 +517,22 @@ async function renderFuel() {
 
   root().innerHTML = `
     <div class="panel">
+      <h3>💰 Tarif du carburant</h3>
+      <div class="desc">Tarif actuel : <b class="mono">${fmt(tariff.pricePerLiter)} GNF/L</b> — appliqué automatiquement à tous les nouveaux calculs.</div>
+      ${canEditPrice ? `<div class="grid-2">
+        <div><label>Nouveau prix / litre (GNF)</label><input id="fp-price" type="number" min="1" value="${esc(String(tariff.pricePerLiter))}" /></div>
+        <div><label>Motif (obligatoire)</label><input id="fp-reason" placeholder="Ex : hausse à la pompe" /></div>
+      </div>
+      <button class="btn gold" onclick="saveFuelPrice()">Modifier le tarif</button>` : ''}
+      <div id="fp-msg"></div>
+    </div>
+    <div class="panel">
       <h3>⛽ Nouveau ravitaillement</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="f-vehicle">${options}</select></div>
         <div><label>Date</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
         <div><label>Kilométrage</label><input id="f-mileage" type="number" /></div>
         <div><label>Litres</label><input id="f-liters" type="number" step="0.01" /></div>
-        <div><label>Prix / litre (GNF, optionnel)</label><input id="f-price" type="number" placeholder="Tarif par défaut si vide" /></div>
         <div><label>Station</label><input id="f-station" /></div>
       </div>
       <button class="btn gold" onclick="createFuel()">Enregistrer</button>
@@ -535,17 +546,26 @@ async function renderFuel() {
 async function createFuel() {
   const msg = document.getElementById('f-msg');
   try {
-    const price = document.getElementById('f-price').value;
     await api('/fuel', { method: 'POST', body: {
       siteId: state.siteId,
       vehicleId: document.getElementById('f-vehicle').value,
       transactionDate: document.getElementById('f-date').value,
       mileage: Number(document.getElementById('f-mileage').value),
       quantityLiters: Number(document.getElementById('f-liters').value),
-      pricePerLiter: price ? Number(price) : undefined,
       station: document.getElementById('f-station').value,
     }});
     msg.innerHTML = '<div class="msg ok">Ravitaillement enregistré — coût calculé automatiquement.</div>';
+    renderFuel();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+async function saveFuelPrice() {
+  const msg = document.getElementById('fp-msg');
+  try {
+    await api('/settings/FUEL_PRICE_PER_LITER', { method: 'PUT', body: {
+      value: String(Number(document.getElementById('fp-price').value)),
+      reason: document.getElementById('fp-reason').value,
+    }});
     renderFuel();
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
@@ -630,6 +650,7 @@ async function renderStock() {
       <div class="grid-2">
         <div><label>Article</label><select id="mv-item">${itemOptions}</select></div>
         <div><label>Quantité</label><input id="mv-qty" type="number" step="0.01" /></div>
+        <div><label>Motif (obligatoire)</label><input id="mv-reason" placeholder="Ex : approvisionnement, livraison, dépotage…" /></div>
       </div>
       <button class="btn" onclick="stockMove('in')">➕ Entrée</button>
       <button class="btn" style="background:var(--danger); margin-left:8px;" onclick="stockMove('out')">➖ Sortie</button>
@@ -661,6 +682,7 @@ async function stockMove(direction) {
       itemId: document.getElementById('mv-item').value,
       siteId: state.siteId,
       quantity: Number(document.getElementById('mv-qty').value),
+      reason: document.getElementById('mv-reason').value,
     }});
     msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
     renderStock();

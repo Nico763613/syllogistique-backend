@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { CreateTripDto, CloseTripDto } from './dto/trip.dto';
+import { CreateTripDto, CloseTripDto, CorrectTripDto } from './dto/trip.dto';
 
 @Injectable()
 export class TripsService {
@@ -79,6 +79,47 @@ export class TripsService {
     });
 
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Trip', entityId: id, newValue: dto });
+    return updated;
+  }
+
+  // Correction d'une erreur de saisie : motif obligatoire, distance recalculée automatiquement.
+  async correct(id: string, dto: CorrectTripDto, actorId: string) {
+    const trip = await this.prisma.trip.findUnique({ where: { id } });
+    if (!trip) throw new NotFoundException('Mission introuvable.');
+
+    const startMileage = dto.startMileage ?? trip.startMileage;
+    const endMileage = dto.endMileage ?? trip.endMileage ?? undefined;
+    if (endMileage !== undefined && endMileage < startMileage) {
+      throw new BadRequestException(
+        'Le kilométrage d\'arrivée ne peut pas être inférieur au kilométrage de départ.',
+      );
+    }
+    const distance = endMileage !== undefined ? endMileage - startMileage : undefined;
+
+    const updated = await this.prisma.trip.update({
+      where: { id },
+      data: {
+        startMileage,
+        endMileage,
+        distance,
+        ...(dto.startTime ? { startTime: new Date(dto.startTime) } : {}),
+        ...(dto.endTime ? { endTime: new Date(dto.endTime) } : {}),
+        ...(dto.destination !== undefined ? { destination: dto.destination } : {}),
+        ...(dto.purpose !== undefined ? { purpose: dto.purpose } : {}),
+        ...(dto.passengerName !== undefined ? { passengerName: dto.passengerName } : {}),
+        ...(dto.observations !== undefined ? { observations: dto.observations } : {}),
+      },
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'UPDATE',
+      entity: 'Trip',
+      entityId: id,
+      oldValue: trip,
+      newValue: updated,
+      reason: dto.reason.trim(),
+    });
     return updated;
   }
 

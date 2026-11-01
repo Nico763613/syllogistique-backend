@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SyncOperationDto } from './sync.dto';
+import { currentFuelPrice } from '../common/fuel-price';
 
 // Moteur de synchronisation Offline → Online (§14-15 du cahier des charges).
 // Le client envoie un lot d'opérations enregistrées hors connexion ; chacune
@@ -22,7 +23,7 @@ const ENTITY_MODELS: Record<string, keyof PrismaService> = {
 export class SyncService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  async push(operations: SyncOperationDto[], actorId: string) {
+  async push(operations: SyncOperationDto[], actorId: string, organizationId?: string) {
     const results: Array<{
       entityId: string;
       entity: string;
@@ -91,12 +92,35 @@ export class SyncService {
           } else {
             // CREATE / UPDATE traités comme un upsert générique
             const { id: _id, createdAt: _c, updatedAt: _u, deletedAt: _d, ...safePayload } = op.payload as any;
+
+            // Le tarif carburant central fait foi : prix et total sont recalculés côté serveur.
+            if (op.entity === 'FuelTransaction' && organizationId && Number(safePayload.quantityLiters) > 0) {
+              const price = await currentFuelPrice(this.prisma, organizationId);
+              safePayload.pricePerLiter = price;
+              safePayload.totalCost = Number((Number(safePayload.quantityLiters) * price).toFixed(2));
+            }
+            if (op.entity === 'StockMovement' && !safePayload.createdById) safePayload.createdById = actorId;
+
+            // Un mouvement de stock créé hors ligne doit mettre à jour le stock de l'article (une seule fois).
+            const existingRecord =
+              op.entity === 'StockMovement' ? await model.findUnique({ where: { id: op.entityId } }) : null;
+
             const created = await model.upsert({
               where: { id: op.entityId },
               create: { id: op.entityId, ...safePayload },
               update: { ...safePayload },
             });
             serverId = created.id;
+
+            if (op.entity === 'StockMovement' && !existingRecord && op.operation === 'CREATE') {
+              const qty = Number(created.quantity);
+              if (created.movementType === 'IN' || created.movementType === 'OUT') {
+                await this.prisma.inventoryItem.update({
+                  where: { id: created.itemId },
+                  data: { currentQuantity: created.movementType === 'IN' ? { increment: qty } : { decrement: qty } },
+                });
+              }
+            }
           }
         }
 

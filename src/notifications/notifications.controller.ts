@@ -1,6 +1,8 @@
 import { Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { RoleName } from '@prisma/client';
+import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 
 @ApiTags('notifications')
@@ -21,6 +23,7 @@ export class NotificationsController {
   }
 
   @Post('run-checks')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   runChecks(@Query('siteId') siteId: string) {
     return this.notificationsService.runDailyChecks(siteId);
   }

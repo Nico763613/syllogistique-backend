@@ -2,12 +2,12 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateOrganizationDto } from './dto/settings.dto';
+import { FUEL_PRICE_KEY, currentFuelPrice } from '../common/fuel-price';
 
 // Paramètres administrateur (§40) : tarifs carburant, seuils, nom/logo de l'entreprise…
-// Les valeurs par défaut (10 000 / 12 000 GNF par litre) restent modifiables ici.
+// Tarif carburant unique : 12 000 GNF/L par défaut, modifiable ici (motif obligatoire).
 const NUMERIC_KEYS = new Set([
-  'TRUCK_FUEL_PRICE',
-  'SERVICE_VEHICLE_FUEL_PRICE',
+  FUEL_PRICE_KEY,
   'MAINTENANCE_ALERT_DAYS',
   'DOCUMENT_ALERT_DAYS',
   'FUEL_ANOMALY_PERCENT',
@@ -22,13 +22,29 @@ export class SettingsService {
     return this.prisma.setting.findMany({ where: { organizationId }, orderBy: { key: 'asc' } });
   }
 
-  async set(organizationId: string, key: string, value: string, actorId: string) {
+  async fuelPrice(organizationId: string) {
+    const setting = await this.prisma.setting.findUnique({
+      where: { organizationId_key: { organizationId, key: FUEL_PRICE_KEY } },
+    });
+    return {
+      key: FUEL_PRICE_KEY,
+      pricePerLiter: await currentFuelPrice(this.prisma, organizationId),
+      currency: 'GNF',
+      updatedAt: setting?.updatedAt ?? null,
+    };
+  }
+
+  async set(organizationId: string, key: string, value: string, actorId: string, reason?: string) {
     if (!KEY_PATTERN.test(key)) {
       throw new BadRequestException('Clé invalide (majuscules, chiffres et _ uniquement).');
     }
     if (NUMERIC_KEYS.has(key)) {
       const n = Number(value);
       if (!Number.isFinite(n) || n < 0) throw new BadRequestException('Cette valeur doit être un nombre positif.');
+      if (key === FUEL_PRICE_KEY && n <= 0) throw new BadRequestException('Le tarif du carburant doit être supérieur à 0.');
+    }
+    if (key === FUEL_PRICE_KEY && (!reason || reason.trim().length < 3)) {
+      throw new BadRequestException('Un motif est obligatoire pour modifier le tarif du carburant.');
     }
     const existing = await this.prisma.setting.findUnique({
       where: { organizationId_key: { organizationId, key } },
@@ -45,6 +61,7 @@ export class SettingsService {
       entityId: saved.id,
       oldValue: existing ? { key, value: existing.value } : undefined,
       newValue: { key, value },
+      reason: reason?.trim() || undefined,
     });
     return saved;
   }

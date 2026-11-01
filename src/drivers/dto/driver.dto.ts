@@ -33,4 +33,6 @@ export class MarkAttendanceDto {
   @IsOptional() @IsString() absenceReason?: string;
   @IsOptional() @IsDateString() checkIn?: string;
   @IsOptional() @IsDateString() checkOut?: string;
+  // Obligatoire quand le pointage du jour existe déjà (correction d'erreur)
+  @IsOptional() @IsString() correctionReason?: string;
 }

@@ -2,6 +2,8 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { MaintenanceService } from './maintenance.service';
 import { CreateMaintenanceDto } from './dto/maintenance.dto';
+import { RoleName } from '@prisma/client';
+import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -13,6 +15,7 @@ export class MaintenanceController {
   constructor(private maintenanceService: MaintenanceService) {}
 
   @Post()
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   create(@Body() dto: CreateMaintenanceDto, @CurrentUser() actor: any) {
     return this.maintenanceService.create(dto, actor.userId);
   }

@@ -4,6 +4,8 @@ import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { v4 as uuid } from 'uuid';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { RoleName } from '@prisma/client';
+import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 
 const ALLOWED_EXT = ['.jpg', '.jpeg', '.png', '.webp', '.pdf', '.heic'];
@@ -19,6 +21,7 @@ const MAX_SIZE = 15 * 1024 * 1024; // 15 Mo
 @Controller('uploads')
 export class UploadsController {
   @Post()
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER, RoleName.CHAUFFEUR)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {

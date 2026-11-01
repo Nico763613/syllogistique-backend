@@ -59,6 +59,13 @@ export class DriversService {
       throw new BadRequestException("Le motif d'absence est obligatoire.");
     }
 
+    const previous = await this.prisma.driverAttendance.findUnique({
+      where: { driverId_date: { driverId: dto.driverId, date: new Date(dto.date) } },
+    });
+    if (previous && (!dto.correctionReason || dto.correctionReason.trim().length < 3)) {
+      throw new BadRequestException('Pointage déjà saisi pour ce jour : un motif de correction est obligatoire.');
+    }
+
     const attendance = await this.prisma.driverAttendance.upsert({
       where: { driverId_date: { driverId: dto.driverId, date: new Date(dto.date) } },
       update: {
@@ -81,10 +88,12 @@ export class DriversService {
 
     await this.audit.log({
       userId: actorId,
-      action: 'CREATE',
+      action: previous ? 'UPDATE' : 'CREATE',
       entity: 'DriverAttendance',
       entityId: attendance.id,
+      oldValue: previous ?? undefined,
       newValue: dto,
+      reason: previous ? dto.correctionReason?.trim() : undefined,
     });
 
     return attendance;

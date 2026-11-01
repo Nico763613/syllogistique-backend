@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { CreateInventoryItemDto, StockInDto, StockOutDto } from './dto/inventory.dto';
+import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto } from './dto/inventory.dto';
 
 @Injectable()
 export class InventoryService {
@@ -60,7 +60,7 @@ export class InventoryService {
           reference: dto.reference,
           unitPrice: dto.unitPrice,
           totalValue,
-          reason: dto.observations,
+          reason: dto.reason ?? dto.observations,
           createdById: actorId,
         },
       });
@@ -113,6 +113,51 @@ export class InventoryService {
 
       return { movement, item: updatedItem };
     });
+  }
+
+  // Correction d'une erreur de saisie (quantité d'une entrée ou d'une sortie) : le stock est
+  // recalculé automatiquement, l'ancienne et la nouvelle valeur sont journalisées avec le motif.
+  async correctMovement(id: string, dto: CorrectStockMovementDto, actorId: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const movement = await tx.stockMovement.findUnique({ where: { id } });
+      if (!movement) throw new NotFoundException('Mouvement introuvable.');
+      if (movement.movementType !== 'IN' && movement.movementType !== 'OUT') {
+        throw new BadRequestException('Seuls les mouvements d\'entrée et de sortie peuvent être corrigés.');
+      }
+      const item = await tx.inventoryItem.findUnique({ where: { id: movement.itemId } });
+      if (!item) throw new NotFoundException('Article introuvable.');
+
+      const oldQuantity = Number(movement.quantity);
+      const delta = (dto.quantity - oldQuantity) * (movement.movementType === 'IN' ? 1 : -1);
+      const newStock = Number(item.currentQuantity) + delta;
+      if (!dto.allowNegative && newStock < 0) {
+        throw new BadRequestException(
+          `Correction impossible : le stock deviendrait négatif (${newStock} ${item.unit}).`,
+        );
+      }
+
+      const totalValue = movement.unitPrice ? Number((Number(movement.unitPrice) * dto.quantity).toFixed(2)) : undefined;
+      const updatedMovement = await tx.stockMovement.update({
+        where: { id },
+        data: { quantity: dto.quantity, totalValue },
+      });
+      const updatedItem = await tx.inventoryItem.update({
+        where: { id: item.id },
+        data: { currentQuantity: { increment: delta } },
+      });
+      return { movement, updatedMovement, item, updatedItem };
+    });
+
+    await this.audit.log({
+      userId: actorId,
+      action: 'UPDATE',
+      entity: 'StockMovement',
+      entityId: id,
+      oldValue: { quantity: result.movement.quantity, stockArticle: result.item.currentQuantity },
+      newValue: { quantity: result.updatedMovement.quantity, stockArticle: result.updatedItem.currentQuantity },
+      reason: dto.reason.trim(),
+    });
+    return { movement: result.updatedMovement, item: result.updatedItem };
   }
 
   async valuation(siteId: string) {

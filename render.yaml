@@ -25,7 +25,3 @@ services:
         value: 3000
       - key: NODE_ENV
         value: production
-      - key: DEFAULT_TRUCK_FUEL_PRICE
-        value: 10000
-      - key: DEFAULT_SERVICE_VEHICLE_FUEL_PRICE
-        value: 12000

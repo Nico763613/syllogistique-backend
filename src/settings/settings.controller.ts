@@ -19,6 +19,12 @@ export class SettingsController {
     return this.settingsService.list(actor.organizationId);
   }
 
+  // Tarif carburant actuel (12 000 GNF/L par défaut)
+  @Get('fuel-price')
+  fuelPrice(@CurrentUser() actor: any) {
+    return this.settingsService.fuelPrice(actor.organizationId);
+  }
+
   @Get('organization')
   getOrganization(@CurrentUser() actor: any) {
     return this.settingsService.getOrganization(actor.organizationId);
@@ -30,10 +36,10 @@ export class SettingsController {
     return this.settingsService.updateOrganization(actor.organizationId, dto, actor.userId);
   }
 
-  // ex: PUT /settings/TRUCK_FUEL_PRICE  { "value": "10500" }
+  // ex: PUT /settings/FUEL_PRICE_PER_LITER  { "value": "12500", "reason": "Hausse à la pompe" }
   @Put(':key')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   set(@Param('key') key: string, @Body() dto: SetSettingDto, @CurrentUser() actor: any) {
-    return this.settingsService.set(actor.organizationId, key, dto.value, actor.userId);
+    return this.settingsService.set(actor.organizationId, key, dto.value, actor.userId, dto.reason);
   }
 }

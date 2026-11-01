@@ -3,6 +3,8 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { ReportsService } from './reports.service';
 import { ExportService } from './export.service';
+import { RoleName } from '@prisma/client';
+import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { MessagingService } from '../messaging/messaging.service';
 
@@ -59,6 +61,7 @@ export class ReportsController {
 
   // Envoie le rapport de la période (PDF) par email — pratique pour le rapport hebdomadaire/mensuel
   @Post('period/send-email')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   async sendReportEmail(
     @Body('to') to: string,
     @Body('siteId') siteId: string,
