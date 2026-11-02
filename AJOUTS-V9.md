@@ -110,3 +110,8 @@
 - Véhicules de service sous plaque IT : champs `registrationType` (NORMALE | IT) et `itExpiryDate` (colonnes ajoutées automatiquement au démarrage).
 - Formulaire véhicule : choix du type d'immatriculation + fin de validité ; badge « IT → date » dans la liste du parc.
 - Alerte automatique (contrôle quotidien 06:00 + centre d'alertes) 15 jours avant l'expiration de la plaque IT, puis tant qu'elle est expirée.
+
+## Permis des chauffeurs
+- Le n° de permis (et catégorie, date d'expiration) se saisit à la création du chauffeur et se corrige par le bouton ✏️ de la colonne « Permis ».
+- Il figure aussi dans le rapport du jour (trajets et absences) à côté du nom du chauffeur.
+- Le parc de départ est de 10 véhicules : aucune limite en dur, on ajoute les véhicules au fur et à mesure.

@@ -534,10 +534,15 @@ async function createVehicle() {
 }
 
 /* ---------------- DRIVERS ---------------- */
+async function editLicense(id, current) {
+  const v = prompt('N° de permis du chauffeur :', current);
+  if (v === null || !v.trim()) return;
+  try { await api('/drivers/' + id, { method: 'PATCH', body: { licenseNumber: v.trim() } }); renderDrivers(); } catch (e) { alert(e.message); }
+}
 async function renderDrivers() {
   const list = await api('/drivers?siteId=' + state.siteId);
   const rows = list.map(d => `
-    <tr><td><b>${esc(d.firstName)} ${esc(d.lastName)}</b></td><td>${esc(d.phone || '—')}</td><td>${esc(d.licenseNumber || '—')}</td>
+    <tr><td><b>${esc(d.firstName)} ${esc(d.lastName)}</b></td><td>${esc(d.phone || '—')}</td><td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}','${esc(d.licenseNumber || '')}')">✏️</button></td>
     <td>${d.licenseExpiryDate ? new Date(d.licenseExpiryDate).toLocaleDateString('fr-FR') : '—'}</td>
     <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun chauffeur enregistré.</td></tr>`;
 
@@ -549,6 +554,8 @@ async function renderDrivers() {
         <div><label>Nom</label><input id="d-last" /></div>
         <div><label>Téléphone</label><input id="d-phone" /></div>
         <div><label>N° de permis</label><input id="d-license" /></div>
+        <div><label>Catégorie du permis</label><input id="d-cat" placeholder="B, C, D…" /></div>
+        <div><label>Expiration du permis</label><input id="d-exp" type="date" /></div>
       </div>
       <button class="btn gold" onclick="createDriver()">Enregistrer</button>
       <div id="d-msg"></div>
@@ -566,7 +573,9 @@ async function createDriver() {
       firstName: document.getElementById('d-first').value,
       lastName: document.getElementById('d-last').value,
       phone: document.getElementById('d-phone').value,
-      licenseNumber: document.getElementById('d-license').value,
+      licenseNumber: document.getElementById('d-license').value.trim() || undefined,
+      licenseCategory: document.getElementById('d-cat').value.trim() || undefined,
+      licenseExpiryDate: document.getElementById('d-exp').value || undefined,
     }});
     msg.innerHTML = '<div class="msg ok">Chauffeur ajouté.</div>';
     renderDrivers();

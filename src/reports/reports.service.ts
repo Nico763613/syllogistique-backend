@@ -134,7 +134,7 @@ export class ReportsService {
         where: { siteId, tripDate: { gte: start, lt: end } },
         include: {
           vehicle: { select: { internalNumber: true } },
-          driver: { select: { firstName: true, lastName: true } },
+          driver: { select: { firstName: true, lastName: true, licenseNumber: true } },
         },
         orderBy: { startTime: 'asc' },
       }),
@@ -151,7 +151,7 @@ export class ReportsService {
       this.prisma.inventoryItem.findMany({ where: { siteId } }),
       this.prisma.driverAttendance.findMany({
         where: { siteId, date: { gte: start, lt: end } },
-        include: { driver: { select: { firstName: true, lastName: true } } },
+        include: { driver: { select: { firstName: true, lastName: true, licenseNumber: true } } },
       }),
     ]);
     if (!site) throw new NotFoundException('Site introuvable.');
@@ -201,7 +201,7 @@ export class ReportsService {
         totalKm: sum(trips, (t) => t.distance ?? 0),
         list: trips.map((t) => ({
           vehicle: t.vehicle.internalNumber,
-          driver: `${t.driver.firstName} ${t.driver.lastName}`,
+          driver: `${t.driver.firstName} ${t.driver.lastName}${t.driver.licenseNumber ? ' (permis ' + t.driver.licenseNumber + ')' : ''}`,
           destination: t.destination ?? '',
           km: t.distance ?? 0,
           closed: t.endMileage !== null,
@@ -236,7 +236,7 @@ export class ReportsService {
         absences: attendance
           .filter((a) => a.status !== 'PRESENT')
           .map((a) => ({
-            driver: `${a.driver.firstName} ${a.driver.lastName}`,
+            driver: `${a.driver.firstName} ${a.driver.lastName}${a.driver.licenseNumber ? ' (permis ' + a.driver.licenseNumber + ')' : ''}`,
             status: a.status,
             reason: a.absenceReason ?? '',
           })),
