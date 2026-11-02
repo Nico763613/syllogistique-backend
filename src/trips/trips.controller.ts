@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { TripsService } from './trips.service';
 import { RoleName } from '@prisma/client';
@@ -44,6 +45,13 @@ export class TripsController {
     @Query('to') to?: string,
   ) {
     return this.tripsService.findAll({ siteId, vehicleId, driverId, from, to });
+  }
+
+  @Get(':id/pdf')
+  async sheet(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
+    const buffer = await this.tripsService.sheetPdf(id, actor.userId);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="fiche_de_bord_${id}.pdf"` });
+    res.send(buffer);
   }
 
   @Get(':id')

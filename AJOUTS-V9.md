@@ -121,3 +121,8 @@
 
 ## Documents des véhicules (interface)
 - Nouvelle section dans la vue Véhicules : assurance, visite technique, carte grise, contrat (référence + échéance), triés par échéance avec état (valide / expire dans X j / expiré). Alerte automatique 30 jours avant (service existant).
+
+## Fiche de bord et bon de sortie (PDF)
+- `GET /trips/:id/pdf` : fiche de bord (véhicule/plaque IT, chauffeur + n° de permis, destination, heures, km départ/retour, carburant du jour, signatures). PWA : section « Missions et fiches de bord » (démarrer, clôturer, imprimer) dans la vue Véhicules.
+- `GET /inventory/delivery-note?siteId&from&to&beneficiary` : bon de sortie/livraison des sorties de stock de la période, « Établi par » automatique + signature du bénéficiaire. PWA : bouton « Bon de sortie (PDF) » dans le journal des mouvements.
+- Socle commun `src/common/pdf-doc.ts` (en-tête, signatures) pour les prochains documents.

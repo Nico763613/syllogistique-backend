@@ -3,6 +3,8 @@ import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
+import { getIssuer } from '../common/issuer';
+import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN } from '../common/pdf-doc';
 import { alertStockThresholds } from '../common/stock-alerts';
 
 @Injectable()
@@ -321,5 +323,49 @@ export class InventoryService {
   // Catégories de stock pour les formulaires et filtres
   categories() {
     return this.prisma.stockCategory.findMany({ orderBy: { name: 'asc' } });
+  }
+
+  // Bon de sortie / de livraison : sorties de stock d'une période, à faire signer par le bénéficiaire
+  async deliveryNotePdf(params: { siteId: string; from?: string; to?: string; beneficiary?: string }, userId: string): Promise<Buffer> {
+    if (!params.siteId) throw new BadRequestException('Le site (siteId) est obligatoire.');
+    const site = await this.prisma.site.findUnique({ where: { id: params.siteId }, include: { organization: true } });
+    if (!site) throw new NotFoundException('Site introuvable.');
+    const rows = (await this.movements({ siteId: params.siteId, type: 'OUT', from: params.from, to: params.to, limit: 500 })).reverse();
+    if (rows.length === 0) throw new BadRequestException('Aucune sortie de stock sur cette période.');
+    const issuer = await getIssuer(this.prisma, userId);
+    const d = (v?: string) => (v ? new Date(v).toLocaleDateString('fr-FR') : '');
+
+    const { doc, done } = startDoc(site.organization?.name ?? 'SYLLOGISTIQUE', 'BON DE SORTIE / LIVRAISON');
+    keyValues(doc, [
+      ['Site', site.name],
+      ['Période', params.from || params.to ? `${d(params.from) || '…'} au ${d(params.to) || '…'}` : 'Toutes les sorties récentes'],
+      ['Bénéficiaire', params.beneficiary ?? ''],
+    ]);
+    doc.moveDown();
+    const x = [50, 105, 260, 330, 400];
+    let y = doc.y;
+    doc.fillColor(NAVY);
+    ['Date', 'Article', 'Qté', 'Véhicule', 'Motif'].forEach((h, i) => doc.text(h, x[i], y));
+    y += 16;
+    doc.moveTo(50, y - 2).lineTo(545, y - 2).strokeColor(GOLD).stroke();
+    doc.fillColor('#000000');
+    let total = 0;
+    for (const m of rows) {
+      if (y > 700) { doc.addPage(); y = 50; }
+      total += Number(m.totalValue ?? 0);
+      doc.text(new Date(m.createdAt).toLocaleDateString('fr-FR'), x[0], y, { width: 52 });
+      doc.text(`${m.item.sku} ${m.item.name}`, x[1], y, { width: 150 });
+      doc.text(`${fmtN(Number(m.quantity))} ${m.item.unit}`, x[2], y, { width: 68 });
+      doc.text(m.vehicle?.internalNumber ?? '', x[3], y, { width: 68 });
+      doc.text(m.reason ?? '', x[4], y, { width: 145 });
+      y += 22;
+    }
+    doc.moveTo(50, y).lineTo(545, y).strokeColor(GOLD).stroke();
+    if (total) doc.fillColor(NAVY).text(`Valeur totale : ${fmtN(total)} GNF`, 50, y + 8, { align: 'right', width: 495 });
+    doc.fillColor('#000000');
+    doc.y = y + 30;
+    signatures(doc, issuer, 'Reçu par (nom, signature)');
+    doc.end();
+    return done;
   }
 }

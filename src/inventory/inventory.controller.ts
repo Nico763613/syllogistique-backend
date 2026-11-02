@@ -99,6 +99,20 @@ export class InventoryController {
   }
 
   // Consommation, couverture en jours, état (rupture / sous seuil / surstock) et quantité conseillée à commander
+  @Get('delivery-note')
+  async deliveryNote(
+    @Query('siteId') siteId: string,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('beneficiary') beneficiary: string,
+    @CurrentUser() actor: any,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.inventoryService.deliveryNotePdf({ siteId, from, to, beneficiary }, actor.userId);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="bon_de_sortie.pdf"' });
+    res.send(buffer);
+  }
+
   @Get('analysis')
   analysis(@Query('siteId') siteId: string, @Query('days') days?: string) {
     return this.inventoryService.analysis(siteId, days ? Number(days) : 30);

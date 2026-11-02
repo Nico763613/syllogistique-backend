@@ -479,6 +479,19 @@ async function renderVehicles() {
       <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
     </div>
     <div class="panel">
+      <h3>🧭 Missions et fiches de bord</h3>
+      <div class="grid-2">
+        <div><label>Véhicule</label><select id="tr-vehicle">${list.filter(v => v.status !== 'IMMOBILIZED').map(v => `<option value="${esc(v.id)}" data-km="${v.currentMileage}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
+        <div><label>Chauffeur</label><select id="tr-driver"></select></div>
+        <div><label>Destination</label><input id="tr-dest" /></div>
+        <div><label>Objet / passager</label><input id="tr-purpose" /></div>
+        <div><label>Km au départ</label><input id="tr-km" type="number" min="0" /></div>
+      </div>
+      <button class="btn gold" onclick="startTrip()">Démarrer la mission</button>
+      <div id="tr-msg"></div>
+      <div id="tr-list" style="margin-top:12px;"></div>
+    </div>
+    <div class="panel">
       <h3>📄 Documents des véhicules (assurance, visite technique, carte grise…)</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="dc-vehicle">${list.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
@@ -504,6 +517,49 @@ async function renderVehicles() {
     </div>`;
   loadDowntimes();
   loadVehicleDocs();
+  loadTrips();
+}
+async function loadTrips() {
+  const box = document.getElementById('tr-list');
+  if (!box) return;
+  try {
+    const [drivers, trips] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/trips?siteId=' + state.siteId)]);
+    document.getElementById('tr-driver').innerHTML = drivers.map(d => `<option value="${esc(d.id)}">${esc(d.firstName)} ${esc(d.lastName)}</option>`).join('');
+    const vs = document.getElementById('tr-vehicle');
+    const fillKm = () => { const o = vs.options[vs.selectedIndex]; if (o) document.getElementById('tr-km').value = o.dataset.km || 0; };
+    vs.onchange = fillKm; fillKm();
+    box.innerHTML = trips.length ? `<table><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Destination</th><th>Km</th><th></th></tr></thead><tbody>${trips.slice(0, 30).map(t => `
+      <tr><td>${new Date(t.tripDate).toLocaleDateString('fr-FR')}</td><td>${esc(t.vehicle?.internalNumber)}</td><td>${esc(t.driver?.firstName)} ${esc(t.driver?.lastName)}</td><td>${esc(t.destination || '—')}</td>
+      <td class="mono">${t.distance ?? '…'}</td>
+      <td>${t.endMileage === null ? `<button class="btn small gold" onclick="closeTrip('${esc(t.id)}')">Clôturer</button>` : ''} <button class="btn small" onclick="tripPdf('${esc(t.id)}')">Fiche de bord</button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune mission enregistrée.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function startTrip() {
+  const msg = document.getElementById('tr-msg');
+  try {
+    const now = new Date().toISOString();
+    await api('/trips', { method: 'POST', body: {
+      siteId: state.siteId, vehicleId: document.getElementById('tr-vehicle').value, driverId: document.getElementById('tr-driver').value,
+      tripDate: now.slice(0, 10), startTime: now, startMileage: Number(document.getElementById('tr-km').value || 0),
+      destination: document.getElementById('tr-dest').value.trim() || undefined, purpose: document.getElementById('tr-purpose').value.trim() || undefined,
+    } });
+    renderVehicles();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function closeTrip(id) {
+  const km = prompt('Kilométrage au retour :');
+  if (km === null || km === '') return;
+  try { await api('/trips/' + id + '/close', { method: 'PATCH', body: { endTime: new Date().toISOString(), endMileage: Number(km) } }); renderVehicles(); } catch (e) { alert(e.message); }
+}
+async function tripPdf(id) {
+  try {
+    const blob = await api('/trips/' + id + '/pdf');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'fiche_de_bord.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { alert(e.message); }
 }
 async function loadVehicleDocs() {
   const box = document.getElementById('dc-list');
@@ -813,6 +869,7 @@ async function renderStock() {
         <div><label>Type</label><select id="jm-type" onchange="loadMovements()"><option value="">Tous</option><option value="IN">Entrées</option><option value="OUT">Sorties</option><option value="ADJUSTMENT">Ajustements</option></select></div>
       </div>
       <button class="btn small" onclick="downloadMovementsExcel()">📥 Exporter en Excel</button>
+      <button class="btn small" style="margin-left:6px;" onclick="downloadDeliveryNote()">🧾 Bon de sortie (PDF)</button>
       <div id="jm-body" style="margin-top:10px;"></div>
     </div>
     <div class="panel">
@@ -888,6 +945,22 @@ async function loadMovements() {
       <td>${esc(m.item.name)}</td><td class="mono">${fmt(m.quantity)} ${esc(m.item.unit)}</td>
       <td>${esc(m.reason || '')}</td><td>${m.createdBy ? esc(m.createdBy.firstName + ' ' + m.createdBy.lastName) : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun mouvement.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function downloadDeliveryNote() {
+  try {
+    const who = prompt('Bénéficiaire (nom / service) — facultatif :') ?? '';
+    const q = new URLSearchParams({ siteId: state.siteId });
+    const f = document.getElementById('jm-from').value, t = document.getElementById('jm-to').value;
+    if (f) q.set('from', f);
+    if (t) q.set('to', t);
+    if (who.trim()) q.set('beneficiary', who.trim());
+    const blob = await api('/inventory/delivery-note?' + q.toString());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bon_de_sortie.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { alert(e.message); }
 }
 async function downloadMovementsExcel() {
   try {

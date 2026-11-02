@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { getIssuer } from '../common/issuer';
+import { startDoc, keyValues, signatures, NAVY } from '../common/pdf-doc';
 import { CreateTripDto, CloseTripDto, CorrectTripDto } from './dto/trip.dto';
 
 @Injectable()
@@ -153,5 +155,46 @@ export class TripsService {
     });
     if (!trip) throw new NotFoundException('Mission introuvable.');
     return trip;
+  }
+
+  // Fiche de bord imprimable (mission : véhicule, chauffeur, kilométrage, destination, signatures)
+  async sheetPdf(id: string, userId: string): Promise<Buffer> {
+    const trip = await this.prisma.trip.findUnique({
+      where: { id },
+      include: { vehicle: true, driver: true, site: { include: { organization: true } } },
+    });
+    if (!trip) throw new NotFoundException('Mission introuvable.');
+    const issuer = await getIssuer(this.prisma, userId);
+    const fuel = await this.prisma.fuelTransaction.findMany({
+      where: { vehicleId: trip.vehicleId, transactionDate: { gte: trip.tripDate, lt: new Date(trip.tripDate.getTime() + 86400000) } },
+    });
+    const liters = fuel.reduce((s, f) => s + Number(f.quantityLiters), 0);
+    const hm = (d?: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
+
+    const { doc, done } = startDoc(trip.site.organization?.name ?? 'SYLLOGISTIQUE', 'FICHE DE BORD');
+    keyValues(doc, [
+      ['Date', new Date(trip.tripDate).toLocaleDateString('fr-FR')],
+      ['Site', trip.site.name],
+      ['Véhicule', `${trip.vehicle.internalNumber} — ${trip.vehicle.registrationNumber}${trip.vehicle.registrationType === 'IT' ? ' (plaque IT)' : ''}`],
+      ['Chauffeur', `${trip.driver.firstName} ${trip.driver.lastName}`],
+      ['N° de permis', trip.driver.licenseNumber ?? ''],
+      ['Destination', trip.destination ?? ''],
+      ['Objet de la mission', trip.purpose ?? ''],
+      ['Passager / bénéficiaire', trip.passengerName ?? ''],
+    ]);
+    doc.moveDown();
+    doc.fillColor(NAVY).fontSize(12).text('Départ / Retour', { underline: true }).fillColor('#000000').fontSize(10);
+    keyValues(doc, [
+      ['Heure de départ', hm(trip.startTime)],
+      ['Heure de retour', hm(trip.endTime)],
+      ['Km au départ', String(trip.startMileage)],
+      ['Km au retour', trip.endMileage === null ? '' : String(trip.endMileage)],
+      ['Distance parcourue', trip.distance === null ? '' : trip.distance + ' km'],
+      ['Carburant servi ce jour', liters ? liters + ' L' : ''],
+    ]);
+    if (trip.observations) { doc.moveDown(); keyValues(doc, [['Observations', trip.observations]]); }
+    signatures(doc, issuer, 'Chauffeur (signature)');
+    doc.end();
+    return done;
   }
 }
