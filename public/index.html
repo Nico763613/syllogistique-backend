@@ -250,6 +250,7 @@
           <h2 id="view-title">Tableau de bord</h2>
         </div>
         <div class="user-chip">
+          <select id="site-switch" style="display:none; max-width:170px; margin-right:8px;" onchange="switchSite(this.value)" title="Entrepôt / site actif"></select>
           <button id="install-btn" class="btn-ghost" style="display:none;" onclick="installApp()">⬇ Installer l'application</button>
           <div class="user-avatar" id="user-initials">SA</div>
           <div>
@@ -341,10 +342,30 @@ function enterApp() {
   document.getElementById('user-initials').textContent = initials;
   document.getElementById('user-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
+  loadSiteSwitch();
   go('dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
   window.addEventListener('offline', updateSyncPill);
+}
+
+// Sélecteur d'entrepôt / site actif (visible s'il y en a plusieurs et que l'utilisateur n'est pas verrouillé sur un seul)
+async function loadSiteSwitch() {
+  const sel = document.getElementById('site-switch');
+  try {
+    const sites = (await api('/sites')).filter(s => s.status === 'ACTIVE');
+    if (!state.siteId || !sites.some(s => s.id === state.siteId)) {
+      if (sites[0]) { state.siteId = sites[0].id; localStorage.setItem('syllo_site_id', state.siteId); }
+    }
+    if (sites.length < 2) { sel.style.display = 'none'; return; }
+    sel.innerHTML = sites.map(s => `<option value="${esc(s.id)}" ${s.id === state.siteId ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+    sel.style.display = '';
+  } catch (e) { sel.style.display = 'none'; }
+}
+function switchSite(id) {
+  state.siteId = id;
+  localStorage.setItem('syllo_site_id', id);
+  renderView(state.view);
 }
 
 function roleLabel(r) {

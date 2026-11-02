@@ -134,3 +134,6 @@
 
 ## Deux entrepôts
 - Limite à 2 entrepôts (sites) actifs, réglage `MAX_SITES` (2 par défaut) ; le Super Admin crée le 2e entrepôt depuis la vue Stocks (panneau Transfert). Au-delà : message de limite.
+
+## Sélecteur d'entrepôt
+- Liste déroulante dans l'en-tête dès qu'il y a 2 entrepôts : change l'entrepôt actif (stocks, journal, achats, rapport) sans manipuler d'identifiant. Si le site mémorisé n'existe plus, le premier entrepôt actif est choisi automatiquement.
