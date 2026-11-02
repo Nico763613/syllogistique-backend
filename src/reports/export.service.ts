@@ -109,4 +109,79 @@ export class ExportService {
       doc.end();
     });
   }
+
+  // PDF du rapport journalier (en-tête, indicateurs, détails, émetteur/signataire)
+  async dailyReportPdf(
+    report: Awaited<ReturnType<ReportsService['dailyReport']>>,
+    issuer: { name: string; phone: string; service: string },
+  ): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const [y, m, d] = report.date.split('-');
+      const n = (v: number) => Math.round(v).toLocaleString('fr-FR');
+      const navy = '#163A5F';
+      const gold = '#E0A72E';
+
+      doc.rect(0, 0, doc.page.width, 70).fill(navy);
+      doc.fillColor('#FFFFFF').fontSize(18).text(report.organization, 50, 20);
+      doc.fillColor(gold).fontSize(12).text('Rapport journalier', 50, 44);
+      doc.fillColor('#000000').fontSize(10).text(`${report.site} — ${d}/${m}/${y}`, 50, 85);
+      doc.moveDown();
+
+      const title = (t: string) => {
+        doc.moveDown(0.6);
+        doc.fillColor(navy).fontSize(13).text(t, { underline: true });
+        doc.fillColor('#000000').fontSize(10).moveDown(0.2);
+      };
+      const line = (t: string) => doc.text(t);
+
+      const t = report.fleet.trucks;
+      const sv = report.fleet.serviceVehicles;
+      title('Flotte');
+      line(`Camions : ${t.available}/${t.total} disponibles — ${t.onMission} en mission — ${t.maintenance} en maintenance — ${t.immobilized} immobilisés`);
+      line(`Véhicules de service : ${sv.available}/${sv.total} disponibles — ${sv.onMission} en mission — ${sv.maintenance + sv.immobilized} indisponibles`);
+      for (const v of report.fleet.unavailable) line(`• ${v.vehicle} (${v.registration}) — ${v.status}`);
+
+      title('Missions');
+      line(`${report.trips.count} mission(s) — ${n(report.trips.totalKm)} km`);
+      for (const x of report.trips.list) {
+        line(`• ${x.vehicle} — ${x.driver}${x.destination ? ' — ' + x.destination : ''} — ${n(x.km)} km${x.closed ? '' : ' (en cours)'}`);
+      }
+
+      title('Carburant');
+      line(`Jour : ${n(report.fuel.liters)} L — ${n(report.fuel.cost)} GNF`);
+      line(`Cumul semaine (lundi → vendredi, depuis le ${report.fuel.week.from}) : ${n(report.fuel.week.liters)} L — ${n(report.fuel.week.cost)} GNF`);
+      for (const x of report.fuel.byVehicle) line(`• ${x.vehicle} — ${n(x.liters)} L — ${n(x.cost)} GNF`);
+
+      title('Stock');
+      line(`${report.stock.entries} entrée(s) — ${report.stock.exits} sortie(s)`);
+      for (const x of report.stock.movements) {
+        line(`• ${x.type === 'IN' ? 'Entrée' : x.type === 'OUT' ? 'Sortie' : x.type} — ${x.item} — ${n(x.quantity)} ${x.unit}${x.reason ? ' — ' + x.reason : ''}`);
+      }
+      if (report.stock.belowMinimum.length) {
+        doc.moveDown(0.3);
+        line('Articles sous le seuil minimum :');
+        for (const x of report.stock.belowMinimum) line(`• ${x.item} — ${n(x.quantity)} / ${n(x.minimum)} ${x.unit}`);
+      }
+
+      title('Pointage des chauffeurs');
+      line(`Présents : ${report.attendance.counts['PRESENT'] ?? 0} — Absents / indisponibles : ${report.attendance.absences.length}`);
+      for (const a of report.attendance.absences) line(`• ${a.driver} — ${a.status}${a.reason ? ' : ' + a.reason : ''}`);
+
+      doc.moveDown(2);
+      doc.fillColor(navy).fontSize(10).text('Établi par', { underline: true });
+      doc.fillColor('#000000');
+      line(issuer.name);
+      if (issuer.service) line(issuer.service);
+      if (issuer.phone) line(`Tél. : ${issuer.phone}`);
+      doc.fillColor('#555555').text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYLLOGISTIQUE`);
+
+      doc.end();
+    });
+  }
 }

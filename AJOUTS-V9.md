@@ -29,7 +29,23 @@
 - Un mouvement de stock créé hors ligne met maintenant à jour le stock de l'article (une seule fois).
 - Les ravitaillements synchronisés sont recalculés avec le tarif central.
 
+## Rapport journalier (PDF + WhatsApp)
+- `GET /reports/daily?siteId&date=AAAA-MM-JJ` : flotte (disponibles/en mission/maintenance/immobilisés), missions du jour,
+  carburant du jour par véhicule + **cumul lundi→vendredi**, mouvements de stock et articles sous seuil, pointage des chauffeurs.
+  Renvoie aussi le texte prêt pour WhatsApp et l'émetteur (nom, téléphone, fonction de l'agent connecté).
+- `GET /reports/daily/export/pdf` : PDF du rapport (bleu nuit / or, bloc « Établi par »).
+- `GET /reports/daily/whatsapp` : liens `wa.me` vers la hiérarchie (paramètre `REPORT_WHATSAPP_NUMBERS`, numéros
+  internationaux séparés par des virgules ; sans numéro, WhatsApp laisse choisir le contact).
+- Application : onglet « Rapport du jour » (date, indicateurs, PDF, partage du PDF via le menu de partage du téléphone,
+  envoi du texte sur WhatsApp, numéros modifiables par l'Administrateur).
+- `POST /reports/daily/send-email` `{ to, siteId, date }` : e-mail avec le PDF en pièce jointe (1 à 10 destinataires).
+  Nécessite `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` sur Render ; sans SMTP l'envoi est
+  simulé et l'application l'indique. Destinataires habituels : paramètre `REPORT_EMAIL_RECIPIENTS`.
+- « Enregistrer dans un dossier » : sélecteur de dossier sur PC (Chrome/Edge) ; sur téléphone, dossier Téléchargements.
+- Limite : la fonction de partage de fichier dépend du téléphone/navigateur ; sinon télécharger le PDF ou envoyer le texte.
+  Aucun envoi automatique sans service WhatsApp Business (API) configuré.
+
 ## Encore à décider / faire
 - **Départements** (Logistique, Carburant, Stock, RH) : nécessite une migration (colonne département sur l'utilisateur).
-- Rapport journalier PDF + partage WhatsApp, bons de commande/livraison/factures, inventaire physique (écarts).
+- Bons de commande/livraison/factures, inventaire physique (écarts).
 - Base déjà en ligne : ajouter la ligne `FUEL_PRICE_PER_LITER` = `12000` (ou la créer via l'application).

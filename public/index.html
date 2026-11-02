@@ -222,6 +222,9 @@
       <div class="nav-item" data-view="stock" onclick="go('stock')">
         <span class="nav-icon">📦</span> Stocks
       </div>
+      <div class="nav-item" data-view="daily" onclick="go('daily')">
+        <span class="nav-icon">📋</span> Rapport du jour
+      </div>
 
       <div class="nav-section-label">Système</div>
       <div class="nav-item" data-view="sync" onclick="go('sync')">
@@ -358,7 +361,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', daily: 'Rapport du jour',
   sync: 'Synchronisation', settings: 'Paramètres',
 };
 
@@ -385,6 +388,7 @@ async function renderView(view) {
     if (view === 'fuel') return renderFuel();
     if (view === 'maintenance') return renderMaintenance();
     if (view === 'stock') return renderStock();
+    if (view === 'daily') return renderDaily();
     if (view === 'sync') return renderSync();
     if (view === 'settings') return renderSettings();
   } catch (e) {
@@ -686,6 +690,136 @@ async function stockMove(direction) {
     }});
     msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
     renderStock();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- RAPPORT JOURNALIER ---------------- */
+let dailyText = '';
+let dailyEmails = '';
+async function renderDaily() {
+  const today = new Date().toISOString().slice(0, 10);
+  const canEdit = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  let numbers = '';
+  try {
+    const all = await api('/settings');
+    numbers = (all.find(s => s.key === 'REPORT_WHATSAPP_NUMBERS') || {}).value || '';
+    dailyEmails = (all.find(s => s.key === 'REPORT_EMAIL_RECIPIENTS') || {}).value || '';
+  } catch (e) {}
+  root().innerHTML = `
+    <div class="panel">
+      <h3>📋 Rapport journalier</h3>
+      <div class="grid-2">
+        <div><label>Date</label><input id="d-date" type="date" value="${today}" onchange="loadDaily()" /></div>
+      </div>
+      <div id="d-body"><div class="empty">Chargement…</div></div>
+    </div>
+    ${canEdit ? `<div class="panel">
+      <h3>💬 WhatsApp de la hiérarchie</h3>
+      <label>Numéros (format international, séparés par des virgules)</label>
+      <input id="d-numbers" value="${esc(numbers)}" placeholder="+224620000000, +224621000000" />
+      <label>E-mails habituels de la hiérarchie (séparés par des virgules)</label>
+      <input id="d-emails" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" />
+      <button class="btn gold" onclick="saveDailyNumbers()">Enregistrer</button>
+      <div id="d-nmsg"></div>
+    </div>` : ''}`;
+  loadDaily();
+}
+async function loadDaily() {
+  const body = document.getElementById('d-body');
+  try {
+    const date = document.getElementById('d-date').value;
+    const { report: r, whatsappText } = await api('/reports/daily?siteId=' + state.siteId + '&date=' + date);
+    dailyText = whatsappText;
+    const t = r.fleet.trucks;
+    body.innerHTML = `
+      <div class="kpi-grid">
+        <div class="kpi-card"><div class="kpi-label">Camions disponibles</div><div class="kpi-value mono">${t.available}/${t.total}</div><div class="kpi-sub">${t.onMission} en mission • ${t.immobilized} immobilisés</div></div>
+        <div class="kpi-card"><div class="kpi-label">Missions</div><div class="kpi-value mono">${r.trips.count}</div><div class="kpi-sub">${fmt(r.trips.totalKm)} km</div></div>
+        <div class="kpi-card"><div class="kpi-label">Carburant du jour</div><div class="kpi-value mono">${fmt(r.fuel.liters)} L</div><div class="kpi-sub">${fmt(r.fuel.cost)} GNF • semaine : ${fmt(r.fuel.week.liters)} L</div></div>
+        <div class="kpi-card"><div class="kpi-label">Stock</div><div class="kpi-value mono">${r.stock.entries} / ${r.stock.exits}</div><div class="kpi-sub">entrées / sorties • ${r.stock.belowMinimum.length} sous seuil</div></div>
+      </div>
+      <pre class="mono" style="white-space:pre-wrap; margin:14px 0;">${esc(whatsappText)}</pre>
+      <button class="btn gold" onclick="downloadDailyPdf()">📄 Télécharger le PDF</button>
+      <button class="btn" style="margin-left:8px;" onclick="shareDailyPdf()">💬 Partager le PDF (WhatsApp…)</button>
+      <button class="btn" style="margin-left:8px;" onclick="sendDailyText()">💬 Envoyer le texte sur WhatsApp</button>
+      <button class="btn" style="margin-left:8px;" onclick="saveDailyToFolder()">💾 Enregistrer dans un dossier</button>
+      <div class="grid-2" style="margin-top:14px;">
+        <div><label>E-mail(s) du/des destinataire(s)</label><input id="d-email" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" /></div>
+      </div>
+      <button class="btn" onclick="sendDailyEmail()">✉️ Envoyer par e-mail (PDF joint)</button>
+      <div id="d-msg"></div>`;
+  } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function dailyPdfPath() {
+  return '/reports/daily/export/pdf?siteId=' + state.siteId + '&date=' + document.getElementById('d-date').value;
+}
+async function downloadDailyPdf() {
+  const msg = document.getElementById('d-msg');
+  try {
+    const blob = await api(dailyPdfPath());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'rapport_journalier_' + document.getElementById('d-date').value + '.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function shareDailyPdf() {
+  const msg = document.getElementById('d-msg');
+  try {
+    const blob = await api(dailyPdfPath());
+    const file = new File([blob], 'rapport_journalier_' + document.getElementById('d-date').value + '.pdf', { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Rapport journalier', text: dailyText });
+    } else {
+      msg.innerHTML = '<div class="msg err">Le partage de fichier n\'est pas disponible sur cet appareil : utilisez « Télécharger le PDF » ou « Envoyer le texte ».</div>';
+    }
+  } catch (e) { if (e.name !== 'AbortError') msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+// Enregistre le PDF dans un dossier choisi (PC : Chrome/Edge ; téléphone : dossier Téléchargements)
+async function saveDailyToFolder() {
+  const msg = document.getElementById('d-msg');
+  try {
+    const name = 'rapport_journalier_' + document.getElementById('d-date').value + '.pdf';
+    const blob = await api(dailyPdfPath());
+    if (window.showSaveFilePicker) {
+      const handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }] });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      msg.innerHTML = '<div class="msg ok">Rapport enregistré dans le dossier choisi.</div>';
+    } else {
+      await downloadDailyPdf();
+      msg.innerHTML = '<div class="msg ok">Rapport téléchargé : retrouvez-le dans le dossier « Téléchargements » de l\'appareil.</div>';
+    }
+  } catch (e) { if (e.name !== 'AbortError') msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function sendDailyEmail() {
+  const msg = document.getElementById('d-msg');
+  try {
+    const r = await api('/reports/daily/send-email', { method: 'POST', body: {
+      to: document.getElementById('d-email').value,
+      siteId: state.siteId,
+      date: document.getElementById('d-date').value,
+    }});
+    msg.innerHTML = r.sent
+      ? '<div class="msg ok">E-mail envoyé avec le PDF en pièce jointe.</div>'
+      : '<div class="msg err">Envoi e-mail non configuré sur le serveur (SMTP) : le message n\'a pas été envoyé. Utilisez le PDF ou WhatsApp en attendant.</div>';
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function sendDailyText() {
+  const msg = document.getElementById('d-msg');
+  try {
+    const w = await api('/reports/daily/whatsapp?siteId=' + state.siteId + '&date=' + document.getElementById('d-date').value);
+    w.links.forEach(l => window.open(l.url, '_blank'));
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function saveDailyNumbers() {
+  const msg = document.getElementById('d-nmsg');
+  try {
+    await api('/settings/REPORT_WHATSAPP_NUMBERS', { method: 'PUT', body: { value: document.getElementById('d-numbers').value } });
+    await api('/settings/REPORT_EMAIL_RECIPIENTS', { method: 'PUT', body: { value: document.getElementById('d-emails').value } });
+    msg.innerHTML = '<div class="msg ok">Destinataires enregistrés.</div>';
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
