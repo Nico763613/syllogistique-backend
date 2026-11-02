@@ -222,6 +222,9 @@
       <div class="nav-item" data-view="stock" onclick="go('stock')">
         <span class="nav-icon">📦</span> Stocks
       </div>
+      <div class="nav-item" data-view="purchases" onclick="go('purchases')">
+        <span class="nav-icon">🛒</span> Achats
+      </div>
       <div class="nav-item" data-view="daily" onclick="go('daily')">
         <span class="nav-icon">📋</span> Rapport du jour
       </div>
@@ -361,7 +364,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', daily: 'Rapport du jour',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', daily: 'Rapport du jour',
   sync: 'Synchronisation', settings: 'Paramètres',
 };
 
@@ -388,6 +391,7 @@ async function renderView(view) {
     if (view === 'fuel') return renderFuel();
     if (view === 'maintenance') return renderMaintenance();
     if (view === 'stock') return renderStock();
+    if (view === 'purchases') return renderPurchases();
     if (view === 'daily') return renderDaily();
     if (view === 'sync') return renderSync();
     if (view === 'settings') return renderSettings();
@@ -788,6 +792,101 @@ async function downloadMovementsExcel() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   } catch (e) { alert(e.message); }
+}
+
+
+/* ---------------- ACHATS & APPROVISIONNEMENT ---------------- */
+async function renderPurchases() {
+  const isAdmin = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  root().innerHTML = `
+    <div class="panel"><h3>À commander (réapprovisionnement automatique)</h3>
+      <div class="desc">Articles sous le seuil ou à moins de 7 jours de couverture, groupés par fournisseur. Les quantités déjà commandées sont déduites.</div>
+      <div id="pu-reorder"><div class="empty">Chargement…</div></div><div id="pu-msg"></div></div>
+    <div class="panel"><h3>Bons de commande</h3><div id="pu-orders"><div class="empty">Chargement…</div></div></div>
+    <div class="panel"><h3>Fournisseurs</h3>
+      <div class="grid-2">
+        <div><label>Nom</label><input id="su-name" /></div><div><label>Contact</label><input id="su-contact" /></div>
+        <div><label>Téléphone</label><input id="su-phone" /></div><div><label>E-mail</label><input id="su-email" /></div>
+      </div>
+      <button class="btn gold" style="margin-top:8px;" onclick="addSupplier()">+ Ajouter le fournisseur</button><div id="su-msg"></div>
+      <div id="su-list" style="margin-top:12px;"></div></div>`;
+  loadReorder(); loadOrders(isAdmin); loadSuppliers();
+}
+async function loadReorder() {
+  const box = document.getElementById('pu-reorder');
+  try {
+    const r = await api('/purchases/reorder?siteId=' + state.siteId);
+    const groups = r.suppliers.map(g => `<h4 style="margin:10px 0 4px;">${esc(g.supplierName)} — <span class="mono">${fmt(g.total)} GNF</span></h4>
+      <table><thead><tr><th>Code</th><th>Article</th><th>Stock</th><th>Couverture</th><th>Déjà commandé</th><th>À commander</th></tr></thead><tbody>${g.lines.map(l => `
+      <tr><td>${esc(l.sku)}</td><td>${esc(l.name)}</td><td class="mono">${fmt(l.currentQuantity)} ${esc(l.unit)}</td><td class="mono">${l.coverageDays ?? '—'} j</td><td class="mono">${fmt(l.alreadyOnOrder)}</td><td class="mono"><b>${fmt(l.quantity)}</b></td></tr>`).join('')}</tbody></table>`).join('');
+    const orphan = r.withoutSupplier.length ? `<div class="msg err">${r.withoutSupplier.length} article(s) à commander n'ont pas de fournisseur : ${esc(r.withoutSupplier.map(l => l.name).join(', '))}. Associez-leur un fournisseur.</div>` : '';
+    box.innerHTML = (groups || '<div class="desc">✅ Rien à commander pour le moment.</div>') + orphan +
+      (r.suppliers.length ? `<div style="margin-top:10px;">Total estimé : <b>${fmt(r.totalEstimated)} GNF</b> <button class="btn gold" style="margin-left:10px;" onclick="createDrafts()">📝 Créer les bons de commande (brouillons)</button></div>` : '');
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function createDrafts() {
+  const msg = document.getElementById('pu-msg');
+  try {
+    const r = await api('/purchases/reorder/create-drafts', { method: 'POST', body: { siteId: state.siteId } });
+    msg.innerHTML = `<div class="msg ok">${r.created.length} bon(s) de commande brouillon créé(s) : ${esc(r.created.map(c => c.reference).join(', '))}.</div>`;
+    renderPurchases();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function loadOrders(isAdmin) {
+  const box = document.getElementById('pu-orders');
+  try {
+    const list = await api('/purchases/orders?siteId=' + state.siteId);
+    const st = { DRAFT: '📝 Brouillon', CONFIRMED: '🟠 Confirmé', PARTIALLY_RECEIVED: '🟡 Reçu partiel', RECEIVED: '✅ Reçu', INVOICED: '🧾 Facturé', CANCELLED: '⚪ Annulé' };
+    box.innerHTML = list.length ? `<table><thead><tr><th>Référence</th><th>Date</th><th>Fournisseur</th><th>État</th><th>Actions</th></tr></thead><tbody>${list.map(o => `
+      <tr><td class="mono">${esc(o.reference)}</td><td>${new Date(o.orderDate).toLocaleDateString('fr-FR')}</td><td>${esc(o.supplier?.name)}</td><td>${st[o.status] || esc(o.status)}</td>
+      <td><button class="btn small" onclick="orderPdf('${esc(o.id)}','${esc(o.reference)}')">PDF</button>
+      ${isAdmin && o.status === 'DRAFT' ? `<button class="btn small gold" onclick="confirmOrder('${esc(o.id)}')">Confirmer</button>` : ''}
+      ${isAdmin && ['DRAFT', 'CONFIRMED'].includes(o.status) ? `<button class="btn small" onclick="cancelOrder('${esc(o.id)}')">Annuler</button>` : ''}
+      ${['CONFIRMED', 'PARTIALLY_RECEIVED'].includes(o.status) ? `<button class="btn small" onclick="receiveOrder('${esc(o.id)}')">Réceptionner</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun bon de commande.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function orderPdf(id, ref) {
+  try {
+    const blob = await api('/purchases/orders/' + id + '/pdf');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bon_commande_' + ref + '.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { alert(e.message); }
+}
+async function confirmOrder(id) {
+  if (!confirm('Confirmer ce bon de commande ?')) return;
+  try { await api('/purchases/orders/' + id + '/confirm', { method: 'POST' }); renderPurchases(); } catch (e) { alert(e.message); }
+}
+async function cancelOrder(id) {
+  const reason = prompt('Motif de l’annulation (obligatoire) :');
+  if (!reason || reason.trim().length < 3) return;
+  try { await api('/purchases/orders/' + id + '/cancel', { method: 'POST', body: { reason: reason.trim() } }); renderPurchases(); } catch (e) { alert(e.message); }
+}
+async function receiveOrder(id) {
+  try {
+    const o = await api('/purchases/orders/' + id);
+    if (!confirm('Réceptionner la totalité du reste à livrer et entrer en stock ?')) return;
+    const lines = o.lines.map(l => ({ lineId: l.id, quantityReceived: Number(l.quantityOrdered) - Number(l.quantityReceived) })).filter(l => l.quantityReceived > 0);
+    await api('/purchases/orders/' + id + '/receive', { method: 'POST', body: { lines } });
+    renderPurchases();
+  } catch (e) { alert(e.message); }
+}
+async function loadSuppliers() {
+  const box = document.getElementById('su-list');
+  try {
+    const list = await api('/suppliers');
+    box.innerHTML = list.length ? `<table><thead><tr><th>Nom</th><th>Contact</th><th>Téléphone</th><th>E-mail</th></tr></thead><tbody>${list.map(f => `<tr><td>${esc(f.name)}</td><td>${esc(f.contactName)}</td><td>${esc(f.phone)}</td><td>${esc(f.email)}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun fournisseur.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function addSupplier() {
+  const msg = document.getElementById('su-msg');
+  const v = (i) => document.getElementById(i).value.trim();
+  try {
+    await api('/suppliers', { method: 'POST', body: { name: v('su-name'), ...(v('su-contact') ? { contactName: v('su-contact') } : {}), ...(v('su-phone') ? { phone: v('su-phone') } : {}), ...(v('su-email') ? { email: v('su-email') } : {}) } });
+    renderPurchases();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
 /* ---------------- INVENTAIRE PHYSIQUE ---------------- */

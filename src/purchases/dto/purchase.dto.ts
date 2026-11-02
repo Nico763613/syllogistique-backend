@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PurchaseOrderLineDto {
@@ -31,4 +31,17 @@ export class ReceivePurchaseOrderDto {
 export class CreatePurchaseInvoiceDto {
   @IsOptional() @IsDateString() dueDate?: string;
   @IsIn(['CASH', 'CREDIT']) paymentTerm: 'CASH' | 'CREDIT';
+}
+
+// Réapprovisionnement automatique : génère des bons de commande BROUILLON par fournisseur
+export class CreateReorderDraftsDto {
+  @IsString() siteId: string;
+  // Limiter à certains articles (sinon tous les articles à commander)
+  @IsOptional() @IsArray() @IsString({ each: true }) itemIds?: string[];
+  // Période d'analyse de la consommation (30 jours par défaut)
+  @IsOptional() @IsInt() @Min(1) days?: number;
+}
+
+export class CancelPurchaseOrderDto {
+  @IsString() @MinLength(3) reason: string;
 }

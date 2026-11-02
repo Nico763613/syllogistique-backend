@@ -89,3 +89,12 @@
 ## Encore à décider / faire
 - Multi-entrepôts avec transferts, bons de commande/livraison/factures.
 - Tarif carburant : sans ligne en base, le défaut 12 000 GNF/L s’applique ; la ligne est créée à la première modification.
+
+
+## Achats & réapprovisionnement automatique
+- `GET /purchases/reorder?siteId=` : articles à commander (sous seuil ou < 7 j de couverture), groupés par fournisseur ; les quantités déjà commandées (bons ouverts) sont déduites ; articles sans fournisseur signalés.
+- `POST /purchases/reorder/create-drafts` : crée un bon de commande BROUILLON par fournisseur (audit).
+- `POST /purchases/orders/:id/confirm` (admins) : validation d'un brouillon.
+- `POST /purchases/orders/:id/cancel` (admins, motif obligatoire) : refusé si marchandise déjà reçue.
+- `GET /purchases/orders/:id/pdf` : bon de commande imprimable (en-tête organisation, fournisseur, lignes, total, « Établi par » automatique, zone de signature).
+- PWA : nouvelle vue « Achats » (à commander, bons de commande, fournisseurs).
