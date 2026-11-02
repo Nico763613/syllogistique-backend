@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateSiteDto, UpdateSiteDto } from './dto/site.dto';
@@ -19,6 +19,11 @@ export class SitesService {
   }
 
   async create(dto: CreateSiteDto, organizationId: string, actorId: string) {
+    // Limite d'entrepôts / sites : 2 pour l'instant (réglage MAX_SITES modifiable plus tard)
+    const setting = await this.prisma.setting.findUnique({ where: { organizationId_key: { organizationId, key: 'MAX_SITES' } } });
+    const max = Number(setting?.value) > 0 ? Number(setting!.value) : 2;
+    const count = await this.prisma.site.count({ where: { organizationId, status: 'ACTIVE' } });
+    if (count >= max) throw new BadRequestException(`Limite atteinte : ${max} entrepôt(s) / site(s) actifs au maximum.`);
     const site = await this.prisma.site.create({ data: { ...dto, organizationId } });
     await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'Site', entityId: site.id, newValue: dto });
     return site;

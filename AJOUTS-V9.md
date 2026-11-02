@@ -131,3 +131,6 @@
 - `POST /inventory/transfers` {itemId, toSiteId, quantity, motif} : sortie à la source + entrée à destination en une seule transaction (annulée si stock insuffisant). L'article est créé à destination avec le même code s'il n'existe pas. Deux mouvements TRANSFER liés par une référence TR-…, visibles dans le journal ; alertes de seuil sur les deux sites ; audit avec motif.
 - Les transferts ne sont pas comptés comme consommation dans l'analyse de réapprovisionnement.
 - PWA : panneau « Transfert vers un autre entrepôt / site » dans la vue Stocks (les entrepôts = sites de l'organisation).
+
+## Deux entrepôts
+- Limite à 2 entrepôts (sites) actifs, réglage `MAX_SITES` (2 par défaut) ; le Super Admin crée le 2e entrepôt depuis la vue Stocks (panneau Transfert). Au-delà : message de limite.

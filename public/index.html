@@ -851,7 +851,8 @@ async function renderStock() {
       <div id="mv-msg"></div>
     </div>
     <div class="panel">
-      <h3>↔ Transfert vers un autre entrepôt / site</h3>
+      <h3>↔ Transfert entre les 2 entrepôts</h3>
+      <div id="wh-box"></div>
       <div class="grid-2">
         <div><label>Article</label><select id="tf-item">${itemOptions}</select></div>
         <div><label>Destination</label><select id="tf-site"></select></div>
@@ -929,8 +930,19 @@ async function loadTransferSites() {
   try {
     const sites = await api('/sites');
     const others = sites.filter(s => s.id !== state.siteId);
-    sel.innerHTML = others.length ? others.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('') : '<option value="">Aucun autre site — créez-en un pour transférer</option>';
+    sel.innerHTML = others.length ? others.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('') : '<option value="">Aucun autre entrepôt — créez le 2e ci-dessous</option>';
+    const box = document.getElementById('wh-box');
+    if (box) {
+      const active = sites.filter(s => s.status === 'ACTIVE');
+      box.innerHTML = `<div class="desc">Entrepôts : ${active.map(s => '<b>' + esc(s.name) + '</b>').join(' • ')} (${active.length} / 2)</div>` +
+        (active.length < 2 && state.user.role === 'SUPER_ADMIN' ? `<div class="grid-2" style="margin-top:8px;"><div><label>Nom du 2e entrepôt</label><input id="wh-name" placeholder="Entrepôt 2" /></div></div><button class="btn small gold" onclick="createWarehouse()">Créer l'entrepôt</button>` : '');
+    }
   } catch (e) {}
+}
+async function createWarehouse() {
+  const name = document.getElementById('wh-name').value.trim();
+  if (!name) return;
+  try { await api('/sites', { method: 'POST', body: { name } }); renderStock(); } catch (e) { alert(e.message); }
 }
 async function transferStock() {
   const msg = document.getElementById('tf-msg');
