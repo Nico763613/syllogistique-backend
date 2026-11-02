@@ -115,3 +115,6 @@
 - Le n° de permis (et catégorie, date d'expiration) se saisit à la création du chauffeur et se corrige par le bouton ✏️ de la colonne « Permis ».
 - Il figure aussi dans le rapport du jour (trajets et absences) à côté du nom du chauffeur.
 - Le parc de départ est de 10 véhicules : aucune limite en dur, on ajoute les véhicules au fur et à mesure.
+
+## Objectif de parc
+- Réglage `FLEET_TARGET` (10 par défaut), modifiable par les administrateurs depuis la vue Véhicules (« ✏️ Objectif ») ; affichage « Parc (x / 10 prévus) » et nombre restant à enregistrer. Aucune limite bloquante.

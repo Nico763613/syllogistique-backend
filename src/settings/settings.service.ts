@@ -11,6 +11,7 @@ const NUMERIC_KEYS = new Set([
   'MAINTENANCE_ALERT_DAYS',
   'DOCUMENT_ALERT_DAYS',
   'FUEL_ANOMALY_PERCENT',
+  'FLEET_TARGET', // nombre de véhicules prévus (10 au départ, à augmenter)
 ]);
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
 

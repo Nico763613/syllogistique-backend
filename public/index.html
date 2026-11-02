@@ -441,6 +441,13 @@ async function markAlertRead(id) {
 /* ---------------- VEHICLES ---------------- */
 async function renderVehicles() {
   const list = await api('/vehicles?siteId=' + state.siteId);
+  let fleetTarget = 10;
+  try {
+    const st = await api('/settings');
+    const f = st.find(x => x.key === 'FLEET_TARGET');
+    if (f && Number(f.value) > 0) fleetTarget = Number(f.value);
+  } catch (e) {}
+  const canTarget = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
   const rows = list.map(v => `
     <tr>
       <td><b>${esc(v.internalNumber)}</b></td>
@@ -466,7 +473,9 @@ async function renderVehicles() {
       <div id="v-msg"></div>
     </div>
     <div class="panel">
-      <h3>Parc (${list.length})</h3>
+      <h3>Parc (${list.length} / ${fleetTarget} prévus)
+        ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})">✏️ Objectif</button>` : ''}</h3>
+      ${list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
       <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
     </div>
     <div class="panel">
@@ -482,6 +491,11 @@ async function renderVehicles() {
       <div id="dt-list" style="margin-top:12px;"></div>
     </div>`;
   loadDowntimes();
+}
+async function editFleetTarget(current) {
+  const v = prompt('Nombre de véhicules prévus dans le parc :', current);
+  if (v === null || !(Number(v) > 0)) return;
+  try { await api('/settings/FLEET_TARGET', { method: 'PUT', body: { value: String(Math.round(Number(v))) } }); renderVehicles(); } catch (e) { alert(e.message); }
 }
 async function loadDowntimes() {
   const box = document.getElementById('dt-list');
