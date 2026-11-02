@@ -25,6 +25,8 @@ const AUTO_SCHEMA: string[] = [
     "note" TEXT
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS "inventory_count_lines_count_id_item_id_key" ON "inventory_count_lines"("count_id", "item_id")',
+  `ALTER TABLE "vehicles" ADD COLUMN IF NOT EXISTS "registration_type" TEXT NOT NULL DEFAULT 'NORMALE'`,
+  'ALTER TABLE "vehicles" ADD COLUMN IF NOT EXISTS "it_expiry_date" TIMESTAMP(3)',
   `CREATE TABLE IF NOT EXISTS "vehicle_downtimes" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "vehicle_id" TEXT NOT NULL REFERENCES "vehicles"("id"),

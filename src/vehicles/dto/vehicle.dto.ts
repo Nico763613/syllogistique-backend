@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsIn, IsInt, IsOptional, IsString, Min } from 'class-validator';
 import { VehicleType, VehicleStatus } from '@prisma/client';
 
 export class CreateVehicleDto {
@@ -13,6 +13,8 @@ export class CreateVehicleDto {
   @IsOptional() @IsString() assignedDriverId?: string;
   @IsOptional() @IsString() photoUrl?: string;
   @IsOptional() @IsString() observations?: string;
+  @IsOptional() @IsIn(['NORMALE', 'IT']) registrationType?: string;
+  @IsOptional() @IsDateString() itExpiryDate?: string;
   @IsString() siteId: string;
 }
 
@@ -27,4 +29,6 @@ export class UpdateVehicleDto {
   @IsOptional() @IsString() assignedDriverId?: string;
   @IsOptional() @IsString() photoUrl?: string;
   @IsOptional() @IsString() observations?: string;
+  @IsOptional() @IsIn(['NORMALE', 'IT']) registrationType?: string;
+  @IsOptional() @IsDateString() itExpiryDate?: string;
 }

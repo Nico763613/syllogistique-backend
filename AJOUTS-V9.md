@@ -105,3 +105,8 @@
 - `POST /downtimes/:id/resolve` : remise en service (coût réel, observation), durée calculée, véhicule redevient DISPONIBLE.
 - `GET /downtimes?siteId=&vehicleId=&open=true` : historique + indicateurs (en cours, jours cumulés, coût).
 - Chaque étape est tracée dans le journal d'audit avec le motif. PWA : section dans la vue Véhicules.
+
+## Véhicules IT (Immatriculation Temporaire)
+- Véhicules de service sous plaque IT : champs `registrationType` (NORMALE | IT) et `itExpiryDate` (colonnes ajoutées automatiquement au démarrage).
+- Formulaire véhicule : choix du type d'immatriculation + fin de validité ; badge « IT → date » dans la liste du parc.
+- Alerte automatique (contrôle quotidien 06:00 + centre d'alertes) 15 jours avant l'expiration de la plaque IT, puis tant qu'elle est expirée.

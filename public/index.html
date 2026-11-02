@@ -445,7 +445,7 @@ async function renderVehicles() {
     <tr>
       <td><b>${esc(v.internalNumber)}</b></td>
       <td>${v.vehicleType === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</td>
-      <td>${esc(v.registrationNumber)}</td>
+      <td>${esc(v.registrationNumber)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT' + (v.itExpiryDate ? ' → ' + new Date(v.itExpiryDate).toLocaleDateString('fr-FR') : '') + '</span>' : ''}</td>
       <td>${esc(v.assignedDriver ? v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName : '—')}</td>
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
@@ -459,6 +459,8 @@ async function renderVehicles() {
         <div><label>N° interne</label><input id="v-internal" placeholder="TRUCK-001" /></div>
         <div><label>Plaque</label><input id="v-plate" placeholder="RC 1234 A" /></div>
         <div><label>Marque / Modèle</label><input id="v-brand" placeholder="Toyota Hilux" /></div>
+        <div><label>Immatriculation</label><select id="v-regtype"><option value="NORMALE">Normale</option><option value="IT">IT (Immatriculation Temporaire)</option></select></div>
+        <div><label>Fin de validité plaque IT</label><input id="v-itexp" type="date" /></div>
       </div>
       <button class="btn gold" onclick="createVehicle()">Enregistrer</button>
       <div id="v-msg"></div>
@@ -523,6 +525,8 @@ async function createVehicle() {
       internalNumber: document.getElementById('v-internal').value,
       registrationNumber: document.getElementById('v-plate').value,
       brand: document.getElementById('v-brand').value,
+      registrationType: document.getElementById('v-regtype').value,
+      ...(document.getElementById('v-regtype').value === 'IT' && document.getElementById('v-itexp').value ? { itExpiryDate: document.getElementById('v-itexp').value } : {}),
     }});
     msg.innerHTML = '<div class="msg ok">Véhicule ajouté.</div>';
     renderVehicles();

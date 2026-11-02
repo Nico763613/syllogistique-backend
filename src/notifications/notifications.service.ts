@@ -56,6 +56,26 @@ export class NotificationsService {
       );
     }
 
+    // Plaques IT (Immatriculation Temporaire) : validité courte, alerte à 15 jours puis si expirée
+    const in15Days = new Date();
+    in15Days.setDate(now.getDate() + 15);
+    const itVehicles = await this.prisma.vehicle.findMany({
+      where: { siteId, registrationType: 'IT', itExpiryDate: { lte: in15Days }, deletedAt: null },
+    });
+    for (const v of itVehicles) {
+      if (await alreadyNotified('Vehicle', v.id)) continue;
+      const expired = v.itExpiryDate! < now;
+      created.push(
+        await this.create(
+          expired ? 'Plaque IT expirée' : 'Plaque IT bientôt expirée',
+          `La plaque IT du véhicule ${v.internalNumber} (${v.registrationNumber}) ${expired ? 'a expiré' : 'expire'} le ${v.itExpiryDate!.toLocaleDateString('fr-FR')}.`,
+          'WARNING',
+          'Vehicle',
+          v.id,
+        ),
+      );
+    }
+
     const items = await this.prisma.inventoryItem.findMany({ where: { siteId } });
     for (const i of items) {
       if (Number(i.currentQuantity) < Number(i.minimumQuantity)) {

@@ -239,6 +239,8 @@ model Vehicle {
   assignedDriverId   String?     @map("assigned_driver_id")
   photoUrl           String?     @map("photo_url")
   observations       String?
+  registrationType   String      @default("NORMALE") @map("registration_type") // NORMALE | IT (Immatriculation Temporaire)
+  itExpiryDate       DateTime?   @map("it_expiry_date") // fin de validité de la plaque IT
   createdAt          DateTime    @default(now()) @map("created_at")
   updatedAt          DateTime    @updatedAt @map("updated_at")
   deletedAt          DateTime?   @map("deleted_at")
