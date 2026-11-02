@@ -48,3 +48,16 @@ export class CorrectStockMovementDto {
   @IsString() @MinLength(3) reason: string;
   @IsOptional() @IsBoolean() allowNegative?: boolean;
 }
+
+// Modification d'un article (notamment les seuils d'alerte) : motif obligatoire (Audit Trail)
+export class UpdateInventoryItemDto {
+  @IsString() @MinLength(3) reason: string;
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() brand?: string;
+  @IsOptional() @IsString() reference?: string;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() location?: string;
+  @IsOptional() @IsNumber() @Min(0) minimumQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) maximumQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
+}

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SyncOperationDto } from './sync.dto';
 import { currentFuelPrice } from '../common/fuel-price';
+import { alertStockThresholds } from '../common/stock-alerts';
 import { ENTITY_DEPARTMENTS, departmentAllows } from '../common/departments';
 
 // Moteur de synchronisation Offline → Online (§14-15 du cahier des charges).
@@ -127,10 +128,12 @@ export class SyncService {
             if (op.entity === 'StockMovement' && !existingRecord && op.operation === 'CREATE') {
               const qty = Number(created.quantity);
               if (created.movementType === 'IN' || created.movementType === 'OUT') {
-                await this.prisma.inventoryItem.update({
+                const updatedItem = await this.prisma.inventoryItem.update({
                   where: { id: created.itemId },
                   data: { currentQuantity: created.movementType === 'IN' ? { increment: qty } : { decrement: qty } },
                 });
+                const afterQty = Number(updatedItem.currentQuantity);
+                await alertStockThresholds(this.prisma, updatedItem, created.movementType === 'IN' ? afterQty - qty : afterQty + qty, afterQty);
               }
             }
           }

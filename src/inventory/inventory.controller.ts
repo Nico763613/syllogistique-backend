@@ -1,8 +1,8 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { InventoryService } from './inventory.service';
-import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto } from './dto/inventory.dto';
+import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Departments } from '../common/decorators/departments.decorator';
@@ -20,6 +20,13 @@ export class InventoryController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
   createItem(@Body() dto: CreateInventoryItemDto, @CurrentUser() actor: any) {
     return this.inventoryService.createItem(dto, actor.userId);
+  }
+
+  // Modifier un article / ses seuils d'alerte — motif obligatoire (Audit Trail)
+  @Patch('items/:id')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  updateItem(@Param('id') id: string, @Body() dto: UpdateInventoryItemDto, @CurrentUser() actor: any) {
+    return this.inventoryService.updateItem(id, dto, actor.userId);
   }
 
   @Get('categories')

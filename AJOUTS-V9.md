@@ -45,6 +45,15 @@
 - Limite : la fonction de partage de fichier dépend du téléphone/navigateur ; sinon télécharger le PDF ou envoyer le texte.
   Aucun envoi automatique sans service WhatsApp Business (API) configuré.
 
+## Alertes et seuils de stock
+- Alertes **instantanées** (en plus du contrôle quotidien de 6h00) : rupture (CRITIQUE), passage sous le seuil minimum
+  (AVERTISSEMENT), dépassement du seuil maximum (INFO) — une seule alerte par franchissement, aussi pour les mouvements
+  synchronisés hors ligne et les corrections.
+- `PATCH /inventory/items/:id` : modifier les seuils minimum/maximum, l'entrepôt/emplacement, le prix — motif obligatoire.
+- Application : centre d'alertes sur le tableau de bord (bouton « Lu »), colonnes seuil max. et entrepôt dans Stocks,
+  bouton « Seuils », champs seuil max. et entrepôt à la création d'un article.
+- « Entrepôt » = champ emplacement de l'article (pas encore de gestion multi-entrepôts avec transferts).
+
 ## Départements (Logistique, Carburant, Stock, RH)
 - Nouvelle colonne `users.department` (texte, facultative). **Ajoutée automatiquement au démarrage de l'API**
   (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`, idempotent) : aucune commande à lancer sur Neon. Elle est aussi déclarée
@@ -60,5 +69,5 @@
   départements ». Effectif à la prochaine connexion (le département est dans le jeton).
 
 ## Encore à décider / faire
-- Bons de commande/livraison/factures, inventaire physique (écarts).
+- Inventaire physique (comptage et écarts), multi-entrepôts avec transferts, bons de commande/livraison/factures.
 - Tarif carburant : sans ligne en base, le défaut 12 000 GNF/L s’applique ; la ligne est créée à la première modification.

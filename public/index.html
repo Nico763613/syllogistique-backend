@@ -410,9 +410,28 @@ async function renderDashboard() {
     <div class="panel">
       <h3>⚠ Alertes</h3>
       <div class="desc">Articles sous le seuil minimum : <b>${d.stock.belowMinimum}</b></div>
+      <div id="alert-list" style="margin-top:10px;"></div>
       <button class="btn small" onclick="go('stock')">Voir le stock</button>
       <button class="btn small gold" style="margin-left:8px;" onclick="go('maintenance')">Voir la maintenance</button>
     </div>`;
+  loadAlerts();
+}
+// Centre d'alertes : ruptures, seuils minimum/maximum, permis, entretiens… (non lues)
+async function loadAlerts() {
+  const box = document.getElementById('alert-list');
+  if (!box) return;
+  try {
+    const list = await api('/notifications?unreadOnly=true');
+    box.innerHTML = list.slice(0, 15).map(n => `
+      <div class="msg ${n.severity === 'INFO' ? 'ok' : 'err'}" style="margin-bottom:6px; display:flex; justify-content:space-between; gap:10px;">
+        <span>${n.severity === 'CRITICAL' ? '🔴' : n.severity === 'WARNING' ? '🟠' : '🔵'} <b>${esc(n.title)}</b> — ${esc(n.message)}</span>
+        <button class="btn small" onclick="markAlertRead('${esc(n.id)}')">✓ Lu</button>
+      </div>`).join('') || '<div class="desc">Aucune alerte non lue.</div>';
+  } catch (e) { box.innerHTML = ''; }
+}
+async function markAlertRead(id) {
+  try { await api('/notifications/' + id + '/read', { method: 'PATCH' }); } catch (e) {}
+  loadAlerts();
 }
 
 /* ---------------- VEHICLES ---------------- */
@@ -629,7 +648,10 @@ async function renderStock() {
     <tr><td><b>${esc(i.sku)}</b></td><td>${esc(i.name)}</td>
     <td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td>
     <td class="mono">${fmt(i.minimumQuantity)} ${esc(i.unit)}</td>
-    <td>${Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge bad">Sous seuil</span>' : '<span class="badge ok">OK</span>'}</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun article enregistré.</td></tr>`;
+    <td class="mono">${i.maximumQuantity === null || i.maximumQuantity === undefined ? '—' : fmt(i.maximumQuantity) + ' ' + esc(i.unit)}</td>
+    <td>${esc(i.location || '—')}</td>
+    <td>${Number(i.currentQuantity) <= 0 ? '<span class="badge bad">Rupture</span>' : Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge bad">Sous seuil</span>' : (i.maximumQuantity !== null && i.maximumQuantity !== undefined && Number(i.currentQuantity) > Number(i.maximumQuantity)) ? '<span class="badge">Au-dessus du max</span>' : '<span class="badge ok">OK</span>'}</td>
+    <td><button class="btn small" onclick="editThresholds('${esc(i.id)}', ${Number(i.minimumQuantity)}, ${i.maximumQuantity === null || i.maximumQuantity === undefined ? 'null' : Number(i.maximumQuantity)})">Seuils</button></td></tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun article enregistré.</td></tr>`;
   const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)}</option>`).join('');
 
   root().innerHTML = `
@@ -644,7 +666,9 @@ async function renderStock() {
         <div><label>Code (SKU)</label><input id="i-sku" /></div>
         <div><label>Désignation</label><input id="i-name" /></div>
         <div><label>Unité</label><input id="i-unit" placeholder="pièce, litre, kg…" /></div>
-        <div><label>Stock minimum</label><input id="i-min" type="number" /></div>
+        <div><label>Seuil minimum (alerte)</label><input id="i-min" type="number" /></div>
+        <div><label>Seuil maximum (alerte, optionnel)</label><input id="i-max" type="number" /></div>
+        <div><label>Entrepôt / emplacement</label><input id="i-loc" placeholder="Ex : Entrepôt A, citerne 1…" /></div>
       </div>
       <button class="btn gold" onclick="createItem()">Créer l'article</button>
       <div id="i-msg"></div>
@@ -662,7 +686,7 @@ async function renderStock() {
     </div>
     <div class="panel">
       <h3>Articles (${items.length})</h3>
-      <table><thead><tr><th>Code</th><th>Désignation</th><th>Stock actuel</th><th>Seuil min.</th><th>État</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>Code</th><th>Désignation</th><th>Stock actuel</th><th>Seuil min.</th><th>Seuil max.</th><th>Entrepôt</th><th>État</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
 async function createItem() {
@@ -674,10 +698,28 @@ async function createItem() {
       name: document.getElementById('i-name').value,
       unit: document.getElementById('i-unit').value || 'pièce',
       minimumQuantity: Number(document.getElementById('i-min').value) || 0,
+      ...(document.getElementById('i-max').value ? { maximumQuantity: Number(document.getElementById('i-max').value) } : {}),
+      ...(document.getElementById('i-loc').value.trim() ? { location: document.getElementById('i-loc').value.trim() } : {}),
     }});
     msg.innerHTML = '<div class="msg ok">Article créé.</div>';
     renderStock();
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function editThresholds(id, curMin, curMax) {
+  const min = prompt('Seuil MINIMUM (alerte quand le stock passe en dessous) :', curMin);
+  if (min === null) return;
+  const max = prompt('Seuil MAXIMUM (vide = aucun) :', curMax === null ? '' : curMax);
+  if (max === null) return;
+  const reason = prompt('Motif de la modification (obligatoire) :');
+  if (!reason) return;
+  try {
+    await api('/inventory/items/' + id, { method: 'PATCH', body: {
+      minimumQuantity: Number(min) || 0,
+      ...(max !== '' ? { maximumQuantity: Number(max) } : {}),
+      reason,
+    }});
+    renderStock();
+  } catch (e) { alert(e.message); }
 }
 async function stockMove(direction) {
   const msg = document.getElementById('mv-msg');

@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto } from './dto/inventory.dto';
+import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
+import { alertStockThresholds } from '../common/stock-alerts';
 
 @Injectable()
 export class InventoryService {
@@ -16,6 +17,31 @@ export class InventoryService {
     });
     await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'InventoryItem', entityId: item.id, newValue: dto });
     return item;
+  }
+
+  // Modification d'un article et de ses seuils d'alerte (minimum / maximum) — motif obligatoire.
+  async updateItem(id: string, dto: UpdateInventoryItemDto, actorId: string) {
+    const before = await this.prisma.inventoryItem.findUnique({ where: { id } });
+    if (!before) throw new NotFoundException('Article introuvable.');
+
+    const min = dto.minimumQuantity ?? Number(before.minimumQuantity);
+    const max = dto.maximumQuantity ?? (before.maximumQuantity === null ? undefined : Number(before.maximumQuantity));
+    if (max !== undefined && max < min) {
+      throw new BadRequestException('Le seuil maximum ne peut pas être inférieur au seuil minimum.');
+    }
+
+    const { reason, ...fields } = dto;
+    const updated = await this.prisma.inventoryItem.update({ where: { id }, data: fields });
+    await this.audit.log({
+      userId: actorId,
+      action: 'UPDATE',
+      entity: 'InventoryItem',
+      entityId: id,
+      oldValue: before,
+      newValue: updated,
+      reason: reason.trim(),
+    });
+    return updated;
   }
 
   findAll(params: { siteId?: string; categoryId?: string; belowMinimum?: boolean }) {
@@ -44,7 +70,7 @@ export class InventoryService {
 
   // Entrée de stock : Stock final = Stock initial + Entrée
   async stockIn(dto: StockInDto, actorId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const item = await tx.inventoryItem.findUnique({ where: { id: dto.itemId } });
       if (!item) throw new NotFoundException('Article introuvable.');
 
@@ -72,13 +98,16 @@ export class InventoryService {
 
       await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'StockMovement', entityId: movement.id, newValue: dto });
 
-      return { movement, item: updatedItem };
+      return { movement, item: updatedItem, before: Number(item.currentQuantity) };
     });
+    // Alerte instantanée si un seuil (rupture / minimum / maximum) vient d'être franchi
+    await alertStockThresholds(this.prisma, result.item, result.before, Number(result.item.currentQuantity));
+    return { movement: result.movement, item: result.item };
   }
 
   // Sortie de stock : bloquée si quantité > stock disponible (sauf autorisation spéciale)
   async stockOut(dto: StockOutDto, actorId: string) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const item = await tx.inventoryItem.findUnique({ where: { id: dto.itemId } });
       if (!item) throw new NotFoundException('Article introuvable.');
 
@@ -111,8 +140,11 @@ export class InventoryService {
 
       await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'StockMovement', entityId: movement.id, newValue: dto });
 
-      return { movement, item: updatedItem };
+      return { movement, item: updatedItem, before: Number(item.currentQuantity) };
     });
+    // Alerte instantanée si un seuil (rupture / minimum / maximum) vient d'être franchi
+    await alertStockThresholds(this.prisma, result.item, result.before, Number(result.item.currentQuantity));
+    return { movement: result.movement, item: result.item };
   }
 
   // Correction d'une erreur de saisie (quantité d'une entrée ou d'une sortie) : le stock est
@@ -147,6 +179,13 @@ export class InventoryService {
       });
       return { movement, updatedMovement, item, updatedItem };
     });
+
+    await alertStockThresholds(
+      this.prisma,
+      result.updatedItem,
+      Number(result.item.currentQuantity),
+      Number(result.updatedItem.currentQuantity),
+    );
 
     await this.audit.log({
       userId: actorId,
