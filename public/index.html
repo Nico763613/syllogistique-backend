@@ -479,6 +479,18 @@ async function renderVehicles() {
       <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
     </div>
     <div class="panel">
+      <h3>📄 Documents des véhicules (assurance, visite technique, carte grise…)</h3>
+      <div class="grid-2">
+        <div><label>Véhicule</label><select id="dc-vehicle">${list.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
+        <div><label>Type</label><select id="dc-type"><option value="ASSURANCE">Assurance</option><option value="VISITE_TECHNIQUE">Visite technique</option><option value="CARTE_GRISE">Carte grise</option><option value="CONTRAT">Contrat</option><option value="AUTRE">Autre</option></select></div>
+        <div><label>N° / référence</label><input id="dc-ref" placeholder="N° de police, de certificat…" /></div>
+        <div><label>Date d'expiration</label><input id="dc-exp" type="date" /></div>
+      </div>
+      <button class="btn gold" onclick="addVehicleDoc()">Enregistrer le document</button>
+      <div id="dc-msg"></div>
+      <div id="dc-list" style="margin-top:12px;"></div>
+    </div>
+    <div class="panel">
       <h3>🚧 Pannes et immobilisations</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="dt-vehicle">${list.filter(v => v.status !== 'IMMOBILIZED').map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
@@ -491,6 +503,32 @@ async function renderVehicles() {
       <div id="dt-list" style="margin-top:12px;"></div>
     </div>`;
   loadDowntimes();
+  loadVehicleDocs();
+}
+async function loadVehicleDocs() {
+  const box = document.getElementById('dc-list');
+  if (!box) return;
+  try {
+    const docs = await api('/documents');
+    const names = { ASSURANCE: 'Assurance', VISITE_TECHNIQUE: 'Visite technique', CARTE_GRISE: 'Carte grise', CONTRAT: 'Contrat', AUTRE: 'Autre' };
+    const stat = (d) => {
+      if (!d.expiryDate) return '<span class="badge info">Sans échéance</span>';
+      const days = Math.ceil((new Date(d.expiryDate) - Date.now()) / 86400000);
+      return days < 0 ? `<span class="badge bad">Expiré (${-days} j)</span>` : days <= 30 ? `<span class="badge warn">Expire dans ${days} j</span>` : '<span class="badge ok">Valide</span>';
+    };
+    docs.sort((a, b) => (a.expiryDate ? new Date(a.expiryDate) : 8.64e15) - (b.expiryDate ? new Date(b.expiryDate) : 8.64e15));
+    box.innerHTML = docs.length ? `<table><thead><tr><th>Véhicule</th><th>Document</th><th>Référence</th><th>Échéance</th><th>État</th></tr></thead><tbody>${docs.map(d => `
+      <tr><td>${esc(d.vehicle?.internalNumber)} — ${esc(d.vehicle?.registrationNumber)}</td><td>${esc(names[d.type] || d.type)}</td><td>${esc(d.fileUrl)}</td>
+      <td>${d.expiryDate ? new Date(d.expiryDate).toLocaleDateString('fr-FR') : '—'}</td><td>${stat(d)}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun document enregistré. Les échéances déclenchent une alerte 30 jours avant.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function addVehicleDoc() {
+  const msg = document.getElementById('dc-msg');
+  try {
+    const exp = document.getElementById('dc-exp').value;
+    await api('/documents', { method: 'POST', body: { vehicleId: document.getElementById('dc-vehicle').value, type: document.getElementById('dc-type').value, fileUrl: document.getElementById('dc-ref').value.trim() || '—', ...(exp ? { expiryDate: exp } : {}) } });
+    renderVehicles();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function editFleetTarget(current) {
   const v = prompt('Nombre de véhicules prévus dans le parc :', current);

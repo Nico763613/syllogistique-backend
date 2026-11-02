@@ -118,3 +118,6 @@
 
 ## Objectif de parc
 - Réglage `FLEET_TARGET` (10 par défaut), modifiable par les administrateurs depuis la vue Véhicules (« ✏️ Objectif ») ; affichage « Parc (x / 10 prévus) » et nombre restant à enregistrer. Aucune limite bloquante.
+
+## Documents des véhicules (interface)
+- Nouvelle section dans la vue Véhicules : assurance, visite technique, carte grise, contrat (référence + échéance), triés par échéance avec état (valide / expire dans X j / expiré). Alerte automatique 30 jours avant (service existant).
