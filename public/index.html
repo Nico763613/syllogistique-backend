@@ -696,10 +696,21 @@ async function renderStock() {
       <div id="ic-detail"></div>
     </div>
     <div class="panel">
+      <h3>📒 Journal des mouvements</h3>
+      <div class="grid-2">
+        <div><label>Du</label><input id="jm-from" type="date" onchange="loadMovements()" /></div>
+        <div><label>Au</label><input id="jm-to" type="date" onchange="loadMovements()" /></div>
+        <div><label>Type</label><select id="jm-type" onchange="loadMovements()"><option value="">Tous</option><option value="IN">Entrées</option><option value="OUT">Sorties</option><option value="ADJUSTMENT">Ajustements</option></select></div>
+      </div>
+      <button class="btn small" onclick="downloadMovementsExcel()">📥 Exporter en Excel</button>
+      <div id="jm-body" style="margin-top:10px;"></div>
+    </div>
+    <div class="panel">
       <h3>Articles (${items.length})</h3>
       <table><thead><tr><th>Code</th><th>Désignation</th><th>Stock actuel</th><th>Seuil min.</th><th>Seuil max.</th><th>Entrepôt</th><th>État</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
   loadCounts();
+  loadMovements();
 }
 async function createItem() {
   const msg = document.getElementById('i-msg');
@@ -745,6 +756,38 @@ async function stockMove(direction) {
     msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
     renderStock();
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- JOURNAL DES MOUVEMENTS ---------------- */
+function movementsQuery() {
+  const q = new URLSearchParams({ siteId: state.siteId });
+  const f = document.getElementById('jm-from').value, t = document.getElementById('jm-to').value, ty = document.getElementById('jm-type').value;
+  if (f) q.set('from', f);
+  if (t) q.set('to', t);
+  if (ty) q.set('type', ty);
+  return q.toString();
+}
+async function loadMovements() {
+  const box = document.getElementById('jm-body');
+  if (!box) return;
+  try {
+    const list = await api('/inventory/movements?limit=100&' + movementsQuery());
+    const lab = { IN: '➕ Entrée', OUT: '➖ Sortie', ADJUSTMENT: '⚖️ Ajustement', TRANSFER: '↔ Transfert' };
+    box.innerHTML = list.length ? `<table><thead><tr><th>Date</th><th>Type</th><th>Article</th><th>Qté</th><th>Motif</th><th>Par</th></tr></thead><tbody>${list.map(m => `
+      <tr><td>${new Date(m.createdAt).toLocaleString('fr-FR')}</td><td>${lab[m.movementType] || esc(m.movementType)}</td>
+      <td>${esc(m.item.name)}</td><td class="mono">${fmt(m.quantity)} ${esc(m.item.unit)}</td>
+      <td>${esc(m.reason || '')}</td><td>${m.createdBy ? esc(m.createdBy.firstName + ' ' + m.createdBy.lastName) : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun mouvement.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function downloadMovementsExcel() {
+  try {
+    const blob = await api('/inventory/movements/export/excel?' + movementsQuery());
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'mouvements_stock.xlsx';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { alert(e.message); }
 }
 
 /* ---------------- INVENTAIRE PHYSIQUE ---------------- */

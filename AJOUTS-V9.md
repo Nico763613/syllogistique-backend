@@ -64,6 +64,14 @@
 - Nouvelles tables `inventory_counts` et `inventory_count_lines` : créées automatiquement au démarrage de l'API.
 - Application : panneau « Inventaire physique » dans Stocks.
 
+## Journal des mouvements et analyse du stock
+- `GET /inventory/movements?siteId&itemId&type&from&to&limit` : journal (qui, quand, quoi, motif) ;
+  `GET /inventory/movements/export/excel` : export Excel avec les mêmes filtres.
+- `GET /inventory/analysis?siteId&days=30` : par article, consommation moyenne par jour, **couverture en jours**,
+  état (rupture / sous seuil / surstock / OK) et **quantité conseillée à commander** (si sous le seuil minimum
+  ou moins de 7 jours de couverture ; cible = seuil maximum, à défaut max(2 × minimum, 30 jours de consommation)).
+- Application : « Journal des mouvements » (filtres + export Excel) dans Stocks.
+
 ## Départements (Logistique, Carburant, Stock, RH)
 - Nouvelle colonne `users.department` (texte, facultative). **Ajoutée automatiquement au démarrage de l'API**
   (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`, idempotent) : aucune commande à lancer sur Neon. Elle est aussi déclarée

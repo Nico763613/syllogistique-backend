@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
@@ -197,6 +198,114 @@ export class InventoryService {
       reason: dto.reason.trim(),
     });
     return { movement: result.updatedMovement, item: result.updatedItem };
+  }
+
+  // ---- Journal des mouvements (fiche de stock) ----
+
+  async movements(params: { siteId?: string; itemId?: string; type?: string; from?: string; to?: string; limit?: number }) {
+    return this.prisma.stockMovement.findMany({
+      where: {
+        ...(params.siteId ? { siteId: params.siteId } : {}),
+        ...(params.itemId ? { itemId: params.itemId } : {}),
+        ...(params.type ? { movementType: params.type as any } : {}),
+        ...(params.from || params.to
+          ? {
+              createdAt: {
+                ...(params.from ? { gte: new Date(params.from) } : {}),
+                ...(params.to ? { lt: new Date(new Date(params.to).getTime() + 86400000) } : {}),
+              },
+            }
+          : {}),
+      },
+      include: {
+        item: { select: { sku: true, name: true, unit: true, location: true } },
+        vehicle: { select: { internalNumber: true } },
+        createdBy: { select: { firstName: true, lastName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: Math.min(Math.max(params.limit ?? 100, 1), 2000),
+    });
+  }
+
+  async movementsExcel(params: { siteId?: string; itemId?: string; type?: string; from?: string; to?: string }): Promise<Buffer> {
+    const rows = await this.movements({ ...params, limit: 2000 });
+    const labels: Record<string, string> = { IN: 'Entrée', OUT: 'Sortie', ADJUSTMENT: 'Ajustement', TRANSFER: 'Transfert' };
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'SYLLOGISTIQUE';
+    const sheet = workbook.addWorksheet('Mouvements de stock');
+    sheet.addRow(['Date', 'Type', 'Code', 'Article', 'Quantité', 'Unité', 'Entrepôt', 'Véhicule', 'Référence', 'Motif', 'Saisi par']);
+    sheet.getRow(1).font = { bold: true };
+    for (const m of rows) {
+      sheet.addRow([
+        new Date(m.createdAt).toLocaleString('fr-FR'),
+        labels[m.movementType] ?? m.movementType,
+        m.item.sku,
+        m.item.name,
+        Number(m.quantity),
+        m.item.unit,
+        m.item.location ?? '',
+        m.vehicle?.internalNumber ?? '',
+        m.reference ?? '',
+        m.reason ?? '',
+        m.createdBy ? `${m.createdBy.firstName} ${m.createdBy.lastName}` : '',
+      ]);
+    }
+    [20, 12, 14, 30, 12, 10, 16, 12, 16, 50, 24].forEach((w, i) => (sheet.getColumn(i + 1).width = w));
+    return Buffer.from(await workbook.xlsx.writeBuffer());
+  }
+
+  // ---- Analyse : consommation, couverture en jours, état et quantité conseillée à commander ----
+
+  async analysis(siteId: string, days = 30) {
+    if (!siteId) throw new BadRequestException('Le site (siteId) est obligatoire.');
+    const period = Math.min(Math.max(Math.round(days) || 30, 1), 365);
+    const since = new Date(Date.now() - period * 86400000);
+    const [items, outs] = await Promise.all([
+      this.prisma.inventoryItem.findMany({
+        where: { siteId },
+        include: { supplier: { select: { id: true, name: true } } },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.stockMovement.groupBy({
+        by: ['itemId'],
+        where: { siteId, movementType: 'OUT', createdAt: { gte: since } },
+        _sum: { quantity: true },
+      }),
+    ]);
+    const consumedBy = new Map(outs.map((o) => [o.itemId, Number(o._sum.quantity ?? 0)]));
+
+    return items.map((i) => {
+      const current = Number(i.currentQuantity);
+      const min = Number(i.minimumQuantity);
+      const max = i.maximumQuantity === null ? null : Number(i.maximumQuantity);
+      const consumed = consumedBy.get(i.id) ?? 0;
+      const avgDaily = Number((consumed / period).toFixed(2));
+      const coverageDays = avgDaily > 0 ? Number((current / avgDaily).toFixed(1)) : null;
+      const state =
+        current <= 0 ? 'RUPTURE' : current < min ? 'SOUS_SEUIL' : max !== null && current > max ? 'SURSTOCK' : 'OK';
+      // À commander : sous le seuil minimum, ou moins de 7 jours de couverture
+      const needsOrder = state === 'RUPTURE' || state === 'SOUS_SEUIL' || (coverageDays !== null && coverageDays < 7);
+      const target = max ?? Math.max(min * 2, avgDaily * 30);
+      const suggestedQuantity = needsOrder ? Math.max(0, Math.ceil(target - current)) : 0;
+      return {
+        itemId: i.id,
+        sku: i.sku,
+        name: i.name,
+        unit: i.unit,
+        location: i.location,
+        supplierId: i.supplierId,
+        supplierName: i.supplier?.name ?? null,
+        currentQuantity: current,
+        minimumQuantity: min,
+        maximumQuantity: max,
+        unitPrice: Number(i.unitPrice ?? 0),
+        consumed,
+        avgDaily,
+        coverageDays,
+        state,
+        suggestedQuantity,
+      };
+    });
   }
 
   async valuation(siteId: string) {

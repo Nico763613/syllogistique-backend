@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { InventoryService } from './inventory.service';
@@ -65,6 +66,42 @@ export class InventoryController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
   correctMovement(@Param('id') id: string, @Body() dto: CorrectStockMovementDto, @CurrentUser() actor: any) {
     return this.inventoryService.correctMovement(id, dto, actor.userId);
+  }
+
+  // Journal des mouvements (fiche de stock) avec filtres : article, type (IN/OUT/ADJUSTMENT), période
+  @Get('movements')
+  movements(
+    @Query('siteId') siteId?: string,
+    @Query('itemId') itemId?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.inventoryService.movements({ siteId, itemId, type, from, to, limit: limit ? Number(limit) : undefined });
+  }
+
+  @Get('movements/export/excel')
+  async movementsExcel(
+    @Res() res: Response,
+    @Query('siteId') siteId?: string,
+    @Query('itemId') itemId?: string,
+    @Query('type') type?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const buffer = await this.inventoryService.movementsExcel({ siteId, itemId, type, from, to });
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="mouvements_stock.xlsx"',
+    });
+    res.send(buffer);
+  }
+
+  // Consommation, couverture en jours, état (rupture / sous seuil / surstock) et quantité conseillée à commander
+  @Get('analysis')
+  analysis(@Query('siteId') siteId: string, @Query('days') days?: string) {
+    return this.inventoryService.analysis(siteId, days ? Number(days) : 30);
   }
 
   @Get('valuation')
