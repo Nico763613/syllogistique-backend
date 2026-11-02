@@ -54,6 +54,16 @@
   bouton « Seuils », champs seuil max. et entrepôt à la création d'un article.
 - « Entrepôt » = champ emplacement de l'article (pas encore de gestion multi-entrepôts avec transferts).
 
+## Inventaire physique
+- `POST /inventory/counts` (démarrer, par site ou entrepôt/emplacement : le stock théorique est figé),
+  `GET /inventory/counts`, `GET /inventory/counts/:id` (écarts et valorisation), `POST /inventory/counts/:id/lines`
+  (saisie des quantités comptées), `POST /inventory/counts/:id/validate` (**motif obligatoire**, réservé aux
+  administrateurs) et `POST /inventory/counts/:id/cancel`.
+- La validation ajuste le stock (variation appliquée au stock courant : les mouvements survenus pendant le comptage
+  sont conservés), crée un mouvement `ADJUSTMENT` par écart, déclenche les alertes de seuil et journalise le tout.
+- Nouvelles tables `inventory_counts` et `inventory_count_lines` : créées automatiquement au démarrage de l'API.
+- Application : panneau « Inventaire physique » dans Stocks.
+
 ## Départements (Logistique, Carburant, Stock, RH)
 - Nouvelle colonne `users.department` (texte, facultative). **Ajoutée automatiquement au démarrage de l'API**
   (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`, idempotent) : aucune commande à lancer sur Neon. Elle est aussi déclarée
@@ -69,5 +79,5 @@
   départements ». Effectif à la prochaine connexion (le département est dans le jeton).
 
 ## Encore à décider / faire
-- Inventaire physique (comptage et écarts), multi-entrepôts avec transferts, bons de commande/livraison/factures.
+- Multi-entrepôts avec transferts, bons de commande/livraison/factures.
 - Tarif carburant : sans ligne en base, le défaut 12 000 GNF/L s’applique ; la ligne est créée à la première modification.

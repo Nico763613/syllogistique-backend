@@ -685,9 +685,21 @@ async function renderStock() {
       <div id="mv-msg"></div>
     </div>
     <div class="panel">
+      <h3>📋 Inventaire physique</h3>
+      <div class="desc">Comptez le stock réel, comparez-le au stock théorique, puis validez l'inventaire (motif obligatoire) : le stock est ajusté et chaque écart est tracé.</div>
+      <div class="grid-2">
+        <div><label>Entrepôt / emplacement (vide = tout le site)</label><input id="ic-loc" placeholder="Ex : Entrepôt A" /></div>
+      </div>
+      <button class="btn gold" onclick="startCount()">Démarrer un inventaire</button>
+      <div id="ic-msg"></div>
+      <div id="ic-list" style="margin-top:12px;"></div>
+      <div id="ic-detail"></div>
+    </div>
+    <div class="panel">
       <h3>Articles (${items.length})</h3>
       <table><thead><tr><th>Code</th><th>Désignation</th><th>Stock actuel</th><th>Seuil min.</th><th>Seuil max.</th><th>Entrepôt</th><th>État</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
+  loadCounts();
 }
 async function createItem() {
   const msg = document.getElementById('i-msg');
@@ -733,6 +745,74 @@ async function stockMove(direction) {
     msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
     renderStock();
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ---------------- INVENTAIRE PHYSIQUE ---------------- */
+async function loadCounts() {
+  const box = document.getElementById('ic-list');
+  if (!box) return;
+  try {
+    const list = await api('/inventory/counts?siteId=' + state.siteId);
+    const st = { OPEN: '🟠 En cours', VALIDATED: '✅ Validé', CANCELLED: '⚪ Annulé' };
+    box.innerHTML = list.length ? `<table><thead><tr><th>Date</th><th>Périmètre</th><th>Articles</th><th>État</th><th></th></tr></thead><tbody>${list.map(c => `
+      <tr><td>${new Date(c.createdAt).toLocaleDateString('fr-FR')}</td><td>${esc(c.location || 'Tout le site')}</td><td class="mono">${c._count.lines}</td><td>${st[c.status] || esc(c.status)}</td>
+      <td><button class="btn small" onclick="openCount('${esc(c.id)}')">Ouvrir</button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun inventaire.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function startCount() {
+  const msg = document.getElementById('ic-msg');
+  try {
+    const loc = document.getElementById('ic-loc').value.trim();
+    const c = await api('/inventory/counts', { method: 'POST', body: { siteId: state.siteId, ...(loc ? { location: loc } : {}) } });
+    msg.innerHTML = '<div class="msg ok">Inventaire démarré : stock théorique figé.</div>';
+    await loadCounts();
+    openCount(c.id);
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+let currentCount = null;
+async function openCount(id) {
+  const box = document.getElementById('ic-detail');
+  try {
+    const c = await api('/inventory/counts/' + id);
+    currentCount = c;
+    const open = c.status === 'OPEN';
+    box.innerHTML = `
+      <h4 style="margin-top:14px;">Inventaire ${esc(c.location || 'Tout le site')} — ${esc(c.status)}</h4>
+      <div class="desc">${c.summary.counted}/${c.summary.articles} comptés • ${c.summary.withVariance} écart(s) • valeur des écarts : <b>${fmt(c.summary.totalVarianceValue)} GNF</b></div>
+      <table><thead><tr><th>Code</th><th>Article</th><th>Théorique</th><th>Compté</th><th>Écart</th></tr></thead><tbody>${c.lines.map(l => `
+        <tr><td>${esc(l.sku)}</td><td>${esc(l.name)}</td><td class="mono">${fmt(l.expected)} ${esc(l.unit)}</td>
+        <td>${open ? `<input type="number" step="0.01" min="0" data-item="${esc(l.itemId)}" value="${l.counted ?? ''}" style="width:110px;" />` : `<span class="mono">${l.counted ?? '—'}</span>`}</td>
+        <td class="mono" style="color:${l.variance ? 'var(--danger)' : 'inherit'}">${l.variance === null ? '—' : (l.variance > 0 ? '+' : '') + fmt(l.variance)}</td></tr>`).join('')}</tbody></table>
+      ${open ? `<button class="btn gold" onclick="saveCount('${esc(c.id)}')">💾 Enregistrer le comptage</button>
+        <button class="btn" style="margin-left:8px;" onclick="validateCount('${esc(c.id)}')">✅ Valider (ajuste le stock)</button>
+        <button class="btn" style="margin-left:8px; background:var(--danger);" onclick="cancelCount('${esc(c.id)}')">Annuler</button>` : ''}`;
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function saveCount(id, silent) {
+  const lines = [...document.querySelectorAll('#ic-detail input[data-item]')]
+    .filter(i => i.value !== '')
+    .map(i => ({ itemId: i.dataset.item, countedQuantity: Number(i.value) }));
+  await api('/inventory/counts/' + id + '/lines', { method: 'POST', body: { lines } });
+  if (!silent) openCount(id);
+}
+async function validateCount(id) {
+  const msg = document.getElementById('ic-msg');
+  const reason = prompt('Motif de la validation (obligatoire), ex : inventaire mensuel :');
+  if (!reason) return;
+  try {
+    await saveCount(id, true);
+    const r = await api('/inventory/counts/' + id + '/validate', { method: 'POST', body: { reason } });
+    msg.innerHTML = `<div class="msg ok">Inventaire validé : ${r.linesAdjusted} article(s) ajusté(s), valeur des écarts ${fmt(r.totalVarianceValue)} GNF.</div>`;
+    renderStock();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function cancelCount(id) {
+  const reason = prompt("Motif de l'annulation (obligatoire) :");
+  if (!reason) return;
+  try {
+    await api('/inventory/counts/' + id + '/cancel', { method: 'POST', body: { reason } });
+    renderStock();
+  } catch (e) { document.getElementById('ic-msg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
 /* ---------------- RAPPORT JOURNALIER ---------------- */

@@ -1,4 +1,5 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateInventoryItemDto {
   @IsString() siteId: string;
@@ -60,4 +61,28 @@ export class UpdateInventoryItemDto {
   @IsOptional() @IsNumber() @Min(0) minimumQuantity?: number;
   @IsOptional() @IsNumber() @Min(0) maximumQuantity?: number;
   @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
+}
+
+// ---- Inventaire physique ----
+export class StartInventoryCountDto {
+  @IsString() siteId: string;
+  // Entrepôt / emplacement à compter (vide = tous les articles du site)
+  @IsOptional() @IsString() location?: string;
+  @IsOptional() @IsString() note?: string;
+}
+
+export class CountLineDto {
+  @IsString() itemId: string;
+  @IsNumber() @Min(0) countedQuantity: number;
+  @IsOptional() @IsString() note?: string;
+}
+
+export class SaveCountLinesDto {
+  @IsArray() @ValidateNested({ each: true }) @Type(() => CountLineDto)
+  lines: CountLineDto[];
+}
+
+// Validation / annulation d'un inventaire : motif obligatoire (Audit Trail)
+export class CloseInventoryCountDto {
+  @IsString() @MinLength(3) reason: string;
 }
