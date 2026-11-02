@@ -86,3 +86,11 @@ export class SaveCountLinesDto {
 export class CloseInventoryCountDto {
   @IsString() @MinLength(3) reason: string;
 }
+
+// Transfert d'un article d'un site / entrepôt vers un autre (même code article)
+export class TransferStockDto {
+  @IsString() itemId: string;
+  @IsString() toSiteId: string;
+  @IsNumber() @Min(0.01) quantity: number;
+  @IsString() @MinLength(3) reason: string;
+}

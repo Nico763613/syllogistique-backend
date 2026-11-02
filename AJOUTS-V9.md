@@ -126,3 +126,8 @@
 - `GET /trips/:id/pdf` : fiche de bord (véhicule/plaque IT, chauffeur + n° de permis, destination, heures, km départ/retour, carburant du jour, signatures). PWA : section « Missions et fiches de bord » (démarrer, clôturer, imprimer) dans la vue Véhicules.
 - `GET /inventory/delivery-note?siteId&from&to&beneficiary` : bon de sortie/livraison des sorties de stock de la période, « Établi par » automatique + signature du bénéficiaire. PWA : bouton « Bon de sortie (PDF) » dans le journal des mouvements.
 - Socle commun `src/common/pdf-doc.ts` (en-tête, signatures) pour les prochains documents.
+
+## Transferts entre entrepôts / sites
+- `POST /inventory/transfers` {itemId, toSiteId, quantity, motif} : sortie à la source + entrée à destination en une seule transaction (annulée si stock insuffisant). L'article est créé à destination avec le même code s'il n'existe pas. Deux mouvements TRANSFER liés par une référence TR-…, visibles dans le journal ; alertes de seuil sur les deux sites ; audit avec motif.
+- Les transferts ne sont pas comptés comme consommation dans l'analyse de réapprovisionnement.
+- PWA : panneau « Transfert vers un autre entrepôt / site » dans la vue Stocks (les entrepôts = sites de l'organisation).

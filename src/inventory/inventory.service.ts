@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
+import { TransferStockDto, CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
 import { getIssuer } from '../common/issuer';
 import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN } from '../common/pdf-doc';
 import { alertStockThresholds } from '../common/stock-alerts';
@@ -367,5 +367,61 @@ export class InventoryService {
     signatures(doc, issuer, 'Reçu par (nom, signature)');
     doc.end();
     return done;
+  }
+
+  // Transfert entre sites / entrepôts : sortie à la source + entrée à la destination, atomiques.
+  // L'article est créé à destination (même code) s'il n'y existe pas encore ; les valeurs totales restent cohérentes.
+  async transfer(dto: TransferStockDto, actorId: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const source = await tx.inventoryItem.findUnique({ where: { id: dto.itemId }, include: { site: true } });
+      if (!source) throw new NotFoundException('Article introuvable.');
+      if (source.siteId === dto.toSiteId) throw new BadRequestException('Le site de destination doit être différent de la source.');
+      const target = await tx.site.findUnique({ where: { id: dto.toSiteId } });
+      if (!target || target.organizationId !== source.site.organizationId) {
+        throw new BadRequestException('Site de destination invalide.');
+      }
+      if (Number(source.currentQuantity) < dto.quantity) {
+        throw new BadRequestException(`Stock insuffisant. Disponible : ${source.currentQuantity} ${source.unit}, demandé : ${dto.quantity}.`);
+      }
+
+      let dest = await tx.inventoryItem.findFirst({ where: { siteId: dto.toSiteId, sku: source.sku } });
+      if (!dest) {
+        dest = await tx.inventoryItem.create({
+          data: {
+            siteId: dto.toSiteId,
+            sku: source.sku,
+            name: source.name,
+            description: source.description,
+            brand: source.brand,
+            reference: source.reference,
+            unit: source.unit,
+            unitPrice: source.unitPrice,
+            supplierId: source.supplierId,
+            categoryId: source.categoryId,
+            qrCode: source.sku,
+          },
+        });
+      }
+      const destBefore = Number(dest.currentQuantity);
+      const ref = `TR-${Date.now().toString(36).toUpperCase()}`;
+      const totalValue = source.unitPrice ? Number((Number(source.unitPrice) * dto.quantity).toFixed(2)) : undefined;
+
+      const out = await tx.stockMovement.create({
+        data: { itemId: source.id, siteId: source.siteId, movementType: 'TRANSFER', quantity: dto.quantity, reference: ref, unitPrice: source.unitPrice ?? undefined, totalValue, reason: `Transfert vers ${target.name} — ${dto.reason.trim()}`, createdById: actorId },
+      });
+      await tx.stockMovement.create({
+        data: { itemId: dest.id, siteId: dto.toSiteId, movementType: 'TRANSFER', quantity: dto.quantity, reference: ref, unitPrice: source.unitPrice ?? undefined, totalValue, reason: `Transfert depuis ${source.site.name} — ${dto.reason.trim()}`, createdById: actorId },
+      });
+      const updatedSource = await tx.inventoryItem.update({ where: { id: source.id }, data: { currentQuantity: { decrement: dto.quantity } } });
+      const updatedDest = await tx.inventoryItem.update({ where: { id: dest.id }, data: { currentQuantity: { increment: dto.quantity } } });
+      await this.audit.log({
+        userId: actorId, action: 'CREATE', entity: 'StockMovement', entityId: out.id,
+        newValue: { reference: ref, article: source.sku, quantite: dto.quantity, de: source.site.name, vers: target.name }, reason: dto.reason.trim(),
+      });
+      return { ref, updatedSource, updatedDest, sourceBefore: Number(source.currentQuantity), destBefore, from: source.site.name, to: target.name };
+    });
+    await alertStockThresholds(this.prisma, result.updatedSource, result.sourceBefore, Number(result.updatedSource.currentQuantity));
+    await alertStockThresholds(this.prisma, result.updatedDest, result.destBefore, Number(result.updatedDest.currentQuantity));
+    return { reference: result.ref, from: result.from, to: result.to, sourceQuantity: Number(result.updatedSource.currentQuantity), destinationQuantity: Number(result.updatedDest.currentQuantity) };
   }
 }

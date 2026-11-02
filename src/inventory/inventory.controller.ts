@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { InventoryService } from './inventory.service';
-import { CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
+import { TransferStockDto, CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Departments } from '../common/decorators/departments.decorator';
@@ -59,6 +59,13 @@ export class InventoryController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
   stockOut(@Body() dto: StockOutDto, @CurrentUser() actor: any) {
     return this.inventoryService.stockOut(dto, actor.userId);
+  }
+
+  // Transfert d'un article vers un autre site / entrepôt
+  @Post('transfers')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  transfer(@Body() dto: TransferStockDto, @CurrentUser() actor: any) {
+    return this.inventoryService.transfer(dto, actor.userId);
   }
 
   // Correction d'une erreur de saisie : motif obligatoire, stock recalculé automatiquement
