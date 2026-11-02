@@ -466,7 +466,48 @@ async function renderVehicles() {
     <div class="panel">
       <h3>Parc (${list.length})</h3>
       <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="panel">
+      <h3>🚧 Pannes et immobilisations</h3>
+      <div class="grid-2">
+        <div><label>Véhicule</label><select id="dt-vehicle">${list.filter(v => v.status !== 'IMMOBILIZED').map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
+        <div><label>Catégorie</label><select id="dt-cat"><option value="PANNE">Panne</option><option value="ACCIDENT">Accident</option><option value="ENTRETIEN">Entretien</option><option value="ADMINISTRATIF">Administratif (papiers, assurance)</option><option value="AUTRE">Autre</option></select></div>
+        <div><label>Motif (obligatoire)</label><input id="dt-reason" placeholder="Ex. : boîte de vitesses HS" /></div>
+        <div><label>Coût estimé (GNF)</label><input id="dt-cost" type="number" min="0" /></div>
+      </div>
+      <button class="btn gold" onclick="reportDowntime()">Immobiliser le véhicule</button>
+      <div id="dt-msg"></div>
+      <div id="dt-list" style="margin-top:12px;"></div>
     </div>`;
+  loadDowntimes();
+}
+async function loadDowntimes() {
+  const box = document.getElementById('dt-list');
+  if (!box) return;
+  try {
+    const r = await api('/downtimes?siteId=' + state.siteId);
+    box.innerHTML = r.items.length ? `<div class="desc">${r.summary.open} en cours • ${fmt(r.summary.totalDays)} jour(s) cumulés • coût : <b>${fmt(r.summary.totalCost)} GNF</b></div>
+      <table><thead><tr><th>Véhicule</th><th>Type</th><th>Motif</th><th>Depuis</th><th>Jours</th><th>Coût</th><th></th></tr></thead><tbody>${r.items.map(i => `
+      <tr><td>${esc(i.vehicle)}</td><td>${esc(i.category)}</td><td>${esc(i.reason)}</td><td>${new Date(i.startedAt).toLocaleDateString('fr-FR')}</td><td class="mono">${i.days}</td><td class="mono">${fmt(i.actualCost ?? i.estimatedCost)}</td>
+      <td>${i.endedAt ? '✅ Remis en service' : `<button class="btn small" onclick="resolveDowntime('${esc(i.id)}')">Remettre en service</button>`}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune immobilisation enregistrée.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function reportDowntime() {
+  const msg = document.getElementById('dt-msg');
+  try {
+    const cost = document.getElementById('dt-cost').value;
+    await api('/downtimes', { method: 'POST', body: { vehicleId: document.getElementById('dt-vehicle').value, category: document.getElementById('dt-cat').value, reason: document.getElementById('dt-reason').value.trim(), ...(cost ? { estimatedCost: Number(cost) } : {}) } });
+    renderVehicles();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function resolveDowntime(id) {
+  const note = prompt('Travaux réalisés / observation (facultatif) :');
+  if (note === null) return;
+  const cost = prompt('Coût réel en GNF (facultatif) :');
+  try {
+    await api('/downtimes/' + id + '/resolve', { method: 'POST', body: { ...(note ? { resolutionNote: note } : {}), ...(cost ? { actualCost: Number(cost) } : {}) } });
+    renderVehicles();
+  } catch (e) { alert(e.message); }
 }
 function statusBadge(s) {
   const map = { AVAILABLE: ['ok', 'Disponible'], ON_MISSION: ['info', 'En mission'], MAINTENANCE: ['warn', 'Maintenance'], IMMOBILIZED: ['bad', 'Immobilisé'], OUT_OF_SERVICE: ['bad', 'Hors service'] };

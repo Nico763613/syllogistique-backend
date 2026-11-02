@@ -251,6 +251,7 @@ model Vehicle {
   expenses           Expense[]
   documents          Document[]
   stockMovements     StockMovement[]
+  downtimes          VehicleDowntime[]
 
   @@unique([siteId, registrationNumber])
   @@index([siteId, vehicleType])
@@ -867,4 +868,26 @@ model Payment {
   purchaseInvoice   PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id])
 
   @@map("payments")
+}
+
+// Pannes et immobilisations de véhicules : motif, durée, coût, remise en service
+model VehicleDowntime {
+  id             String    @id @default(uuid())
+  vehicleId      String    @map("vehicle_id")
+  siteId         String    @map("site_id")
+  category       String    @default("PANNE") // PANNE | ACCIDENT | ENTRETIEN | ADMINISTRATIF | AUTRE
+  reason         String    // motif obligatoire
+  estimatedCost  Decimal?  @map("estimated_cost") @db.Decimal(14, 2)
+  actualCost     Decimal?  @map("actual_cost") @db.Decimal(14, 2)
+  startedAt      DateTime  @default(now()) @map("started_at")
+  endedAt        DateTime? @map("ended_at")
+  resolutionNote String?   @map("resolution_note")
+  createdById    String    @map("created_by")
+  resolvedById   String?   @map("resolved_by")
+
+  vehicle        Vehicle   @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId])
+  @@index([siteId, startedAt])
+  @@map("vehicle_downtimes")
 }

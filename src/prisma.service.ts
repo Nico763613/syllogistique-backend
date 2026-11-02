@@ -25,6 +25,22 @@ const AUTO_SCHEMA: string[] = [
     "note" TEXT
   )`,
   'CREATE UNIQUE INDEX IF NOT EXISTS "inventory_count_lines_count_id_item_id_key" ON "inventory_count_lines"("count_id", "item_id")',
+  `CREATE TABLE IF NOT EXISTS "vehicle_downtimes" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "vehicle_id" TEXT NOT NULL REFERENCES "vehicles"("id"),
+    "site_id" TEXT NOT NULL,
+    "category" TEXT NOT NULL DEFAULT 'PANNE',
+    "reason" TEXT NOT NULL,
+    "estimated_cost" DECIMAL(14,2),
+    "actual_cost" DECIMAL(14,2),
+    "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "ended_at" TIMESTAMP(3),
+    "resolution_note" TEXT,
+    "created_by" TEXT NOT NULL,
+    "resolved_by" TEXT
+  )`,
+  'CREATE INDEX IF NOT EXISTS "vehicle_downtimes_vehicle_id_idx" ON "vehicle_downtimes"("vehicle_id")',
+  'CREATE INDEX IF NOT EXISTS "vehicle_downtimes_site_id_started_at_idx" ON "vehicle_downtimes"("site_id", "started_at")',
 ];
 
 @Injectable()

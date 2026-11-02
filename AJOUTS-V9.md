@@ -98,3 +98,10 @@
 - `POST /purchases/orders/:id/cancel` (admins, motif obligatoire) : refusé si marchandise déjà reçue.
 - `GET /purchases/orders/:id/pdf` : bon de commande imprimable (en-tête organisation, fournisseur, lignes, total, « Établi par » automatique, zone de signature).
 - PWA : nouvelle vue « Achats » (à commander, bons de commande, fournisseurs).
+
+## Pannes et immobilisations de véhicules
+- Table `vehicle_downtimes` (créée automatiquement au démarrage + déclarée dans `schema.prisma`).
+- `POST /downtimes` (motif obligatoire, catégorie, coût estimé) : le véhicule passe en IMMOBILISÉ ; une seule immobilisation ouverte par véhicule.
+- `POST /downtimes/:id/resolve` : remise en service (coût réel, observation), durée calculée, véhicule redevient DISPONIBLE.
+- `GET /downtimes?siteId=&vehicleId=&open=true` : historique + indicateurs (en cours, jours cumulés, coût).
+- Chaque étape est tracée dans le journal d'audit avec le motif. PWA : section dans la vue Véhicules.
