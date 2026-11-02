@@ -5,11 +5,13 @@ import { CreateMaintenanceDto } from './dto/maintenance.dto';
 import { RoleName } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('maintenance')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('LOGISTIQUE')
 @Controller('maintenance')
 export class MaintenanceController {
   constructor(private maintenanceService: MaintenanceService) {}

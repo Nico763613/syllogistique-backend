@@ -5,11 +5,13 @@ import { DriversService } from './drivers.service';
 import { CreateDriverDto, UpdateDriverDto, MarkAttendanceDto } from './dto/driver.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('drivers')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('LOGISTIQUE', 'RH')
 @Controller('drivers')
 export class DriversController {
   constructor(private driversService: DriversService) {}

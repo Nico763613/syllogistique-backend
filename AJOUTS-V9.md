@@ -45,7 +45,20 @@
 - Limite : la fonction de partage de fichier dépend du téléphone/navigateur ; sinon télécharger le PDF ou envoyer le texte.
   Aucun envoi automatique sans service WhatsApp Business (API) configuré.
 
+## Départements (Logistique, Carburant, Stock, RH)
+- Nouvelle colonne `users.department` (texte, facultative). **Ajoutée automatiquement au démarrage de l'API**
+  (`ALTER TABLE … ADD COLUMN IF NOT EXISTS`, idempotent) : aucune commande à lancer sur Neon. Elle est aussi déclarée
+  dans `schema.prisma` (compatible `db push` / `migrate`).
+- Règle : un utilisateur **sans département n'est pas restreint** (les comptes existants continuent de fonctionner) ;
+  le SUPER_ADMIN a toujours un accès global ; un utilisateur rattaché à un département ne peut **modifier** que les
+  données de son département. La consultation (GET) reste ouverte (listes de véhicules, chauffeurs…).
+- Départements → modules : LOGISTIQUE = véhicules, missions, maintenance, documents, dépenses, chauffeurs ;
+  CARBURANT = carburant, missions, dépenses ; STOCK = articles et mouvements, fournisseurs, achats, ventes, clients ;
+  RH = chauffeurs et pointage.
+- Appliqué aussi à la synchronisation hors ligne (`/sync/push`, entité par entité).
+- Affectation : `PATCH /users/:id` `{ "department": "STOCK" }` (ou `null`), ou Paramètres → « Utilisateurs et
+  départements ». Effectif à la prochaine connexion (le département est dans le jeton).
+
 ## Encore à décider / faire
-- **Départements** (Logistique, Carburant, Stock, RH) : nécessite une migration (colonne département sur l'utilisateur).
 - Bons de commande/livraison/factures, inventaire physique (écarts).
-- Base déjà en ligne : ajouter la ligne `FUEL_PRICE_PER_LITER` = `12000` (ou la créer via l'application).
+- Tarif carburant : sans ligne en base, le défaut 12 000 GNF/L s’applique ; la ligne est créée à la première modification.

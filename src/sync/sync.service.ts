@@ -1,8 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SyncOperationDto } from './sync.dto';
 import { currentFuelPrice } from '../common/fuel-price';
+import { ENTITY_DEPARTMENTS, departmentAllows } from '../common/departments';
 
 // Moteur de synchronisation Offline → Online (§14-15 du cahier des charges).
 // Le client envoie un lot d'opérations enregistrées hors connexion ; chacune
@@ -23,7 +24,12 @@ const ENTITY_MODELS: Record<string, keyof PrismaService> = {
 export class SyncService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  async push(operations: SyncOperationDto[], actorId: string, organizationId?: string) {
+  async push(
+    operations: SyncOperationDto[],
+    actorId: string,
+    organizationId?: string,
+    actor?: { role?: string; department?: string | null },
+  ) {
     const results: Array<{
       entityId: string;
       entity: string;
@@ -48,6 +54,12 @@ export class SyncService {
       try {
         const modelKey = ENTITY_MODELS[op.entity];
         if (!modelKey) throw new BadRequestException(`Entité de synchronisation inconnue : ${op.entity}`);
+
+        // Cloisonnement par département : on ne synchronise que les entités de son département.
+        const allowedDepartments = ENTITY_DEPARTMENTS[op.entity];
+        if (actor && allowedDepartments && !departmentAllows(actor, allowedDepartments)) {
+          throw new ForbiddenException(`Action réservée au département : ${allowedDepartments.join(' / ')}.`);
+        }
 
         // Déduplication : si cette opération (même client entityId + device) a déjà réussi, on l'ignore.
         const alreadySynced = await this.prisma.syncQueueEntry.findFirst({

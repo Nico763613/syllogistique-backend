@@ -5,11 +5,13 @@ import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto } from './dto/expense.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('expenses')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('LOGISTIQUE', 'CARBURANT')
 @Controller()
 export class ExpensesController {
   constructor(private expensesService: ExpensesService) {}

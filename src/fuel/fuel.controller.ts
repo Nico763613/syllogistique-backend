@@ -5,11 +5,13 @@ import { RoleName } from '@prisma/client';
 import { CreateFuelTransactionDto, CorrectFuelTransactionDto } from './dto/fuel.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('fuel')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('CARBURANT')
 @Controller('fuel')
 export class FuelController {
   constructor(private fuelService: FuelService) {}

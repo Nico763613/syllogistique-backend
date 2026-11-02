@@ -20,6 +20,7 @@ export class AuthService {
     email: string;
     organizationId: string;
     siteId: string | null;
+    department?: string | null;
     role: { name: string };
   }) {
     const payload = {
@@ -28,6 +29,7 @@ export class AuthService {
       role: user.role.name,
       organizationId: user.organizationId,
       siteId: user.siteId ?? undefined,
+      department: user.department ?? undefined,
     };
 
     const accessToken = await this.jwt.signAsync(payload, {
@@ -86,6 +88,7 @@ export class AuthService {
         role: user.role.name,
         organizationId: user.organizationId,
         siteId: user.siteId,
+        department: user.department,
       },
     };
   }

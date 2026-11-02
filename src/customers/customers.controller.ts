@@ -5,11 +5,13 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('customers')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('STOCK')
 @Controller('customers')
 export class CustomersController {
   constructor(private customersService: CustomersService) {}

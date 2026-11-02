@@ -123,6 +123,8 @@ model User {
   lastName       String    @map("last_name")
   email          String    @unique
   phone          String?
+  // Département : LOGISTIQUE, CARBURANT, STOCK ou RH (vide = pas de restriction de département)
+  department     String?
   passwordHash   String    @map("password_hash")
   status         UserStatus @default(ACTIVE)
   refreshTokenHash String? @map("refresh_token_hash")

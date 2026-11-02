@@ -5,11 +5,13 @@ import { PurchasesService } from './purchases.service';
 import { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, CreatePurchaseInvoiceDto } from './dto/purchase.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('purchases')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('STOCK')
 @Controller('purchases')
 export class PurchasesController {
   constructor(private purchasesService: PurchasesService) {}

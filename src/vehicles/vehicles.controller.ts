@@ -5,11 +5,13 @@ import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto, UpdateVehicleDto } from './dto/vehicle.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('vehicles')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('LOGISTIQUE')
 @Controller('vehicles')
 export class VehiclesController {
   constructor(private vehiclesService: VehiclesService) {}

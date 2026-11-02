@@ -7,12 +7,14 @@ import { SalesDocumentsService } from './sales-documents.service';
 import { CreateSalesOrderDto, DeliverSalesOrderDto, CreateSalesInvoiceDto } from './dto/sale.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { MessagingService } from '../messaging/messaging.service';
 
 @ApiTags('sales')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('STOCK')
 @Controller('sales')
 export class SalesController {
   constructor(

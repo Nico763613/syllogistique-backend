@@ -18,7 +18,7 @@ export class SyncController {
   @Post('push')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER, RoleName.CHAUFFEUR)
   push(@Body() dto: SyncPushDto, @CurrentUser() actor: any) {
-    return this.syncService.push(dto.operations, actor.userId, actor.organizationId);
+    return this.syncService.push(dto.operations, actor.userId, actor.organizationId, actor);
   }
 
   @Get('pending-count')

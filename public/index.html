@@ -857,8 +857,36 @@ function renderSettings() {
     </div>
     <div class="panel">
       <h3>Compte</h3>
-      <div class="desc">${esc(state.user.firstName)} ${esc(state.user.lastName)} — ${roleLabel(state.user.role)}</div>
-    </div>`;
+      <div class="desc">${esc(state.user.firstName)} ${esc(state.user.lastName)} — ${roleLabel(state.user.role)}${state.user.department ? ' — Département : ' + esc(deptLabel(state.user.department)) : ''}</div>
+    </div>
+    ${['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) ? `<div class="panel">
+      <h3>👥 Utilisateurs et départements</h3>
+      <div class="desc">Un utilisateur rattaché à un département ne peut modifier que les données de son département (consultation libre). « Tous » = aucune restriction. L'Administrateur Général a toujours un accès global.</div>
+      <div id="u-body"><div class="empty">Chargement…</div></div>
+      <div id="u-msg"></div>
+    </div>` : ''}`;
+  if (['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role)) loadUsersPanel();
+}
+function deptLabel(d) {
+  return { LOGISTIQUE: 'Logistique', CARBURANT: 'Carburant', STOCK: 'Stock', RH: 'Ressources humaines' }[d] || d;
+}
+async function loadUsersPanel() {
+  const body = document.getElementById('u-body');
+  try {
+    const users = await api('/users');
+    const opts = (cur) => ['', 'LOGISTIQUE', 'CARBURANT', 'STOCK', 'RH']
+      .map(d => `<option value="${d}" ${(cur || '') === d ? 'selected' : ''}>${d ? deptLabel(d) : 'Tous (sans restriction)'}</option>`).join('');
+    body.innerHTML = `<table><thead><tr><th>Nom</th><th>Rôle</th><th>Département</th></tr></thead><tbody>${users.map(u => `
+      <tr><td>${esc(u.firstName)} ${esc(u.lastName)}</td><td>${roleLabel(u.role.name)}</td>
+      <td>${u.role.name === 'SUPER_ADMIN' ? 'Accès global' : `<select onchange="setUserDepartment('${esc(u.id)}', this.value)">${opts(u.department)}</select>`}</td></tr>`).join('')}</tbody></table>`;
+  } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function setUserDepartment(id, value) {
+  const msg = document.getElementById('u-msg');
+  try {
+    await api('/users/' + id, { method: 'PATCH', body: { department: value || null } });
+    msg.innerHTML = '<div class="msg ok">Département enregistré (effectif à la prochaine connexion de l\'utilisateur).</div>';
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 function saveSettings() {
   state.apiUrl = document.getElementById('s-api').value.trim();

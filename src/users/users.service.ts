@@ -20,6 +20,7 @@ export class UsersService {
       data: {
         organizationId,
         siteId: dto.siteId,
+        department: dto.department ?? undefined,
         roleId: role.id,
         firstName: dto.firstName,
         lastName: dto.lastName,
@@ -79,6 +80,7 @@ export class UsersService {
         phone: dto.phone,
         status: dto.status,
         siteId: dto.siteId,
+        department: dto.department,
         roleId,
       },
       include: { role: true },

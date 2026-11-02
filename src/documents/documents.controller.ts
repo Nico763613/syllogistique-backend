@@ -5,11 +5,13 @@ import { DocumentsService } from './documents.service';
 import { CreateDocumentDto, UpdateDocumentDto } from './dto/document.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('documents')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+@Departments('LOGISTIQUE')
 @Controller('documents')
 export class DocumentsController {
   constructor(private documentsService: DocumentsService) {}
