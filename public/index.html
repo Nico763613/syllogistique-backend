@@ -285,7 +285,29 @@ const state = {
 
 document.getElementById('api-url').value = state.apiUrl || 'https://syllogistique-backend.onrender.com';
 
-async function api(path, options = {}) {
+// Renouvelle la session en silence (le jeton d'accès dure 15 min) ; une seule demande à la fois
+let refreshing = null;
+async function refreshSession() {
+  if (!state.refreshToken) return false;
+  if (!refreshing) {
+    refreshing = (async () => {
+      try {
+        const r = await fetch(state.apiUrl.replace(/\/$/, '') + '/auth/refresh', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refreshToken: state.refreshToken }),
+        });
+        if (!r.ok) return false;
+        const d = await r.json();
+        state.accessToken = d.accessToken;
+        if (d.refreshToken) state.refreshToken = d.refreshToken;
+        localStorage.setItem('syllo_access_token', state.accessToken);
+        localStorage.setItem('syllo_refresh_token', state.refreshToken);
+        return true;
+      } catch (e) { return false; } finally { setTimeout(() => { refreshing = null; }, 0); }
+    })();
+  }
+  return refreshing;
+}
+async function api(path, options = {}, retried = false) {
   const res = await fetch(state.apiUrl.replace(/\/$/, '') + path, {
     ...options,
     headers: {
@@ -295,6 +317,11 @@ async function api(path, options = {}) {
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+  if (res.status === 401 && !retried && !path.startsWith('/auth/')) {
+    if (await refreshSession()) return api(path, options, true);
+    logout();
+    throw new Error('Session expirée : reconnectez-vous.');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.message || 'Erreur API');
@@ -1376,6 +1403,15 @@ function renderSettings() {
       <div id="s-msg"></div>
     </div>
     <div class="panel">
+      <h3>🔑 Changer mon mot de passe</h3>
+      <label>Mot de passe actuel</label><input id="pw-old" type="password" autocomplete="current-password" />
+      <label>Nouveau mot de passe (6 caractères minimum)</label><input id="pw-new" type="password" autocomplete="new-password" />
+      <label>Confirmer le nouveau mot de passe</label><input id="pw-new2" type="password" autocomplete="new-password" />
+      <label style="display:flex; align-items:center; gap:6px; margin-top:6px;"><input type="checkbox" onchange="['pw-old','pw-new','pw-new2'].forEach(i => document.getElementById(i).type = this.checked ? 'text' : 'password')" style="width:auto;" /> Afficher les mots de passe</label>
+      <button class="btn gold" style="margin-top:8px;" onclick="changePassword()">Changer le mot de passe</button>
+      <div id="pw-msg"></div>
+    </div>
+    <div class="panel">
       <h3>Compte</h3>
       <div class="desc">${esc(state.user.firstName)} ${esc(state.user.lastName)} — ${roleLabel(state.user.role)}${state.user.department ? ' — Département : ' + esc(deptLabel(state.user.department)) : ''}</div>
     </div>
@@ -1386,6 +1422,17 @@ function renderSettings() {
       <div id="u-msg"></div>
     </div>` : ''}`;
   if (['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role)) loadUsersPanel();
+}
+async function changePassword() {
+  const msg = document.getElementById('pw-msg');
+  const v = (i) => document.getElementById(i).value;
+  try {
+    if (v('pw-new').length < 6) throw new Error('Le nouveau mot de passe doit avoir au moins 6 caractères.');
+    if (v('pw-new') !== v('pw-new2')) throw new Error('La confirmation ne correspond pas au nouveau mot de passe.');
+    await api('/auth/change-password', { method: 'POST', body: { currentPassword: v('pw-old'), newPassword: v('pw-new') } });
+    ['pw-old', 'pw-new', 'pw-new2'].forEach(i => { document.getElementById(i).value = ''; });
+    msg.innerHTML = '<div class="msg ok">Mot de passe changé. Utilisez-le à votre prochaine connexion.</div>';
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 function deptLabel(d) {
   return { LOGISTIQUE: 'Logistique', CARBURANT: 'Carburant', STOCK: 'Stock', RH: 'Ressources humaines' }[d] || d;
