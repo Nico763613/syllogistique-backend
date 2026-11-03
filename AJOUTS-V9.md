@@ -137,3 +137,8 @@
 
 ## Sélecteur d'entrepôt
 - Liste déroulante dans l'en-tête dès qu'il y a 2 entrepôts : change l'entrepôt actif (stocks, journal, achats, rapport) sans manipuler d'identifiant. Si le site mémorisé n'existe plus, le premier entrepôt actif est choisi automatiquement.
+
+## États des besoins
+- Tables `need_requests` / `need_request_lines` (créées au démarrage + `schema.prisma`). Référence EB-AAAA-NNNN.
+- API `/needs` : suggestions automatiques (articles en rupture / sous seuil), création, liste, modification (brouillon pour tous ; le Super Admin peut tout modifier), changement d'état (Envoyé / Approuvé / Rejeté avec motif / Satisfait), PDF (« Établi par » automatique + visa de la hiérarchie), texte WhatsApp (numéros REPORT_WHATSAPP_NUMBERS), envoi par e-mail avec PDF (SMTP requis).
+- PWA : vue « États des besoins » (formulaire à lignes libres, chargement des articles à commander, liste avec PDF / WhatsApp / e-mail / modifier / état).

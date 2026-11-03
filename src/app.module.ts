@@ -19,6 +19,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SyncModule } from './sync/sync.module';
 import { CustomersModule } from './customers/customers.module';
 import { PurchasesModule } from './purchases/purchases.module';
+import { NeedsModule } from './needs/needs.module';
 import { SalesModule } from './sales/sales.module';
 import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
@@ -53,6 +54,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     SyncModule,
     CustomersModule,
     PurchasesModule,
+    NeedsModule,
     SalesModule,
     PaymentsModule,
     UploadsModule,

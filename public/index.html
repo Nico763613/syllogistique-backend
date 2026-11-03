@@ -229,6 +229,9 @@
       <div class="nav-item" data-view="purchases" onclick="go('purchases')">
         <span class="nav-icon">🛒</span> Achats
       </div>
+      <div class="nav-item" data-view="needs" onclick="go('needs')">
+        <span class="nav-icon">📝</span> États des besoins
+      </div>
       <div class="nav-item" data-view="daily" onclick="go('daily')">
         <span class="nav-icon">📋</span> Rapport du jour
       </div>
@@ -422,7 +425,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', daily: 'Rapport du jour',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
   sync: 'Synchronisation', settings: 'Paramètres',
 };
 
@@ -450,6 +453,7 @@ async function renderView(view) {
     if (view === 'maintenance') return renderMaintenance();
     if (view === 'stock') return renderStock();
     if (view === 'purchases') return renderPurchases();
+    if (view === 'needs') return renderNeeds();
     if (view === 'daily') return renderDaily();
     if (view === 'sync') return renderSync();
     if (view === 'settings') return renderSettings();
@@ -1170,6 +1174,130 @@ async function addSupplier() {
     await api('/suppliers', { method: 'POST', body: { name: v('su-name'), ...(v('su-contact') ? { contactName: v('su-contact') } : {}), ...(v('su-phone') ? { phone: v('su-phone') } : {}), ...(v('su-email') ? { email: v('su-email') } : {}) } });
     renderPurchases();
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+
+/* ---------------- ÉTATS DES BESOINS ---------------- */
+let needLines = [];
+let editingNeed = null;
+async function renderNeeds() {
+  needLines = []; editingNeed = null;
+  root().innerHTML = `
+    <div class="panel"><h3 id="nd-title">📝 Nouvel état des besoins</h3>
+      <div class="desc">Pour demander à la hiérarchie des articles en rupture, des pièces à changer, du matériel… Vous pouvez charger automatiquement les articles sous le seuil.</div>
+      <div class="grid-2">
+        <div><label>Objet</label><input id="nd-obj" placeholder="Ex : Pièces de rechange — camion TRUCK-003" /></div>
+        <div><label>Priorité</label><select id="nd-prio"><option value="NORMALE">Normale</option><option value="URGENTE">Urgente</option></select></div>
+        <div><label>À l'attention de</label><input id="nd-to" placeholder="Directeur / Chef de site…" /></div>
+        <div><label>Justification</label><input id="nd-just" placeholder="Pourquoi ce besoin ?" /></div>
+      </div>
+      <div id="nd-lines" style="margin-top:10px;"></div>
+      <button class="btn small" onclick="addNeedLine()">➕ Ajouter une ligne</button>
+      <button class="btn small" style="margin-left:6px;" onclick="loadNeedSuggestions()">📦 Charger les articles à commander</button>
+      <div style="margin-top:10px;"><button class="btn gold" onclick="saveNeed()">💾 Enregistrer</button>
+      <button class="btn small" id="nd-cancel" style="display:none;margin-left:6px;" onclick="renderNeeds()">Annuler la modification</button></div>
+      <div id="nd-msg"></div>
+    </div>
+    <div class="panel"><h3>États des besoins</h3><div id="nd-list"><div class="empty">Chargement…</div></div></div>`;
+  addNeedLine();
+  loadNeeds();
+}
+function drawNeedLines() {
+  const box = document.getElementById('nd-lines');
+  box.innerHTML = `<table><thead><tr><th>Désignation</th><th>Qté</th><th>Unité</th><th>P.U. estimé</th><th>Observation</th><th></th></tr></thead><tbody>${needLines.map((l, i) => `
+    <tr><td><input value="${esc(l.designation)}" oninput="needLines[${i}].designation=this.value" style="min-width:150px;" /></td>
+    <td><input type="number" step="0.01" min="0" value="${esc(l.quantity)}" oninput="needLines[${i}].quantity=this.value" style="width:80px;" /></td>
+    <td><input value="${esc(l.unit || '')}" oninput="needLines[${i}].unit=this.value" style="width:70px;" /></td>
+    <td><input type="number" min="0" value="${esc(l.estimatedUnitPrice || '')}" oninput="needLines[${i}].estimatedUnitPrice=this.value" style="width:100px;" /></td>
+    <td><input value="${esc(l.note || '')}" oninput="needLines[${i}].note=this.value" /></td>
+    <td><button class="btn small" onclick="needLines.splice(${i},1);drawNeedLines()">✖</button></td></tr>`).join('')}</tbody></table>`;
+}
+function addNeedLine() { needLines.push({ designation: '', quantity: '1', unit: '', estimatedUnitPrice: '', note: '' }); drawNeedLines(); }
+async function loadNeedSuggestions() {
+  const msg = document.getElementById('nd-msg');
+  try {
+    const s = await api('/needs/suggestions?siteId=' + state.siteId);
+    if (!s.length) { msg.innerHTML = '<div class="msg ok">Aucun article à commander pour le moment.</div>'; return; }
+    needLines = needLines.filter(l => l.designation.trim()).concat(s.map(x => ({ itemId: x.itemId, designation: x.designation, quantity: String(x.quantity), unit: x.unit, estimatedUnitPrice: x.estimatedUnitPrice || '', note: x.note })));
+    if (!document.getElementById('nd-obj').value.trim()) document.getElementById('nd-obj').value = 'Réapprovisionnement du stock';
+    drawNeedLines();
+    msg.innerHTML = `<div class="msg ok">${s.length} article(s) ajouté(s). Vérifiez les quantités avant d'enregistrer.</div>`;
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function saveNeed() {
+  const msg = document.getElementById('nd-msg');
+  try {
+    const lines = needLines.filter(l => l.designation.trim()).map(l => ({
+      ...(l.itemId ? { itemId: l.itemId } : {}), designation: l.designation.trim(), quantity: Number(l.quantity),
+      ...(l.unit ? { unit: l.unit } : {}), ...(l.estimatedUnitPrice ? { estimatedUnitPrice: Number(l.estimatedUnitPrice) } : {}), ...(l.note ? { note: l.note } : {}),
+    }));
+    if (!lines.length) throw new Error('Ajoutez au moins une ligne avec une désignation.');
+    const body = { title: document.getElementById('nd-obj').value.trim(), priority: document.getElementById('nd-prio').value,
+      recipient: document.getElementById('nd-to').value.trim() || undefined, justification: document.getElementById('nd-just').value.trim() || undefined, lines };
+    if (editingNeed) await api('/needs/' + editingNeed, { method: 'PATCH', body });
+    else await api('/needs', { method: 'POST', body: { ...body, siteId: state.siteId } });
+    renderNeeds();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function loadNeeds() {
+  const box = document.getElementById('nd-list');
+  try {
+    const list = await api('/needs?siteId=' + state.siteId);
+    const st = { BROUILLON: '📝 Brouillon', ENVOYE: '📤 Envoyé', APPROUVE: '✅ Approuvé', REJETE: '❌ Rejeté', SATISFAIT: '📦 Satisfait' };
+    const admin = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+    const canEdit = (n) => n.status === 'BROUILLON' || state.user.role === 'SUPER_ADMIN';
+    box.innerHTML = list.length ? `<table><thead><tr><th>N°</th><th>Objet</th><th>Priorité</th><th>Total est.</th><th>État</th><th>Actions</th></tr></thead><tbody>${list.map(n => `
+      <tr><td class="mono">${esc(n.reference)}</td><td>${esc(n.title)}<div class="desc">${new Date(n.createdAt).toLocaleDateString('fr-FR')} • ${n.lines.length} ligne(s)${n.decisionNote ? ' • ' + esc(n.decisionNote) : ''}</div></td>
+      <td>${n.priority === 'URGENTE' ? '<span class="badge bad">Urgente</span>' : 'Normale'}</td><td class="mono">${n.total ? fmt(n.total) : '—'}</td><td>${st[n.status] || esc(n.status)}</td>
+      <td><button class="btn small" onclick="needPdf('${esc(n.id)}','${esc(n.reference)}')">PDF</button>
+      <button class="btn small" onclick="needWhatsapp('${esc(n.id)}')">WhatsApp</button>
+      <button class="btn small" onclick="needEmail('${esc(n.id)}')">E-mail</button>
+      ${canEdit(n) ? `<button class="btn small" onclick="editNeed('${esc(n.id)}')">✏️ Modifier</button>` : ''}
+      ${admin ? `<select onchange="needStatus('${esc(n.id)}', this.value)"><option value="">État…</option><option value="ENVOYE">Envoyé</option><option value="APPROUVE">Approuvé</option><option value="REJETE">Rejeté</option><option value="SATISFAIT">Satisfait</option></select>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun état des besoins.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function editNeed(id) {
+  try {
+    const n = await api('/needs/' + id);
+    editingNeed = id;
+    document.getElementById('nd-title').textContent = '✏️ Modifier ' + n.reference;
+    document.getElementById('nd-obj').value = n.title;
+    document.getElementById('nd-prio').value = n.priority;
+    document.getElementById('nd-to').value = n.recipient || '';
+    document.getElementById('nd-just').value = n.justification || '';
+    needLines = n.lines.map(l => ({ itemId: l.itemId || undefined, designation: l.designation, quantity: String(Number(l.quantity)), unit: l.unit || '', estimatedUnitPrice: l.estimatedUnitPrice ? String(Number(l.estimatedUnitPrice)) : '', note: l.note || '' }));
+    drawNeedLines();
+    document.getElementById('nd-cancel').style.display = '';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) { alert(e.message); }
+}
+async function needStatus(id, status) {
+  if (!status) return;
+  let note;
+  if (status === 'REJETE') { note = prompt('Motif du rejet (obligatoire) :'); if (!note) return loadNeeds(); }
+  try { await api('/needs/' + id + '/status', { method: 'POST', body: { status, ...(note ? { note } : {}) } }); loadNeeds(); } catch (e) { alert(e.message); loadNeeds(); }
+}
+async function needPdf(id, ref) {
+  try {
+    const blob = await api('/needs/' + id + '/pdf');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'etat_des_besoins_' + ref + '.pdf';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  } catch (e) { alert(e.message); }
+}
+async function needWhatsapp(id) {
+  try { const w = await api('/needs/' + id + '/whatsapp'); w.links.forEach(l => window.open(l.url, '_blank')); } catch (e) { alert(e.message); }
+}
+async function needEmail(id) {
+  const to = prompt('Adresse(s) e-mail du destinataire (séparées par des virgules) :');
+  if (!to) return;
+  try {
+    const r = await api('/needs/' + id + '/send-email', { method: 'POST', body: { to } });
+    alert(r.sent ? 'E-mail envoyé avec le PDF.' : "Envoi e-mail non configuré sur le serveur (SMTP) : rien n'a été envoyé. Utilisez le PDF ou WhatsApp.");
+    loadNeeds();
+  } catch (e) { alert(e.message); }
 }
 
 /* ---------------- INVENTAIRE PHYSIQUE ---------------- */
