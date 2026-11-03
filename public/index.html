@@ -509,6 +509,7 @@ async function renderVehicles() {
     const f = st.find(x => x.key === 'FLEET_TARGET');
     if (f && Number(f.value) > 0) fleetTarget = Number(f.value);
   } catch (e) {}
+  window._vehicles = list;
   const canTarget = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
   const rows = list.map(v => `
     <tr>
@@ -518,7 +519,8 @@ async function renderVehicles() {
       <td>${esc(v.assignedDriver ? v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName : '—')}</td>
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
-    </tr>`).join('') || `<tr><td colspan="6" class="empty">Aucun véhicule enregistré.</td></tr>`;
+      <td><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button></td>
+    </tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun véhicule enregistré.</td></tr>`;
 
   root().innerHTML = `
     <div class="panel">
@@ -538,7 +540,7 @@ async function renderVehicles() {
       <h3>Parc (${list.length} / ${fleetTarget} prévus)
         ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})">✏️ Objectif</button>` : ''}</h3>
       ${list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
-      <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>
     <div class="panel">
       <h3>🧭 Missions et fiches de bord</h3>
@@ -703,6 +705,64 @@ async function createVehicle() {
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
+
+/* ---------------- ÉDITEUR GÉNÉRIQUE (corriger une fiche déjà enregistrée) ---------------- */
+function openEditor(title, fields, onSave) {
+  const old = document.getElementById('editor-overlay'); if (old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'editor-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
+  ov.innerHTML = `<div class="panel" style="max-width:520px;width:100%;margin:20px auto;"><h3>${esc(title)}</h3>
+    ${fields.map(f => `<label>${esc(f.label)}</label>` + (f.options
+      ? `<select data-k="${esc(f.key)}">${f.options.map(o => `<option value="${esc(o[0])}" ${String(f.value ?? '') === o[0] ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`
+      : `<input data-k="${esc(f.key)}" type="${f.type || 'text'}" value="${esc(f.value ?? '')}" />`)).join('')}
+    <div id="editor-msg"></div>
+    <div style="margin-top:12px;"><button class="btn gold" id="editor-save">💾 Enregistrer</button> <button class="btn" onclick="document.getElementById('editor-overlay').remove()">Annuler</button></div></div>`;
+  document.body.appendChild(ov);
+  document.getElementById('editor-save').onclick = async () => {
+    const data = {};
+    ov.querySelectorAll('[data-k]').forEach(el => {
+      const f = fields.find(x => x.key === el.dataset.k);
+      let v = el.value.trim();
+      if (f.type === 'number') v = v === '' ? undefined : Number(v);
+      if (f.type === 'date') v = v || undefined;
+      if (v === '' ) v = undefined;
+      data[f.key] = v;
+    });
+    try { await onSave(data); ov.remove(); } catch (e) { document.getElementById('editor-msg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+  };
+}
+const day10 = (d) => (d ? String(d).slice(0, 10) : '');
+function editVehicle(id) {
+  const v = (window._vehicles || []).find(x => x.id === id); if (!v) return;
+  openEditor('Modifier le véhicule ' + v.internalNumber, [
+    { key: 'internalNumber', label: 'N° interne', value: v.internalNumber },
+    { key: 'registrationNumber', label: 'Plaque', value: v.registrationNumber },
+    { key: 'brand', label: 'Marque', value: v.brand }, { key: 'model', label: 'Modèle', value: v.model },
+    { key: 'year', label: 'Année', type: 'number', value: v.year },
+    { key: 'status', label: 'Statut', value: v.status, options: [['AVAILABLE', 'Disponible'], ['ON_MISSION', 'En mission'], ['MAINTENANCE', 'Maintenance'], ['IMMOBILIZED', 'Immobilisé'], ['OUT_OF_SERVICE', 'Hors service']] },
+    { key: 'observations', label: 'Observations', value: v.observations },
+  ], async (d) => { await api('/vehicles/' + id, { method: 'PATCH', body: d }); renderVehicles(); });
+}
+function editDriver(id) {
+  const d0 = (window._drivers || []).find(x => x.id === id); if (!d0) return;
+  openEditor('Modifier le chauffeur ' + d0.firstName + ' ' + d0.lastName, [
+    { key: 'firstName', label: 'Prénom', value: d0.firstName }, { key: 'lastName', label: 'Nom', value: d0.lastName },
+    { key: 'phone', label: 'Téléphone', value: d0.phone },
+    { key: 'licenseNumber', label: 'N° de permis', value: d0.licenseNumber }, { key: 'licenseCategory', label: 'Catégorie du permis', value: d0.licenseCategory },
+    { key: 'licenseExpiryDate', label: 'Expiration du permis', type: 'date', value: day10(d0.licenseExpiryDate) },
+    { key: 'status', label: 'Statut', value: d0.status, options: [['ACTIVE', 'Actif'], ['SUSPENDED', 'Suspendu'], ['INACTIVE', 'Inactif']] },
+  ], async (d) => { await api('/drivers/' + id, { method: 'PATCH', body: d }); renderDrivers(); });
+}
+function editSupplier(id) {
+  const s = (window._suppliers || []).find(x => x.id === id); if (!s) return;
+  openEditor('Modifier le fournisseur ' + s.name, [
+    { key: 'name', label: 'Nom', value: s.name }, { key: 'contactName', label: 'Contact', value: s.contactName },
+    { key: 'phone', label: 'Téléphone', value: s.phone }, { key: 'email', label: 'E-mail', value: s.email },
+    { key: 'address', label: 'Adresse', value: s.address }, { key: 'productsSupplied', label: 'Produits fournis', value: s.productsSupplied },
+  ], async (d) => { await api('/suppliers/' + id, { method: 'PATCH', body: d }); renderPurchases(); });
+}
+
 /* ---------------- DRIVERS ---------------- */
 async function editLicense(id, current) {
   const v = prompt('N° de permis du chauffeur :', current);
@@ -711,10 +771,12 @@ async function editLicense(id, current) {
 }
 async function renderDrivers() {
   const list = await api('/drivers?siteId=' + state.siteId);
+  window._drivers = list;
   const rows = list.map(d => `
     <tr><td><b>${esc(d.firstName)} ${esc(d.lastName)}</b></td><td>${esc(d.phone || '—')}</td><td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}','${esc(d.licenseNumber || '')}')">✏️</button></td>
     <td>${d.licenseExpiryDate ? new Date(d.licenseExpiryDate).toLocaleDateString('fr-FR') : '—'}</td>
-    <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun chauffeur enregistré.</td></tr>`;
+    <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td>
+    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')">✏️ Modifier</button></td></tr>`).join('') || `<tr><td colspan="6" class="empty">Aucun chauffeur enregistré.</td></tr>`;
 
   root().innerHTML = `
     <div class="panel">
@@ -732,7 +794,7 @@ async function renderDrivers() {
     </div>
     <div class="panel">
       <h3>Chauffeurs (${list.length})</h3>
-      <table><thead><tr><th>Nom</th><th>Téléphone</th><th>Permis</th><th>Expiration</th><th>Statut</th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>Nom</th><th>Téléphone</th><th>Permis</th><th>Expiration</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
 async function createDriver() {
@@ -1164,7 +1226,8 @@ async function loadSuppliers() {
   const box = document.getElementById('su-list');
   try {
     const list = await api('/suppliers');
-    box.innerHTML = list.length ? `<table><thead><tr><th>Nom</th><th>Contact</th><th>Téléphone</th><th>E-mail</th></tr></thead><tbody>${list.map(f => `<tr><td>${esc(f.name)}</td><td>${esc(f.contactName)}</td><td>${esc(f.phone)}</td><td>${esc(f.email)}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun fournisseur.</div>';
+    window._suppliers = list;
+    box.innerHTML = list.length ? `<table><thead><tr><th>Nom</th><th>Contact</th><th>Téléphone</th><th>E-mail</th><th></th></tr></thead><tbody>${list.map(f => `<tr><td>${esc(f.name)}</td><td>${esc(f.contactName)}</td><td>${esc(f.phone)}</td><td>${esc(f.email)}</td><td><button class="btn small" onclick="editSupplier('${esc(f.id)}')">✏️</button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun fournisseur.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function addSupplier() {

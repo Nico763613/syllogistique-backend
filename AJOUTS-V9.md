@@ -142,3 +142,6 @@
 - Tables `need_requests` / `need_request_lines` (créées au démarrage + `schema.prisma`). Référence EB-AAAA-NNNN.
 - API `/needs` : suggestions automatiques (articles en rupture / sous seuil), création, liste, modification (brouillon pour tous ; le Super Admin peut tout modifier), changement d'état (Envoyé / Approuvé / Rejeté avec motif / Satisfait), PDF (« Établi par » automatique + visa de la hiérarchie), texte WhatsApp (numéros REPORT_WHATSAPP_NUMBERS), envoi par e-mail avec PDF (SMTP requis).
 - PWA : vue « États des besoins » (formulaire à lignes libres, chargement des articles à commander, liste avec PDF / WhatsApp / e-mail / modifier / état).
+
+## Modification des fiches déjà enregistrées
+- Éditeur commun (fenêtre « Modifier ») pour les véhicules, chauffeurs et fournisseurs ; déjà disponibles : articles et seuils (motif), mouvements de stock (correction avec motif), missions, carburant, états des besoins. Toutes les modifications sont tracées dans le journal d'audit.
