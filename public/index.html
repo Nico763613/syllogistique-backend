@@ -183,7 +183,11 @@
     <input id="login-email" placeholder="admin@syllogistique.local" />
 
     <label>Mot de passe</label>
-    <input id="login-password" type="password" placeholder="••••••••" />
+    <div style="position:relative;">
+      <input id="login-password" type="password" placeholder="••••••••" style="padding-right:48px;" />
+      <button type="button" id="pw-toggle" onclick="togglePassword()" aria-label="Afficher ou masquer le mot de passe"
+        style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; font-size:20px; cursor:pointer;">👁</button>
+    </div>
 
     <button class="btn gold" style="width:100%" onclick="login()">Se connecter</button>
     <div id="login-msg"></div>
@@ -299,6 +303,12 @@ async function api(path, options = {}) {
   return ct.includes('application/json') ? res.json() : res.blob();
 }
 
+function togglePassword() {
+  const i = document.getElementById('login-password');
+  const show = i.type === 'password';
+  i.type = show ? 'text' : 'password';
+  document.getElementById('pw-toggle').textContent = show ? '🙈' : '👁';
+}
 async function login() {
   const msg = document.getElementById('login-msg');
   msg.innerHTML = '';
