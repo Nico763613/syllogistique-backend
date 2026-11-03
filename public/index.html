@@ -180,7 +180,7 @@
     <input id="api-url" placeholder="https://votre-api.exemple.com" />
 
     <label>Email</label>
-    <input id="login-email" placeholder="admin@syllogistique.local" />
+    <input id="login-email" type="email" autocomplete="username" value="admin@syllogistique.local" placeholder="Votre e-mail" />
 
     <label>Mot de passe</label>
     <div style="position:relative;">
@@ -1471,7 +1471,13 @@ if (state.accessToken && state.user) {
 /* ---------------- PWA : service worker + installation ---------------- */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then((reg) => reg.update()).catch(() => {});
+    // Nouvelle version installée : rechargement automatique (une seule fois)
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController && !reloaded) { reloaded = true; location.reload(); }
+    });
   });
 }
 
