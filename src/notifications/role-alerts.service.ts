@@ -68,11 +68,11 @@ export class RoleAlertsService {
     }
 
     // --- Commercial & Caisse ---
-    const overdueInstallments = await this.prisma.salesInstallment.findMany({ where: { dueDate: { lt: now } }, include: { invoice: { select: { id: true, reference: true, siteId: true, status: true } } } });
+    const overdueInstallments = await this.prisma.salesInstallment.findMany({ where: { dueDate: { lt: now } }, include: { salesInvoice: { select: { id: true, reference: true, siteId: true, status: true } } } });
     for (const i of overdueInstallments) {
-      if (Number(i.amountPaid) >= Number(i.amount) || ['CANCELLED', 'PAID'].includes(i.invoice.status)) continue;
+      if (Number(i.amountPaid) >= Number(i.amount) || ['CANCELLED', 'PAID'].includes(i.salesInvoice.status)) continue;
       const days = Math.floor((+now - +i.dueDate) / DAY);
-      await emit({ role: 'RESPONSABLE_COMMERCIAL', siteId: i.invoice.siteId, title: 'Échéance client impayée', message: `Facture ${i.invoice.reference} : échéance du ${fr(i.dueDate)} non réglée (${days} j).`, severity: days > 30 ? 'CRITICAL' : 'WARNING', entity: 'SalesInstallment', entityId: i.id });
+      await emit({ role: 'RESPONSABLE_COMMERCIAL', siteId: i.salesInvoice.siteId, title: 'Échéance client impayée', message: `Facture ${i.salesInvoice.reference} : échéance du ${fr(i.dueDate)} non réglée (${days} j).`, severity: days > 30 ? 'CRITICAL' : 'WARNING', entity: 'SalesInstallment', entityId: i.id });
     }
     const staleCash = await this.prisma.cashSession.findMany({ where: { closedAt: null, openedAt: { lt: new Date(+now - DAY) } } });
     for (const s of staleCash) {
