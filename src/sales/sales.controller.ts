@@ -24,7 +24,7 @@ export class SalesController {
   ) {}
 
   @Post('orders')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   createOrder(@Body() dto: CreateSalesOrderDto, @CurrentUser() actor: any) {
     return this.salesService.createOrder(dto, actor.userId);
   }
@@ -40,19 +40,19 @@ export class SalesController {
   }
 
   @Post('orders/:id/confirm')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   confirm(@Param('id') id: string, @CurrentUser() actor: any) {
     return this.salesService.confirm(id, actor.userId);
   }
 
   @Post('orders/:id/deliver')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   deliver(@Param('id') id: string, @Body() dto: DeliverSalesOrderDto, @CurrentUser() actor: any) {
     return this.salesService.deliver(id, dto, actor.userId);
   }
 
   @Post('orders/:id/invoice')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   createInvoice(@Param('id') id: string, @Body() dto: CreateSalesInvoiceDto, @CurrentUser() actor: any) {
     return this.salesService.createInvoiceFromOrder(id, dto, actor.userId);
   }

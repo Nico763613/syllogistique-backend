@@ -1,5 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 
 // Mises à niveau du schéma, idempotentes (sans effet si déjà appliquées). Gardées en phase avec prisma/schema.prisma.
 const AUTO_SCHEMA: string[] = [
@@ -73,6 +75,22 @@ const AUTO_SCHEMA: string[] = [
   'CREATE INDEX IF NOT EXISTS "vehicle_downtimes_site_id_started_at_idx" ON "vehicle_downtimes"("site_id", "started_at")',
 ];
 
+// Tableaux de bord par département : instructions lues dans prisma/dashboards-upgrade.sql (blocs séparés par « --# »).
+// Le dossier prisma/ est copié dans l'image Docker ; en cas d'absence du fichier, rien n'est fait.
+function loadDashboardUpgrades(): string[] {
+  try {
+    const file = join(__dirname, '..', 'prisma', 'dashboards-upgrade.sql');
+    if (!existsSync(file)) return [];
+    return readFileSync(file, 'utf-8')
+      .split(/^--#\s*$/m)
+      .map((block) => block.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n').trim().replace(/;$/, ''))
+      .filter(Boolean);
+  } catch (e: any) {
+    console.warn('⚠️  Lecture de dashboards-upgrade.sql impossible :', e?.message ?? e);
+    return [];
+  }
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
@@ -80,7 +98,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // Mise à niveau automatique et idempotente : ajoute la colonne « département » si elle manque
     // (aucune migration manuelle à lancer sur Neon). Sans effet si la colonne existe déjà.
     // Les nouvelles tables (inventaire physique, pannes…) sont créées de la même façon.
-    for (const sql of AUTO_SCHEMA) {
+    for (const sql of [...AUTO_SCHEMA, ...loadDashboardUpgrades()]) {
       try {
         await this.$executeRawUnsafe(sql);
       } catch (e: any) {

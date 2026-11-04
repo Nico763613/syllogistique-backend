@@ -24,6 +24,9 @@ export class PaymentsService {
           reference: dto.reference,
           salesInvoiceId: dto.salesInvoiceId,
           purchaseInvoiceId: dto.purchaseInvoiceId,
+          cashSessionId: dto.cashSessionId,
+          externalRef: dto.externalRef,
+          clientOpId: dto.clientOpId,
           createdById: actorId,
         },
       });
