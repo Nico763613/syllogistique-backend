@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsNumber, IsOptional, IsString, MinLength, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, MinLength, Min } from 'class-validator';
 
 export class CreateFuelTransactionDto {
   @IsString() vehicleId: string;
@@ -13,6 +13,9 @@ export class CreateFuelTransactionDto {
   @IsOptional() @IsString() receiptNumber?: string;
   @IsOptional() @IsString() receiptImageUrl?: string;
   @IsOptional() @IsString() observations?: string;
+  // STATION (pompe externe) ou TANK (cuve du site) ; compteur horaire pour les engins
+  @IsOptional() @IsIn(['STATION', 'TANK']) source?: string;
+  @IsOptional() @IsNumber() @Min(0) hours?: number;
 }
 
 // Correction d'une saisie de carburant : le motif est obligatoire (Audit Trail)

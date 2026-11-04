@@ -74,21 +74,48 @@ export class PurchasesService {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.purchaseOrder.findUnique({ where: { id: orderId }, include: { lines: true } });
       if (!order) throw new NotFoundException('Bon de commande introuvable.');
+      if (order.status === 'DRAFT' || order.status === 'CANCELLED') {
+        throw new BadRequestException("Ce bon de commande n'est pas réceptionnable (brouillon ou annulé).");
+      }
+
+      const receiptLines: Array<{
+        purchaseOrderLineId: string; itemId: string; quantityReceived: number;
+        quantityAccepted: number; quantityRejected: number; rejectReason?: string;
+      }> = [];
 
       for (const recv of dto.lines) {
         const line = order.lines.find((l) => l.id === recv.lineId);
         if (!line) throw new BadRequestException(`Ligne inconnue : ${recv.lineId}`);
 
+        const rejected = recv.quantityRejected ?? 0;
+        if (rejected > recv.quantityReceived) {
+          throw new BadRequestException('La quantité rejetée dépasse la quantité livrée.');
+        }
+        if (rejected > 0 && !recv.rejectReason?.trim()) {
+          throw new BadRequestException('Indiquez le motif du rejet.');
+        }
+        const accepted = Number((recv.quantityReceived - rejected).toFixed(3));
+
         const remaining = Number(line.quantityOrdered) - Number(line.quantityReceived);
-        if (recv.quantityReceived > remaining) {
+        if (accepted > remaining) {
           throw new BadRequestException(
-            `Quantité reçue (${recv.quantityReceived}) supérieure à la quantité restant à recevoir (${remaining}) pour cette ligne.`,
+            `Quantité acceptée (${accepted}) supérieure à la quantité restant à recevoir (${remaining}) pour cette ligne.`,
           );
         }
 
+        receiptLines.push({
+          purchaseOrderLineId: line.id,
+          itemId: line.itemId,
+          quantityReceived: recv.quantityReceived,
+          quantityAccepted: accepted,
+          quantityRejected: rejected,
+          rejectReason: recv.rejectReason?.trim(),
+        });
+        if (accepted <= 0) continue; // tout refusé : aucune entrée de stock
+
         await tx.purchaseOrderLine.update({
           where: { id: line.id },
-          data: { quantityReceived: { increment: recv.quantityReceived } },
+          data: { quantityReceived: { increment: accepted } },
         });
 
         // Entrée de stock automatique + mise à jour du prix d'achat de référence
@@ -97,29 +124,47 @@ export class PurchasesService {
             itemId: line.itemId,
             siteId: order.siteId,
             movementType: 'IN',
-            quantity: recv.quantityReceived,
+            quantity: accepted,
             supplierId: order.supplierId,
             reference: order.reference,
             unitPrice: line.unitPrice,
-            totalValue: Number((Number(line.unitPrice) * recv.quantityReceived).toFixed(2)),
+            totalValue: Number((Number(line.unitPrice) * accepted).toFixed(2)),
             reason: 'Réception bon de commande',
+            reasonCode: 'RECEIPT',
             createdById: actorId,
           },
         });
         await tx.inventoryItem.update({
           where: { id: line.itemId },
-          data: { currentQuantity: { increment: recv.quantityReceived }, unitPrice: line.unitPrice },
+          data: { currentQuantity: { increment: accepted }, unitPrice: line.unitPrice },
         });
       }
+
+      // Bon de réception (traçabilité : livré / accepté / rejeté, fret, bon de livraison)
+      const receipt = await tx.goodsReceipt.create({
+        data: {
+          siteId: order.siteId,
+          purchaseOrderId: orderId,
+          reference: order.reference,
+          deliveryNoteNo: dto.deliveryNoteNo,
+          freightCost: Math.round(dto.freightCost ?? 0),
+          notes: dto.notes,
+          createdBy: actorId,
+          lines: { create: receiptLines },
+        },
+      });
 
       const updatedLines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: orderId } });
       const fullyReceived = updatedLines.every((l) => Number(l.quantityReceived) >= Number(l.quantityOrdered));
       const partiallyReceived = updatedLines.some((l) => Number(l.quantityReceived) > 0);
 
       const status = fullyReceived ? 'RECEIVED' : partiallyReceived ? 'PARTIALLY_RECEIVED' : order.status;
-      const updatedOrder = await tx.purchaseOrder.update({ where: { id: orderId }, data: { status } });
+      const updatedOrder = await tx.purchaseOrder.update({
+        where: { id: orderId },
+        data: { status, ...(dto.freightCost ? { freightCost: { increment: Math.round(dto.freightCost) } } : {}) },
+      });
 
-      await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'PurchaseOrder', entityId: orderId, newValue: dto });
+      await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'PurchaseOrder', entityId: orderId, newValue: { ...dto, goodsReceiptId: receipt.id } });
       return updatedOrder;
     });
   }
@@ -219,7 +264,7 @@ export class PurchasesService {
     const order = await this.prisma.purchaseOrder.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Bon de commande introuvable.');
     if (order.status !== 'DRAFT') throw new BadRequestException('Seul un bon de commande en brouillon peut être confirmé.');
-    const updated = await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'CONFIRMED' } });
+    const updated = await this.prisma.purchaseOrder.update({ where: { id }, data: { status: 'CONFIRMED', approvedBy: actorId, approvedAt: new Date() } });
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'PurchaseOrder', entityId: id, oldValue: { status: 'DRAFT' }, newValue: { status: 'CONFIRMED' } });
     return updated;
   }

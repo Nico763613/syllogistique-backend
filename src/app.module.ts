@@ -30,6 +30,11 @@ import { SitesModule } from './sites/sites.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { SearchModule } from './search/search.module';
+import { DashboardsModule } from './dashboards/dashboards.module';
+import { CashModule } from './cash/cash.module';
+import { TransfersModule } from './transfers/transfers.module';
+import { StockLocationsModule } from './stock-locations/stock-locations.module';
+import { HseModule } from './hse/hse.module';
 
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -65,6 +70,11 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     DocumentsModule,
     ExpensesModule,
     SearchModule,
+    DashboardsModule,
+    CashModule,
+    TransfersModule,
+    StockLocationsModule,
+    HseModule,
   ],
   controllers: [HealthController],
   providers: [

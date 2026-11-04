@@ -20,10 +20,17 @@ export class CreatePurchaseOrderDto {
 
 export class ReceiveLineDto {
   @IsString() lineId: string;
+  // Quantité livrée (acceptée + rejetée)
   @IsNumber() @Min(0.01) quantityReceived: number;
+  // Quantité refusée à la réception (non conforme) : n'entre pas en stock
+  @IsOptional() @IsNumber() @Min(0) quantityRejected?: number;
+  @IsOptional() @IsString() rejectReason?: string;
 }
 
 export class ReceivePurchaseOrderDto {
+  @IsOptional() @IsString() deliveryNoteNo?: string;
+  @IsOptional() @IsNumber() @Min(0) freightCost?: number;
+  @IsOptional() @IsString() notes?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => ReceiveLineDto)
   lines: ReceiveLineDto[];
 }

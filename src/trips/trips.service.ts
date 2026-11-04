@@ -39,6 +39,7 @@ export class TripsService {
         purpose: dto.purpose,
         passengerName: dto.passengerName,
         observations: dto.observations,
+        status: dto.endMileage !== undefined ? 'COMPLETED' : 'IN_PROGRESS',
         createdById: actorId,
       },
     });
@@ -72,12 +73,12 @@ export class TripsService {
 
     const updated = await this.prisma.trip.update({
       where: { id },
-      data: { endTime: new Date(dto.endTime), endMileage: dto.endMileage, distance, observations: dto.observations },
+      data: { endTime: new Date(dto.endTime), endMileage: dto.endMileage, distance, observations: dto.observations, status: 'COMPLETED', endCondition: dto.endCondition },
     });
 
     await this.prisma.vehicle.update({
       where: { id: trip.vehicleId },
-      data: { currentMileage: dto.endMileage, status: 'AVAILABLE' },
+      data: { currentMileage: dto.endMileage, status: dto.endCondition === 'PANNE' || dto.endCondition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' },
     });
 
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Trip', entityId: id, newValue: dto });

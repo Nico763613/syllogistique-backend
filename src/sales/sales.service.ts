@@ -1,7 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateSalesOrderDto, DeliverSalesOrderDto, CreateSalesInvoiceDto } from './dto/sale.dto';
+import { Actor, isCommercialManager, toNumber } from '../common/actor';
+import { numericSettings } from '../common/settings-util';
+
+// Plafonds de remise par rôle (en %, modifiables dans les réglages)
+const DISCOUNT_CAPS = { CASHIER_DISCOUNT_CAP_PERCENT: 5, MANAGER_DISCOUNT_CAP_PERCENT: 15 };
 
 @Injectable()
 export class SalesService {
@@ -17,8 +22,20 @@ export class SalesService {
 
   // ---- Devis / Bon de commande client ----
 
-  async createOrder(dto: CreateSalesOrderDto, actorId: string) {
+  async createOrder(dto: CreateSalesOrderDto, actor: Actor) {
+    const actorId = actor.userId;
     if (!dto.lines?.length) throw new BadRequestException('La commande doit contenir au moins une ligne.');
+    if (actor.role !== 'SUPER_ADMIN' && actor.siteId && dto.siteId !== actor.siteId) {
+      throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
+    }
+
+    // Plafond de remise selon le rôle : le caissier est limité, le responsable commercial a un plafond plus haut
+    const discount = dto.discountPercent ?? 0;
+    if (discount > 0 && (actor.role === 'CAISSIER' || actor.role === 'RESPONSABLE_COMMERCIAL')) {
+      const caps = await numericSettings(this.prisma, DISCOUNT_CAPS);
+      const cap = actor.role === 'CAISSIER' ? caps.CASHIER_DISCOUNT_CAP_PERCENT : caps.MANAGER_DISCOUNT_CAP_PERCENT;
+      if (discount > cap) throw new ForbiddenException(`Remise limitée à ${cap} % pour votre rôle.`);
+    }
 
     const status = dto.status ?? 'QUOTE';
     const prefix = status === 'QUOTE' ? 'DEV' : 'BCC';
@@ -33,6 +50,7 @@ export class SalesService {
         status,
         discountPercent: dto.discountPercent ?? 0,
         taxPercent: dto.taxPercent ?? 0,
+        saleType: dto.saleType ?? 'CASH',
         notes: dto.notes,
         createdById: actorId,
         lines: {
@@ -141,9 +159,22 @@ export class SalesService {
 
   // ---- Facturation client ----
 
-  async createInvoiceFromOrder(orderId: string, dto: CreateSalesInvoiceDto, actorId: string) {
-    const order = await this.prisma.salesOrder.findUnique({ where: { id: orderId }, include: { lines: true } });
+  async createInvoiceFromOrder(orderId: string, dto: CreateSalesInvoiceDto, actor: Actor) {
+    const actorId = actor.userId;
+    const order = await this.prisma.salesOrder.findUnique({
+      where: { id: orderId },
+      include: { lines: { include: { item: { select: { unitPrice: true } } } } },
+    });
     if (!order) throw new NotFoundException('Commande introuvable.');
+    if (actor.role !== 'SUPER_ADMIN' && actor.siteId && order.siteId !== actor.siteId) {
+      throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
+    }
+
+    // Le caissier ne peut facturer que caisse ouverte ; la facture est rattachée à sa session
+    const session = await this.prisma.cashSession.findFirst({ where: { cashierId: actorId, closedAt: null } });
+    if (actor.role === 'CAISSIER' && !session) {
+      throw new BadRequestException('Ouvrez votre caisse avant de facturer.');
+    }
 
     const subtotal = order.lines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
     const discountAmount = Number((subtotal * (Number(order.discountPercent) / 100)).toFixed(2));
@@ -151,7 +182,28 @@ export class SalesService {
     const taxAmount = Number((taxableBase * (Number(order.taxPercent) / 100)).toFixed(2));
     const totalAmount = Number((taxableBase + taxAmount).toFixed(2));
 
+    // Échéancier (vente échelonnée) : somme = total TTC
+    const installments = dto.installments ?? [];
+    if (installments.length) {
+      const sum = installments.reduce((a, i) => a + i.amount, 0);
+      if (Math.abs(sum - totalAmount) > 1) {
+        throw new BadRequestException(`La somme des échéances (${sum}) doit égaler le total TTC (${Math.round(totalAmount)}).`);
+      }
+    }
+
+    // Coût des marchandises vendues (marge) : renseigné seulement si tous les articles ont un coût connu
+    const costed = order.lines.map((l) => ({
+      qty: Number(l.quantityDelivered) > 0 ? Number(l.quantityDelivered) : Number(l.quantityOrdered),
+      cost: l.item?.unitPrice === null || l.item?.unitPrice === undefined ? null : Number(l.item.unitPrice),
+    }));
+    const cogsAmount = costed.every((c) => c.cost !== null)
+      ? Math.round(costed.reduce((a, c) => a + c.qty * (c.cost as number), 0))
+      : undefined;
+
     const reference = await this.nextReference('FV', 'salesInvoice');
+    const earliest = installments.length
+      ? installments.map((i) => new Date(i.dueDate)).sort((a, b) => +a - +b)[0]
+      : dto.dueDate ? new Date(dto.dueDate) : undefined;
 
     const invoice = await this.prisma.salesInvoice.create({
       data: {
@@ -160,20 +212,52 @@ export class SalesService {
         salesOrderId: order.id,
         reference,
         invoiceDate: new Date(),
-        dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
-        paymentTerm: dto.paymentTerm,
+        dueDate: earliest,
+        paymentTerm: installments.length ? 'CREDIT' : dto.paymentTerm,
         subtotal,
         discountAmount,
         taxAmount,
         totalAmount,
+        cogsAmount,
+        cashSessionId: session?.id,
+        discountApprovedBy: discountAmount > 0 && isCommercialManager(actor) ? actorId : undefined,
         status: 'UNPAID',
         createdById: actorId,
+        ...(installments.length
+          ? { installments: { create: installments.map((i) => ({ dueDate: new Date(i.dueDate), amount: Math.round(i.amount) })) } }
+          : {}),
       },
     });
 
     await this.prisma.salesOrder.update({ where: { id: order.id }, data: { status: 'INVOICED' } });
     await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'SalesInvoice', entityId: invoice.id, newValue: dto });
     return invoice;
+  }
+
+  // Annulation d'une facture non encaissée (direction commerciale). Pour une facture déjà payée : passer par un retour.
+  async cancelInvoice(id: string, reason: string, actor: Actor) {
+    if (!isCommercialManager(actor)) throw new ForbiddenException("Annulation réservée à la direction commerciale.");
+    const invoice = await this.prisma.salesInvoice.findUnique({ where: { id } });
+    if (!invoice) throw new NotFoundException('Facture introuvable.');
+    if (actor.role !== 'SUPER_ADMIN' && actor.siteId && invoice.siteId !== actor.siteId) {
+      throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
+    }
+    if (invoice.status === 'CANCELLED') throw new BadRequestException('Facture déjà annulée.');
+    if (toNumber(invoice.amountPaid) > 0) {
+      throw new BadRequestException('Facture déjà encaissée : enregistrez un retour client pour la corriger.');
+    }
+    const updated = await this.prisma.salesInvoice.update({ where: { id }, data: { status: 'CANCELLED' } });
+    if (invoice.salesOrderId) {
+      const lines = await this.prisma.salesOrderLine.findMany({ where: { salesOrderId: invoice.salesOrderId } });
+      const all = lines.every((l) => Number(l.quantityDelivered) >= Number(l.quantityOrdered));
+      const some = lines.some((l) => Number(l.quantityDelivered) > 0);
+      await this.prisma.salesOrder.update({
+        where: { id: invoice.salesOrderId },
+        data: { status: all ? 'DELIVERED' : some ? 'PARTIALLY_DELIVERED' : 'CONFIRMED' },
+      });
+    }
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'SalesInvoice', entityId: id, newValue: { event: 'CANCELLED' }, reason });
+    return updated;
   }
 
   findAllInvoices(params: { siteId?: string; status?: string }) {

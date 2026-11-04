@@ -58,6 +58,22 @@ model Site {
   purchaseInvoices PurchaseInvoice[]
   salesInvoices  SalesInvoice[]
 
+
+  stockLocations   StockLocation[]
+  stockLots        StockLot[]
+  goodsReceipts    GoodsReceipt[]
+  transfersFrom    StockTransfer[] @relation("TransferFromSite")
+  transfersTo      StockTransfer[] @relation("TransferToSite")
+  cashSessions     CashSession[]
+  salesReturns     SalesReturn[]
+  payments         Payment[]
+  notifications    Notification[]
+  hseIncidents     HseIncident[]
+  hseCorrectiveActions HseCorrectiveAction[]
+  hseToolboxTalks  HseToolboxTalk[]
+  hseInspections   HseInspection[]
+  ppeIssuances     PpeIssuance[]
+  hseWorkedHours   HseWorkedHours[]
   @@index([organizationId])
   @@map("sites")
 }
@@ -91,6 +107,10 @@ enum RoleName {
   MAGASINIER
   CHAUFFEUR
   LECTEUR
+  RESPONSABLE_COMMERCIAL
+  CAISSIER
+  GESTIONNAIRE_HSE
+  AGENT_HSE
 }
 
 model Permission {
@@ -141,6 +161,16 @@ model User {
   trips          Trip[]        @relation("TripCreatedBy")
   attendancesMarked DriverAttendance[] @relation("AttendanceCreatedBy")
 
+
+  cashSessions     CashSession[]
+  notifications    Notification[]
+  hseCorrectiveActions HseCorrectiveAction[] @relation("ActionResponsible")
+  hseToolboxTalks  HseToolboxTalk[] @relation("TalkFacilitator")
+  hseToolboxAttendees HseToolboxAttendee[]
+  hseInspections   HseInspection[] @relation("InspectionInspector")
+  hseIncidentPersons HseIncidentPerson[]
+  ppeIssuances     PpeIssuance[]
+  hseTrainings     HseTraining[]
   @@index([organizationId])
   @@index([roleId])
   @@map("users")
@@ -178,6 +208,11 @@ model Driver {
   trips             Trip[]
   fuelTransactions  FuelTransaction[]
 
+
+  hseIncidentPersons HseIncidentPerson[]
+  hseToolboxAttendees HseToolboxAttendee[]
+  ppeIssuances     PpeIssuance[]
+  hseTrainings     HseTraining[]
   @@index([siteId])
   @@map("drivers")
 }
@@ -255,6 +290,12 @@ model Vehicle {
   stockMovements     StockMovement[]
   downtimes          VehicleDowntime[]
 
+
+  currentHours       Decimal?    @map("current_hours") @db.Decimal(10, 1) // compteur horaire (engins / camions de site)
+  referenceConsumption Decimal?  @map("reference_consumption") @db.Decimal(6, 2) // L/100 km ou L/h constructeur
+  purchaseOrders     PurchaseOrder[]
+  hseIncidents       HseIncident[]
+  hseInspections     HseInspection[]
   @@unique([siteId, registrationNumber])
   @@index([siteId, vehicleType])
   @@map("vehicles")
@@ -301,6 +342,9 @@ model Trip {
   site          Site     @relation(fields: [siteId], references: [id])
   createdBy     User     @relation("TripCreatedBy", fields: [createdById], references: [id])
 
+
+  status        String   @default("PLANNED") // PLANNED | IN_PROGRESS | COMPLETED | CANCELLED
+  endCondition  String?  @map("end_condition")
   @@index([siteId, tripDate])
   @@index([vehicleId])
   @@map("trips")
@@ -331,6 +375,9 @@ model FuelTransaction {
   driver           Driver?  @relation(fields: [driverId], references: [id])
   site             Site     @relation(fields: [siteId], references: [id])
 
+
+  source           String   @default("STATION") // STATION | TANK
+  hours            Decimal? @db.Decimal(10, 1)
   @@index([siteId, transactionDate])
   @@index([vehicleId])
   @@map("fuel_transactions")
@@ -371,6 +418,11 @@ model Maintenance {
   maintenanceType   MaintenanceType @relation(fields: [maintenanceTypeId], references: [id])
   supplier          Supplier? @relation(fields: [supplierId], references: [id])
 
+
+  kind              String   @default("CORRECTIVE") // PREVENTIVE | CORRECTIVE
+  partsCost         Decimal  @default(0) @map("parts_cost") @db.Decimal(14, 0)
+  laborCost         Decimal  @default(0) @map("labor_cost") @db.Decimal(14, 0)
+  nextHours         Decimal? @map("next_hours") @db.Decimal(10, 1)
   @@index([vehicleId])
   @@map("maintenance")
 }
@@ -424,6 +476,23 @@ model InventoryItem {
   salesOrderLines  SalesOrderLine[]
   countLines       InventoryCountLine[]
 
+
+  locationId       String?  @map("location_id")
+  valuationMethod  String   @default("FIFO") @map("valuation_method") // FIFO | LIFO | CMUP
+  reorderPoint     Decimal? @map("reorder_point") @db.Decimal(14, 3)
+  taxRate          Decimal? @map("tax_rate") @db.Decimal(5, 2)
+  salePrice        Decimal? @map("sale_price") @db.Decimal(14, 2)
+  hasExpiry        Boolean  @default(false) @map("has_expiry")
+  isHazardous      Boolean  @default(false) @map("is_hazardous")
+  sdsUrl           String?  @map("sds_url") // fiche de données de sécurité
+  deletedAt        DateTime? @map("deleted_at")
+
+  stockLocation    StockLocation? @relation(fields: [locationId], references: [id])
+  lots             StockLot[]
+  goodsReceiptLines GoodsReceiptLine[]
+  transferLines    StockTransferLine[]
+  salesReturnLines SalesReturnLine[]
+  hseIncidents     HseIncident[]
   @@unique([siteId, sku])
   @@index([siteId])
   @@map("stock_items")
@@ -458,6 +527,8 @@ model InventoryCountLine {
   count            InventoryCount @relation(fields: [countId], references: [id], onDelete: Cascade)
   item             InventoryItem  @relation(fields: [itemId], references: [id])
 
+
+  unitCost         Decimal? @map("unit_cost") @db.Decimal(14, 2)
   @@unique([countId, itemId])
   @@map("inventory_count_lines")
 }
@@ -483,6 +554,19 @@ model StockMovement {
   supplier      Supplier? @relation(fields: [supplierId], references: [id])
   createdBy     User     @relation(fields: [createdById], references: [id])
 
+
+  lotId         String?  @map("lot_id")
+  fromLocationId String? @map("from_location_id")
+  toLocationId  String?  @map("to_location_id")
+  transferId    String?  @map("transfer_id")
+  reasonCode    String?  @map("reason_code") // RECEIPT, CONSUMPTION, SALE, RETURN, LOSS, BREAKAGE, DONATION, SCRAP, COUNT_GAP
+  approvedBy    String?  @map("approved_by")
+  clientOpId    String?  @unique @map("client_op_id") // idempotence hors-ligne
+
+  lot           StockLot? @relation(fields: [lotId], references: [id])
+  fromLocation  StockLocation? @relation("MovementFromLocation", fields: [fromLocationId], references: [id])
+  toLocation    StockLocation? @relation("MovementToLocation", fields: [toLocationId], references: [id])
+  transfer      StockTransfer? @relation(fields: [transferId], references: [id])
   @@index([itemId])
   @@index([siteId, createdAt])
   @@map("stock_movements")
@@ -493,6 +577,7 @@ enum StockMovementType {
   OUT
   ADJUSTMENT
   TRANSFER
+  RETURN
 }
 
 // ============================================================
@@ -517,6 +602,9 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   purchaseInvoices PurchaseInvoice[]
 
+
+  contractualLeadDays Int?  @map("contractual_lead_days")
+  paymentTermDays     Int?  @map("payment_term_days")
   @@map("suppliers")
 }
 
@@ -565,6 +653,14 @@ model Notification {
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at")
 
+
+  siteId    String?  @map("site_id")
+  userId    String?  @map("user_id") // destinataire (vide = par rôle)
+  roleName  String?  @map("role_name")
+  status    String   @default("NEW") // NEW | SEEN | HANDLED
+
+  site      Site?    @relation(fields: [siteId], references: [id])
+  user      User?    @relation(fields: [userId], references: [id])
   @@map("notifications")
 }
 
@@ -662,6 +758,8 @@ model Customer {
   salesOrders  SalesOrder[]
   salesInvoices SalesInvoice[]
 
+
+  paymentTermDays Int? @map("payment_term_days")
   @@index([siteId])
   @@map("customers")
 }
@@ -698,6 +796,15 @@ model PurchaseOrder {
   lines        PurchaseOrderLine[]
   invoices     PurchaseInvoice[]
 
+
+  freightCost  Decimal  @default(0) @map("freight_cost") @db.Decimal(14, 0)
+  approvedBy   String?  @map("approved_by")
+  approvedAt   DateTime? @map("approved_at")
+  vehicleId    String?  @map("vehicle_id")
+  category     String?  // STOCK | PARTS | FUEL
+
+  vehicle      Vehicle? @relation(fields: [vehicleId], references: [id])
+  goodsReceipts GoodsReceipt[]
   @@index([siteId, status])
   @@map("purchase_orders")
 }
@@ -714,6 +821,8 @@ model PurchaseOrderLine {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   item            InventoryItem @relation(fields: [itemId], references: [id])
 
+
+  goodsReceiptLines GoodsReceiptLine[]
   @@index([purchaseOrderId])
   @@map("purchase_order_lines")
 }
@@ -789,6 +898,8 @@ model SalesOrder {
   lines        SalesOrderLine[]
   invoices     SalesInvoice[]
 
+
+  saleType     String   @default("CASH") @map("sale_type") // CASH | CREDIT | INSTALLMENT | PROMO
   @@index([siteId, status])
   @@map("sales_orders")
 }
@@ -805,6 +916,9 @@ model SalesOrderLine {
   salesOrder      SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
   item            InventoryItem @relation(fields: [itemId], references: [id])
 
+
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  taxPercent      Decimal @default(0) @map("tax_percent") @db.Decimal(5, 2)
   @@index([salesOrderId])
   @@map("sales_order_lines")
 }
@@ -833,6 +947,14 @@ model SalesInvoice {
   salesOrder    SalesOrder? @relation(fields: [salesOrderId], references: [id])
   payments      Payment[]
 
+
+  cashSessionId String?  @map("cash_session_id")
+  cogsAmount    Decimal? @map("cogs_amount") @db.Decimal(14, 0) // coût des marchandises vendues (marge)
+  discountApprovedBy String? @map("discount_approved_by")
+
+  cashSession   CashSession? @relation(fields: [cashSessionId], references: [id])
+  installments  SalesInstallment[]
+  returns       SalesReturn[]
   @@index([siteId, status])
   @@map("sales_invoices")
 }
@@ -852,6 +974,7 @@ enum PaymentMethod {
   MOBILE_MONEY
   CHEQUE
   OTHER
+  ORANGE_MONEY
 }
 
 model Payment {
@@ -869,6 +992,15 @@ model Payment {
   salesInvoice      SalesInvoice? @relation(fields: [salesInvoiceId], references: [id])
   purchaseInvoice   PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id])
 
+
+  cashSessionId     String?  @map("cash_session_id")
+  siteId            String?  @map("site_id")
+  externalRef       String?  @map("external_ref") // n° de transaction Orange / Mobile Money
+  reconciled        Boolean  @default(false)
+  clientOpId        String?  @unique @map("client_op_id")
+
+  cashSession       CashSession? @relation(fields: [cashSessionId], references: [id])
+  site              Site?    @relation(fields: [siteId], references: [id])
   @@map("payments")
 }
 
@@ -930,4 +1062,395 @@ model NeedRequestLine {
 
   @@index([requestId])
   @@map("need_request_lines")
+}
+
+// ============================================================
+// TABLEAUX DE BORD PAR DÉPARTEMENT — nouveaux modèles
+// (Logistique, Entrepôt, Commercial & Caisse, Flotte, HSE)
+// ============================================================
+
+// ---- Logistique & approvisionnements ----------------------
+
+model GoodsReceipt {
+  id              String   @id @default(uuid())
+  siteId          String   @map("site_id")
+  purchaseOrderId String   @map("purchase_order_id")
+  reference       String?
+  receivedAt      DateTime @default(now()) @map("received_at")
+  deliveryNoteNo  String?  @map("delivery_note_no")
+  freightCost     Decimal  @default(0) @map("freight_cost") @db.Decimal(14, 0)
+  notes           String?
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  site            Site          @relation(fields: [siteId], references: [id])
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  lines           GoodsReceiptLine[]
+
+  @@index([siteId, receivedAt])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptLine {
+  id                  String  @id @default(uuid())
+  goodsReceiptId      String  @map("goods_receipt_id")
+  purchaseOrderLineId String? @map("purchase_order_line_id")
+  itemId              String  @map("item_id")
+  quantityReceived    Decimal @map("quantity_received") @db.Decimal(14, 3)
+  quantityAccepted    Decimal @map("quantity_accepted") @db.Decimal(14, 3)
+  quantityRejected    Decimal @default(0) @map("quantity_rejected") @db.Decimal(14, 3)
+  rejectReason        String? @map("reject_reason")
+  lotId               String? @map("lot_id")
+
+  goodsReceipt        GoodsReceipt       @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderLine   PurchaseOrderLine? @relation(fields: [purchaseOrderLineId], references: [id])
+  item                InventoryItem      @relation(fields: [itemId], references: [id])
+  lot                 StockLot?          @relation(fields: [lotId], references: [id])
+
+  @@map("goods_receipt_lines")
+}
+
+model StockTransfer {
+  id             String   @id @default(uuid())
+  reference      String?
+  fromSiteId     String   @map("from_site_id")
+  toSiteId       String   @map("to_site_id")
+  fromLocationId String?  @map("from_location_id")
+  toLocationId   String?  @map("to_location_id")
+  status         String   @default("IN_TRANSIT") // DRAFT | IN_TRANSIT | RECEIVED | CANCELLED
+  shippedAt      DateTime? @map("shipped_at")
+  receivedAt     DateTime? @map("received_at")
+  createdBy      String?  @map("created_by")
+  receivedBy     String?  @map("received_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  fromSite       Site     @relation("TransferFromSite", fields: [fromSiteId], references: [id])
+  toSite         Site     @relation("TransferToSite", fields: [toSiteId], references: [id])
+  lines          StockTransferLine[]
+  movements      StockMovement[]
+
+  @@index([status, shippedAt])
+  @@map("stock_transfers")
+}
+
+model StockTransferLine {
+  id         String  @id @default(uuid())
+  transferId String  @map("transfer_id")
+  itemId     String  @map("item_id")
+  lotId      String? @map("lot_id")
+  quantity   Decimal @db.Decimal(14, 3)
+
+  transfer   StockTransfer  @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  item       InventoryItem  @relation(fields: [itemId], references: [id])
+
+  @@map("stock_transfer_lines")
+}
+
+// ---- Entrepôt & stocks ------------------------------------
+
+model StockLocation {
+  id       String  @id @default(uuid())
+  siteId   String  @map("site_id")
+  code     String
+  name     String
+  zone     String?
+  isActive Boolean @default(true) @map("is_active")
+
+  site     Site    @relation(fields: [siteId], references: [id])
+  items    InventoryItem[]
+  lots     StockLot[]
+  movementsFrom StockMovement[] @relation("MovementFromLocation")
+  movementsTo   StockMovement[] @relation("MovementToLocation")
+  hseIncidents  HseIncident[]
+  hseToolboxTalks HseToolboxTalk[]
+  hseInspections  HseInspection[]
+
+  @@unique([siteId, code])
+  @@map("stock_locations")
+}
+
+model StockLot {
+  id          String   @id @default(uuid())
+  itemId      String   @map("item_id")
+  siteId      String   @map("site_id")
+  locationId  String?  @map("location_id")
+  lotNumber   String   @map("lot_number")
+  receivedAt  DateTime @default(now()) @map("received_at")
+  expiryDate  DateTime? @map("expiry_date")
+  quantity    Decimal  @default(0) @db.Decimal(14, 3)
+  unitCost    Decimal  @default(0) @map("unit_cost") @db.Decimal(14, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  item        InventoryItem  @relation(fields: [itemId], references: [id])
+  site        Site           @relation(fields: [siteId], references: [id])
+  location    StockLocation? @relation(fields: [locationId], references: [id])
+  movements   StockMovement[]
+  goodsReceiptLines GoodsReceiptLine[]
+
+  @@index([siteId, expiryDate])
+  @@index([itemId])
+  @@map("stock_lots")
+}
+
+// ---- Commercial & caisse ----------------------------------
+
+model CashSession {
+  id           String   @id @default(uuid())
+  siteId       String   @map("site_id")
+  cashierId    String   @map("cashier_id")
+  openedAt     DateTime @default(now()) @map("opened_at")
+  closedAt     DateTime? @map("closed_at")
+  openingFloat Decimal  @default(0) @map("opening_float") @db.Decimal(14, 0)
+  countedCash  Decimal? @map("counted_cash") @db.Decimal(14, 0)
+  expectedCash Decimal? @map("expected_cash") @db.Decimal(14, 0)
+  gapAmount    Decimal? @map("gap_amount") @db.Decimal(14, 0)
+  validatedBy  String?  @map("validated_by")
+  note         String?
+
+  site         Site     @relation(fields: [siteId], references: [id])
+  cashier      User     @relation(fields: [cashierId], references: [id])
+  invoices     SalesInvoice[]
+  payments     Payment[]
+  expenses     CashExpense[]
+
+  @@index([siteId, openedAt])
+  @@map("cash_sessions")
+}
+
+// Décaissements de caisse (dépenses payées en espèces pendant la session)
+model CashExpense {
+  id            String   @id @default(uuid())
+  cashSessionId String   @map("cash_session_id")
+  amount        Decimal  @db.Decimal(14, 0)
+  reason        String
+  createdBy     String?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  cashSession   CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+
+  @@index([cashSessionId])
+  @@map("cash_expenses")
+}
+
+model SalesInstallment {
+  id             String   @id @default(uuid())
+  salesInvoiceId String   @map("sales_invoice_id")
+  dueDate        DateTime @map("due_date")
+  amount         Decimal  @db.Decimal(14, 0)
+  amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(14, 0)
+
+  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+
+  @@index([dueDate])
+  @@map("sales_installments")
+}
+
+model SalesReturn {
+  id             String   @id @default(uuid())
+  siteId         String   @map("site_id")
+  salesInvoiceId String   @map("sales_invoice_id")
+  reference      String?
+  reason         String
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(14, 0)
+  restock        Boolean  @default(true)
+  status         String   @default("PENDING") // PENDING | VALIDATED | REJECTED
+  createdBy      String?  @map("created_by")
+  validatedBy    String?  @map("validated_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  site           Site         @relation(fields: [siteId], references: [id])
+  salesInvoice   SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
+  lines          SalesReturnLine[]
+
+  @@index([siteId, createdAt])
+  @@map("sales_returns")
+}
+
+model SalesReturnLine {
+  id        String  @id @default(uuid())
+  returnId  String  @map("return_id")
+  itemId    String  @map("item_id")
+  quantity  Decimal @db.Decimal(14, 3)
+  amount    Decimal @db.Decimal(14, 0)
+
+  salesReturn SalesReturn   @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@map("sales_return_lines")
+}
+
+// ---- HSE ---------------------------------------------------
+
+model HseIncident {
+  id              String   @id @default(uuid())
+  siteId          String   @map("site_id")
+  reference       String?
+  occurredAt      DateTime @map("occurred_at")
+  zone            String?
+  locationId      String?  @map("location_id")
+  type            String   // ACCIDENT | NEAR_MISS | DAMAGE | ENVIRONMENT | FIRE | OTHER
+  severity        String   // LOW | MEDIUM | HIGH | CRITICAL
+  lostTime        Boolean  @default(false) @map("lost_time") // accident avec arrêt
+  lostDays        Int      @default(0) @map("lost_days")
+  riskCategory    String?  @map("risk_category")
+  vehicleId       String?  @map("vehicle_id")
+  itemId          String?  @map("item_id")
+  description     String
+  immediateAction String?  @map("immediate_action")
+  rootCause       String?  @map("root_cause")
+  status          String   @default("OPEN") // OPEN | INVESTIGATING | CLOSED
+  photos          Json?
+  reportedBy      String?  @map("reported_by")
+  closedBy        String?  @map("closed_by")
+  closedAt        DateTime? @map("closed_at")
+  clientOpId      String?  @unique @map("client_op_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  site            Site           @relation(fields: [siteId], references: [id])
+  location        StockLocation? @relation(fields: [locationId], references: [id])
+  vehicle         Vehicle?       @relation(fields: [vehicleId], references: [id])
+  item            InventoryItem? @relation(fields: [itemId], references: [id])
+  persons         HseIncidentPerson[]
+  actions         HseCorrectiveAction[]
+
+  @@index([siteId, occurredAt])
+  @@map("hse_incidents")
+}
+
+model HseIncidentPerson {
+  id         String  @id @default(uuid())
+  incidentId String  @map("incident_id")
+  userId     String? @map("user_id")
+  driverId   String? @map("driver_id")
+  fullName   String? @map("full_name")
+  injury     String?
+
+  incident   HseIncident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [userId], references: [id])
+  driver     Driver?     @relation(fields: [driverId], references: [id])
+
+  @@map("hse_incident_persons")
+}
+
+model HseInspection {
+  id          String   @id @default(uuid())
+  siteId      String   @map("site_id")
+  type        String   // WAREHOUSE | VEHICLE | FIRE_EXTINGUISHER | ZONE
+  locationId  String?  @map("location_id")
+  vehicleId   String?  @map("vehicle_id")
+  inspectedAt DateTime @default(now()) @map("inspected_at")
+  inspectorId String?  @map("inspector_id")
+  score       Decimal? @db.Decimal(5, 2)
+  compliant   Boolean?
+  checklist   Json?
+  notes       String?
+
+  site        Site           @relation(fields: [siteId], references: [id])
+  location    StockLocation? @relation(fields: [locationId], references: [id])
+  vehicle     Vehicle?       @relation(fields: [vehicleId], references: [id])
+  inspector   User?          @relation("InspectionInspector", fields: [inspectorId], references: [id])
+  actions     HseCorrectiveAction[]
+
+  @@map("hse_inspections")
+}
+
+model HseCorrectiveAction {
+  id            String   @id @default(uuid())
+  siteId        String   @map("site_id")
+  incidentId    String?  @map("incident_id")
+  inspectionId  String?  @map("inspection_id")
+  title         String
+  responsibleId String?  @map("responsible_id")
+  dueDate       DateTime @map("due_date")
+  status        String   @default("OPEN") // OPEN | IN_PROGRESS | DONE | OVERDUE
+  doneAt        DateTime? @map("done_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  site          Site           @relation(fields: [siteId], references: [id])
+  incident      HseIncident?   @relation(fields: [incidentId], references: [id])
+  inspection    HseInspection? @relation(fields: [inspectionId], references: [id])
+  responsible   User?          @relation("ActionResponsible", fields: [responsibleId], references: [id])
+
+  @@index([status, dueDate])
+  @@map("hse_corrective_actions")
+}
+
+model HseToolboxTalk {
+  id            String   @id @default(uuid())
+  siteId        String   @map("site_id")
+  theme         String
+  plannedAt     DateTime @map("planned_at")
+  heldAt        DateTime? @map("held_at")
+  facilitatorId String?  @map("facilitator_id")
+  locationId    String?  @map("location_id")
+  status        String   @default("PLANNED") // PLANNED | DONE | CANCELLED
+  notes         String?
+
+  site          Site           @relation(fields: [siteId], references: [id])
+  facilitator   User?          @relation("TalkFacilitator", fields: [facilitatorId], references: [id])
+  location      StockLocation? @relation(fields: [locationId], references: [id])
+  attendees     HseToolboxAttendee[]
+
+  @@map("hse_toolbox_talks")
+}
+
+model HseToolboxAttendee {
+  id           String  @id @default(uuid())
+  talkId       String  @map("talk_id")
+  userId       String? @map("user_id")
+  driverId     String? @map("driver_id")
+  fullName     String? @map("full_name")
+  signatureUrl String? @map("signature_url")
+
+  talk         HseToolboxTalk @relation(fields: [talkId], references: [id], onDelete: Cascade)
+  user         User?          @relation(fields: [userId], references: [id])
+  driver       Driver?        @relation(fields: [driverId], references: [id])
+
+  @@map("hse_toolbox_attendees")
+}
+
+model PpeIssuance {
+  id         String   @id @default(uuid())
+  siteId     String   @map("site_id")
+  userId     String?  @map("user_id")
+  driverId   String?  @map("driver_id")
+  ppeType    String   @map("ppe_type") // CASQUE, GILET, CHAUSSURES, GANTS, LUNETTES...
+  issuedAt   DateTime @map("issued_at")
+  renewalDue DateTime? @map("renewal_due")
+  compliant  Boolean  @default(true) // dernier contrôle
+  checkedAt  DateTime? @map("checked_at")
+
+  site       Site     @relation(fields: [siteId], references: [id])
+  user       User?    @relation(fields: [userId], references: [id])
+  driver     Driver?  @relation(fields: [driverId], references: [id])
+
+  @@map("ppe_issuances")
+}
+
+model HseTraining {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  driverId   String?  @map("driver_id")
+  title      String   // habilitation / formation
+  obtainedAt DateTime @map("obtained_at")
+  expiresAt  DateTime? @map("expires_at")
+
+  user       User?    @relation(fields: [userId], references: [id])
+  driver     Driver?  @relation(fields: [driverId], references: [id])
+
+  @@map("hse_trainings")
+}
+
+// Heures travaillées par mois et par site (taux de fréquence des accidents)
+model HseWorkedHours {
+  id      String   @id @default(uuid())
+  siteId  String   @map("site_id")
+  period  DateTime @db.Date // 1er jour du mois
+  hours   Decimal  @db.Decimal(12, 1)
+
+  site    Site     @relation(fields: [siteId], references: [id])
+
+  @@unique([siteId, period])
+  @@map("hse_worked_hours")
 }
