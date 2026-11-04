@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
+import { sessionTotals } from '../cash/cash-math';
 import { DAY_MS, bucketKey, bucketKeys, resolvePeriod, startOfDay, variation } from './dashboard-period';
 
 interface Actor {
@@ -45,9 +46,9 @@ const ACTIONS: Array<{ key: string; label: string; endpoint: string; roles: stri
   { key: 'issue_invoice', label: 'Émettre la facture / le reçu', endpoint: 'POST /sales/orders/:id/invoice', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: true },
   { key: 'record_payment', label: 'Enregistrer un règlement client', endpoint: 'POST /payments', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: true },
   { key: 'new_quote', label: 'Créer un devis / une proforma', endpoint: 'POST /sales/orders (status: QUOTE)', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL'], available: true },
-  { key: 'sales_return', label: 'Retour / annulation (avoir automatique)', endpoint: 'POST /sales/returns', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: false },
-  { key: 'cash_session', label: 'Ouvrir / clôturer la caisse', endpoint: 'POST /cash-sessions/open | /:id/close', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: false },
-  { key: 'cash_expense', label: 'Enregistrer un décaissement de caisse', endpoint: 'POST /cash-sessions/:id/expenses', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: false },
+  { key: 'sales_return', label: 'Retour / annulation (avoir automatique)', endpoint: 'POST /sales/returns', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: true },
+  { key: 'cash_session', label: 'Ouvrir / clôturer la caisse', endpoint: 'POST /cash-sessions/open | /:id/close', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: true },
+  { key: 'cash_expense', label: 'Enregistrer un décaissement de caisse', endpoint: 'POST /cash-sessions/:id/expenses', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'], available: true },
 ];
 
 @Injectable()
@@ -150,6 +151,7 @@ export class CommercialDashboardService {
               select: {
                 id: true, reference: true, invoiceDate: true, dueDate: true, totalAmount: true, amountPaid: true,
                 customer: { select: { id: true, name: true, phone: true } },
+                installments: { select: { dueDate: true, amount: true, amountPaid: true } },
               },
               orderBy: { dueDate: 'asc' },
               take: 5000,
@@ -234,26 +236,46 @@ export class CommercialDashboardService {
 
     // ---------- Créances clients ----------
     const aging = { notDue: 0, d1_30: 0, d31_60: 0, d60plus: 0 };
-    let receivableTotal = 0, overdueTotal = 0, overdueCount = 0;
+    let receivableTotal = 0, overdueTotal = 0;
+    const overdueInvoices = new Set<string>();
     const overdueList: any[] = [];
     const dueTodayList: any[] = [];
     for (const r of receivables as any[]) {
       const remaining = num(r.totalAmount) - num(r.amountPaid);
       if (remaining <= 0) continue;
-      receivableTotal += remaining;
-      const due = startOfDay(new Date(r.dueDate ?? r.invoiceDate));
-      const daysLate = Math.floor((+today - +due) / DAY_MS);
-      if (daysLate <= 0) aging.notDue += remaining;
-      else if (daysLate <= 30) aging.d1_30 += remaining;
-      else if (daysLate <= 60) aging.d31_60 += remaining;
-      else aging.d60plus += remaining;
-      const row = {
-        invoiceId: r.id, reference: r.reference, customer: r.customer?.name ?? '—', phone: r.customer?.phone ?? null,
-        dueDate: r.dueDate ?? r.invoiceDate, remaining: gnf(remaining), daysLate: Math.max(daysLate, 0),
-      };
-      if (daysLate > 0) { overdueTotal += remaining; overdueCount++; overdueList.push(row); }
-      else if (daysLate === 0) dueTodayList.push(row);
+      // Une facture échelonnée se découpe en échéances ; le solde restant est réparti de la plus ancienne à la plus récente
+      let parts: Array<{ due: Date; remaining: number }>;
+      if (r.installments?.length) {
+        let left = remaining;
+        parts = [];
+        for (const inst of [...r.installments].sort((a: any, b: any) => +new Date(a.dueDate) - +new Date(b.dueDate))) {
+          if (left <= 0) break;
+          const take = Math.min(num(inst.amount) - num(inst.amountPaid), left);
+          if (take > 0) { parts.push({ due: new Date(inst.dueDate), remaining: take }); left -= take; }
+        }
+        if (left > 0.5) {
+          if (parts.length) parts[parts.length - 1].remaining += left;
+          else parts.push({ due: new Date(r.dueDate ?? r.invoiceDate), remaining: left });
+        }
+      } else {
+        parts = [{ due: new Date(r.dueDate ?? r.invoiceDate), remaining }];
+      }
+      for (const part of parts) {
+        receivableTotal += part.remaining;
+        const daysLate = Math.floor((+today - +startOfDay(part.due)) / DAY_MS);
+        if (daysLate <= 0) aging.notDue += part.remaining;
+        else if (daysLate <= 30) aging.d1_30 += part.remaining;
+        else if (daysLate <= 60) aging.d31_60 += part.remaining;
+        else aging.d60plus += part.remaining;
+        const row = {
+          invoiceId: r.id, reference: r.reference, customer: r.customer?.name ?? '—', phone: r.customer?.phone ?? null,
+          dueDate: part.due, remaining: gnf(part.remaining), daysLate: Math.max(daysLate, 0), installment: parts.length > 1 || !!r.installments?.length,
+        };
+        if (daysLate > 0) { overdueTotal += part.remaining; overdueInvoices.add(r.id); overdueList.push(row); }
+        else if (daysLate === 0) dueTodayList.push(row);
+      }
     }
+    const overdueCount = overdueInvoices.size;
     overdueList.sort((a, b) => b.daysLate - a.daysLate);
 
     // ---------- Caisse ----------
@@ -261,14 +283,11 @@ export class CommercialDashboardService {
     if (isCashier) {
       const s: any = (sessions as any[])[0] ?? null;
       if (s) {
-        const cashIn = await this.prisma.payment.aggregate({
-          where: { cashSessionId: s.id, direction: 'IN', method: 'CASH' },
-          _sum: { amount: true },
-        });
-        const expected = num(s.openingFloat) + num(cashIn._sum.amount);
+        const t = await sessionTotals(this.prisma, s.id, num(s.openingFloat));
+        const expected = s.closedAt && s.expectedCash !== null && s.expectedCash !== undefined ? num(s.expectedCash) : t.expectedCash;
         cash = {
           sessionId: s.id, open: !s.closedAt, openedAt: s.openedAt, closedAt: s.closedAt,
-          openingFloat: gnf(num(s.openingFloat)), cashCollected: gnf(num(cashIn._sum.amount)),
+          openingFloat: gnf(num(s.openingFloat)), cashCollected: t.cashCollected, cashRefunds: t.cashRefunds, expenses: t.expenses,
           expectedCash: gnf(expected), countedCash: s.countedCash === null ? null : gnf(num(s.countedCash)),
           gap: s.closedAt && s.countedCash !== null ? gnf(num(s.countedCash) - expected) : null,
         };

@@ -105,3 +105,7 @@ CREATE INDEX IF NOT EXISTS sales_returns_site_id_created_at_idx ON sales_returns
 CREATE INDEX IF NOT EXISTS hse_incidents_site_id_occurred_at_idx ON hse_incidents (site_id, occurred_at);
 --#
 CREATE INDEX IF NOT EXISTS hse_corrective_actions_status_due_date_idx ON hse_corrective_actions (status, due_date);
+--#
+CREATE TABLE IF NOT EXISTS cash_expenses (id text PRIMARY KEY, cash_session_id text NOT NULL REFERENCES cash_sessions(id) ON DELETE CASCADE, amount numeric(14,0) NOT NULL, reason text NOT NULL, created_by text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+--#
+CREATE INDEX IF NOT EXISTS cash_expenses_cash_session_id_idx ON cash_expenses (cash_session_id);

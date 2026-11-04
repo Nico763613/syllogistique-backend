@@ -10,6 +10,8 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { MessagingService } from '../messaging/messaging.service';
+import { SalesReturnsService } from './sales-returns.service';
+import { CancelInvoiceDto, CreateSalesReturnDto, RejectSalesReturnDto } from './dto/return.dto';
 
 @ApiTags('sales')
 @ApiBearerAuth()
@@ -21,12 +23,13 @@ export class SalesController {
     private salesService: SalesService,
     private salesDocuments: SalesDocumentsService,
     private messaging: MessagingService,
+    private returns: SalesReturnsService,
   ) {}
 
   @Post('orders')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   createOrder(@Body() dto: CreateSalesOrderDto, @CurrentUser() actor: any) {
-    return this.salesService.createOrder(dto, actor.userId);
+    return this.salesService.createOrder(dto, actor);
   }
 
   @Get('orders')
@@ -54,7 +57,7 @@ export class SalesController {
   @Post('orders/:id/invoice')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   createInvoice(@Param('id') id: string, @Body() dto: CreateSalesInvoiceDto, @CurrentUser() actor: any) {
-    return this.salesService.createInvoiceFromOrder(id, dto, actor.userId);
+    return this.salesService.createInvoiceFromOrder(id, dto, actor);
   }
 
   @Get('invoices')
@@ -99,5 +102,43 @@ export class SalesController {
     const invoice = await this.salesService.findInvoice(id);
     const message = `Bonjour ${invoice.customer.name}, voici votre facture ${invoice.reference} d'un montant de ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF. — SYLLOGISTIQUE`;
     return { link: this.messaging.buildWhatsAppLink(phone, message) };
+  }
+
+  // ---- Retours / avoirs et annulations ----
+
+  @Post('returns')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
+  createReturn(@Body() dto: CreateSalesReturnDto, @CurrentUser() actor: any) {
+    return this.returns.create(dto, actor);
+  }
+
+  @Get('returns')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.LECTEUR)
+  listReturns(@CurrentUser() actor: any, @Query('siteId') siteId?: string, @Query('status') status?: string) {
+    return this.returns.list(actor, { siteId, status });
+  }
+
+  @Get('returns/:id')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.LECTEUR)
+  getReturn(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.returns.get(id, actor);
+  }
+
+  @Post('returns/:id/validate')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL)
+  validateReturn(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.returns.validate(id, actor);
+  }
+
+  @Post('returns/:id/reject')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL)
+  rejectReturn(@Param('id') id: string, @Body() dto: RejectSalesReturnDto, @CurrentUser() actor: any) {
+    return this.returns.reject(id, actor, dto.note);
+  }
+
+  @Post('invoices/:id/cancel')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL)
+  cancelInvoice(@Param('id') id: string, @Body() dto: CancelInvoiceDto, @CurrentUser() actor: any) {
+    return this.salesService.cancelInvoice(id, dto.reason, actor);
   }
 }

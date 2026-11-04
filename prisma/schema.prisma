@@ -1211,9 +1211,25 @@ model CashSession {
   cashier      User     @relation(fields: [cashierId], references: [id])
   invoices     SalesInvoice[]
   payments     Payment[]
+  expenses     CashExpense[]
 
   @@index([siteId, openedAt])
   @@map("cash_sessions")
+}
+
+// Décaissements de caisse (dépenses payées en espèces pendant la session)
+model CashExpense {
+  id            String   @id @default(uuid())
+  cashSessionId String   @map("cash_session_id")
+  amount        Decimal  @db.Decimal(14, 0)
+  reason        String
+  createdBy     String?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  cashSession   CashSession @relation(fields: [cashSessionId], references: [id], onDelete: Cascade)
+
+  @@index([cashSessionId])
+  @@map("cash_expenses")
 }
 
 model SalesInstallment {

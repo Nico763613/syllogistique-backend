@@ -31,6 +31,7 @@ import { DocumentsModule } from './documents/documents.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { SearchModule } from './search/search.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
+import { CashModule } from './cash/cash.module';
 
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -67,6 +68,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     ExpensesModule,
     SearchModule,
     DashboardsModule,
+    CashModule,
   ],
   controllers: [HealthController],
   providers: [

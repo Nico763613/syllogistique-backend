@@ -24,7 +24,7 @@ export class PaymentsController {
     ) {
       throw new ForbiddenException('Votre rôle ne peut enregistrer que des règlements clients.');
     }
-    return this.paymentsService.create(dto, actor.userId);
+    return this.paymentsService.create(dto, actor.userId, actor);
   }
 
   @Get()
