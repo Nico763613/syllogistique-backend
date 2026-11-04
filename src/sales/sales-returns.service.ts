@@ -98,14 +98,15 @@ export class SalesReturnsService {
       // Nouveaux montants de la facture (GNF entiers)
       const newTotal = Math.max(total - amount, 0);
       const newTax = total > 0 ? Math.round((tax * newTotal) / total) : 0;
-      const newSubtotal = newTotal - newTax + discount;
+      const newDiscount = total > 0 ? Math.round((discount * newTotal) / total) : 0; // remise réduite au prorata
+      const newSubtotal = newTotal - newTax + newDiscount;
       const newPaid = Math.min(paid, newTotal);
       const refund = Math.max(paid - newTotal, 0);
       const status = newTotal <= 0 ? 'CANCELLED' : newPaid >= newTotal ? 'PAID' : newPaid > 0 ? 'PARTIALLY_PAID' : 'UNPAID';
 
       await tx.salesInvoice.update({
         where: { id: inv.id },
-        data: { totalAmount: newTotal, taxAmount: newTax, subtotal: newSubtotal, amountPaid: newPaid, status },
+        data: { totalAmount: newTotal, taxAmount: newTax, subtotal: newSubtotal, discountAmount: newDiscount, amountPaid: newPaid, status },
       });
 
       if (refund > 0) {

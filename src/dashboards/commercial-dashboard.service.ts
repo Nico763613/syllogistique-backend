@@ -1,21 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
+import { Actor } from '../common/actor';
+import { Status, gnf, num, pct, resolveSite } from './dashboard-common';
 import { sessionTotals } from '../cash/cash-math';
 import { DAY_MS, bucketKey, bucketKeys, resolvePeriod, startOfDay, variation } from './dashboard-period';
-
-interface Actor {
-  userId: string;
-  role: string;
-  siteId?: string;
-  department?: string;
-}
-
-type Status = 'ok' | 'warning' | 'critical';
-
-const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
-const gnf = (v: number): number => Math.round(v); // montants en GNF entiers
-const pct = (a: number, b: number): number | null => (b ? Math.round((a / b) * 1000) / 10 : null);
 
 // Canaux d'encaissement affichés (Chèque regroupé avec la banque)
 const CHANNEL_OF: Record<string, string> = {
@@ -55,16 +44,8 @@ const ACTIONS: Array<{ key: string; label: string; endpoint: string; roles: stri
 export class CommercialDashboardService {
   constructor(private prisma: PrismaService) {}
 
-  // Site effectif : le Super Admin voit tout ou le site demandé ; les autres restent sur leur site.
   private resolveSite(actor: Actor, requested?: string): string | undefined {
-    if (actor.role === 'SUPER_ADMIN') return requested || undefined;
-    if (actor.siteId) {
-      if (requested && requested !== actor.siteId) {
-        throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
-      }
-      return actor.siteId;
-    }
-    return requested || undefined;
+    return resolveSite(actor, requested);
   }
 
   private async thresholds(): Promise<Record<string, number>> {
