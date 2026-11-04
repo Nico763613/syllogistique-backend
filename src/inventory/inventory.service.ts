@@ -79,6 +79,28 @@ export class InventoryService {
 
       const totalValue = dto.unitPrice ? Number((dto.unitPrice * dto.quantity).toFixed(2)) : undefined;
 
+      // Lot (traçabilité / péremption) : un même numéro de lot s'additionne
+      let lotId: string | undefined;
+      if (dto.lotNumber?.trim()) {
+        const lotNumber = dto.lotNumber.trim();
+        const lot = await tx.stockLot.findFirst({ where: { itemId: dto.itemId, siteId: dto.siteId, lotNumber } });
+        if (lot) {
+          await tx.stockLot.update({ where: { id: lot.id }, data: { quantity: { increment: dto.quantity } } });
+          lotId = lot.id;
+        } else {
+          const created = await tx.stockLot.create({
+            data: {
+              itemId: dto.itemId, siteId: dto.siteId, locationId: dto.locationId ?? item.locationId, lotNumber,
+              quantity: dto.quantity, unitCost: dto.unitPrice ?? Number(item.unitPrice ?? 0),
+              expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : undefined,
+            },
+          });
+          lotId = created.id;
+        }
+      } else if (item.hasExpiry) {
+        throw new BadRequestException('Article périssable : indiquez le numéro de lot et la date de péremption.');
+      }
+
       const movement = await tx.stockMovement.create({
         data: {
           itemId: dto.itemId,
@@ -90,6 +112,9 @@ export class InventoryService {
           unitPrice: dto.unitPrice,
           totalValue,
           reason: dto.reason ?? dto.observations,
+          reasonCode: dto.reasonCode ?? 'RECEIPT',
+          lotId,
+          toLocationId: dto.locationId ?? item.locationId ?? undefined,
           createdById: actorId,
         },
       });
@@ -122,6 +147,27 @@ export class InventoryService {
 
       const totalValue = item.unitPrice ? Number((Number(item.unitPrice) * dto.quantity).toFixed(2)) : undefined;
 
+      // Consommation des lots : le plus proche de la péremption d'abord (FEFO), sinon FIFO — ou LIFO si l'article l'exige
+      let lotId: string | undefined;
+      const lots = await tx.stockLot.findMany({ where: { itemId: dto.itemId, siteId: dto.siteId, quantity: { gt: 0 } } });
+      if (lots.length) {
+        const far = 8.64e15;
+        const ordered = [...lots].sort((a, b) => {
+          const ea = a.expiryDate ? +a.expiryDate : far;
+          const eb = b.expiryDate ? +b.expiryDate : far;
+          if (ea !== eb) return ea - eb;
+          return item.valuationMethod === 'LIFO' ? +b.receivedAt - +a.receivedAt : +a.receivedAt - +b.receivedAt;
+        });
+        let left = dto.quantity;
+        for (const lot of ordered) {
+          if (left <= 0) break;
+          const take = Math.min(Number(lot.quantity), left);
+          await tx.stockLot.update({ where: { id: lot.id }, data: { quantity: { decrement: take } } });
+          lotId ??= lot.id;
+          left -= take;
+        }
+      }
+
       const movement = await tx.stockMovement.create({
         data: {
           itemId: dto.itemId,
@@ -130,6 +176,9 @@ export class InventoryService {
           quantity: dto.quantity,
           vehicleId: dto.vehicleId,
           reason: dto.reason,
+          reasonCode: dto.reasonCode ?? 'CONSUMPTION',
+          lotId,
+          fromLocationId: dto.locationId ?? item.locationId ?? undefined,
           unitPrice: item.unitPrice ?? undefined,
           totalValue,
           createdById: actorId,

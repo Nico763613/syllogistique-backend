@@ -1,5 +1,8 @@
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export const REASON_CODES = ['RECEIPT', 'CONSUMPTION', 'SALE', 'RETURN', 'LOSS', 'BREAKAGE', 'DONATION', 'SCRAP', 'COUNT_GAP'];
+export const VALUATION_METHODS = ['FIFO', 'LIFO', 'CMUP'];
 
 export class CreateInventoryItemDto {
   @IsString() siteId: string;
@@ -17,6 +20,14 @@ export class CreateInventoryItemDto {
   @IsOptional() @IsString() location?: string;
   @IsOptional() @IsString() supplierId?: string;
   @IsOptional() @IsString() photoUrl?: string;
+  @IsOptional() @IsString() locationId?: string;
+  @IsOptional() @IsIn(VALUATION_METHODS) valuationMethod?: string;
+  @IsOptional() @IsNumber() @Min(0) reorderPoint?: number;
+  @IsOptional() @IsNumber() @Min(0) taxRate?: number;
+  @IsOptional() @IsNumber() @Min(0) salePrice?: number;
+  @IsOptional() @IsBoolean() hasExpiry?: boolean;
+  @IsOptional() @IsBoolean() isHazardous?: boolean;
+  @IsOptional() @IsString() sdsUrl?: string;
 }
 
 export class StockInDto {
@@ -29,6 +40,11 @@ export class StockInDto {
   // Motif obligatoire (approvisionnement, retour, dépotage…)
   @IsString() @MinLength(3) reason: string;
   @IsOptional() @IsString() observations?: string;
+  // Traçabilité : lot, péremption, emplacement, motif codifié
+  @IsOptional() @IsString() lotNumber?: string;
+  @IsOptional() @IsDateString() expiryDate?: string;
+  @IsOptional() @IsString() locationId?: string;
+  @IsOptional() @IsIn(REASON_CODES) reasonCode?: string;
 }
 
 export class StockOutDto {
@@ -41,6 +57,8 @@ export class StockOutDto {
   @IsOptional() @IsString() observations?: string;
   // Un magasinier peut être autorisé à forcer une sortie au-delà du stock disponible
   @IsOptional() allowNegative?: boolean;
+  @IsOptional() @IsString() locationId?: string;
+  @IsOptional() @IsIn(REASON_CODES) reasonCode?: string;
 }
 
 // Correction d'un mouvement de stock : motif obligatoire (Audit Trail)
@@ -61,6 +79,14 @@ export class UpdateInventoryItemDto {
   @IsOptional() @IsNumber() @Min(0) minimumQuantity?: number;
   @IsOptional() @IsNumber() @Min(0) maximumQuantity?: number;
   @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
+  @IsOptional() @IsString() locationId?: string;
+  @IsOptional() @IsIn(VALUATION_METHODS) valuationMethod?: string;
+  @IsOptional() @IsNumber() @Min(0) reorderPoint?: number;
+  @IsOptional() @IsNumber() @Min(0) taxRate?: number;
+  @IsOptional() @IsNumber() @Min(0) salePrice?: number;
+  @IsOptional() @IsBoolean() hasExpiry?: boolean;
+  @IsOptional() @IsBoolean() isHazardous?: boolean;
+  @IsOptional() @IsString() sdsUrl?: string;
 }
 
 // ---- Inventaire physique ----

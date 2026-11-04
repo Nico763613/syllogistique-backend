@@ -28,7 +28,7 @@ export class InventoryCountsService {
         location,
         note: dto.note,
         createdById: actorId,
-        lines: { create: items.map((i) => ({ itemId: i.id, expectedQuantity: i.currentQuantity })) },
+        lines: { create: items.map((i) => ({ itemId: i.id, expectedQuantity: i.currentQuantity, unitCost: i.unitPrice ?? undefined })) },
       },
     });
     await this.audit.log({
