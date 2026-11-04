@@ -7,9 +7,20 @@ import { PrismaService } from '../prisma.service';
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  findAll(unreadOnly = false) {
+  // Chaque utilisateur voit les alertes générales + celles adressées à son rôle et à son site.
+  // L'Administrateur Général voit tout.
+  findAll(unreadOnly = false, actor?: { role: string; siteId?: string }) {
+    const scope: any =
+      !actor || actor.role === 'SUPER_ADMIN'
+        ? {}
+        : {
+            AND: [
+              { OR: [{ roleName: null }, { roleName: actor.role }] },
+              ...(actor.siteId ? [{ OR: [{ siteId: null }, { siteId: actor.siteId }] }] : []),
+            ],
+          };
     return this.prisma.notification.findMany({
-      where: unreadOnly ? { isRead: false } : {},
+      where: { ...(unreadOnly ? { isRead: false } : {}), ...scope },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
