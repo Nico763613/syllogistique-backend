@@ -208,6 +208,13 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
+      <div class="nav-section-label" id="nav-dept-label">Départements</div>
+      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">🧭</span> Logistique &amp; Appro.</div>
+      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">🏬</span> Entrepôt &amp; Stocks</div>
+      <div class="nav-item" data-view="dash-commercial" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,RESPONSABLE_COMMERCIAL,CAISSIER,LECTEUR" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
+      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">🚚</span> Charroi &amp; Flotte</div>
+      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
+
       <div class="nav-section-label">Flotte</div>
       <div class="nav-item" data-view="vehicles" onclick="go('vehicles')">
         <span class="nav-icon">🚛</span> Camions &amp; Véhicules
@@ -383,7 +390,9 @@ function enterApp() {
   document.getElementById('user-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
   loadSiteSwitch();
-  go('dashboard');
+  applyRoleNav();
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'dash-hse', AGENT_HSE: 'dash-hse' }[state.user.role];
+  go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
   window.addEventListener('offline', updateSyncPill);
@@ -413,6 +422,8 @@ function roleLabel(r) {
     SUPER_ADMIN: 'Super Administrateur', ADMIN_LOGISTIQUE: 'Administrateur Logistique',
     GESTIONNAIRE_FLOTTE: 'Gestionnaire de flotte', MAGASINIER: 'Magasinier',
     CHAUFFEUR: 'Chauffeur', LECTEUR: 'Lecteur / Superviseur',
+    RESPONSABLE_COMMERCIAL: 'Responsable commercial', CAISSIER: 'Caissier',
+    GESTIONNAIRE_HSE: 'Gestionnaire HSE', AGENT_HSE: 'Agent HSE',
   }[r] || esc(r);
 }
 
@@ -427,6 +438,8 @@ const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
   sync: 'Synchronisation', settings: 'Paramètres',
+  'dash-logistics': 'Logistique & Approvisionnements', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
+  'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
 
 function go(view) {
@@ -442,11 +455,122 @@ function fmt(n) { return Number(n || 0).toLocaleString('fr-FR'); }
 // Échappe toute donnée texte avant insertion dans le HTML (protection XSS)
 function esc(v) { return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 
+/* ---------------- TABLEAUX DE BORD PAR DÉPARTEMENT ---------------- */
+const DEPT_PERIOD = { value: 'month' };
+const WL_TITLES = {
+  expectedDeliveries: 'Livraisons attendues', ordersToApprove: 'Commandes à valider', itemsToReorder: 'Articles à réapprovisionner',
+  transfersToReceive: 'Transferts à réceptionner', supplierInvoicesDueSoon: 'Factures fournisseurs à échéance',
+  stockouts: 'Ruptures et sous-seuil', expiringLots: 'Lots périmés / bientôt périmés', dormantItems: 'Stock dormant', openInventories: 'Inventaires ouverts',
+  overdueReceivables: 'Impayés clients', dueToday: 'Échéances du jour', pendingQuotes: 'Devis en attente', mobileMoneyToReconcile: 'Mobile Money à rapprocher', latestSales: 'Dernières ventes',
+  documentsToRenew: 'Documents à renouveler', maintenanceDue: 'Entretiens dus', consumptionAnomalies: 'Surconsommations', tripsInProgress: 'Missions en cours', openDowntimes: 'Immobilisations en cours',
+  openIncidents: 'Incidents ouverts', overdueActions: 'Actions correctives en retard', upcomingTalks: 'Causeries à venir', trainingsDue: 'Formations à renouveler',
+};
+const CH_TITLES = {
+  purchasesTrend: 'Achats', receiptsTrend: 'Réceptions', spendBySupplier: 'Dépenses par fournisseur', leadTimeBySupplier: 'Délai moyen par fournisseur (jours)', supplierDebtAging: 'Dettes fournisseurs par ancienneté',
+  movementsTrend: 'Mouvements de stock', valueByCategory: 'Valeur par catégorie', abcAnalysis: 'Analyse ABC', lossesByReason: 'Pertes par motif',
+  revenueTrend: "Chiffre d'affaires", paymentsByMethod: 'Encaissements par canal', salesByType: 'Ventes par type', receivablesAging: 'Créances par ancienneté', topCustomers: 'Meilleurs clients', topProducts: 'Meilleurs produits',
+  fuelTrend: 'Carburant', distanceTrend: 'Kilométrage', costBreakdown: 'Répartition des coûts', consumptionByVehicle: 'Consommation par véhicule (L/100 km)', vehiclesByStatus: 'Véhicules par statut', downtimeByCategory: "Immobilisations par cause",
+  incidentsTrend: 'Incidents', incidentsByType: 'Incidents par type', incidentsBySeverity: 'Incidents par gravité', incidentsByRisk: 'Incidents par risque', actionsByStatus: 'Actions correctives',
+};
+const COL_FR = {
+  reference: 'Référence', supplier: 'Fournisseur', expectedDate: 'Date prévue', lateDays: 'Retard (j)', status: 'Statut', remainingQuantity: 'Reste',
+  orderDate: 'Date', amount: 'Montant', name: 'Article', unit: 'Unité', quantity: 'Quantité', threshold: 'Seuil', from: 'De', to: 'Vers', shippedAt: 'Expédié', late: 'En retard', lines: 'Lignes',
+  dueDate: 'Échéance', item: 'Article', lotNumber: 'Lot', expiryDate: 'Péremption', daysLeft: 'Jours', expired: 'Périmé', value: 'Valeur', startedAt: 'Début', location: 'Emplacement', daysOpen: 'Jours ouverts',
+  date: 'Date', customer: 'Client', total: 'Total', invoice: 'Facture', method: 'Mode', label: 'Type', subject: 'Concerné', vehicle: 'Véhicule', type: 'Type', nextDate: 'Prochaine date', kmLeft: 'Km restants', overdue: 'En retard',
+  km: 'Km', liters: 'Litres', actual: 'Réel', reference_: 'Réf.', driver: 'Chauffeur', destination: 'Destination', category: 'Cause', reason: 'Motif', since: 'Depuis', days: 'Jours',
+  severity: 'Gravité', description: 'Description', title: 'Intitulé', daysLate: 'Retard (j)', theme: 'Thème', plannedAt: 'Prévue le', person: 'Personne', expiresAt: 'Expire le', balance: 'Solde', installment: 'Échéance',
+};
+const DEPT_REFRESH = { timer: null };
+
+function fmtCell(k, v) {
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return v ? '<span class="badge bad">Oui</span>' : 'Non';
+  if (/(date|At|Date|since)$/.test(k) && typeof v === 'string' && /^\d{4}-\d\d-\d\d/.test(v)) return new Date(v).toLocaleDateString('fr-FR');
+  if (typeof v === 'number') return fmt(v);
+  return esc(v);
+}
+
+function deptKpiCard(k) {
+  const cls = k.status === 'critical' ? 'bad' : k.status === 'warning' ? 'warn' : 'ok';
+  const val = k.value === null || k.value === undefined ? '—' : fmt(k.value);
+  let v = '';
+  if (k.variationPercent !== null && k.variationPercent !== undefined) {
+    const up = k.variationPercent > 0;
+    const good = k.favorable === 'neutral' ? null : (k.favorable === 'up') === up;
+    const color = good === null ? 'var(--muted)' : good ? 'var(--success)' : 'var(--danger)';
+    v = `<span style="color:${color}; font-weight:600;">${up ? '▲' : '▼'} ${Math.abs(k.variationPercent)} %</span> vs période préc.`;
+  }
+  const border = k.status === 'critical' ? 'var(--danger)' : k.status === 'warning' ? 'var(--gold)' : 'var(--line)';
+  return `<div class="kpi-card" style="border-color:${border}"><div class="kpi-label">${esc(k.label)}</div>
+    <div class="kpi-value mono">${val} <span style="font-size:12px; color:var(--muted); font-family:Inter,sans-serif;">${esc(k.unit || '')}</span></div>
+    <div class="kpi-sub">${v || '&nbsp;'}</div></div>`;
+}
+
+function deptChart(title, rows) {
+  if (!rows || !rows.length) return '';
+  const keys = Object.keys(rows[0]);
+  const labelKey = ['period', 'name', 'label', 'category', 'key', 'type', 'status', 'bucket', 'vehicle', 'reason', 'class'].find((k) => keys.includes(k)) || keys[0];
+  const numKeys = keys.filter((k) => typeof rows[0][k] === 'number' && !/percent|Percent|id$|Id$/.test(k));
+  const nk = ['amount', 'ttc', 'value', 'cost', 'km', 'liters', 'count', 'incidents', 'receipts', 'inValue', 'averageDays', 'actual'].find((k) => numKeys.includes(k)) || numKeys[0];
+  if (!nk) return '';
+  const max = Math.max(1, ...rows.map((r) => Number(r[nk]) || 0));
+  const isTime = labelKey === 'period';
+  const body = isTime
+    ? `<div style="display:flex; align-items:flex-end; gap:3px; height:110px; margin-top:8px;">${rows.map((r) => `<div title="${esc(r[labelKey])} : ${fmt(r[nk])}" style="flex:1; min-width:3px; background:var(--navy); border-radius:3px 3px 0 0; height:${Math.max(2, ((Number(r[nk]) || 0) / max) * 100)}%;"></div>`).join('')}</div>
+       <div class="desc" style="display:flex; justify-content:space-between;"><span>${esc(rows[0][labelKey])}</span><span>${esc(rows[rows.length - 1][labelKey])}</span></div>`
+    : rows.slice(0, 12).map((r) => `<div style="margin-top:7px;"><div style="display:flex; justify-content:space-between; font-size:12px;"><span>${esc(r[labelKey])}</span><b class="mono">${fmt(r[nk])}</b></div>
+        <div style="background:var(--line); border-radius:4px; height:7px;"><div style="background:var(--gold); height:7px; border-radius:4px; width:${((Number(r[nk]) || 0) / max) * 100}%;"></div></div></div>`).join('');
+  return `<div class="panel"><h3 style="margin-top:0;">${esc(title)}</h3>${body}</div>`;
+}
+
+function deptWorklist(title, rows) {
+  if (!rows || !rows.length) return `<div class="panel"><h3 style="margin-top:0;">${esc(title)}</h3><div class="desc">Rien à traiter.</div></div>`;
+  const cols = Object.keys(rows[0]).filter((k) => !/Id$|^id$/.test(k));
+  return `<div class="panel" style="overflow-x:auto;"><h3 style="margin-top:0;">${esc(title)} <span class="badge info">${rows.length}</span></h3>
+    <table><thead><tr>${cols.map((c) => `<th>${esc(COL_FR[c] || c)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${fmtCell(c, r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+
+async function renderDeptDashboard(key) {
+  const q = new URLSearchParams({ period: DEPT_PERIOD.value });
+  if (state.siteId) q.set('siteId', state.siteId);
+  const d = await api('/dashboards/' + key + '?' + q.toString());
+  const periods = [['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois'], ['year', 'Année']];
+  const bar = `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+    ${periods.map(([v, l]) => `<button class="btn small ${DEPT_PERIOD.value === v ? 'gold' : ''}" onclick="DEPT_PERIOD.value='${v}'; renderView(state.view)">${l}</button>`).join('')}
+    <span class="desc" style="margin-left:auto;">${d.access.scope === 'session' ? 'Vue « ma session de caisse » · ' : ''}Période : ${new Date(d.period.from).toLocaleDateString('fr-FR')} → ${new Date(d.period.to).toLocaleDateString('fr-FR')}</span></div>`;
+  const kpis = `<div class="kpi-grid">${(d.kpis || []).map(deptKpiCard).join('')}</div>`;
+  const allowed = (d.actions || []).filter((a) => a.allowed && a.available !== false);
+  const actions = allowed.length ? `<div class="panel"><h3 style="margin-top:0;">Actions rapides</h3><div style="display:flex; flex-wrap:wrap; gap:8px;">${allowed.map((a) => `<span class="badge info" title="${esc(a.endpoint)}">${esc(a.label)}</span>`).join('')}</div>
+    <div class="desc" style="margin-top:8px;">Les écrans de saisie correspondants arrivent dans une prochaine version ; ces opérations sont déjà disponibles côté serveur.</div></div>` : '';
+  const wl = Object.entries(d.worklists || {}).map(([k, rows]) => deptWorklist(WL_TITLES[k] || k, rows)).join('');
+  const ch = `<div class="grid-2">${Object.entries(d.charts || {}).map(([k, rows]) => deptChart(CH_TITLES[k] || k, rows)).join('')}</div>`;
+  root().innerHTML = bar + kpis + actions + ch + wl;
+}
+
+function applyRoleNav() {
+  const role = state.user && state.user.role;
+  let any = false;
+  document.querySelectorAll('.nav-item[data-roles]').forEach((el) => {
+    const ok = el.dataset.roles.split(',').includes(role);
+    el.style.display = ok ? '' : 'none';
+    if (ok) any = true;
+  });
+  // Les rôles départementaux (commercial, caisse, HSE) ne voient que leur espace
+  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE'].includes(role)) {
+    document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings') el.style.display = 'none'; });
+    document.querySelectorAll('#sidebar .nav-section-label').forEach((el) => { if (el.id !== 'nav-dept-label') el.style.display = 'none'; });
+  }
+  const lbl = document.getElementById('nav-dept-label');
+  if (lbl) lbl.style.display = any ? '' : 'none';
+}
+
 /* ---------------- DASHBOARD ---------------- */
 async function renderView(view) {
   root().innerHTML = '<div class="empty">Chargement…</div>';
   try {
     if (view === 'dashboard') return renderDashboard();
+    if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
     if (view === 'vehicles') return renderVehicles();
     if (view === 'drivers') return renderDrivers();
     if (view === 'fuel') return renderFuel();
