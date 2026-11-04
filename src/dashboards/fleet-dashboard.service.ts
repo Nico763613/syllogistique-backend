@@ -118,7 +118,7 @@ export class FleetDashboardService {
     // Entretiens dus : dernier entretien de chaque véhicule/type portant une échéance (date ou kilométrage)
     const allMaint = await this.prisma.maintenance.findMany({
       where: { ...vehicleSite, OR: [{ nextDate: { not: null } }, { nextMileage: { not: null } }] },
-      select: { vehicleId: true, maintenanceTypeId: true, maintenanceDate: true, nextDate: true, nextMileage: true, maintenanceType: { select: { name: true } }, vehicle: { select: { internalNumber: true, currentMileage: true } } },
+      select: { vehicleId: true, maintenanceTypeId: true, maintenanceDate: true, nextDate: true, nextMileage: true, maintenanceType: { select: { label: true } }, vehicle: { select: { internalNumber: true, currentMileage: true } } },
       orderBy: { maintenanceDate: 'desc' },
     });
     const seen = new Set<string>();
@@ -131,7 +131,7 @@ export class FleetDashboardService {
       const kmLeft = m.nextMileage !== null ? m.nextMileage - m.vehicle.currentMileage : null;
       const overdue = (byDate !== null && byDate < 0) || (kmLeft !== null && kmLeft <= 0);
       const soon = (byDate !== null && byDate <= 15) || (kmLeft !== null && kmLeft <= 500);
-      if (overdue || soon) dueList.push({ vehicleId: m.vehicleId, vehicle: m.vehicle.internalNumber, type: m.maintenanceType.name, nextDate: m.nextDate, daysLeft: byDate, kmLeft, overdue });
+      if (overdue || soon) dueList.push({ vehicleId: m.vehicleId, vehicle: m.vehicle.internalNumber, type: m.maintenanceType.label, nextDate: m.nextDate, daysLeft: byDate, kmLeft, overdue });
     }
     dueList.sort((a, b) => Number(b.overdue) - Number(a.overdue) || (a.daysLeft ?? 9999) - (b.daysLeft ?? 9999));
     const overdueMaint = dueList.filter((d) => d.overdue).length;

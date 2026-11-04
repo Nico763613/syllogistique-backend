@@ -34,6 +34,7 @@ import { DashboardsModule } from './dashboards/dashboards.module';
 import { CashModule } from './cash/cash.module';
 import { TransfersModule } from './transfers/transfers.module';
 import { StockLocationsModule } from './stock-locations/stock-locations.module';
+import { HseModule } from './hse/hse.module';
 
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -73,6 +74,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     CashModule,
     TransfersModule,
     StockLocationsModule,
+    HseModule,
   ],
   controllers: [HealthController],
   providers: [
