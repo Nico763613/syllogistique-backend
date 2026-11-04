@@ -32,6 +32,8 @@ export class FuelService {
         receiptNumber: dto.receiptNumber,
         receiptImageUrl: dto.receiptImageUrl,
         observations: dto.observations,
+        source: dto.source ?? 'STATION',
+        hours: dto.hours,
       },
     });
 

@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CreateTripDto {
   @IsString() vehicleId: string;
@@ -19,6 +19,8 @@ export class CloseTripDto {
   @IsDateString() endTime: string;
   @IsInt() @Min(0) endMileage: number;
   @IsOptional() @IsString() observations?: string;
+  // État du véhicule au retour : RAS | DOMMAGE_MINEUR | DOMMAGE_MAJEUR | PANNE
+  @IsOptional() @IsIn(['RAS', 'DOMMAGE_MINEUR', 'DOMMAGE_MAJEUR', 'PANNE']) endCondition?: string;
 }
 
 // Correction d'une erreur de saisie sur une mission : motif obligatoire (Audit Trail)

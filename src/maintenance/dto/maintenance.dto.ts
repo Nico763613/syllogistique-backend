@@ -1,4 +1,4 @@
-import { IsDateString, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateMaintenanceDto {
   @IsString() vehicleId: string;
@@ -12,4 +12,8 @@ export class CreateMaintenanceDto {
   @IsOptional() @IsInt() @Min(0) nextMileage?: number;
   @IsOptional() @IsString() invoiceNumber?: string;
   @IsOptional() @IsString() invoiceUrl?: string;
+  @IsOptional() @IsIn(['PREVENTIVE', 'CORRECTIVE']) kind?: string;
+  @IsOptional() @IsNumber() @Min(0) partsCost?: number;
+  @IsOptional() @IsNumber() @Min(0) laborCost?: number;
+  @IsOptional() @IsNumber() @Min(0) nextHours?: number;
 }
