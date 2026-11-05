@@ -602,22 +602,59 @@ const ACTION_FORMS = {
   },
   async new_sale() {
     const [cust, items] = await Promise.all([api('/customers'), api('/inventory/items?siteId=' + state.siteId)]);
-    openEditor('Vente au comptant (commande → livraison → facture → encaissement)', [
+    openEditor('Nouvelle vente (commande → livraison → facture → encaissement)', [
       { key: 'customerId', label: 'Client', options: needOpt(optList(cust, (x) => x.id, (x) => x.name), 'client') },
       { key: 'itemId', label: 'Article', options: needOpt(optList(items, (x) => x.id, (x) => `${x.name} (${x.currentQuantity} en stock)`), 'article') },
       { key: 'quantity', label: 'Quantité', type: 'number' },
-      { key: 'unitPrice', label: 'Prix unitaire TTC/HT (GNF)', type: 'number' },
+      { key: 'unitPrice', label: 'Prix unitaire (GNF)', type: 'number' },
       { key: 'discountPercent', label: 'Remise (%)', type: 'number' },
+      { key: 'saleType', label: 'Type de vente', options: [['CASH', 'Comptant'], ['CREDIT', 'À crédit'], ['INSTALLMENT', 'Échelonnée (mensualités)']] },
+      { key: 'creditDays', label: 'Crédit : délai de paiement (jours, défaut 30)', type: 'number' },
+      { key: 'installments', label: 'Échelonnée : nombre de mensualités (défaut 3)', type: 'number' },
+      { key: 'deposit', label: 'Acompte / montant encaissé maintenant (GNF) — comptant : laisser vide = tout', type: 'number' },
       { key: 'method', label: "Mode d'encaissement", options: [['CASH', 'Espèces'], ['ORANGE_MONEY', 'Orange Money'], ['MOBILE_MONEY', 'Mobile Money'], ['BANK_TRANSFER', 'Virement']] },
       { key: 'externalRef', label: 'N° de transaction (mobile money / virement)' },
     ], async (d) => {
-      const op = 'web-' + Date.now();
-      const order = await api('/sales/orders', { method: 'POST', body: { siteId: state.siteId, customerId: d.customerId, orderDate: nowIso(), status: 'CONFIRMED', saleType: 'CASH', discountPercent: d.discountPercent || 0, lines: [{ itemId: d.itemId, quantityOrdered: d.quantity, unitPrice: d.unitPrice }] } });
+      const type = d.saleType || 'CASH';
+      const order = await api('/sales/orders', { method: 'POST', body: { siteId: state.siteId, customerId: d.customerId, orderDate: nowIso(), status: 'CONFIRMED', saleType: type, discountPercent: d.discountPercent || 0, lines: [{ itemId: d.itemId, quantityOrdered: d.quantity, unitPrice: d.unitPrice }] } });
       const full = order.lines ? order : await api('/sales/orders/' + order.id);
       await api('/sales/orders/' + order.id + '/deliver', { method: 'POST', body: { lines: full.lines.map((l) => ({ lineId: l.id, quantityDelivered: Number(l.quantityOrdered) })) } });
-      const inv = await api('/sales/orders/' + order.id + '/invoice', { method: 'POST', body: { paymentTerm: 'CASH' } });
-      await api('/payments', { method: 'POST', body: { direction: 'IN', method: d.method, amount: Number(inv.totalAmount), paymentDate: nowIso(), salesInvoiceId: inv.id, externalRef: d.externalRef, clientOpId: op } });
-      alert('Vente enregistrée : facture ' + (inv.reference || '') + ' — ' + fmt(inv.totalAmount) + ' GNF encaissés.');
+      const invBody = { paymentTerm: type === 'CASH' ? 'CASH' : 'CREDIT' };
+      const DAY = 86400000;
+      if (type === 'CREDIT') invBody.dueDate = new Date(Date.now() + (d.creditDays || 30) * DAY).toISOString();
+      if (type === 'INSTALLMENT') {
+        const subtotal = full.lines.reduce((a, l) => a + Number(l.lineTotal), 0);
+        const disc = Number((subtotal * (Number(full.discountPercent || 0) / 100)).toFixed(2));
+        const tax = Number(((subtotal - disc) * (Number(full.taxPercent || 0) / 100)).toFixed(2));
+        const total = Number((subtotal - disc + tax).toFixed(2));
+        const n = Math.max(2, Math.min(24, Math.round(d.installments || 3)));
+        const each = Math.floor(total / n);
+        invBody.installments = Array.from({ length: n }, (_, i) => ({
+          dueDate: new Date(Date.now() + (i + 1) * 30 * DAY).toISOString(),
+          amount: i === n - 1 ? Number((total - each * (n - 1)).toFixed(2)) : each,
+        }));
+        invBody.dueDate = invBody.installments[n - 1].dueDate;
+      }
+      const inv = await api('/sales/orders/' + order.id + '/invoice', { method: 'POST', body: invBody });
+      const pay = type === 'CASH' ? (d.deposit || Number(inv.totalAmount)) : (d.deposit || 0);
+      if (pay > 0) await api('/payments', { method: 'POST', body: { direction: 'IN', method: d.method, amount: Math.min(pay, Number(inv.totalAmount)), paymentDate: nowIso(), salesInvoiceId: inv.id, externalRef: d.externalRef, clientOpId: 'web-' + Date.now() } });
+      alert(`Vente enregistrée : facture ${inv.reference || ''} — total ${fmt(inv.totalAmount)} GNF, encaissé ${fmt(Math.min(pay, Number(inv.totalAmount)))} GNF.`);
+      refreshDept();
+    });
+  },
+  async record_payment() {
+    const [a, b] = await Promise.all([api('/sales/invoices?siteId=' + state.siteId + '&status=UNPAID'), api('/sales/invoices?siteId=' + state.siteId + '&status=PARTIALLY_PAID')]);
+    const inv = [...a, ...b].filter((x) => Number(x.totalAmount) - Number(x.amountPaid) > 0);
+    const bal = (x) => Number(x.totalAmount) - Number(x.amountPaid);
+    openEditor('Enregistrer un règlement client', [
+      { key: 'id', label: 'Facture impayée', options: needOpt(optList(inv, (x) => x.id, (x) => `${x.reference} — ${x.customer?.name || ''} — reste ${fmt(bal(x))} GNF`), 'facture impayée') },
+      { key: 'amount', label: 'Montant reçu (GNF) — vide = solde complet', type: 'number' },
+      { key: 'method', label: 'Mode de paiement', options: [['CASH', 'Espèces'], ['ORANGE_MONEY', 'Orange Money'], ['MOBILE_MONEY', 'Mobile Money'], ['BANK_TRANSFER', 'Virement'], ['CHEQUE', 'Chèque']] },
+      { key: 'externalRef', label: 'N° de transaction' },
+    ], async (d) => {
+      const x = inv.find((i) => i.id === d.id);
+      const amount = Math.min(d.amount || bal(x), bal(x));
+      await api('/payments', { method: 'POST', body: { direction: 'IN', method: d.method, amount, paymentDate: nowIso(), salesInvoiceId: d.id, externalRef: d.externalRef, clientOpId: 'web-' + Date.now() } });
       refreshDept();
     });
   },
@@ -723,7 +760,6 @@ async function stockMove(dir) {
 
 const ACTION_FALLBACK = {
   issue_invoice: 'L\'écran de facturation arrive dans une prochaine version.',
-  record_payment: 'L\'écran d\'encaissement arrive dans une prochaine version.',
   new_quote: 'L\'écran de devis arrive dans une prochaine version.',
   sales_return: 'L\'écran de retour client arrive dans une prochaine version.',
   maintenance: 'Utilisez le menu Maintenance.',
