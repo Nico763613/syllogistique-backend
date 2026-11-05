@@ -541,11 +541,186 @@ async function renderDeptDashboard(key) {
     <span class="desc" style="margin-left:auto;">${d.access.scope === 'session' ? 'Vue « ma session de caisse » · ' : ''}Période : ${new Date(d.period.from).toLocaleDateString('fr-FR')} → ${new Date(d.period.to).toLocaleDateString('fr-FR')}</span></div>`;
   const kpis = `<div class="kpi-grid">${(d.kpis || []).map(deptKpiCard).join('')}</div>`;
   const allowed = (d.actions || []).filter((a) => a.allowed && a.available !== false);
-  const actions = allowed.length ? `<div class="panel"><h3 style="margin-top:0;">Actions rapides</h3><div style="display:flex; flex-wrap:wrap; gap:8px;">${allowed.map((a) => `<span class="badge info" title="${esc(a.endpoint)}">${esc(a.label)}</span>`).join('')}</div>
-    <div class="desc" style="margin-top:8px;">Les écrans de saisie correspondants arrivent dans une prochaine version ; ces opérations sont déjà disponibles côté serveur.</div></div>` : '';
+  const actions = allowed.length ? `<div class="panel"><h3 style="margin-top:0;">Actions rapides</h3><div style="display:flex; flex-wrap:wrap; gap:8px;">${allowed.map((a) => `<button class="btn small ${ACTION_FORMS[a.key] ? '' : 'gold'}" style="${ACTION_FORMS[a.key] ? '' : 'opacity:.75;'}" onclick="runAction('${esc(a.key)}')">${esc(a.label)}</button>`).join('')}</div></div>` : '';
   const wl = Object.entries(d.worklists || {}).map(([k, rows]) => deptWorklist(WL_TITLES[k] || k, rows)).join('');
   const ch = `<div class="grid-2">${Object.entries(d.charts || {}).map(([k, rows]) => deptChart(CH_TITLES[k] || k, rows)).join('')}</div>`;
   root().innerHTML = bar + kpis + actions + ch + wl;
+}
+
+/* ---------------- FORMULAIRES DES ACTIONS RAPIDES ---------------- */
+const today10 = () => new Date().toISOString().slice(0, 10);
+const nowIso = () => new Date().toISOString();
+const optList = (rows, v, l) => rows.map((r) => [String(v(r)), String(l(r))]);
+const needOpt = (opts, what) => { if (!opts.length) throw new Error(`Aucun(e) ${what} disponible : créez-en d'abord.`); return opts; };
+
+const ACTION_FORMS = {
+  async new_order() {
+    const [sup, items] = await Promise.all([api('/suppliers'), api('/inventory/items?siteId=' + state.siteId)]);
+    openEditor('Nouveau bon de commande', [
+      { key: 'supplierId', label: 'Fournisseur', options: needOpt(optList(sup, (x) => x.id, (x) => x.name), 'fournisseur') },
+      { key: 'itemId', label: 'Article', options: needOpt(optList(items, (x) => x.id, (x) => x.name), 'article') },
+      { key: 'quantityOrdered', label: 'Quantité', type: 'number' },
+      { key: 'unitPrice', label: 'Prix unitaire (GNF)', type: 'number' },
+      { key: 'expectedDate', label: 'Livraison prévue', type: 'date' },
+    ], async (d) => {
+      await api('/purchases/orders', { method: 'POST', body: { siteId: state.siteId, supplierId: d.supplierId, orderDate: nowIso(), expectedDate: d.expectedDate ? new Date(d.expectedDate).toISOString() : undefined, lines: [{ itemId: d.itemId, quantityOrdered: d.quantityOrdered, unitPrice: d.unitPrice }] } });
+      refreshDept();
+    });
+  },
+  async approve_order() {
+    const o = (await api('/purchases/orders?siteId=' + state.siteId + '&status=DRAFT'));
+    openEditor('Valider un bon de commande', [{ key: 'id', label: 'Bon de commande (brouillon)', options: needOpt(optList(o, (x) => x.id, (x) => x.reference), 'brouillon') }],
+      async (d) => { await api('/purchases/orders/' + d.id + '/confirm', { method: 'POST' }); refreshDept(); });
+  },
+  async receive() {
+    const all = await api('/purchases/orders?siteId=' + state.siteId);
+    const o = all.filter((x) => ['CONFIRMED', 'PARTIALLY_RECEIVED'].includes(x.status));
+    openEditor('Réceptionner une livraison (reçoit tout le reste à livrer)', [
+      { key: 'id', label: 'Bon de commande', options: needOpt(optList(o, (x) => x.id, (x) => x.reference), 'commande à réceptionner') },
+      { key: 'deliveryNoteNo', label: 'N° bon de livraison' },
+      { key: 'freightCost', label: 'Frais de transport (GNF)', type: 'number' },
+    ], async (d) => {
+      const order = await api('/purchases/orders/' + d.id);
+      const lines = order.lines.map((l) => ({ lineId: l.id, quantityReceived: Number(l.quantityOrdered) - Number(l.quantityReceived) })).filter((l) => l.quantityReceived > 0);
+      if (!lines.length) throw new Error('Rien à réceptionner sur cette commande.');
+      await api('/purchases/orders/' + d.id + '/receive', { method: 'POST', body: { lines, deliveryNoteNo: d.deliveryNoteNo, freightCost: d.freightCost } });
+      refreshDept();
+    });
+  },
+  async transfer() {
+    const [sites, items] = await Promise.all([api('/sites'), api('/inventory/items?siteId=' + state.siteId)]);
+    openEditor('Transfert vers un autre site', [
+      { key: 'toSiteId', label: 'Site de destination', options: needOpt(optList(sites.filter((x) => x.id !== state.siteId), (x) => x.id, (x) => x.name), 'autre site') },
+      { key: 'itemId', label: 'Article', options: needOpt(optList(items, (x) => x.id, (x) => `${x.name} (${x.currentQuantity})`), 'article') },
+      { key: 'quantity', label: 'Quantité', type: 'number' },
+    ], async (d) => { await api('/transfers', { method: 'POST', body: { fromSiteId: state.siteId, toSiteId: d.toSiteId, lines: [{ itemId: d.itemId, quantity: d.quantity }] } }); refreshDept(); });
+  },
+  async receive_transfer() {
+    const t = await api('/transfers?status=IN_TRANSIT&siteId=' + state.siteId);
+    openEditor('Réceptionner un transfert', [{ key: 'id', label: 'Transfert en transit', options: needOpt(optList(t.filter((x) => x.toSiteId === state.siteId), (x) => x.id, (x) => `${x.reference} (de ${x.fromSite?.name || '?'})`), 'transfert à réceptionner') }],
+      async (d) => { await api('/transfers/' + d.id + '/receive', { method: 'POST', body: {} }); refreshDept(); });
+  },
+  async stock_in() { return stockMove('in'); },
+  async stock_out() { return stockMove('out'); },
+  async fuel() {
+    const [v, dr] = await Promise.all([api('/vehicles?siteId=' + state.siteId), api('/drivers?siteId=' + state.siteId)]);
+    openEditor('Saisir un plein de carburant', [
+      { key: 'vehicleId', label: 'Véhicule', options: needOpt(optList(v, (x) => x.id, (x) => x.internalNumber), 'véhicule') },
+      { key: 'driverId', label: 'Chauffeur', options: [['', '—'], ...optList(dr, (x) => x.id, (x) => `${x.firstName} ${x.lastName}`)] },
+      { key: 'quantityLiters', label: 'Litres', type: 'number' },
+      { key: 'mileage', label: 'Kilométrage', type: 'number' },
+      { key: 'source', label: 'Source', options: [['STATION', 'Station'], ['TANK', 'Cuve du site']] },
+    ], async (d) => { await api('/fuel', { method: 'POST', body: { ...d, siteId: state.siteId, transactionDate: nowIso() } }); refreshDept(); });
+  },
+  async assign_mission() {
+    const [v, dr] = await Promise.all([api('/vehicles?siteId=' + state.siteId), api('/drivers?siteId=' + state.siteId)]);
+    openEditor('Affecter une mission', [
+      { key: 'vehicleId', label: 'Véhicule', options: needOpt(optList(v, (x) => x.id, (x) => `${x.internalNumber} (${x.currentMileage} km)`), 'véhicule') },
+      { key: 'driverId', label: 'Chauffeur', options: needOpt(optList(dr, (x) => x.id, (x) => `${x.firstName} ${x.lastName}`), 'chauffeur') },
+      { key: 'startMileage', label: 'Kilométrage de départ', type: 'number' },
+      { key: 'destination', label: 'Destination' },
+      { key: 'purpose', label: 'Objet' },
+    ], async (d) => { await api('/trips', { method: 'POST', body: { ...d, siteId: state.siteId, tripDate: nowIso(), startTime: nowIso() } }); refreshDept(); });
+  },
+  async close_mission() {
+    const t = (await api('/trips?siteId=' + state.siteId)).filter((x) => x.status === 'IN_PROGRESS' || (!x.endTime && !x.endMileage));
+    openEditor('Retour de mission', [
+      { key: 'id', label: 'Mission en cours', options: needOpt(optList(t, (x) => x.id, (x) => `${x.destination || 'Mission'} — ${x.vehicle?.internalNumber || String(x.id).slice(0, 6)}`), 'mission en cours') },
+      { key: 'endMileage', label: "Kilométrage d'arrivée", type: 'number' },
+      { key: 'endCondition', label: 'État du véhicule', options: [['RAS', 'RAS'], ['DOMMAGE_MINEUR', 'Dommage mineur'], ['DOMMAGE_MAJEUR', 'Dommage majeur'], ['PANNE', 'Panne']] },
+    ], async (d) => { await api('/trips/' + d.id + '/close', { method: 'PATCH', body: { endTime: nowIso(), endMileage: d.endMileage, endCondition: d.endCondition } }); refreshDept(); });
+  },
+  async declare_incident() {
+    openEditor('Déclarer un incident / presque-accident', [
+      { key: 'type', label: 'Type', options: [['NEAR_MISS', 'Presque-accident'], ['ACCIDENT', 'Accident'], ['DAMAGE', 'Dégât matériel'], ['ENVIRONMENT', 'Environnement'], ['FIRE', 'Incendie'], ['OTHER', 'Autre']] },
+      { key: 'severity', label: 'Gravité', options: [['LOW', 'Faible'], ['MEDIUM', 'Moyenne'], ['HIGH', 'Élevée'], ['CRITICAL', 'Critique']] },
+      { key: 'description', label: 'Description' },
+      { key: 'zone', label: 'Zone / lieu' },
+      { key: 'lostDays', label: "Jours d'arrêt (si accident avec arrêt)", type: 'number' },
+      { key: 'immediateAction', label: 'Action immédiate' },
+    ], async (d) => { await api('/hse/incidents', { method: 'POST', body: { ...d, siteId: state.siteId, occurredAt: nowIso(), clientOpId: 'web-' + Date.now() } }); refreshDept(); });
+  },
+  async corrective_action() {
+    openEditor('Action corrective', [
+      { key: 'title', label: 'Action à mener' },
+      { key: 'dueDate', label: 'Échéance', type: 'date', value: today10() },
+    ], async (d) => { await api('/hse/actions', { method: 'POST', body: { siteId: state.siteId, title: d.title, dueDate: new Date(d.dueDate).toISOString() } }); refreshDept(); });
+  },
+  async toolbox_talk() {
+    openEditor('Planifier une causerie sécurité', [
+      { key: 'theme', label: 'Thème' },
+      { key: 'plannedAt', label: 'Date prévue', type: 'date', value: today10() },
+    ], async (d) => { await api('/hse/talks', { method: 'POST', body: { siteId: state.siteId, theme: d.theme, plannedAt: new Date(d.plannedAt).toISOString() } }); refreshDept(); });
+  },
+  async inspection() {
+    openEditor('Inspection HSE', [
+      { key: 'type', label: 'Type', options: [['WAREHOUSE', 'Entrepôt'], ['VEHICLE', 'Véhicule'], ['FIRE_EXTINGUISHER', 'Extincteurs'], ['ZONE', 'Zone']] },
+      { key: 'compliant', label: 'Résultat', options: [['true', 'Conforme'], ['false', 'Non conforme']] },
+      { key: 'notes', label: 'Observations' },
+    ], async (d) => { await api('/hse/inspections', { method: 'POST', body: { siteId: state.siteId, type: d.type, compliant: d.compliant === 'true', notes: d.notes } }); refreshDept(); });
+  },
+  async worked_hours() {
+    openEditor('Heures travaillées du mois', [
+      { key: 'period', label: 'Mois (1er jour)', type: 'date', value: today10().slice(0, 8) + '01' },
+      { key: 'hours', label: 'Heures travaillées (tous agents)', type: 'number' },
+    ], async (d) => { await api('/hse/worked-hours', { method: 'PUT', body: { siteId: state.siteId, period: new Date(d.period).toISOString(), hours: d.hours } }); refreshDept(); });
+  },
+  async cash_session() {
+    const cur = await api('/cash-sessions/current').catch(() => null);
+    if (cur && cur.id) {
+      openEditor('Clôturer la caisse', [{ key: 'countedCash', label: 'Espèces comptées (GNF)', type: 'number' }, { key: 'note', label: 'Note' }],
+        async (d) => { await api('/cash-sessions/' + cur.id + '/close', { method: 'POST', body: d }); refreshDept(); });
+    } else {
+      openEditor('Ouvrir la caisse', [{ key: 'openingFloat', label: 'Fonds de caisse initial (GNF)', type: 'number' }],
+        async (d) => { await api('/cash-sessions/open', { method: 'POST', body: { siteId: state.siteId, openingFloat: d.openingFloat || 0 } }); refreshDept(); });
+    }
+  },
+  async cash_expense() {
+    const cur = await api('/cash-sessions/current').catch(() => null);
+    if (!cur || !cur.id) throw new Error("Ouvrez d'abord la caisse.");
+    openEditor('Décaissement de caisse', [{ key: 'amount', label: 'Montant (GNF)', type: 'number' }, { key: 'reason', label: 'Motif' }],
+      async (d) => { await api('/cash-sessions/' + cur.id + '/expenses', { method: 'POST', body: d }); refreshDept(); });
+  },
+};
+
+async function stockMove(dir) {
+  const items = await api('/inventory/items?siteId=' + state.siteId);
+  const fields = [
+    { key: 'itemId', label: 'Article', options: needOpt(optList(items, (x) => x.id, (x) => `${x.name} (${x.currentQuantity} ${x.unit || ''})`), 'article') },
+    { key: 'quantity', label: 'Quantité', type: 'number' },
+    { key: 'reason', label: 'Motif' },
+  ];
+  if (dir === 'in') fields.push({ key: 'unitPrice', label: 'Prix unitaire (GNF)', type: 'number' }, { key: 'lotNumber', label: 'N° de lot (obligatoire si périssable)' }, { key: 'expiryDate', label: 'Date de péremption', type: 'date' });
+  else fields.push({ key: 'reasonCode', label: 'Nature de la sortie', options: [['CONSUMPTION', 'Consommation'], ['SALE', 'Vente'], ['LOSS', 'Perte / vol'], ['BREAKAGE', 'Casse'], ['SCRAP', 'Rebut'], ['DONATION', 'Don']] });
+  openEditor(dir === 'in' ? 'Entrée de stock' : 'Sortie de stock', fields, async (d) => {
+    const body = { ...d, siteId: state.siteId };
+    if (body.expiryDate) body.expiryDate = new Date(body.expiryDate).toISOString();
+    await api('/inventory/movements/' + dir, { method: 'POST', body });
+    refreshDept();
+  });
+}
+
+const ACTION_FALLBACK = {
+  new_sale: 'La vente se fait par commande puis facture : l\'écran de vente arrive dans une prochaine version.',
+  issue_invoice: 'L\'écran de facturation arrive dans une prochaine version.',
+  record_payment: 'L\'écran d\'encaissement arrive dans une prochaine version.',
+  new_quote: 'L\'écran de devis arrive dans une prochaine version.',
+  sales_return: 'L\'écran de retour client arrive dans une prochaine version.',
+  maintenance: 'Utilisez le menu Maintenance.',
+  documents: 'Utilisez la fiche du véhicule (Camions & Véhicules).',
+  inventory: 'Utilisez le menu Stocks.',
+  locations: 'L\'écran des emplacements arrive dans une prochaine version.',
+  reorder: 'Utilisez le menu Achats (réapprovisionnement).',
+  supplier_invoice: 'Utilisez le menu Achats.',
+  ppe: 'L\'écran de remise d\'EPI arrive dans une prochaine version.',
+  training: 'L\'écran des formations arrive dans une prochaine version.',
+};
+function refreshDept() { if (state.view && state.view.startsWith('dash-')) renderView(state.view); }
+async function runAction(key) {
+  try {
+    if (ACTION_FORMS[key]) return await ACTION_FORMS[key]();
+    alert(ACTION_FALLBACK[key] || 'Cette action arrive dans une prochaine version.');
+  } catch (e) { alert(e.message); }
 }
 
 function applyRoleNav() {
