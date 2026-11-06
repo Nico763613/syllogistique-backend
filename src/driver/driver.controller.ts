@@ -8,7 +8,7 @@ import { DriverDeviceGuard } from './driver-device.guard';
 import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
-import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, SyncDto } from './driver.dto';
+import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, SyncDto, TakeoverDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -29,6 +29,27 @@ export class DriverController {
   @UseGuards(DriverDeviceGuard)
   me(@CurrentUser() user: any, @Req() req: any) {
     return this.app.me(user.userId, req.driverDevice);
+  }
+
+  @Post('profile')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  profile(@Body() dto: UpdateProfileDto, @CurrentUser() user: any) {
+    return this.app.updateProfile(user.userId, dto.phone);
+  }
+
+  @Get('vehicles')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  vehicles(@CurrentUser() user: any) {
+    return this.app.availableVehicles(user.userId);
+  }
+
+  @Post('takeover')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  takeover(@Body() dto: TakeoverDto, @CurrentUser() user: any) {
+    return this.app.takeover(user.userId, dto.vehicleId, dto.reason, dto.note);
   }
 
   @Post('sync')

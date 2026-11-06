@@ -34,3 +34,14 @@ export class SyncOpDto {
 export class SyncDto {
   @IsArray() @ArrayMaxSize(100) ops: SyncOpDto[];
 }
+
+export class UpdateProfileDto {
+  @IsString() @MinLength(6) @MaxLength(30) phone: string;
+}
+
+export class TakeoverDto {
+  @IsString() vehicleId: string;
+  // MALADIE | CONGE | AUTRE
+  @IsIn(['MALADIE', 'CONGE', 'AUTRE']) reason: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+}
