@@ -356,6 +356,15 @@ model Trip {
   startLng      Float?   @map("start_lng")
   endLat        Float?   @map("end_lat")
   endLng        Float?   @map("end_lng")
+  // Fiche chauffeur : nature, régions, chargement, voyages, état avant départ, maintenance
+  purposeType   String?  @map("purpose_type") // MISSION | AUTRE | TRANSPORT
+  regions       String[] @default([])
+  cargo         String?
+  tripsCount    Int?     @map("trips_count")
+  preCondition  String?  @map("pre_condition") // RAS | ANOMALIE
+  preAnomalies  String?  @map("pre_anomalies")
+  maintenanceNeeded Boolean? @map("maintenance_needed")
+  maintenanceReason String?  @map("maintenance_reason")
   @@index([siteId, tripDate])
   @@index([vehicleId])
   @@map("trips")
