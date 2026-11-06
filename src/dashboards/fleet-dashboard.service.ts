@@ -39,7 +39,7 @@ export class FleetDashboardService {
       }),
       this.prisma.trip.findMany({
         where: { ...siteWhere, tripDate: { gte: p.from, lt: p.to } },
-        select: { id: true, vehicleId: true, tripDate: true, startTime: true, status: true, distance: true, destination: true, driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { internalNumber: true } } },
+        select: { id: true, vehicleId: true, tripDate: true, startTime: true, status: true, distance: true, destination: true, scheduledArrival: true, driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { internalNumber: true } } },
       }),
       this.prisma.trip.aggregate({ where: { ...siteWhere, tripDate: { gte: p.previousFrom, lt: p.previousTo } }, _sum: { distance: true }, _count: { _all: true } }),
       this.prisma.fuelTransaction.findMany({
