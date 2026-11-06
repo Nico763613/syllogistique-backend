@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 
 export class CreateTripDto {
   @IsString() vehicleId: string;
@@ -7,8 +7,11 @@ export class CreateTripDto {
   @IsDateString() tripDate: string;
   @IsDateString() startTime: string;
   @IsOptional() @IsDateString() endTime?: string;
-  @IsInt() @Min(0) startMileage: number;
+  @IsOptional() @IsInt() @Min(0) startMileage?: number; // omis pour une mission planifiée : compteur du véhicule
   @IsOptional() @IsInt() @Min(0) endMileage?: number;
+  // Mission planifiée (affectée au chauffeur, démarrée depuis l'application mobile)
+  @IsOptional() @IsBoolean() planned?: boolean;
+  @IsOptional() @IsDateString() scheduledArrival?: string;
   @IsOptional() @IsString() destination?: string;
   @IsOptional() @IsString() purpose?: string;
   @IsOptional() @IsString() passengerName?: string;

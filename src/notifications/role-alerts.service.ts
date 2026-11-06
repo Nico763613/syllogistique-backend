@@ -23,6 +23,44 @@ export class RoleAlertsService {
     }
   }
 
+  // Retards de mission : toutes les 15 minutes (heure d'arrivée prévue dépassée / départ planifié non démarré)
+  @Cron('*/15 * * * *')
+  async delaysScheduled() {
+    try {
+      await this.delays();
+    } catch (e) {
+      this.logger.error(`Alertes de retard en échec : ${(e as Error).message}`);
+    }
+  }
+
+  async delays(): Promise<number> {
+    const now = new Date();
+    const since = new Date(+now - DAY);
+    const created = { n: 0 };
+    const late = await this.prisma.trip.findMany({
+      where: { status: 'IN_PROGRESS', scheduledArrival: { lt: new Date(+now - 15 * 60_000) } },
+      include: { vehicle: { select: { internalNumber: true } }, driver: { select: { firstName: true, lastName: true } } },
+    });
+    for (const t of late) {
+      const mins = Math.floor((+now - +(t.scheduledArrival as Date)) / 60_000);
+      await this.emit(created, since, {
+        role: 'GESTIONNAIRE_FLOTTE', siteId: t.siteId, severity: mins > 240 ? 'CRITICAL' : 'WARNING', entity: 'TripDelay', entityId: t.id,
+        title: 'Mission en retard', message: `${t.vehicle.internalNumber} (${t.driver.firstName} ${t.driver.lastName}) → ${t.destination ?? 'destination'} : arrivée prévue dépassée de ${mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`}.`,
+      });
+    }
+    const notStarted = await this.prisma.trip.findMany({
+      where: { status: 'PLANNED', startTime: { lt: new Date(+now - 60 * 60_000) } },
+      include: { vehicle: { select: { internalNumber: true } }, driver: { select: { firstName: true, lastName: true } } },
+    });
+    for (const t of notStarted) {
+      await this.emit(created, since, {
+        role: 'GESTIONNAIRE_FLOTTE', siteId: t.siteId, severity: 'WARNING', entity: 'TripNotStarted', entityId: t.id,
+        title: 'Départ non déclaré', message: `${t.vehicle.internalNumber} (${t.driver.firstName} ${t.driver.lastName}) : départ prévu à ${t.startTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}, mission non démarrée.`,
+      });
+    }
+    return created.n;
+  }
+
   private async emit(created: { n: number }, since: Date, a: { role: string; siteId?: string | null; title: string; message: string; severity: Sev; entity: string; entityId: string }) {
     const targets = a.severity === 'CRITICAL' && a.role !== 'SUPER_ADMIN' ? [a.role, 'SUPER_ADMIN'] : [a.role];
     for (const role of targets) {

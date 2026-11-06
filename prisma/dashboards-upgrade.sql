@@ -109,3 +109,31 @@ CREATE INDEX IF NOT EXISTS hse_corrective_actions_status_due_date_idx ON hse_cor
 CREATE TABLE IF NOT EXISTS cash_expenses (id text PRIMARY KEY, cash_session_id text NOT NULL REFERENCES cash_sessions(id) ON DELETE CASCADE, amount numeric(14,0) NOT NULL, reason text NOT NULL, created_by text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
 --#
 CREATE INDEX IF NOT EXISTS cash_expenses_cash_session_id_idx ON cash_expenses (cash_session_id);
+--#
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS user_id text;
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS drivers_user_id_key ON drivers (user_id);
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS scheduled_arrival timestamp(3), ADD COLUMN IF NOT EXISTS delay_reason text, ADD COLUMN IF NOT EXISTS recipient_name text, ADD COLUMN IF NOT EXISTS signature_data text, ADD COLUMN IF NOT EXISTS start_lat double precision, ADD COLUMN IF NOT EXISTS start_lng double precision, ADD COLUMN IF NOT EXISTS end_lat double precision, ADD COLUMN IF NOT EXISTS end_lng double precision;
+--#
+ALTER TABLE fuel_transactions ADD COLUMN IF NOT EXISTS trip_id text, ADD COLUMN IF NOT EXISTS client_op_id text;
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS fuel_transactions_client_op_id_key ON fuel_transactions (client_op_id);
+--#
+ALTER TABLE vehicle_downtimes ADD COLUMN IF NOT EXISTS severity text, ADD COLUMN IF NOT EXISTS photo_urls text[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS latitude double precision, ADD COLUMN IF NOT EXISTS longitude double precision, ADD COLUMN IF NOT EXISTS trip_id text, ADD COLUMN IF NOT EXISTS client_op_id text;
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS vehicle_downtimes_client_op_id_key ON vehicle_downtimes (client_op_id);
+--#
+ALTER TABLE hse_incidents ADD COLUMN IF NOT EXISTS latitude double precision, ADD COLUMN IF NOT EXISTS longitude double precision, ADD COLUMN IF NOT EXISTS photo_urls text[] NOT NULL DEFAULT '{}';
+--#
+CREATE TABLE IF NOT EXISTS driver_devices (id text PRIMARY KEY, driver_id text NOT NULL, user_id text NOT NULL, fingerprint text, model text, os text, token_hash text, otp_hash text, activation_expires_at timestamp(3), status text NOT NULL DEFAULT 'PENDING', blocked_at timestamp(3), blocked_by text, blocked_reason text, activated_at timestamp(3), last_seen_at timestamp(3), created_by text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+--#
+CREATE INDEX IF NOT EXISTS driver_devices_driver_id_status_idx ON driver_devices (driver_id, status);
+--#
+CREATE INDEX IF NOT EXISTS driver_devices_user_id_fingerprint_idx ON driver_devices (user_id, fingerprint);
+--#
+CREATE TABLE IF NOT EXISTS trip_logs (id text PRIMARY KEY, trip_id text NOT NULL, driver_id text NOT NULL, event_type text NOT NULL, latitude double precision, longitude double precision, mileage integer, synced_offline boolean NOT NULL DEFAULT false, client_op_id text, occurred_at timestamp(3) NOT NULL, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS trip_logs_client_op_id_key ON trip_logs (client_op_id);
+--#
+CREATE INDEX IF NOT EXISTS trip_logs_trip_id_occurred_at_idx ON trip_logs (trip_id, occurred_at);

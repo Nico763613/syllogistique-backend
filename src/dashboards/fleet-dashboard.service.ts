@@ -163,7 +163,7 @@ export class FleetDashboardService {
       kmTrend.set(k, b);
     }
     const inProgress = trips.filter((t) => t.status === 'IN_PROGRESS');
-    const lateTrips = inProgress.filter((t) => now.getTime() - +t.startTime > 24 * 3_600_000);
+    const lateTrips = inProgress.filter((t) => (t.scheduledArrival ? now.getTime() > +t.scheduledArrival + 15 * 60_000 : now.getTime() - +t.startTime > 24 * 3_600_000));
     const partsTotal = maints.reduce((a, m) => a + num(m.partsCost), 0);
     const laborTotal = maints.reduce((a, m) => a + num(m.laborCost), 0);
 
@@ -190,7 +190,7 @@ export class FleetDashboardService {
         documentsToRenew: docRows.slice(0, 30),
         maintenanceDue: dueList.slice(0, 30),
         consumptionAnomalies: anomalies.slice(0, 20),
-        tripsInProgress: inProgress.slice(0, 20).map((t) => ({ tripId: t.id, vehicle: t.vehicle.internalNumber, driver: `${t.driver.firstName} ${t.driver.lastName}`, destination: t.destination, startedAt: t.startTime, late: lateTrips.some((x) => x.id === t.id) })),
+        tripsInProgress: inProgress.slice(0, 20).map((t) => ({ tripId: t.id, vehicle: t.vehicle.internalNumber, driver: `${t.driver.firstName} ${t.driver.lastName}`, destination: t.destination, startedAt: t.startTime, scheduledArrival: t.scheduledArrival, late: lateTrips.some((x) => x.id === t.id) })),
         openDowntimes: openDowntimes.map((d) => ({ downtimeId: d.id, vehicle: d.vehicle.internalNumber, category: d.category, reason: d.reason, since: d.startedAt, days: Math.floor((+now - +d.startedAt) / DAY_MS) })),
       },
       charts: {

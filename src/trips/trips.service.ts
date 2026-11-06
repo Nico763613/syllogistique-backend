@@ -16,13 +16,24 @@ export class TripsService {
     const driver = await this.prisma.driver.findUnique({ where: { id: dto.driverId } });
     if (!driver) throw new BadRequestException('Chauffeur inexistant.');
 
-    if (dto.endMileage !== undefined && dto.endMileage < dto.startMileage) {
+    // Un véhicule immobilisé (ou en attente de levée de réserve) ne peut pas être réaffecté
+    const openDowntime = await this.prisma.vehicleDowntime.findFirst({ where: { vehicleId: dto.vehicleId, endedAt: null } });
+    if (openDowntime || ['IMMOBILIZED', 'MAINTENANCE', 'OUT_OF_SERVICE'].includes(vehicle.status)) {
+      throw new BadRequestException(`Le véhicule ${vehicle.internalNumber} est immobilisé : l'atelier doit d'abord valider la levée de réserve.`);
+    }
+
+    const startMileage = dto.startMileage ?? vehicle.currentMileage;
+    if (dto.endMileage !== undefined && dto.endMileage < startMileage) {
       throw new BadRequestException(
         'Le kilométrage d\'arrivée ne peut pas être inférieur au kilométrage de départ.',
       );
     }
+    if (dto.planned && dto.endMileage !== undefined) throw new BadRequestException('Une mission planifiée ne peut pas avoir de kilométrage d\'arrivée.');
+    if (dto.scheduledArrival && new Date(dto.scheduledArrival) < new Date(dto.startTime)) {
+      throw new BadRequestException("L'heure d'arrivée prévue doit être postérieure au départ.");
+    }
 
-    const distance = dto.endMileage !== undefined ? dto.endMileage - dto.startMileage : undefined;
+    const distance = dto.endMileage !== undefined ? dto.endMileage - startMileage : undefined;
 
     const trip = await this.prisma.trip.create({
       data: {
@@ -32,23 +43,26 @@ export class TripsService {
         tripDate: new Date(dto.tripDate),
         startTime: new Date(dto.startTime),
         endTime: dto.endTime ? new Date(dto.endTime) : undefined,
-        startMileage: dto.startMileage,
+        startMileage,
+        scheduledArrival: dto.scheduledArrival ? new Date(dto.scheduledArrival) : undefined,
         endMileage: dto.endMileage,
         distance,
         destination: dto.destination,
         purpose: dto.purpose,
         passengerName: dto.passengerName,
         observations: dto.observations,
-        status: dto.endMileage !== undefined ? 'COMPLETED' : 'IN_PROGRESS',
+        status: dto.planned ? 'PLANNED' : dto.endMileage !== undefined ? 'COMPLETED' : 'IN_PROGRESS',
         createdById: actorId,
       },
     });
 
-    // Le véhicule est mis en mission dès le départ enregistré
-    await this.prisma.vehicle.update({
-      where: { id: dto.vehicleId },
-      data: { status: 'ON_MISSION' },
-    });
+    // Le véhicule est mis en mission dès le départ enregistré (pas pour une mission seulement planifiée)
+    if (!dto.planned) {
+      await this.prisma.vehicle.update({
+        where: { id: dto.vehicleId },
+        data: { status: 'ON_MISSION' },
+      });
+    }
 
     if (dto.endMileage !== undefined) {
       await this.prisma.vehicle.update({ where: { id: dto.vehicleId }, data: { currentMileage: dto.endMileage } });

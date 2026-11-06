@@ -162,6 +162,32 @@
     .menu-toggle{display:inline-flex !important;}
   }
   .menu-toggle{display:none; align-items:center; justify-content:center; width:36px; height:36px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; margin-right:10px;}
+  /* ---------- Application chauffeur (mobile d'abord) ---------- */
+  #driver-app{display:none; min-height:100vh; background:#f3f5f9; padding-bottom:76px;}
+  .drv-head{background:var(--navy); color:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; position:sticky; top:0; z-index:5;}
+  .drv-head b{font-size:15px;} .drv-head small{display:block; color:var(--gold-soft); font-size:11px;}
+  .drv-pill{font-size:11px; padding:4px 9px; border-radius:20px; background:rgba(255,255,255,.15); white-space:nowrap;}
+  .drv-pill.off{background:#9A6A0C;} .drv-pill.pend{background:var(--gold); color:#1a1a1a;}
+  #drv-root{padding:14px; max-width:640px; margin:0 auto;}
+  .drv-card{background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px;}
+  .drv-card h4{margin:0 0 6px; font-size:15px; color:var(--navy);}
+  .drv-row{display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:4px 0; border-bottom:1px dashed var(--line);} .drv-row:last-child{border-bottom:none;}
+  .drv-row span:first-child{color:var(--muted);}
+  .drv-btn{display:block; width:100%; padding:14px; border:none; border-radius:12px; font-size:15px; font-weight:700; background:var(--navy); color:#fff; margin-top:8px; cursor:pointer;}
+  .drv-btn.gold{background:var(--gold); color:#1a1a1a;} .drv-btn.red{background:#C0392B;} .drv-btn.ghost{background:#fff; color:var(--navy); border:1px solid var(--line);}
+  .drv-actions{display:grid; grid-template-columns:1fr 1fr; gap:8px;} .drv-actions .drv-btn{margin-top:0; font-size:13px; padding:12px 6px;}
+  .drv-tabs{position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:flex; z-index:6;}
+  .drv-tabs button{flex:1; padding:10px 4px; border:none; background:none; font-size:11px; color:var(--muted); cursor:pointer;} .drv-tabs button span{display:block; font-size:20px;}
+  .drv-tabs button.on{color:var(--navy); font-weight:700;}
+  .drv-steps{display:flex; gap:6px; margin:8px 0; font-size:11px;} .drv-steps div{flex:1; text-align:center; padding:6px 2px; border-radius:8px; background:#eef1f6; color:var(--muted);} .drv-steps .done{background:#E7F5EC; color:var(--success); font-weight:700;} .drv-steps .now{background:#FCF1DB; color:#9A6A0C; font-weight:700;}
+  .drv-sheet{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; display:flex; align-items:flex-end; justify-content:center;}
+  .drv-sheet > div{background:#fff; width:100%; max-width:640px; max-height:92vh; overflow:auto; border-radius:18px 18px 0 0; padding:16px 16px 28px;}
+  .drv-sheet h3{margin:0 0 6px; color:var(--navy);} .drv-sheet input,.drv-sheet select,.drv-sheet textarea{font-size:16px; padding:12px;}
+  .drv-sig{border:1px dashed var(--navy-soft); border-radius:10px; background:#fff; width:100%; height:130px; touch-action:none; display:block;}
+  .drv-thumbs{display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;} .drv-thumbs img{width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--line);}
+  .drv-warn{background:#FBE9E7; color:var(--danger); padding:10px 12px; border-radius:10px; font-size:13px; margin-bottom:10px;}
+  .drv-center{text-align:center; padding:26px 8px;}
+  .drv-otp{font-size:34px; letter-spacing:6px; font-weight:800; color:var(--navy); font-family:monospace;}
 </style>
 </head>
 <body>
@@ -219,6 +245,7 @@
       <div class="nav-item" data-view="vehicles" onclick="go('vehicles')">
         <span class="nav-icon">🚛</span> Camions &amp; Véhicules
       </div>
+      <div class="nav-item" data-view="driver-devices" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-devices')"><span class="nav-icon">📲</span> Appareils chauffeurs</div>
       <div class="nav-item" data-view="drivers" onclick="go('drivers')">
         <span class="nav-icon">👨‍✈️</span> Chauffeurs
       </div>
@@ -278,6 +305,22 @@
   </div>
 </div>
 
+
+<!-- ============ APPLICATION CHAUFFEUR ============ -->
+<div id="driver-app">
+  <div class="drv-head">
+    <div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div>
+    <div style="display:flex; align-items:center; gap:8px;"><span class="drv-pill" id="drv-pill">…</span><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()">⎋</button></div>
+  </div>
+  <div id="drv-root"></div>
+  <nav class="drv-tabs" id="drv-tabs">
+    <button data-t="missions" onclick="drvTab('missions')"><span>📍</span>Missions</button>
+    <button data-t="vehicle" onclick="drvTab('vehicle')"><span>🚛</span>Véhicule</button>
+    <button data-t="declare" onclick="drvTab('declare')"><span>📝</span>Déclarer</button>
+    <button data-t="queue" onclick="drvTab('queue')"><span>🔄</span>Envois</button>
+  </nav>
+</div>
+
 <script>
 /* ============================================================
    SYLLOGISTIQUE — client léger (HTML/JS pur, sans build)
@@ -323,6 +366,7 @@ async function api(path, options = {}, retried = false) {
     headers: {
       'Content-Type': 'application/json',
       ...(state.accessToken ? { Authorization: 'Bearer ' + state.accessToken } : {}),
+      ...(localStorage.getItem('syllo_device_id') ? { 'x-device-id': localStorage.getItem('syllo_device_id') } : {}),
       ...(options.headers || {}),
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -334,7 +378,7 @@ async function api(path, options = {}, retried = false) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || 'Erreur API');
+    const ex = new Error(Array.isArray(err.message) ? err.message.join(', ') : err.message || 'Erreur API'); ex.code = err.code; throw ex;
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.blob();
@@ -379,10 +423,12 @@ function logout() {
   ['syllo_access_token', 'syllo_refresh_token', 'syllo_user'].forEach((k) => localStorage.removeItem(k));
   state.accessToken = ''; state.user = null;
   document.getElementById('app').style.display = 'none';
+  const da = document.getElementById('driver-app'); if (da) da.style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
 
 function enterApp() {
+  if (state.user && state.user.role === 'CHAUFFEUR') return drvEnter();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   const initials = ((state.user.firstName || '?')[0] + (state.user.lastName || '?')[0]).toUpperCase();
@@ -437,7 +483,7 @@ function updateSyncPill() {
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
-  sync: 'Synchronisation', settings: 'Paramètres',
+  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs',
   'dash-logistics': 'Logistique & Approvisionnements', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
@@ -803,6 +849,7 @@ async function renderView(view) {
     if (view === 'dashboard') return renderDashboard();
     if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
     if (view === 'vehicles') return renderVehicles();
+    if (view === 'driver-devices') return renderDriverDevices();
     if (view === 'drivers') return renderDrivers();
     if (view === 'fuel') return renderFuel();
     if (view === 'maintenance') return renderMaintenance();
@@ -2059,5 +2106,427 @@ if (isIOS && !isStandalone) {
   hint.onclick = null;
 }
 </script>
+<script>
+/* ============================================================
+   APPLICATION CHAUFFEUR — appareil activé, missions, saisies hors ligne
+   Toute saisie passe par une file locale (localStorage) puis POST /driver/sync (idempotent).
+   ============================================================ */
+const DRV = { tab: 'missions', me: null, blocked: '', flushing: false, error: '' };
+const dget = (k, d) => { try { const v = localStorage.getItem('syllo_drv_' + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+const dset = (k, v) => { try { localStorage.setItem('syllo_drv_' + k, JSON.stringify(v)); return true; } catch (e) { return false; } };
+const drvDevice = () => { try { return localStorage.getItem('syllo_device_id') || ''; } catch (e) { return ''; } };
+const drvUid = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID() : 'op-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+const drvQueue = () => dget('queue', []);
+const drvDt = (d) => (d ? new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—');
+const drvEl = (id) => document.getElementById(id);
+
+function drvEnter() {
+  drvEl('login-screen').style.display = 'none';
+  drvEl('app').style.display = 'none';
+  drvEl('driver-app').style.display = 'block';
+  drvEl('drv-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  window.addEventListener('online', () => { drvLoad(); });
+  window.addEventListener('offline', drvPill);
+  setInterval(() => { if (drvDevice() && navigator.onLine) drvFlush().then(drvRender); }, 30000);
+  if (!drvDevice()) return drvActivationScreen();
+  drvLoad();
+}
+function drvLogout() {
+  if (drvQueue().some((o) => !o.rejected) && !confirm('Des saisies ne sont pas encore envoyées. Se déconnecter quand même ? (elles seront conservées sur cet appareil)')) return;
+  drvEl('driver-app').style.display = 'none';
+  logout();
+}
+function drvPill() {
+  const pend = drvQueue().filter((o) => !o.rejected).length;
+  const p = drvEl('drv-pill');
+  if (!p) return;
+  p.className = 'drv-pill' + (!navigator.onLine ? ' off' : pend ? ' pend' : '');
+  p.textContent = !navigator.onLine ? `Hors ligne${pend ? ' · ' + pend : ''}` : pend ? `${pend} à envoyer` : 'Synchronisé';
+}
+
+async function drvLoad() {
+  DRV.me = dget('me', null);
+  drvRender();
+  try {
+    await drvFlush();
+    DRV.me = await api('/driver/me');
+    dset('me', DRV.me);
+    DRV.blocked = ''; DRV.error = '';
+  } catch (e) {
+    if (e.code === 'DEVICE_BLOCKED') DRV.blocked = e.message;
+    else if (!(e instanceof TypeError)) DRV.error = e.message;
+  }
+  drvRender();
+}
+
+// Vue = données serveur + saisies encore en file (affichage cohérent hors ligne)
+function drvView() {
+  const me = DRV.me ? JSON.parse(JSON.stringify(DRV.me)) : null;
+  if (!me) return null;
+  for (const o of drvQueue()) {
+    if (o.rejected) continue;
+    const t = (me.trips || []).find((x) => x.id === o.tripId);
+    if (o.type === 'start' && t) { t.status = 'IN_PROGRESS'; t.startMileage = o.payload.odometer; t.startTime = o.payload.occurredAt; me.activeTrip = t; }
+    if (o.type === 'arrive' && t) { t.status = 'COMPLETED'; t.endMileage = o.payload.odometer; t.endTime = o.payload.occurredAt; if (me.activeTrip && me.activeTrip.id === t.id) me.activeTrip = null; }
+  }
+  return me;
+}
+
+function drvTab(t) { DRV.tab = t; drvRender(); }
+function drvRender() {
+  drvPill();
+  document.querySelectorAll('#drv-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === DRV.tab));
+  const root = drvEl('drv-root');
+  if (DRV.blocked) {
+    root.innerHTML = `<div class="drv-card drv-center"><div style="font-size:44px">🔒</div><h4>Application verrouillée</h4><div class="drv-warn">${esc(DRV.blocked)}</div>
+      <button class="drv-btn" onclick="drvLoad()">Réessayer</button><button class="drv-btn ghost" onclick="drvResetDevice()">Saisir un nouveau code d'activation</button></div>`;
+    return;
+  }
+  const me = drvView();
+  if (!me) { root.innerHTML = `<div class="drv-card drv-center">${DRV.error ? `<div class="drv-warn">${esc(DRV.error)}</div>` : 'Chargement…'}<button class="drv-btn ghost" onclick="drvLoad()">Actualiser</button></div>`; return; }
+  const v = me.vehicle;
+  const banner = (DRV.error ? `<div class="drv-warn">${esc(DRV.error)}</div>` : '') + (v && v.immobilized ? `<div class="drv-warn">🚫 Véhicule immobilisé${v.downtimeReason ? ' : ' + esc(v.downtimeReason) : ''}. Départ impossible tant que l'atelier n'a pas validé la levée de réserve.</div>` : '');
+  if (DRV.tab === 'missions') root.innerHTML = banner + drvMissionsHtml(me);
+  else if (DRV.tab === 'vehicle') root.innerHTML = banner + drvVehicleHtml(me);
+  else if (DRV.tab === 'declare') root.innerHTML = banner + drvDeclareHtml(me);
+  else root.innerHTML = drvQueueHtml();
+}
+
+function drvStepsHtml(t) {
+  const s = t.status;
+  const cls = (n) => (s === 'COMPLETED' || (s === 'IN_PROGRESS' && n === 0) ? 'done' : (s === 'PLANNED' && n === 0) || (s === 'IN_PROGRESS' && n === 1) ? 'now' : '');
+  return `<div class="drv-steps"><div class="${s === 'PLANNED' ? 'now' : 'done'}">1 · Prête</div><div class="${s === 'PLANNED' ? '' : s === 'IN_PROGRESS' ? 'now' : 'done'}">2 · En route</div><div class="${s === 'COMPLETED' ? 'done' : ''}">3 · Arrivée</div></div>`;
+}
+function drvMissionsHtml(me) {
+  const trips = me.trips.filter((t) => t.status !== 'CANCELLED');
+  if (!trips.length) return `<div class="drv-card drv-center">Aucune mission affectée pour le moment.<button class="drv-btn ghost" onclick="drvLoad()">Actualiser</button></div>`;
+  const late = (t) => t.scheduledArrival && t.status === 'IN_PROGRESS' && Date.now() > +new Date(t.scheduledArrival) + 15 * 60000;
+  return trips.map((t) => `
+    <div class="drv-card">
+      <h4>${esc(t.destination || 'Mission')} ${late(t) ? '<span class="badge bad">En retard</span>' : ''}</h4>
+      ${drvStepsHtml(t)}
+      <div class="drv-row"><span>Véhicule</span><b>${esc(t.vehicle)}</b></div>
+      ${t.purpose ? `<div class="drv-row"><span>Instructions</span><b style="text-align:right">${esc(t.purpose)}</b></div>` : ''}
+      ${t.passengerName ? `<div class="drv-row"><span>Contact / client</span><b>${esc(t.passengerName)}</b></div>` : ''}
+      ${t.observations ? `<div class="drv-row"><span>Notes</span><b style="text-align:right">${esc(t.observations)}</b></div>` : ''}
+      <div class="drv-row"><span>Départ prévu</span><b>${drvDt(t.startTime)}</b></div>
+      <div class="drv-row"><span>Arrivée prévue</span><b>${drvDt(t.scheduledArrival)}</b></div>
+      ${t.status !== 'PLANNED' ? `<div class="drv-row"><span>Km départ → arrivée</span><b>${esc(t.startMileage)} → ${t.endMileage ?? '…'}</b></div>` : ''}
+      ${t.status === 'PLANNED' ? `<button class="drv-btn gold" onclick="drvStartForm('${esc(t.id)}')">▶ Déclarer le départ</button>` : ''}
+      ${t.status === 'IN_PROGRESS' ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(t.id)}')">🏁 Déclarer l'arrivée</button>
+        <div class="drv-actions" style="margin-top:8px"><button class="drv-btn ghost" onclick="drvFuelForm('${esc(t.id)}')">⛽ Carburant</button><button class="drv-btn ghost" onclick="drvBreakdownForm('${esc(t.id)}')">🛠 Panne</button></div>
+        <button class="drv-btn ghost" style="margin-top:8px" onclick="drvIncidentForm('${esc(t.id)}')">⚠ Incident / contrôle</button>` : ''}
+    </div>`).join('');
+}
+function drvVehicleHtml(me) {
+  const v = me.vehicle;
+  if (!v) return `<div class="drv-card drv-center">Aucun véhicule affecté.</div>`;
+  return `<div class="drv-card"><h4>${esc(v.number)} — ${esc(v.plate)}</h4>
+    <div class="drv-row"><span>Modèle</span><b>${esc(v.label || '—')}</b></div>
+    <div class="drv-row"><span>État</span><b>${v.immobilized ? '🚫 Immobilisé' : v.status === 'ON_MISSION' ? 'En mission' : 'Disponible'}</b></div>
+    <div class="drv-row"><span>Compteur</span><b>${fmt(v.mileage)} km</b></div>
+    <div class="drv-row"><span>Capacité</span><b>${esc(v.capacity || '—')}</b></div>
+    ${v.equipment ? `<div class="drv-row"><span>Équipements / notes</span><b style="text-align:right">${esc(v.equipment)}</b></div>` : ''}</div>
+    <div class="drv-card"><h4>Chauffeur</h4><div class="drv-row"><span>Nom</span><b>${esc(me.driver.name)}</b></div><div class="drv-row"><span>Appareil</span><b>${esc(me.device.model || 'activé')}</b></div></div>`;
+}
+function drvDeclareHtml(me) {
+  const t = me.activeTrip;
+  const tid = t ? esc(t.id) : '';
+  return `<div class="drv-card"><h4>Déclarations</h4><div class="desc" style="font-size:12px;color:var(--muted)">${t ? 'Rattachées à la mission en cours : ' + esc(t.destination || '') : 'Aucune mission en cours : rattachées à votre véhicule.'}</div>
+    <button class="drv-btn" onclick="drvFuelForm('${tid}')">⛽ Déclarer un plein de carburant</button>
+    <button class="drv-btn red" onclick="drvBreakdownForm('${tid}')">🛠 Déclarer une panne</button>
+    <button class="drv-btn ghost" onclick="drvIncidentForm('${tid}')">⚠ Accident / contrôle de police / événement routier</button></div>`;
+}
+function drvQueueHtml() {
+  const q = drvQueue();
+  const label = { start: 'Départ', arrive: 'Arrivée', fuel: 'Carburant', breakdown: 'Panne', incident: 'Incident' };
+  const rows = q.map((o) => `<div class="drv-row"><span>${esc(label[o.type])} · ${drvDt(o.createdAt)}</span><b>${o.rejected ? `<span class="badge bad">Refusé</span> <a href="#" onclick="drvDrop('${esc(o.clientOpId)}');return false;">supprimer</a>` : '<span class="badge warn">En attente</span>'}</b></div>${o.rejected ? `<div class="drv-warn" style="margin:4px 0">${esc(o.error)}</div>` : ''}`).join('');
+  return `<div class="drv-card"><h4>Envois vers le bureau</h4>${rows || '<div class="drv-center">Tout est synchronisé ✔</div>'}
+    <button class="drv-btn" onclick="drvSyncNow()">🔄 Synchroniser maintenant</button></div>`;
+}
+function drvDrop(id) { dset('queue', drvQueue().filter((o) => o.clientOpId !== id)); drvRender(); }
+async function drvSyncNow() { await drvLoad(); }
+
+/* ---------- File d'envoi hors ligne ---------- */
+function drvEnqueue(op) {
+  const q = drvQueue();
+  q.push({ ...op, clientOpId: drvUid(), createdAt: new Date().toISOString() });
+  if (!dset('queue', q)) { alert("Mémoire de l'appareil pleine : envoyez d'abord les saisies en attente."); return false; }
+  drvRender();
+  if (navigator.onLine) drvFlush().then(() => drvLoad());
+  return true;
+}
+async function drvUpload(dataUrl, category) {
+  const blob = await (await fetch(dataUrl)).blob();
+  const fd = new FormData();
+  fd.append('file', blob, 'photo.jpg');
+  const res = await fetch(state.apiUrl.replace(/\/$/, '') + '/uploads?category=' + category, { method: 'POST', headers: { Authorization: 'Bearer ' + state.accessToken }, body: fd });
+  if (res.status === 401) { await api('/driver/me').catch(() => {}); throw new TypeError('session'); }
+  if (!res.ok) throw new Error('Envoi de la photo refusé.');
+  return (await res.json()).url;
+}
+async function drvFlush() {
+  if (DRV.flushing || !navigator.onLine) return;
+  let q = drvQueue();
+  if (!q.some((o) => !o.rejected)) return;
+  DRV.flushing = true;
+  try {
+    for (const o of q) {
+      if (o.rejected || !o.photos || !o.photos.length || o.uploaded) continue;
+      o.uploaded = [];
+      for (const p of o.photos) o.uploaded.push(await drvUpload(p, o.type === 'fuel' ? 'fuel_receipt' : 'incident_photo'));
+      if (o.type === 'fuel') o.payload.receiptImageUrl = o.uploaded[0]; else o.payload.photoUrls = o.uploaded;
+      o.photos = [];
+      dset('queue', q);
+    }
+    const todo = q.filter((o) => !o.rejected).slice(0, 50);
+    if (!todo.length) return;
+    const r = await api('/driver/sync', { method: 'POST', body: { ops: todo.map((o) => ({ type: o.type, clientOpId: o.clientOpId, tripId: o.tripId || undefined, payload: o.payload })) } });
+    const byId = new Map(r.results.map((x) => [x.clientOpId, x]));
+    q = drvQueue().filter((o) => { const x = byId.get(o.clientOpId); if (x && x.ok) return false; if (x && !x.ok) { o.rejected = true; o.error = x.error; } return true; });
+    dset('queue', q);
+  } catch (e) {
+    if (e.code === 'DEVICE_BLOCKED') DRV.blocked = e.message;
+  } finally { DRV.flushing = false; }
+}
+
+/* ---------- Outils : position, photos, fenêtre de saisie ---------- */
+function drvGeo() {
+  return new Promise((res) => {
+    if (!navigator.geolocation) return res({});
+    navigator.geolocation.getCurrentPosition((p) => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res({}), { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 });
+  });
+}
+function drvShrink(file, max = 1280, q = 0.7) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); resolve(c.toDataURL('image/jpeg', q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Photo illisible : reprenez-la en JPEG.')); };
+    img.src = url;
+  });
+}
+const DRV_PHOTOS = [];
+async function drvPickPhotos(input) {
+  for (const f of input.files) { if (DRV_PHOTOS.length < 4) DRV_PHOTOS.push(await drvShrink(f)); }
+  input.value = '';
+  drvEl('drv-thumbs').innerHTML = DRV_PHOTOS.map((p) => `<img src="${p}">`).join('');
+}
+function drvSheet(title, html, onSubmit, submitLabel) {
+  DRV_PHOTOS.length = 0;
+  const old = drvEl('drv-sheet'); if (old) old.remove();
+  const s = document.createElement('div');
+  s.id = 'drv-sheet'; s.className = 'drv-sheet';
+  s.innerHTML = `<div><h3>${esc(title)}</h3>${html}<div id="drv-sheet-msg"></div><button class="drv-btn gold" id="drv-sheet-ok">${esc(submitLabel || 'Enregistrer')}</button><button class="drv-btn ghost" onclick="drvEl('drv-sheet').remove()">Annuler</button></div>`;
+  document.body.appendChild(s);
+  drvEl('drv-sheet-ok').onclick = async () => {
+    const btn = drvEl('drv-sheet-ok'); btn.disabled = true; btn.textContent = 'Position GPS…';
+    try { await onSubmit(); s.remove(); } catch (e) { drvEl('drv-sheet-msg').innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = submitLabel || 'Enregistrer'; }
+  };
+}
+const drvPhotoField = (label, multiple) => `<label>${label}</label><input type="file" accept="image/*" capture="environment" ${multiple ? 'multiple' : ''} onchange="drvPickPhotos(this)"><div class="drv-thumbs" id="drv-thumbs"></div>`;
+const drvNum = (id) => { const v = drvEl(id).value.trim(); return v === '' ? undefined : Number(v); };
+const drvTripOf = (id) => (drvView().trips || []).find((t) => t.id === id);
+
+/* ---------- Formulaires ---------- */
+function drvStartForm(tripId) {
+  const me = drvView(), t = drvTripOf(tripId);
+  drvSheet('Départ — ' + (t.destination || 'mission'), `<label>Kilométrage au compteur (obligatoire)</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">`, async () => {
+    const odometer = drvNum('f-odo');
+    if (odometer === undefined || odometer < 0) throw new Error('Saisissez le kilométrage de départ.');
+    const g = await drvGeo();
+    drvEnqueue({ type: 'start', tripId, payload: { odometer, occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+  }, 'Confirmer le départ');
+}
+function drvArriveForm(tripId) {
+  const t = drvTripOf(tripId);
+  const late = t.scheduledArrival && Date.now() > +new Date(t.scheduledArrival) + 15 * 60000;
+  drvSheet('Arrivée — ' + (t.destination || 'mission'), `
+    <label>Kilométrage d'arrivée (obligatoire, départ : ${esc(t.startMileage)})</label><input id="f-odo" type="number" inputmode="numeric">
+    <label>Nom de la personne qui réceptionne</label><input id="f-recipient">
+    <label>État du véhicule</label><select id="f-cond"><option value="RAS">RAS</option><option value="DOMMAGE_MINEUR">Dommage mineur</option><option value="DOMMAGE_MAJEUR">Dommage majeur</option><option value="PANNE">Panne</option></select>
+    ${late ? '<label>Motif du retard</label><input id="f-delay" placeholder="Embouteillage, contrôle, attente chargement…">' : ''}
+    <label>Observations</label><textarea id="f-obs" rows="2"></textarea>
+    <label>Signature du destinataire (bon de livraison)</label><canvas class="drv-sig" id="f-sig" width="600" height="260"></canvas><a href="#" onclick="drvSigClear();return false;" style="font-size:12px">Effacer la signature</a>`, async () => {
+    const odometer = drvNum('f-odo');
+    if (odometer === undefined) throw new Error("Saisissez le kilométrage d'arrivée.");
+    if (odometer < t.startMileage) throw new Error(`Le kilométrage d'arrivée doit être supérieur ou égal à ${t.startMileage}.`);
+    const g = await drvGeo();
+    const sig = drvSigData();
+    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, occurredAt: new Date().toISOString(), offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
+  }, "Confirmer l'arrivée");
+  drvSigInit();
+}
+let drvSigDrawn = false;
+function drvSigInit() {
+  const c = drvEl('f-sig'), ctx = c.getContext('2d'); drvSigDrawn = false;
+  ctx.lineWidth = 4; ctx.lineCap = 'round'; ctx.strokeStyle = '#163A5F';
+  let down = false;
+  const pos = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.onpointerdown = (e) => { down = true; const [x, y] = pos(e); ctx.beginPath(); ctx.moveTo(x, y); c.setPointerCapture(e.pointerId); };
+  c.onpointermove = (e) => { if (!down) return; const [x, y] = pos(e); ctx.lineTo(x, y); ctx.stroke(); drvSigDrawn = true; };
+  c.onpointerup = () => { down = false; };
+}
+function drvSigClear() { const c = drvEl('f-sig'); c.getContext('2d').clearRect(0, 0, c.width, c.height); drvSigDrawn = false; }
+function drvSigData() {
+  if (!drvSigDrawn) return undefined;
+  const c = drvEl('f-sig'), s = document.createElement('canvas'); s.width = 300; s.height = 130;
+  const x = s.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 300, 130); x.drawImage(c, 0, 0, 300, 130);
+  return s.toDataURL('image/png');
+}
+function drvFuelForm(tripId) {
+  const me = drvView();
+  drvSheet('⛽ Plein de carburant', `
+    <label>Quantité (litres)</label><input id="f-liters" type="number" inputmode="decimal" step="0.01">
+    <label>Montant payé (GNF) — facultatif</label><input id="f-cost" type="number" inputmode="numeric">
+    <label>Station</label><input id="f-station">
+    <label>Kilométrage actuel</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
+    ${drvPhotoField('📷 Photo du reçu (OBLIGATOIRE)', false)}`, async () => {
+    const liters = drvNum('f-liters');
+    if (!liters || liters <= 0) throw new Error('Saisissez les litres.');
+    if (!DRV_PHOTOS.length) throw new Error('La photo du reçu est obligatoire.');
+    const g = await drvGeo();
+    drvEnqueue({ type: 'fuel', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { liters, totalCost: drvNum('f-cost'), station: drvEl('f-station').value, odometer: drvNum('f-odo'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+  });
+}
+function drvBreakdownForm(tripId) {
+  drvSheet('🛠 Déclarer une panne', `
+    <label>Gravité</label><select id="f-sev"><option value="LOW">Légère</option><option value="MEDIUM" selected>Moyenne</option><option value="HIGH">Grave — immobilisé</option><option value="CRITICAL">Critique — danger</option></select>
+    <label>Description</label><textarea id="f-desc" rows="3" placeholder="Que se passe-t-il ? Voyants, bruit, fuite…"></textarea>
+    ${drvPhotoField('📷 Photos (jusqu’à 4)', true)}
+    <div class="desc" style="font-size:12px;color:var(--muted);margin-top:8px">Le véhicule sera immobilisé et le gestionnaire de flotte alerté avec votre position GPS.</div>`, async () => {
+    const description = drvEl('f-desc').value.trim();
+    if (!description) throw new Error('Décrivez la panne.');
+    const g = await drvGeo();
+    drvEnqueue({ type: 'breakdown', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { severity: drvEl('f-sev').value, description, occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+  }, 'Envoyer la panne');
+}
+function drvIncidentForm(tripId) {
+  drvSheet('⚠ Déclarer un incident', `
+    <label>Type</label><select id="f-kind"><option value="ACCIDENT">Accident</option><option value="POLICE_CONTROL">Contrôle de police</option><option value="ROAD_EVENT">Événement routier</option><option value="OTHER">Autre</option></select>
+    <label>Gravité</label><select id="f-sev"><option value="LOW">Faible</option><option value="MEDIUM">Moyenne</option><option value="HIGH">Grave</option><option value="CRITICAL">Critique</option></select>
+    <label>Description</label><textarea id="f-desc" rows="3"></textarea>
+    ${drvPhotoField('📷 Photos (jusqu’à 4)', true)}`, async () => {
+    const description = drvEl('f-desc').value.trim();
+    if (!description) throw new Error("Décrivez l'incident.");
+    const g = await drvGeo();
+    drvEnqueue({ type: 'incident', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { kind: drvEl('f-kind').value, severity: drvEl('f-sev').value, description, occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+  }, "Envoyer l'incident");
+}
+
+/* ---------- Activation de l'appareil (code à 6 chiffres ou QR) ---------- */
+function drvResetDevice() { try { localStorage.removeItem('syllo_device_id'); } catch (e) {} DRV.blocked = ''; drvActivationScreen(); }
+function drvActivationScreen() {
+  drvPill();
+  drvEl('drv-root').innerHTML = `<div class="drv-card"><h4>📲 Activer cet appareil</h4>
+    <div style="font-size:13px;color:var(--muted)">Votre compte est personnel et fonctionne sur un seul appareil. Saisissez le code à 6 chiffres remis par le gestionnaire de flotte, ou scannez son QR code.</div>
+    <label>Code d'activation</label><input id="act-code" inputmode="text" autocomplete="off" style="font-size:22px;letter-spacing:4px;text-align:center" placeholder="000000">
+    <video id="act-video" playsinline style="display:none;width:100%;border-radius:12px;margin-top:10px"></video>
+    <div id="act-msg"></div>
+    <button class="drv-btn gold" onclick="drvActivate()">Activer</button>
+    <button class="drv-btn ghost" onclick="drvScan()">📷 Scanner le QR code</button></div>`;
+}
+async function drvActivate() {
+  const code = drvEl('act-code').value.trim();
+  try {
+    let fp = localStorage.getItem('syllo_fp'); if (!fp) { fp = drvUid(); localStorage.setItem('syllo_fp', fp); }
+    const r = await api('/driver/activate', { method: 'POST', body: { code, fingerprint: fp, model: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || 'mobile', os: navigator.userAgent.slice(0, 110) } });
+    localStorage.setItem('syllo_device_id', r.deviceId);
+    drvLoad();
+  } catch (e) { drvEl('act-msg').innerHTML = `<div class="drv-warn" style="margin-top:10px">${esc(e.message)}</div>`; }
+}
+async function drvScan() {
+  const msg = drvEl('act-msg');
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices) { msg.innerHTML = '<div class="drv-warn" style="margin-top:10px">Scan non disponible sur ce navigateur : saisissez le code à 6 chiffres.</div>'; return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = drvEl('act-video'); video.srcObject = stream; video.style.display = 'block'; await video.play();
+    const det = new BarcodeDetector({ formats: ['qr_code'] });
+    const tick = async () => {
+      if (!drvEl('act-video')) return stream.getTracks().forEach((t) => t.stop());
+      try { const found = await det.detect(video); if (found.length) { stream.getTracks().forEach((t) => t.stop()); drvEl('act-code').value = found[0].rawValue; return drvActivate(); } } catch (e) {}
+      setTimeout(tick, 300);
+    };
+    tick();
+  } catch (e) { msg.innerHTML = '<div class="drv-warn" style="margin-top:10px">Caméra inaccessible : saisissez le code à 6 chiffres.</div>'; }
+}
+</script>
+
+<script>
+/* ============ GESTION DES APPAREILS CHAUFFEURS (gestionnaire de flotte) ============ */
+async function renderDriverDevices() {
+  const list = await api('/driver-admin/overview?siteId=' + state.siteId);
+  window._drvOv = list;
+  const badge = (d) => ({ ACTIVE: '<span class="badge ok">Actif</span>', PENDING: '<span class="badge warn">Code en attente</span>', BLOCKED: '<span class="badge bad">Bloqué</span>' }[d.status] || esc(d.status));
+  const rows = list.map((d) => {
+    const dev = d.devices.find((x) => x.status === 'ACTIVE') || d.devices.find((x) => x.status === 'BLOCKED') || d.devices.find((x) => x.status === 'PENDING');
+    return `<tr><td><b>${esc(d.name)}</b></td><td>${d.linked ? esc(d.userEmail) : '<span class="badge bad">Non lié</span>'}</td>
+      <td>${dev ? badge(dev) + (dev.model ? ' ' + esc(dev.model) : '') : '—'}${dev && dev.lastSeenAt ? `<div style="font-size:11px;color:var(--muted)">vu ${new Date(dev.lastSeenAt).toLocaleString('fr-FR')}</div>` : ''}${dev && dev.blockedReason ? `<div style="font-size:11px;color:var(--danger)">${esc(dev.blockedReason)}</div>` : ''}</td>
+      <td style="white-space:nowrap">
+        ${d.linked ? '' : `<button class="btn small" onclick="drvLinkForm('${esc(d.id)}')">🔗 Lier un compte</button> `}
+        ${d.linked ? `<button class="btn small gold" onclick="drvProvision('${esc(d.id)}')">🔑 Code / QR</button> ` : ''}
+        ${dev && dev.status === 'ACTIVE' ? `<button class="btn small" onclick="drvBlock('${esc(dev.id)}')">⛔ Bloquer</button> ` : ''}
+        ${dev && dev.status === 'BLOCKED' ? `<button class="btn small" onclick="drvUnblock('${esc(dev.id)}')">✅ Débloquer</button> ` : ''}
+        <button class="btn small" onclick="drvHistory('driver','${esc(d.id)}')">📜 Historique</button></td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
+  root().innerHTML = `<div class="panel"><h3>📲 Application chauffeur — appareils autorisés</h3>
+    <div class="desc">Un chauffeur = un compte personnel = un seul appareil actif. Générez un code (QR + 6 chiffres, valable 24 h) ; l'ancien appareil est automatiquement révoqué à l'activation du nouveau.</div>
+    <button class="btn gold" onclick="drvPlanTrip()">🗓 Planifier une mission</button>
+    <div style="overflow:auto;margin-top:12px"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${rows}</table></div></div>
+    <div id="drv-hist"></div>`;
+}
+function drvLinkForm(driverId) {
+  openEditor('Lier un compte utilisateur', [{ key: 'email', label: 'E-mail du compte (rôle Chauffeur, créé dans Utilisateurs)' }], async (d) => {
+    await api('/driver-admin/link', { method: 'POST', body: { driverId, email: d.email } }); renderDriverDevices();
+  });
+}
+async function drvProvision(driverId) {
+  try {
+    const r = await api('/driver-admin/provision', { method: 'POST', body: { driverId } });
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    ov.innerHTML = `<div class="panel" style="max-width:360px;text-align:center"><h3>Code d'activation — ${esc(r.driver)}</h3>
+      <img src="${r.qrImage}" alt="QR" style="width:240px;height:240px"><div class="desc">ou saisir ce code :</div>
+      <div style="font-size:32px;font-weight:800;letter-spacing:6px;font-family:monospace;color:var(--navy)">${esc(r.otp)}</div>
+      <div class="desc" style="margin-top:8px">Valable jusqu'au ${new Date(r.expiresAt).toLocaleString('fr-FR')}. Le chauffeur se connecte avec son compte puis active l'appareil.</div>
+      <button class="btn gold" onclick="this.closest('div[style*=fixed]').remove();renderDriverDevices()">Fermer</button></div>`;
+    document.body.appendChild(ov);
+  } catch (e) { alert(e.message); }
+}
+function drvBlock(id) {
+  openEditor('Bloquer l\'appareil', [{ key: 'reason', label: 'Motif (obligatoire)' }], async (d) => {
+    await api('/driver-admin/devices/' + id + '/block', { method: 'POST', body: { reason: d.reason || '' } }); renderDriverDevices();
+  });
+}
+async function drvUnblock(id) { try { await api('/driver-admin/devices/' + id + '/unblock', { method: 'POST' }); renderDriverDevices(); } catch (e) { alert(e.message); } }
+async function drvPlanTrip() {
+  const [drivers, vehicles] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/vehicles?siteId=' + state.siteId)]);
+  const usable = vehicles.filter((v) => !['IMMOBILIZED', 'MAINTENANCE', 'OUT_OF_SERVICE'].includes(v.status));
+  openEditor('Planifier une mission', [
+    { key: 'driverId', label: 'Chauffeur', options: drivers.map((d) => [d.id, d.firstName + ' ' + d.lastName]) },
+    { key: 'vehicleId', label: 'Véhicule disponible', options: usable.map((v) => [v.id, v.internalNumber + ' — ' + v.registrationNumber]) },
+    { key: 'destination', label: 'Destination' }, { key: 'purpose', label: 'Instructions' }, { key: 'passengerName', label: 'Contact / client' },
+    { key: 'startTime', label: 'Départ prévu', type: 'datetime-local' }, { key: 'scheduledArrival', label: 'Arrivée prévue', type: 'datetime-local' },
+  ], async (d) => {
+    if (!d.startTime) throw new Error('Indiquez le départ prévu.');
+    const iso = (s) => new Date(s).toISOString();
+    await api('/trips', { method: 'POST', body: { planned: true, siteId: state.siteId, driverId: d.driverId, vehicleId: d.vehicleId, destination: d.destination, purpose: d.purpose, passengerName: d.passengerName, tripDate: iso(d.startTime), startTime: iso(d.startTime), scheduledArrival: d.scheduledArrival ? iso(d.scheduledArrival) : undefined } });
+    alert('Mission planifiée : elle apparaît sur le téléphone du chauffeur.');
+  });
+}
+async function drvHistory(kind, id) {
+  const h = await api('/driver-admin/history/' + kind + '/' + id);
+  const s = h.summary;
+  drvEl('drv-hist').innerHTML = `<div class="panel"><h3>📜 Historique — ${esc(h.driver || h.vehicle)}</h3>
+    <div class="desc">${s.missions} missions · ${fmt(s.km)} km · ${s.liters} L (${fmt(s.cost)} GNF) · conso ${s.consumption ?? '—'} L/100 km${s.gapPct !== null ? ` (écart ${s.gapPct > 0 ? '+' : ''}${s.gapPct} % vs référence)` : ''} · ${s.breakdowns} pannes · ${s.incidents} incidents · ${s.late} retards</div>
+    <table><tr><th>Date</th><th>Mission</th><th>Statut</th><th>Km</th><th>Retard</th></tr>${h.trips.slice(0, 30).map((t) => `<tr><td>${drvDt(t.startTime)}</td><td>${esc(t.destination || '—')} <span style="color:var(--muted)">${esc(t.who)}</span></td><td>${esc(t.status)}${t.signed ? ' ✍' : ''}</td><td>${t.distance ?? '—'}</td><td>${esc(t.delayReason || '')}</td></tr>`).join('')}</table></div>`;
+  drvEl('drv-hist').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+
 </body>
 </html>

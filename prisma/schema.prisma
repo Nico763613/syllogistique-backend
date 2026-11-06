@@ -213,6 +213,8 @@ model Driver {
   hseToolboxAttendees HseToolboxAttendee[]
   ppeIssuances     PpeIssuance[]
   hseTrainings     HseTraining[]
+  // Compte utilisateur (rôle CHAUFFEUR) lié à ce profil chauffeur : permet l'application mobile
+  userId           String?   @unique @map("user_id")
   @@index([siteId])
   @@map("drivers")
 }
@@ -345,6 +347,15 @@ model Trip {
 
   status        String   @default("PLANNED") // PLANNED | IN_PROGRESS | COMPLETED | CANCELLED
   endCondition  String?  @map("end_condition")
+  // Application chauffeur : retard prévu, position GPS, livraison signée
+  scheduledArrival DateTime? @map("scheduled_arrival")
+  delayReason   String?  @map("delay_reason")
+  recipientName String?  @map("recipient_name")
+  signatureData String?  @map("signature_data")
+  startLat      Float?   @map("start_lat")
+  startLng      Float?   @map("start_lng")
+  endLat        Float?   @map("end_lat")
+  endLng        Float?   @map("end_lng")
   @@index([siteId, tripDate])
   @@index([vehicleId])
   @@map("trips")
@@ -378,6 +389,8 @@ model FuelTransaction {
 
   source           String   @default("STATION") // STATION | TANK
   hours            Decimal? @db.Decimal(10, 1)
+  tripId           String?  @map("trip_id")
+  clientOpId       String?  @unique @map("client_op_id")
   @@index([siteId, transactionDate])
   @@index([vehicleId])
   @@map("fuel_transactions")
@@ -1018,6 +1031,13 @@ model VehicleDowntime {
   resolutionNote String?   @map("resolution_note")
   createdById    String    @map("created_by")
   resolvedById   String?   @map("resolved_by")
+  // Déclaration par le chauffeur
+  severity       String?
+  photoUrls      String[]  @default([]) @map("photo_urls")
+  latitude       Float?
+  longitude      Float?
+  tripId         String?   @map("trip_id")
+  clientOpId     String?   @unique @map("client_op_id")
 
   vehicle        Vehicle   @relation(fields: [vehicleId], references: [id])
 
@@ -1316,6 +1336,9 @@ model HseIncident {
 
   @@index([siteId, occurredAt])
   @@map("hse_incidents")
+  latitude        Float?
+  longitude       Float?
+  photoUrls       String[] @default([]) @map("photo_urls")
 }
 
 model HseIncidentPerson {
@@ -1453,4 +1476,50 @@ model HseWorkedHours {
 
   @@unique([siteId, period])
   @@map("hse_worked_hours")
+}
+
+
+// ============================================================
+// APPLICATION CHAUFFEUR : appareils autorisés et journal de trajet
+// ============================================================
+// 1 chauffeur = 1 appareil actif. Activation par QR (jeton) ou code OTP à usage unique ; blocage à distance.
+model DriverDevice {
+  id                  String    @id @default(uuid())
+  driverId            String    @map("driver_id")
+  userId              String    @map("user_id")
+  fingerprint         String?
+  model               String?
+  os                  String?
+  tokenHash           String?   @map("token_hash")
+  otpHash             String?   @map("otp_hash")
+  activationExpiresAt DateTime? @map("activation_expires_at")
+  status              String    @default("PENDING") // PENDING | ACTIVE | BLOCKED | REVOKED
+  blockedAt           DateTime? @map("blocked_at")
+  blockedBy           String?   @map("blocked_by")
+  blockedReason       String?   @map("blocked_reason")
+  activatedAt         DateTime? @map("activated_at")
+  lastSeenAt          DateTime? @map("last_seen_at")
+  createdBy           String?   @map("created_by")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  @@index([driverId, status])
+  @@index([userId, fingerprint])
+  @@map("driver_devices")
+}
+
+model TripLog {
+  id            String   @id @default(uuid())
+  tripId        String   @map("trip_id")
+  driverId      String   @map("driver_id")
+  eventType     String   @map("event_type") // START | PAUSE | RESUME | ARRIVE | INCIDENT | BREAKDOWN | FUEL
+  latitude      Float?
+  longitude     Float?
+  mileage       Int?
+  syncedOffline Boolean  @default(false) @map("synced_offline")
+  clientOpId    String?  @unique @map("client_op_id")
+  occurredAt    DateTime @map("occurred_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tripId, occurredAt])
+  @@map("trip_logs")
 }
