@@ -205,8 +205,8 @@
     <label>URL de l'API</label>
     <input id="api-url" placeholder="https://votre-api.exemple.com" />
 
-    <label>Email</label>
-    <input id="login-email" type="email" autocomplete="username" value="admin@syllogistique.local" placeholder="Votre e-mail" />
+    <label>E-mail ou numéro de téléphone</label>
+    <input id="login-email" type="text" autocomplete="username" value="admin@syllogistique.local" placeholder="E-mail ou téléphone (chauffeurs)" />
 
     <label>Mot de passe</label>
     <div style="position:relative;">
@@ -2139,6 +2139,7 @@ const drvDt = (d) => (d ? new Date(d).toLocaleString('fr-FR', { day: '2-digit', 
 const drvEl = (id) => document.getElementById(id);
 
 function drvEnter() {
+  { const uid = String(state.user.id || state.user.email || ''); if (dget('uid', '') !== uid) { try { localStorage.removeItem('syllo_drv_me'); } catch (e) {} dset('uid', uid); } }
   drvEl('login-screen').style.display = 'none';
   drvEl('app').style.display = 'none';
   drvEl('driver-app').style.display = 'block';
@@ -2198,7 +2199,7 @@ function drvRender() {
   const root = drvEl('drv-root');
   if (DRV.blocked) {
     root.innerHTML = `<div class="drv-card drv-center"><div style="font-size:44px">🔒</div><h4>Application verrouillée</h4><div class="drv-warn">${esc(DRV.blocked)}</div>
-      <button class="drv-btn" onclick="drvLoad()">Réessayer</button><button class="drv-btn ghost" onclick="drvResetDevice()">Saisir un nouveau code d'activation</button></div>`;
+      <button class="drv-btn" onclick="drvLoad()">Réessayer</button><button class="drv-btn ghost" onclick="drvResetDevice()">Saisir un nouveau code d'activation</button><button class="drv-btn ghost" onclick="drvLogout()">Changer de chauffeur (déconnexion)</button></div>`;
     return;
   }
   const me = drvView();
@@ -2568,7 +2569,7 @@ async function renderDriverDevices() {
       <td style="white-space:nowrap">
         ${d.linked ? '' : `<button class="btn small" onclick="drvLinkForm('${esc(d.id)}')">🔗 Lier un compte</button> `}
         ${d.linked ? `<button class="btn small gold" onclick="drvProvision('${esc(d.id)}')">🔑 Code / QR</button> ` : ''}
-        ${dev && dev.status === 'ACTIVE' ? `<button class="btn small" onclick="drvBlock('${esc(dev.id)}')">⛔ Bloquer</button> ` : ''}
+        ${dev && dev.status === 'ACTIVE' ? `<button class="btn small" onclick="drvTransfer('${esc(dev.id)}','${esc(d.id)}')">🔁 Transférer</button> <button class="btn small" onclick="drvBlock('${esc(dev.id)}')">⛔ Bloquer</button> ` : ''}
         ${dev && dev.status === 'BLOCKED' ? `<button class="btn small" onclick="drvUnblock('${esc(dev.id)}')">✅ Débloquer</button> ` : ''}
         <button class="btn small" onclick="drvHistory('driver','${esc(d.id)}')">📜 Historique</button></td></tr>`;
   }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
@@ -2583,14 +2584,17 @@ async function drvCreateAccount() {
   if (!drivers.length) return alert('Tous les chauffeurs ont déjà un compte (ou aucune fiche chauffeur : créez-la dans Chauffeurs).');
   openEditor('Créer un compte chauffeur', [
     { key: 'driverId', label: 'Fiche chauffeur', options: drivers.map((d) => [d.id, d.firstName + ' ' + d.lastName]) },
-    { key: 'email', label: 'E-mail (identifiant de connexion)', type: 'email' },
+    { key: 'email', label: 'E-mail (facultatif — sinon le chauffeur se connecte avec son numéro de téléphone)' },
     { key: 'password', label: 'Mot de passe provisoire (6 caractères minimum)' },
   ], async (d) => {
     const drv = drivers.find((x) => x.id === d.driverId);
-    if (!d.email || !d.password) throw new Error('E-mail et mot de passe obligatoires.');
+    const digits = (drv.phone || '').replace(/\D/g, '');
+    if (!d.email && digits.length < 8) throw new Error("Sans e-mail, la fiche du chauffeur doit avoir un numéro de téléphone (menu Chauffeurs ✏️).");
+    if (!d.password) throw new Error('Mot de passe obligatoire.');
+    d.email = d.email || (digits + '@chauffeur.local');
     await api('/users', { method: 'POST', body: { firstName: drv.firstName, lastName: drv.lastName, email: d.email, password: d.password, phone: drv.phone || undefined, role: 'CHAUFFEUR', siteId: state.siteId } });
     await api('/driver-admin/link', { method: 'POST', body: { driverId: d.driverId, email: d.email } });
-    alert('Compte créé et lié. Cliquez sur « Code / QR » pour activer son téléphone.');
+    alert('Compte créé et lié. Le chauffeur se connecte avec ' + (d.email.endsWith('@chauffeur.local') ? 'son numéro de téléphone' : d.email) + '. Cliquez sur « Code / QR » pour activer son téléphone.');
     renderDriverDevices();
   });
 }
@@ -2611,6 +2615,14 @@ async function drvProvision(driverId) {
       <button class="btn gold" onclick="this.closest('div[style*=fixed]').remove();renderDriverDevices()">Fermer</button></div>`;
     document.body.appendChild(ov);
   } catch (e) { alert(e.message); }
+}
+function drvTransfer(devId, fromId) {
+  const others = (window._drvOv || []).filter((x) => x.id !== fromId && x.linked);
+  if (!others.length) return alert("Aucun autre chauffeur n'a de compte lié. Créez d'abord son compte.");
+  openEditor('Transférer le téléphone à un remplaçant', [
+    { key: 'driverId', label: 'Chauffeur remplaçant', options: others.map((x) => [x.id, x.name]) },
+    { key: 'reason', label: 'Motif', options: [['MALADIE', 'Maladie'], ['CONGE', 'Congé'], ['AUTRE', 'Autre']] },
+  ], async (d) => { await api('/driver-admin/devices/' + devId + '/transfer', { method: 'POST', body: d }); alert("Transfert effectué : le remplaçant se connecte sur ce téléphone avec son numéro et son mot de passe. Le véhicule et les missions planifiées lui sont affectés."); renderDriverDevices(); });
 }
 function drvBlock(id) {
   openEditor('Bloquer l\'appareil', [{ key: 'reason', label: 'Motif (obligatoire)' }], async (d) => {
