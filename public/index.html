@@ -1136,14 +1136,16 @@ function openEditor(title, fields, onSave) {
   };
 }
 const day10 = (d) => (d ? String(d).slice(0, 10) : '');
-function editVehicle(id) {
+async function editVehicle(id) {
   const v = (window._vehicles || []).find(x => x.id === id); if (!v) return;
+  let drv = []; try { drv = await api('/drivers?siteId=' + state.siteId); } catch (e) {}
   openEditor('Modifier le véhicule ' + v.internalNumber, [
     { key: 'internalNumber', label: 'N° interne', value: v.internalNumber },
     { key: 'registrationNumber', label: 'Plaque', value: v.registrationNumber },
     { key: 'brand', label: 'Marque', value: v.brand }, { key: 'model', label: 'Modèle', value: v.model },
     { key: 'year', label: 'Année', type: 'number', value: v.year },
     { key: 'status', label: 'Statut', value: v.status, options: [['AVAILABLE', 'Disponible'], ['ON_MISSION', 'En mission'], ['MAINTENANCE', 'Maintenance'], ['IMMOBILIZED', 'Immobilisé'], ['OUT_OF_SERVICE', 'Hors service']] },
+    { key: 'assignedDriverId', label: 'Chauffeur affecté', value: v.assignedDriverId || '', options: [['', '— inchangé / aucun —']].concat(drv.map(d => [d.id, d.firstName + ' ' + d.lastName])) },
     { key: 'observations', label: 'Observations', value: v.observations },
   ], async (d) => { await api('/vehicles/' + id, { method: 'PATCH', body: d }); renderVehicles(); });
 }
@@ -2572,9 +2574,25 @@ async function renderDriverDevices() {
   }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
   root().innerHTML = `<div class="panel"><h3>📲 Application chauffeur — appareils autorisés</h3>
     <div class="desc">Un chauffeur = un compte personnel = un seul appareil actif. Générez un code (QR + 6 chiffres, valable 24 h) ; l'ancien appareil est automatiquement révoqué à l'activation du nouveau.</div>
-    <button class="btn gold" onclick="drvPlanTrip()">🗓 Planifier une mission</button>
+    <button class="btn gold" onclick="drvPlanTrip()">🗓 Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()">➕ Créer un compte chauffeur</button>
     <div style="overflow:auto;margin-top:12px"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${rows}</table></div></div>
     <div id="drv-hist"></div>`;
+}
+async function drvCreateAccount() {
+  const drivers = (await api('/drivers?siteId=' + state.siteId)).filter((d) => !(window._drvOv || []).some((o) => o.id === d.id && o.linked));
+  if (!drivers.length) return alert('Tous les chauffeurs ont déjà un compte (ou aucune fiche chauffeur : créez-la dans Chauffeurs).');
+  openEditor('Créer un compte chauffeur', [
+    { key: 'driverId', label: 'Fiche chauffeur', options: drivers.map((d) => [d.id, d.firstName + ' ' + d.lastName]) },
+    { key: 'email', label: 'E-mail (identifiant de connexion)', type: 'email' },
+    { key: 'password', label: 'Mot de passe provisoire (6 caractères minimum)' },
+  ], async (d) => {
+    const drv = drivers.find((x) => x.id === d.driverId);
+    if (!d.email || !d.password) throw new Error('E-mail et mot de passe obligatoires.');
+    await api('/users', { method: 'POST', body: { firstName: drv.firstName, lastName: drv.lastName, email: d.email, password: d.password, phone: drv.phone || undefined, role: 'CHAUFFEUR', siteId: state.siteId } });
+    await api('/driver-admin/link', { method: 'POST', body: { driverId: d.driverId, email: d.email } });
+    alert('Compte créé et lié. Cliquez sur « Code / QR » pour activer son téléphone.');
+    renderDriverDevices();
+  });
 }
 function drvLinkForm(driverId) {
   openEditor('Lier un compte utilisateur', [{ key: 'email', label: 'E-mail du compte (rôle Chauffeur, créé dans Utilisateurs)' }], async (d) => {
