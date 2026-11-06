@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import * as QRCode from 'qrcode';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
@@ -100,6 +101,42 @@ export class DriverDevicesService {
     return updated;
   }
 
+  // Invitation WhatsApp : crée le compte (identifiant = numéro de téléphone) s'il n'existe pas, le lie à la fiche,
+  // prépare le code d'activation et renvoie le message à envoyer (même lien pour tous les chauffeurs).
+  async invite(driverId: string, appUrl: string, actor: Actor, organizationId: string) {
+    if (!/^https:\/\//.test(appUrl)) throw new BadRequestException("Lien de l'application invalide.");
+    const driver = await this.driverInScope(driverId, actor);
+    const digits = (driver.phone ?? '').replace(/\D/g, '');
+    if (digits.length < 8) throw new BadRequestException(`Renseignez le numéro de téléphone de ${driver.firstName} ${driver.lastName} (menu Chauffeurs).`);
+    let tempPassword: string | null = null;
+    let userId = driver.userId;
+    if (!userId) {
+      const last9 = digits.slice(-9);
+      const dup = (await this.prisma.user.findMany({ where: { phone: { not: null }, role: { name: 'CHAUFFEUR' } }, select: { phone: true } })).some((u) => (u.phone ?? '').replace(/\D/g, '').slice(-9) === last9);
+      if (dup) throw new BadRequestException('Un compte chauffeur existe déjà avec ce numéro de téléphone.');
+      const role = await this.prisma.role.findUnique({ where: { name: 'CHAUFFEUR' } });
+      if (!role) throw new BadRequestException('Rôle Chauffeur introuvable.');
+      tempPassword = String(randomInt(100000, 1_000_000));
+      const email = `${last9}@chauffeur.local`;
+      if (await this.prisma.user.findUnique({ where: { email } })) throw new BadRequestException('Un compte existe déjà avec ce numéro.');
+      const u = await this.prisma.user.create({
+        data: { organizationId, siteId: driver.siteId, roleId: role.id, firstName: driver.firstName, lastName: driver.lastName, email, phone: driver.phone, passwordHash: await bcrypt.hash(tempPassword, 10) },
+      });
+      await this.prisma.driver.update({ where: { id: driver.id }, data: { userId: u.id } });
+      await this.audit.log({ userId: actor.userId, action: 'CREATE', entity: 'User', entityId: u.id, newValue: { role: 'CHAUFFEUR', driverId: driver.id, via: 'invitation' } });
+      userId = u.id;
+    }
+    const prov = await this.provision(driver.id, actor);
+    const lines = [
+      `Bonjour ${driver.firstName},`,
+      `Voici votre application de travail SYLLOGISTIQUE : ${appUrl}`,
+      `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
+      `2) Connexion : votre numéro de téléphone${tempPassword ? ` et le mot de passe provisoire ${tempPassword} (à changer dans « Profil »)` : ' et votre mot de passe habituel'}.`,
+      `3) Code d'activation de votre téléphone : ${prov.otp} (valable 24 h).`,
+    ];
+    return { driver: `${driver.firstName} ${driver.lastName}`, phone: digits, message: lines.join('\n'), newAccount: !!tempPassword };
+  }
+
   // Transfert d'appareil : le téléphone reste au bureau, le remplaçant s'y connecte avec son propre compte.
   // Le véhicule et les missions planifiées de l'absent passent au remplaçant.
   async transfer(id: string, newDriverId: string, reason: string | undefined, actor: Actor) {
@@ -136,7 +173,7 @@ export class DriverDevicesService {
         id: x.id, status: x.status, model: x.model, os: x.os, activatedAt: x.activatedAt, lastSeenAt: x.lastSeenAt,
         blockedReason: x.blockedReason, expiresAt: x.status === 'PENDING' ? x.activationExpiresAt : null,
       }));
-      return { id: d.id, name: `${d.firstName} ${d.lastName}`, userEmail: users.find((u) => u.id === d.userId)?.email ?? null, linked: !!d.userId, devices: ds };
+      return { id: d.id, name: `${d.firstName} ${d.lastName}`, phone: d.phone, activity: d.activity, userEmail: users.find((u) => u.id === d.userId)?.email ?? null, linked: !!d.userId, devices: ds };
     });
   }
 }
