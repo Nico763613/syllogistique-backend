@@ -8,7 +8,7 @@ import { DriverDeviceGuard } from './driver-device.guard';
 import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
-import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, SyncDto, TakeoverDto, UpdateProfileDto } from './driver.dto';
+import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, SyncDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -89,6 +89,11 @@ export class DriverAdminController {
   @Post('devices/:id/block')
   block(@Param('id') id: string, @Body() dto: DeviceReasonDto, @CurrentUser() actor: any) {
     return this.devices.setStatus(id, 'BLOCKED', dto.reason, actor);
+  }
+
+  @Post('devices/:id/transfer')
+  transfer(@Param('id') id: string, @Body() dto: TransferDeviceDto, @CurrentUser() actor: any) {
+    return this.devices.transfer(id, dto.driverId, dto.reason, actor);
   }
 
   @Post('devices/:id/unblock')

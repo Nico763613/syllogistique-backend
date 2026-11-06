@@ -100,6 +100,27 @@ export class DriverDevicesService {
     return updated;
   }
 
+  // Transfert d'appareil : le téléphone reste au bureau, le remplaçant s'y connecte avec son propre compte.
+  // Le véhicule et les missions planifiées de l'absent passent au remplaçant.
+  async transfer(id: string, newDriverId: string, reason: string | undefined, actor: Actor) {
+    const dev = await this.prisma.driverDevice.findUnique({ where: { id } });
+    if (!dev || dev.status !== 'ACTIVE') throw new BadRequestException("Seul un appareil actif peut être transféré.");
+    const oldDriver = await this.driverInScope(dev.driverId, actor);
+    const target = await this.driverInScope(newDriverId, actor);
+    if (target.id === oldDriver.id) throw new BadRequestException('Choisissez un autre chauffeur.');
+    if (!target.userId) throw new BadRequestException("Le remplaçant n'a pas de compte lié.");
+    const running = await this.prisma.trip.findFirst({ where: { driverId: oldDriver.id, status: 'IN_PROGRESS' } });
+    if (running) throw new BadRequestException("Le chauffeur absent a une mission en cours : elle doit d'abord être terminée.");
+    await this.prisma.$transaction([
+      this.prisma.driverDevice.updateMany({ where: { driverId: target.id, status: { in: ['ACTIVE', 'PENDING'] } }, data: { status: 'REVOKED', blockedReason: 'Remplacé par un transfert d\'appareil' } }),
+      this.prisma.driverDevice.update({ where: { id }, data: { driverId: target.id, userId: target.userId } }),
+      this.prisma.vehicle.updateMany({ where: { assignedDriverId: oldDriver.id }, data: { assignedDriverId: target.id } }),
+      this.prisma.trip.updateMany({ where: { driverId: oldDriver.id, status: 'PLANNED' }, data: { driverId: target.id } }),
+    ]);
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'DriverDevice', entityId: id, oldValue: { driverId: oldDriver.id }, newValue: { driverId: target.id }, reason: `Remplacement${reason ? ' (' + reason + ')' : ''} : ${oldDriver.firstName} ${oldDriver.lastName} → ${target.firstName} ${target.lastName}` });
+    return { deviceId: id, driver: `${target.firstName} ${target.lastName}` };
+  }
+
   // Vue d'ensemble : chauffeurs, compte lié, appareil actif / en attente
   async overview(actor: Actor, siteId?: string) {
     const site = this.siteScope(actor, siteId);

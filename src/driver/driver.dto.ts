@@ -39,6 +39,11 @@ export class UpdateProfileDto {
   @IsString() @MinLength(6) @MaxLength(30) phone: string;
 }
 
+export class TransferDeviceDto {
+  @IsString() driverId: string;
+  @IsOptional() @IsIn(['MALADIE', 'CONGE', 'AUTRE']) reason?: string;
+}
+
 export class TakeoverDto {
   @IsString() vehicleId: string;
   // MALADIE | CONGE | AUTRE
