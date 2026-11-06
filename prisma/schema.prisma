@@ -22,6 +22,7 @@ model Organization {
   phone     String?
   email     String?
   logoUrl   String?  @map("logo_url")
+  brandColor String? @map("brand_color")
   currency  String   @default("GNF")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -142,6 +143,7 @@ model User {
   firstName      String    @map("first_name")
   lastName       String    @map("last_name")
   email          String    @unique
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   phone          String?
   // Département : LOGISTIQUE, CARBURANT, STOCK ou RH (vide = pas de restriction de département)
   department     String?

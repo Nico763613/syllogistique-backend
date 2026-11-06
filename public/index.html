@@ -406,6 +406,7 @@ async function login() {
   try {
     localStorage.setItem('syllo_api_url', state.apiUrl);
     const data = await api('/auth/login', { method: 'POST', body: { email, password } });
+    state._pw = password;
     state.accessToken = data.accessToken;
     state.refreshToken = data.refreshToken;
     state.user = data.user;
@@ -429,6 +430,7 @@ function logout() {
 }
 
 function enterApp() {
+  if (state.user && state.user.mustChangePassword) { setTimeout(() => forcePasswordScreen(), 0); return; }
   if (state.user && state.user.role === 'CHAUFFEUR') { setTimeout(() => drvEnter(), 0); return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -2036,6 +2038,7 @@ function renderSettings() {
       <div id="u-msg"></div>
     </div>` : ''}`;
   if (['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role)) loadUsersPanel();
+  brandPanel();
 }
 async function changePassword() {
   const msg = document.getElementById('pw-msg');
@@ -2197,7 +2200,7 @@ function drvView() {
 }
 
 function drvIsTruck(me) { return me && ((me.vehicle && me.vehicle.type === 'TRUCK') || (!me.vehicle && me.driver.activity === 'TRUCK')); }
-function drvKind(me) { return (drvIsTruck(me) ? 'Chauffeur de camion' : 'Chauffeur de véhicule de service') + (me.vehicle && me.vehicle.registrationType === 'IT' ? ' · plaque IT' : ''); }
+function drvKind(me) { return (BRAND.name && BRAND.name !== 'SYLLOGISTIQUE' ? BRAND.name + ' · ' : '') + (drvIsTruck(me) ? 'Chauffeur de camion' : 'Chauffeur de véhicule de service') + (me.vehicle && me.vehicle.registrationType === 'IT' ? ' · plaque IT' : ''); }
 function drvTab(t) { DRV.tab = t; drvRender(); }
 function drvRender() {
   drvPill();
@@ -2683,6 +2686,92 @@ async function drvHistory(kind, id) {
     <table><tr><th>Date</th><th>Mission</th><th>Statut</th><th>Km</th><th>Retard</th></tr>${h.trips.slice(0, 30).map((t) => `<tr><td>${drvDt(t.startTime)}</td><td>${esc(t.destination || '—')} <span style="color:var(--muted)">${esc(t.who)}</span></td><td>${esc(t.status)}${t.signed ? ' ✍' : ''}</td><td>${t.distance ?? '—'}</td><td>${esc(t.delayReason || '')}</td></tr>`).join('')}</table></div>`;
   drvEl('drv-hist').scrollIntoView({ behavior: 'smooth' });
 }
+</script>
+
+<script>
+/* ============ PERSONNALISATION (nom, logo, couleur de l'entreprise) ============ */
+const BRAND = (() => { try { return JSON.parse(localStorage.getItem('syllo_brand') || 'null') || { name: 'SYLLOGISTIQUE' }; } catch (e) { return { name: 'SYLLOGISTIQUE' }; } })();
+const brandSrc = (u) => (u && u.startsWith('/') ? (state.apiUrl || localStorage.getItem('syllo_api_url') || '').replace(/\/$/, '') + u : u);
+function brandApply() {
+  const n = BRAND.name || 'SYLLOGISTIQUE';
+  document.title = n + ' — Gestion Logistique & Flotte';
+  if (BRAND.brandColor) document.documentElement.style.setProperty('--navy', BRAND.brandColor);
+  const logo = BRAND.logoUrl ? `<img src="${esc(brandSrc(BRAND.logoUrl))}" alt="" style="height:44px;max-width:120px;object-fit:contain;vertical-align:middle">` : '';
+  const lb = document.querySelector('.login-brand .brand'); if (lb) lb.textContent = n;
+  const lt = document.querySelector('.login-truck'); if (lt) lt.innerHTML = logo || '🚚';
+  const sb = document.querySelector('.brand-block .brand'); if (sb) sb.innerHTML = (logo ? logo.replace('height:44px', 'height:30px') + ' ' : '🚚 ') + esc(n);
+  const ds = document.getElementById('drv-sub'); if (ds && !ds.dataset.k) ds.textContent = n;
+}
+async function brandLoad() {
+  brandApply();
+  try {
+    const base = (document.getElementById('api-url') ? document.getElementById('api-url').value : '') || localStorage.getItem('syllo_api_url') || '';
+    if (!base) return;
+    const r = await fetch(base.replace(/\/$/, '') + '/branding');
+    if (!r.ok) return;
+    Object.assign(BRAND, await r.json());
+    localStorage.setItem('syllo_brand', JSON.stringify(BRAND));
+    brandApply();
+  } catch (e) {}
+}
+function brandPanel() {
+  if (!['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role)) return;
+  const p = document.createElement('div'); p.className = 'panel';
+  p.innerHTML = `<h3>🏷️ Personnalisation de l'application</h3>
+    <div class="desc">Le nom, le logo et la couleur de votre entreprise apparaissent sur l'écran de connexion et dans l'espace de chaque utilisateur.</div>
+    <label>Nom de l'entreprise</label><input id="b-name" value="${esc(BRAND.name || '')}">
+    <label>Couleur principale</label><input id="b-color" type="color" value="${esc(BRAND.brandColor || '#163A5F')}" style="height:44px;padding:2px">
+    <label>Logo (PNG, JPG ou WebP)</label><input id="b-logo" type="file" accept="image/png,image/jpeg,image/webp">
+    ${BRAND.logoUrl ? `<div style="margin:8px 0"><img src="${esc(brandSrc(BRAND.logoUrl))}" style="height:56px"> <a href="#" onclick="brandSave(true);return false;">retirer le logo</a></div>` : ''}
+    <button class="btn gold" onclick="brandSave()">Enregistrer</button><div id="b-msg"></div>`;
+  root().appendChild(p);
+}
+async function brandSave(removeLogo) {
+  const m = document.getElementById('b-msg');
+  try {
+    const body = { name: document.getElementById('b-name').value.trim(), brandColor: document.getElementById('b-color').value };
+    const f = document.getElementById('b-logo').files[0];
+    if (removeLogo) body.logoUrl = '';
+    else if (f) {
+      const fd = new FormData(); fd.append('file', f, f.name);
+      const res = await fetch(state.apiUrl.replace(/\/$/, '') + '/uploads?category=logo', { method: 'POST', headers: { Authorization: 'Bearer ' + state.accessToken }, body: fd });
+      if (!res.ok) throw new Error('Logo refusé (PNG, JPG ou WebP, 15 Mo max).');
+      body.logoUrl = (await res.json()).url;
+    }
+    const r = await api('/branding', { method: 'PATCH', body });
+    Object.assign(BRAND, r); localStorage.setItem('syllo_brand', JSON.stringify(BRAND)); brandApply();
+    m.innerHTML = '<div class="msg ok">Personnalisation enregistrée.</div>';
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
+/* ============ PREMIÈRE CONNEXION : le chauffeur crée son propre mot de passe ============ */
+function forcePasswordScreen() {
+  const old = document.getElementById('force-pw'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'force-pw';
+  ov.style.cssText = 'position:fixed;inset:0;background:var(--navy);z-index:3000;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;';
+  const known = !!state._pw;
+  ov.innerHTML = `<div class="panel" style="max-width:380px;width:100%"><h3>🔑 Créez votre mot de passe</h3>
+    <div class="desc">Pour votre sécurité, choisissez un mot de passe personnel que vous seul connaissez. Vous l'utiliserez pour vous connecter.</div>
+    ${known ? '' : '<label>Mot de passe provisoire reçu</label><input id="fp-old" type="password">'}
+    <label>Nouveau mot de passe (6 caractères minimum)</label><input id="fp-new" type="password" autocomplete="new-password">
+    <label>Confirmer le mot de passe</label><input id="fp-new2" type="password" autocomplete="new-password">
+    <div id="fp-msg"></div><button class="btn gold" style="width:100%;margin-top:10px" onclick="forcePasswordSave()">Enregistrer et continuer</button></div>`;
+  document.body.appendChild(ov);
+}
+async function forcePasswordSave() {
+  const m = document.getElementById('fp-msg'), v = (i) => (document.getElementById(i) ? document.getElementById(i).value : '');
+  try {
+    if (v('fp-new').length < 6) throw new Error('Le mot de passe doit avoir au moins 6 caractères.');
+    if (v('fp-new') !== v('fp-new2')) throw new Error('La confirmation ne correspond pas.');
+    if (v('fp-new') === (state._pw || v('fp-old'))) throw new Error('Choisissez un mot de passe différent du provisoire.');
+    await api('/auth/change-password', { method: 'POST', body: { currentPassword: state._pw || v('fp-old'), newPassword: v('fp-new') } });
+    state._pw = null; state.user.mustChangePassword = false;
+    localStorage.setItem('syllo_user', JSON.stringify(state.user));
+    document.getElementById('force-pw').remove();
+    enterApp();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+brandLoad();
 </script>
 
 </body>

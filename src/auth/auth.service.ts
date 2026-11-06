@@ -96,6 +96,7 @@ export class AuthService {
         organizationId: user.organizationId,
         siteId: user.siteId,
         department: user.department,
+        mustChangePassword: user.mustChangePassword,
       },
     };
   }
@@ -150,7 +151,7 @@ export class AuthService {
     if (!ok) throw new BadRequestException('Mot de passe actuel incorrect.');
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: false } });
 
     await this.audit.log({
       userId,

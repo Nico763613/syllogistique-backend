@@ -143,3 +143,12 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS purpose_type text, ADD COLUMN IF NOT 
 
 --#
 ALTER TABLE drivers ADD COLUMN IF NOT EXISTS activity text;
+
+--#
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS brand_color text;
+
+--#
+ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL DEFAULT false;
+
+--#
+CREATE TABLE IF NOT EXISTS uploaded_files (name text PRIMARY KEY, mime text NOT NULL, size integer NOT NULL, data bytea NOT NULL, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);

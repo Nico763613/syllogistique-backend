@@ -120,7 +120,7 @@ export class DriverDevicesService {
       const email = `${last9}@chauffeur.local`;
       if (await this.prisma.user.findUnique({ where: { email } })) throw new BadRequestException('Un compte existe déjà avec ce numéro.');
       const u = await this.prisma.user.create({
-        data: { organizationId, siteId: driver.siteId, roleId: role.id, firstName: driver.firstName, lastName: driver.lastName, email, phone: driver.phone, passwordHash: await bcrypt.hash(tempPassword, 10) },
+        data: { organizationId, siteId: driver.siteId, roleId: role.id, firstName: driver.firstName, lastName: driver.lastName, email, phone: driver.phone, mustChangePassword: true, passwordHash: await bcrypt.hash(tempPassword, 10) },
       });
       await this.prisma.driver.update({ where: { id: driver.id }, data: { userId: u.id } });
       await this.audit.log({ userId: actor.userId, action: 'CREATE', entity: 'User', entityId: u.id, newValue: { role: 'CHAUFFEUR', driverId: driver.id, via: 'invitation' } });
@@ -131,7 +131,7 @@ export class DriverDevicesService {
       `Bonjour ${driver.firstName},`,
       `Voici votre application de travail SYLLOGISTIQUE : ${appUrl}`,
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
-      `2) Connexion : votre numéro de téléphone${tempPassword ? ` et le mot de passe provisoire ${tempPassword} (à changer dans « Profil »)` : ' et votre mot de passe habituel'}.`,
+      `2) Connexion : votre numéro de téléphone${tempPassword ? ` et le mot de passe provisoire ${tempPassword} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe habituel'}.`,
       `3) Code d'activation de votre téléphone : ${prov.otp} (valable 24 h).`,
     ];
     return { driver: `${driver.firstName} ${driver.lastName}`, phone: digits, message: lines.join('\n'), newAccount: !!tempPassword };
