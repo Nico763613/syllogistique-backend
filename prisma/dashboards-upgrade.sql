@@ -140,3 +140,6 @@ CREATE INDEX IF NOT EXISTS trip_logs_trip_id_occurred_at_idx ON trip_logs (trip_
 
 --#
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS purpose_type text, ADD COLUMN IF NOT EXISTS regions text[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS cargo text, ADD COLUMN IF NOT EXISTS trips_count integer, ADD COLUMN IF NOT EXISTS pre_condition text, ADD COLUMN IF NOT EXISTS pre_anomalies text, ADD COLUMN IF NOT EXISTS maintenance_needed boolean, ADD COLUMN IF NOT EXISTS maintenance_reason text;
+
+--#
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS activity text;

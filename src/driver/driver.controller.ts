@@ -8,7 +8,7 @@ import { DriverDeviceGuard } from './driver-device.guard';
 import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
-import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, SyncDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -79,6 +79,11 @@ export class DriverAdminController {
   @Post('link')
   link(@Body() dto: LinkDriverDto, @CurrentUser() actor: any) {
     return this.devices.link(dto.driverId, dto.email, actor);
+  }
+
+  @Post('invite')
+  invite(@Body() dto: InviteDto, @CurrentUser() actor: any) {
+    return this.devices.invite(dto.driverId, dto.appUrl, actor, actor.organizationId);
   }
 
   @Post('provision')

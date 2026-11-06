@@ -133,7 +133,7 @@ export class ReportsService {
       this.prisma.trip.findMany({
         where: { siteId, tripDate: { gte: start, lt: end } },
         include: {
-          vehicle: { select: { internalNumber: true, registrationNumber: true, brand: true, model: true, vehicleType: true, referenceConsumption: true } },
+          vehicle: { select: { internalNumber: true, registrationNumber: true, brand: true, model: true, vehicleType: true, referenceConsumption: true, registrationType: true, itExpiryDate: true } },
           driver: { select: { firstName: true, lastName: true, licenseNumber: true, phone: true } },
         },
         orderBy: { startTime: 'asc' },
@@ -211,6 +211,7 @@ export class ReportsService {
           return {
             vehicle: t.vehicle.internalNumber,
             plate: t.vehicle.registrationNumber,
+            plateIT: t.vehicle.registrationType === 'IT',
             brand: [t.vehicle.brand, t.vehicle.model].filter(Boolean).join(' '),
             kind: t.vehicle.vehicleType === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE',
             driver: `${t.driver.firstName} ${t.driver.lastName}${t.driver.licenseNumber ? ' (permis ' + t.driver.licenseNumber + ')' : ''}`,
@@ -313,7 +314,7 @@ export class ReportsService {
     ];
     for (const x of r.trips.list) {
       const hh = (d: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
-      lines.push(`   - ${x.plate} ${x.driver.split(' (')[0]} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' (' + x.cargo + ')' : ''}, ${hh(x.startTime)}→${hh(x.endTime)}, ${n(x.km)} km, ${x.liters} L${x.liters ? ' / ' + n(x.fuelCost) + ' GNF' : ''}${x.voyages ? ', ' + x.voyages + ' voyages' : ''}${x.maintenanceNeeded ? ' ⚠ maintenance : ' + x.maintenanceReason : ''}`);
+      lines.push(`   - ${x.kind === 'TRUCK' ? '🚛' : '🚙'} ${x.plate}${x.plateIT ? ' (IT)' : ''} ${x.driver.split(' (')[0]} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' (' + x.cargo + ')' : ''}, ${hh(x.startTime)}→${hh(x.endTime)}, ${n(x.km)} km, ${x.liters} L${x.liters ? ' / ' + n(x.fuelCost) + ' GNF' : ''}${x.voyages ? ', ' + x.voyages + ' voyages' : ''}${x.maintenanceNeeded ? ' ⚠ maintenance : ' + x.maintenanceReason : ''}`);
     }
     const present = r.attendance.counts['PRESENT'] ?? 0;
     lines.push(`👥 *Chauffeurs* : ${present} présent(s), ${r.attendance.absences.length} absent(s)/indisponible(s)`);

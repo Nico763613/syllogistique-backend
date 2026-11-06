@@ -153,7 +153,7 @@ export class ExportService {
       const hh = (d: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
       for (const x of report.trips.list) {
         doc.moveDown(0.3);
-        doc.fillColor(navy).text(`${x.plate} — ${x.brand || x.vehicle} — ${x.driver}${x.phone ? ' — ' + x.phone : ''}`).fillColor('#000000');
+        doc.fillColor(navy).text(`${x.kind === 'TRUCK' ? 'CAMION' : 'VÉHICULE DE SERVICE'}${x.plateIT ? ' (plaque IT)' : ''} — ${x.plate} — ${x.brand || x.vehicle} — ${x.driver}${x.phone ? ' — ' + x.phone : ''}`).fillColor('#000000');
         line(`   ${x.kind === 'TRUCK' ? 'Site / destination' : 'Destination'} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' — ' + x.cargo : ''}${x.purposeType ? ' — ' + x.purposeType.toLowerCase() : ''}`);
         line(`   Horaires : ${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? ' — ' + x.voyages + ' voyage(s)' : ''}`);
         line(`   Compteur : ${n(x.startMileage)} → ${x.endMileage !== null ? n(x.endMileage) : 'en cours'}${x.fuelMileages.length ? ' (plein à ' + x.fuelMileages.map(n).join(', ') + ')' : ''} — ${n(x.km)} km`);

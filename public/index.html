@@ -1154,6 +1154,7 @@ function editDriver(id) {
   openEditor('Modifier le chauffeur ' + d0.firstName + ' ' + d0.lastName, [
     { key: 'firstName', label: 'Prénom', value: d0.firstName }, { key: 'lastName', label: 'Nom', value: d0.lastName },
     { key: 'phone', label: 'Téléphone', value: d0.phone },
+    { key: 'activity', label: 'Activité', value: d0.activity || 'TRUCK', options: [['TRUCK', 'Chauffeur de camion'], ['SERVICE_VEHICLE', 'Chauffeur de véhicule de service']] },
     { key: 'licenseNumber', label: 'N° de permis', value: d0.licenseNumber }, { key: 'licenseCategory', label: 'Catégorie du permis', value: d0.licenseCategory },
     { key: 'licenseExpiryDate', label: 'Expiration du permis', type: 'date', value: day10(d0.licenseExpiryDate) },
     { key: 'status', label: 'Statut', value: d0.status, options: [['ACTIVE', 'Actif'], ['SUSPENDED', 'Suspendu'], ['INACTIVE', 'Inactif']] },
@@ -1178,10 +1179,10 @@ async function renderDrivers() {
   const list = await api('/drivers?siteId=' + state.siteId);
   window._drivers = list;
   const rows = list.map(d => `
-    <tr><td><b>${esc(d.firstName)} ${esc(d.lastName)}</b></td><td>${esc(d.phone || '—')}</td><td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}','${esc(d.licenseNumber || '')}')">✏️</button></td>
+    <tr><td><b>${esc(d.firstName)} ${esc(d.lastName)}</b></td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '🚛 Camion' : d.activity === 'SERVICE_VEHICLE' ? '🚙 Véhicule de service' : '—'}</td><td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}','${esc(d.licenseNumber || '')}')">✏️</button></td>
     <td>${d.licenseExpiryDate ? new Date(d.licenseExpiryDate).toLocaleDateString('fr-FR') : '—'}</td>
     <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td>
-    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')">✏️ Modifier</button></td></tr>`).join('') || `<tr><td colspan="6" class="empty">Aucun chauffeur enregistré.</td></tr>`;
+    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')">✏️ Modifier</button></td></tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun chauffeur enregistré.</td></tr>`;
 
   root().innerHTML = `
     <div class="panel">
@@ -1189,7 +1190,8 @@ async function renderDrivers() {
       <div class="grid-2">
         <div><label>Prénom</label><input id="d-first" /></div>
         <div><label>Nom</label><input id="d-last" /></div>
-        <div><label>Téléphone</label><input id="d-phone" /></div>
+        <div><label>Téléphone (WhatsApp)</label><input id="d-phone" /></div>
+        <div><label>Activité</label><select id="d-act"><option value="TRUCK">Chauffeur de camion (sites / transport)</option><option value="SERVICE_VEHICLE">Chauffeur de véhicule de service</option></select></div>
         <div><label>N° de permis</label><input id="d-license" /></div>
         <div><label>Catégorie du permis</label><input id="d-cat" placeholder="B, C, D…" /></div>
         <div><label>Expiration du permis</label><input id="d-exp" type="date" /></div>
@@ -1199,7 +1201,7 @@ async function renderDrivers() {
     </div>
     <div class="panel">
       <h3>Chauffeurs (${list.length})</h3>
-      <table><thead><tr><th>Nom</th><th>Téléphone</th><th>Permis</th><th>Expiration</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      <table><thead><tr><th>Nom</th><th>Téléphone</th><th>Activité</th><th>Permis</th><th>Expiration</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
 async function createDriver() {
@@ -1210,6 +1212,7 @@ async function createDriver() {
       firstName: document.getElementById('d-first').value,
       lastName: document.getElementById('d-last').value,
       phone: document.getElementById('d-phone').value,
+      activity: document.getElementById('d-act').value,
       licenseNumber: document.getElementById('d-license').value.trim() || undefined,
       licenseCategory: document.getElementById('d-cat').value.trim() || undefined,
       licenseExpiryDate: document.getElementById('d-exp').value || undefined,
@@ -2144,6 +2147,7 @@ function drvEnter() {
   drvEl('app').style.display = 'none';
   drvEl('driver-app').style.display = 'block';
   drvEl('drv-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  { const m = dget('me', null); if (m) drvEl('drv-sub').textContent = drvKind(m); }
   window.addEventListener('online', () => { drvLoad(); });
   window.addEventListener('offline', drvPill);
   setInterval(() => { if (drvDevice() && navigator.onLine) drvFlush().then(drvRender); }, 30000);
@@ -2192,9 +2196,12 @@ function drvView() {
   return me;
 }
 
+function drvIsTruck(me) { return me && ((me.vehicle && me.vehicle.type === 'TRUCK') || (!me.vehicle && me.driver.activity === 'TRUCK')); }
+function drvKind(me) { return (drvIsTruck(me) ? 'Chauffeur de camion' : 'Chauffeur de véhicule de service') + (me.vehicle && me.vehicle.registrationType === 'IT' ? ' · plaque IT' : ''); }
 function drvTab(t) { DRV.tab = t; drvRender(); }
 function drvRender() {
   drvPill();
+  if (DRV.me) drvEl('drv-sub').textContent = drvKind(DRV.me);
   document.querySelectorAll('#drv-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === DRV.tab));
   const root = drvEl('drv-root');
   if (DRV.blocked) {
@@ -2224,7 +2231,7 @@ function drvMissionsHtml(me) {
   const late = (t) => t.scheduledArrival && t.status === 'IN_PROGRESS' && Date.now() > +new Date(t.scheduledArrival) + 15 * 60000;
   const id = `<div class="drv-card"><h4>👤 ${esc(me.driver.name)}</h4>
     <div class="drv-row"><span>Téléphone</span><b>${esc(me.driver.phone || '—')}</b></div>
-    ${v ? `<div class="drv-row"><span>${v.type === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</span><b>${esc(v.plate)}</b></div><div class="drv-row"><span>Marque</span><b>${esc(v.label || '—')}</b></div><div class="drv-row"><span>Compteur</span><b>${fmt(v.mileage)} km</b></div>` : '<div class="drv-row"><span>Véhicule</span><b>Aucun affecté</b></div>'}
+    ${v ? `<div class="drv-row"><span>${v.type === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</span><b>${esc(v.plate)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : ''}</b></div><div class="drv-row"><span>Marque</span><b>${esc(v.label || '—')}</b></div><div class="drv-row"><span>Compteur</span><b>${fmt(v.mileage)} km</b></div>` : '<div class="drv-row"><span>Véhicule</span><b>Aucun affecté</b></div>'}
     ${v && !me.activeTrip && !v.immobilized ? `<button class="drv-btn gold" onclick="drvStartForm('')">➕ ${v.type === 'TRUCK' ? 'Commencer ma journée' : 'Nouvelle mission'}</button>` : ''}</div>`;
   const list = trips.map((t) => `
     <div class="drv-card">
@@ -2407,7 +2414,7 @@ function drvToggleStart() {
 }
 const DRV_REGIONS = ['Conakry', 'Boké', 'Kindia', 'Mamou', 'Labé', 'Faranah', 'Kankan', "N'Zérékoré"];
 function drvStartForm(tripId) {
-  const me = drvView(), v = me.vehicle, t = tripId ? drvTripOf(tripId) : null, truck = v && v.type === 'TRUCK';
+  const me = drvView(), v = me.vehicle, t = tripId ? drvTripOf(tripId) : null, truck = drvIsTruck(me);
   const id = tripId || drvUid();
   const common = `<div class="drv-card" style="margin:0 0 6px"><div class="drv-row"><span>Chauffeur</span><b>${esc(me.driver.name)} ${esc(me.driver.phone || '')}</b></div><div class="drv-row"><span>${truck ? 'Camion' : 'Véhicule'}</span><b>${esc(v ? v.plate : '')} ${esc(v ? v.label || '' : '')}</b></div></div>
     <label>Compteur au départ (km) — obligatoire</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(v ? v.mileage : '')}">`;
@@ -2438,7 +2445,7 @@ function drvStartForm(tripId) {
   drvToggleStart();
 }
 function drvArriveForm(tripId) {
-  const t = drvTripOf(tripId), truck = drvView().vehicle && drvView().vehicle.type === 'TRUCK';
+  const t = drvTripOf(tripId), truck = drvIsTruck(drvView());
   const late = t.scheduledArrival && Date.now() > +new Date(t.scheduledArrival) + 15 * 60000;
   drvSheet('Arrêt — ' + (t.destination || 'mission'), `
     <label>Compteur à l'arrêt (km) — obligatoire (départ : ${esc(t.startMileage)})</label><input id="f-odo" type="number" inputmode="numeric">
@@ -2575,9 +2582,32 @@ async function renderDriverDevices() {
   }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
   root().innerHTML = `<div class="panel"><h3>📲 Application chauffeur — appareils autorisés</h3>
     <div class="desc">Un chauffeur = un compte personnel = un seul appareil actif. Générez un code (QR + 6 chiffres, valable 24 h) ; l'ancien appareil est automatiquement révoqué à l'activation du nouveau.</div>
-    <button class="btn gold" onclick="drvPlanTrip()">🗓 Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()">➕ Créer un compte chauffeur</button>
+    <button class="btn gold" onclick="drvPlanTrip()">🗓 Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()">➕ Créer un compte chauffeur</button> <button class="btn gold" onclick="drvInvitePanel()">📲 Envoyer l'application aux chauffeurs</button>
     <div style="overflow:auto;margin-top:12px"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${rows}</table></div></div>
     <div id="drv-hist"></div>`;
+}
+function drvInvitePanel() {
+  const list = window._drvOv || [];
+  const act = (a) => (a === 'TRUCK' ? '🚛 Camion' : a === 'SERVICE_VEHICLE' ? '🚙 Véhicule de service' : '<span class="badge warn">Activité à préciser</span>');
+  const link = location.origin + location.pathname.replace(/index\.html$/, '');
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
+  ov.innerHTML = `<div class="panel" style="max-width:640px;width:100%;margin:20px auto;"><h3>📲 Envoyer l'application aux chauffeurs</h3>
+    <div class="desc">Même lien pour tous : <b>${esc(link)}</b>. Pour chaque chauffeur, le message WhatsApp contient le lien, la marche à suivre, son mot de passe provisoire (premier envoi) et son code d'activation personnel.</div>
+    <table>${list.map((d) => `<tr><td><b>${esc(d.name)}</b><div style="font-size:11px">${esc(d.phone || 'pas de numéro')}</div></td><td>${act(d.activity)}</td>
+      <td><button class="btn small gold" ${d.phone ? '' : 'disabled'} onclick="drvInviteSend('${esc(d.id)}')">💬 WhatsApp</button></td></tr>`).join('') || '<tr><td class="empty">Aucun chauffeur.</td></tr>'}</table>
+    <div id="inv-msg"></div><button class="btn" style="margin-top:10px" onclick="this.closest('div[style*=fixed]').remove();renderDriverDevices()">Fermer</button></div>`;
+  document.body.appendChild(ov);
+}
+async function drvInviteSend(driverId) {
+  const m = document.getElementById('inv-msg');
+  try {
+    const link = location.origin + location.pathname.replace(/index\.html$/, '');
+    const r = await api('/driver-admin/invite', { method: 'POST', body: { driverId, appUrl: link } });
+    const num = r.phone.length === 9 ? '224' + r.phone : r.phone;
+    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(r.message), '_blank');
+    m.innerHTML = `<div class="msg ok">Message prêt pour ${esc(r.driver)}${r.newAccount ? ' (compte créé)' : ''}. Appuyez sur « Envoyer » dans WhatsApp.</div>`;
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function drvCreateAccount() {
   const drivers = (await api('/drivers?siteId=' + state.siteId)).filter((d) => !(window._drvOv || []).some((o) => o.id === d.id && o.linked));

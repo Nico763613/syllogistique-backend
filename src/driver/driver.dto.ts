@@ -39,6 +39,11 @@ export class UpdateProfileDto {
   @IsString() @MinLength(6) @MaxLength(30) phone: string;
 }
 
+export class InviteDto {
+  @IsString() driverId: string;
+  @IsString() @MaxLength(200) appUrl: string;
+}
+
 export class TransferDeviceDto {
   @IsString() driverId: string;
   @IsOptional() @IsIn(['MALADIE', 'CONGE', 'AUTRE']) reason?: string;

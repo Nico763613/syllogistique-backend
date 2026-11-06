@@ -69,10 +69,10 @@ export class DriverAppService {
       purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount,
     });
     return {
-      driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId },
+      driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
       device: { id: device.id, model: device.model, activatedAt: device.activatedAt },
       vehicle: vehicleRow
-        ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
+        ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
         : null,
       activeTrip: active ? fmtTrip(active) : null,
       trips: trips.map(fmtTrip),
@@ -153,7 +153,7 @@ export class DriverAppService {
       ]);
     }
     const where = destination ?? (regions.length ? regions.join(', ') : '—');
-    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: 'INFO', entity: 'Trip', entityId: tripId, title: `Départ — ${vehicle.internalNumber}`, message: `${vehicle.registrationNumber} → ${where}${cargo ? ` (${cargo})` : ''}, compteur ${odometer} km.` });
+    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: 'INFO', entity: 'Trip', entityId: tripId, title: `Départ — ${vehicle.internalNumber}${vehicle.registrationType === 'IT' ? ' (IT)' : ''}`, message: `${vehicle.registrationNumber}${vehicle.registrationType === 'IT' ? ' [plaque IT]' : ''} → ${where}${cargo ? ` (${cargo})` : ''}, compteur ${odometer} km.` });
     if (preCondition === 'ANOMALIE') {
       await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: 'WARNING', entity: 'Vehicle', entityId: vehicle.id, title: `Anomalie avant départ — ${vehicle.internalNumber}`, message: (preAnomalies as string).slice(0, 200) });
     }

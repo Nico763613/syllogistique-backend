@@ -215,6 +215,8 @@ model Driver {
   hseTrainings     HseTraining[]
   // Compte utilisateur (rôle CHAUFFEUR) lié à ce profil chauffeur : permet l'application mobile
   userId           String?   @unique @map("user_id")
+  // Activité : TRUCK (chauffeur de camion / sites miniers) ou SERVICE_VEHICLE (véhicule de service)
+  activity         String?
   @@index([siteId])
   @@map("drivers")
 }
