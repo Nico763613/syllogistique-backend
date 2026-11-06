@@ -318,6 +318,7 @@
     <button data-t="vehicle" onclick="drvTab('vehicle')"><span>🚛</span>Véhicule</button>
     <button data-t="declare" onclick="drvTab('declare')"><span>📝</span>Déclarer</button>
     <button data-t="queue" onclick="drvTab('queue')"><span>🔄</span>Envois</button>
+    <button data-t="profile" onclick="drvTab('profile')"><span>👤</span>Profil</button>
   </nav>
 </div>
 
@@ -2205,6 +2206,7 @@ function drvRender() {
   if (DRV.tab === 'missions') root.innerHTML = banner + drvMissionsHtml(me);
   else if (DRV.tab === 'vehicle') root.innerHTML = banner + drvVehicleHtml(me);
   else if (DRV.tab === 'declare') root.innerHTML = banner + drvDeclareHtml(me);
+  else if (DRV.tab === 'profile') root.innerHTML = drvProfileHtml(me);
   else root.innerHTML = drvQueueHtml();
 }
 
@@ -2267,6 +2269,45 @@ function drvQueueHtml() {
   const rows = q.map((o) => `<div class="drv-row"><span>${esc(label[o.type])} · ${drvDt(o.createdAt)}</span><b>${o.rejected ? `<span class="badge bad">Refusé</span> <a href="#" onclick="drvDrop('${esc(o.clientOpId)}');return false;">supprimer</a>` : '<span class="badge warn">En attente</span>'}</b></div>${o.rejected ? `<div class="drv-warn" style="margin:4px 0">${esc(o.error)}</div>` : ''}`).join('');
   return `<div class="drv-card"><h4>Envois vers le bureau</h4>${rows || '<div class="drv-center">Tout est synchronisé ✔</div>'}
     <button class="drv-btn" onclick="drvSyncNow()">🔄 Synchroniser maintenant</button></div>`;
+}
+function drvProfileHtml(me) {
+  const v = me.vehicle;
+  return `<div class="drv-card"><h4>👤 Mon profil</h4>
+    <div class="drv-row"><span>Nom</span><b>${esc(me.driver.name)}</b></div>
+    <label>Téléphone</label><input id="p-phone" inputmode="tel" value="${esc(me.driver.phone || '')}">
+    <button class="drv-btn" onclick="drvSavePhone()">Enregistrer le téléphone</button><div id="p-msg1"></div>
+    <div class="drv-row" style="margin-top:10px"><span>Véhicule affecté</span><b>${v ? esc(v.plate) + ' · ' + esc(v.label || '') : 'Aucun'}</b></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Ces informations sont déjà enregistrées : vous ne les ressaisissez pas chaque jour.</div></div>
+    <div class="drv-card"><h4>🔁 Je remplace un collègue</h4>
+    <div style="font-size:13px;color:var(--muted)">Si le chauffeur habituel est malade ou absent, prenez le véhicule : il passe sur votre compte et le gestionnaire est prévenu.</div>
+    <button class="drv-btn ghost" onclick="drvTakeoverForm()">Choisir le véhicule à reprendre</button></div>
+    <div class="drv-card"><h4>🔑 Changer mon mot de passe</h4>
+    <label>Mot de passe actuel</label><input id="pw-old" type="password" autocomplete="current-password">
+    <label>Nouveau mot de passe (6 caractères minimum)</label><input id="pw-new" type="password" autocomplete="new-password">
+    <button class="drv-btn" onclick="drvChangePw()">Changer le mot de passe</button><div id="p-msg2"></div></div>`;
+}
+async function drvSavePhone() {
+  const m = drvEl('p-msg1');
+  try { const r = await api('/driver/profile', { method: 'POST', body: { phone: drvEl('p-phone').value } }); DRV.me.driver.phone = r.phone; dset('me', DRV.me); m.innerHTML = '<div class="msg ok">Téléphone enregistré.</div>'; }
+  catch (e) { m.innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; }
+}
+async function drvChangePw() {
+  const m = drvEl('p-msg2');
+  try { await api('/auth/change-password', { method: 'POST', body: { currentPassword: drvEl('pw-old').value, newPassword: drvEl('pw-new').value } }); drvEl('pw-old').value = ''; drvEl('pw-new').value = ''; m.innerHTML = '<div class="msg ok">Mot de passe modifié.</div>'; }
+  catch (e) { m.innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; }
+}
+async function drvTakeoverForm() {
+  let list;
+  try { list = await api('/driver/vehicles'); } catch (e) { return alert(e.message.includes('Failed') || e instanceof TypeError ? 'Connexion nécessaire pour changer de véhicule.' : e.message); }
+  drvSheet('Remplacement de chauffeur', `
+    <label>Véhicule à reprendre</label><select id="t-veh">${list.filter((x) => !x.mine).map((x) => `<option value="${esc(x.id)}">${esc(x.plate)} · ${esc(x.label || x.number)}${x.currentDriver ? ' — actuellement ' + esc(x.currentDriver) : ''}</option>`).join('') || '<option value="">Aucun véhicule disponible</option>'}</select>
+    <label>Motif du remplacement</label><select id="t-reason"><option value="MALADIE">Maladie du chauffeur</option><option value="CONGE">Congé</option><option value="AUTRE">Autre</option></select>
+    <label>Précisions</label><input id="t-note" placeholder="Facultatif">`, async () => {
+    const vehicleId = drvEl('t-veh').value;
+    if (!vehicleId) throw new Error('Aucun véhicule à reprendre.');
+    await api('/driver/takeover', { method: 'POST', body: { vehicleId, reason: drvEl('t-reason').value, note: drvEl('t-note').value.trim() || undefined } });
+    DRV.tab = 'missions'; await drvLoad();
+  }, 'Confirmer le remplacement');
 }
 function drvDrop(id) { dset('queue', drvQueue().filter((o) => o.clientOpId !== id)); drvRender(); }
 async function drvSyncNow() { await drvLoad(); }
@@ -2368,12 +2409,12 @@ function drvStartForm(tripId) {
   const common = `<div class="drv-card" style="margin:0 0 6px"><div class="drv-row"><span>Chauffeur</span><b>${esc(me.driver.name)} ${esc(me.driver.phone || '')}</b></div><div class="drv-row"><span>${truck ? 'Camion' : 'Véhicule'}</span><b>${esc(v ? v.plate : '')} ${esc(v ? v.label || '' : '')}</b></div></div>
     <label>Compteur au départ (km) — obligatoire</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(v ? v.mileage : '')}">`;
   const body = truck ? `
-    <label>Site de destination (nom du site minier)</label><input id="f-dest" value="${esc(t ? t.destination || '' : '')}" placeholder="Ex. site de Boké, mine de…">
+    <label>Site de destination (nom du site minier)</label><input id="f-dest" value="${esc(t ? t.destination || '' : dget('lastDest', ''))}" placeholder="Ex. site de Boké, mine de…">
     <label>Motif — transport de</label><select id="f-cargo"><option>Sable</option><option>Bauxite</option><option>Gravier</option><option value="Autre">Autre (à préciser)</option></select>
     <label>Précisions</label><input id="f-purpose" placeholder="Matériau, client, chantier…">`
     : `<label>Motif du déplacement</label><select id="f-ptype" onchange="drvToggleStart()"><option value="MISSION">Mission dans les régions</option><option value="AUTRE">Autre</option></select>
     <div id="f-reg-box"><label>Région(s) — cochez une ou plusieurs</label>${DRV_REGIONS.map((r) => `<label style="display:inline-flex;gap:6px;align-items:center;margin:4px 12px 4px 0;font-size:15px;color:var(--text)"><input type="checkbox" class="f-reg" value="${esc(r)}" style="width:auto"> ${esc(r)}</label>`).join('')}</div>
-    <label>Destination / lieu</label><input id="f-dest" value="${esc(t ? t.destination || '' : '')}">
+    <label>Destination / lieu</label><input id="f-dest" value="${esc(t ? t.destination || '' : dget('lastDest', ''))}">
     <label>Précisions sur le motif</label><input id="f-purpose">`;
   drvSheet(truck ? 'Début de journée — camion' : 'Départ du véhicule', common + body + `
     <label>État du véhicule avant le départ</label><select id="f-cond" onchange="drvToggleStart()"><option value="RAS">Bon état (RAS)</option><option value="ANOMALIE">Signaler une anomalie</option></select>
@@ -2387,6 +2428,7 @@ function drvStartForm(tripId) {
     const dest = drvEl('f-dest').value.trim();
     if (truck && !dest) throw new Error('Indiquez le nom du site de destination.');
     if (!truck && ptype === 'MISSION' && !regions.length && !dest) throw new Error('Cochez au moins une région.');
+    dset('lastDest', dest);
     const g = await drvGeo();
     drvEnqueue({ type: 'start', tripId: id, payload: { odometer, occurredAt: new Date().toISOString(), offline: !navigator.onLine, purposeType: ptype, regions: ptype === 'MISSION' ? regions : [], destination: dest || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
   }, 'Confirmer le départ');

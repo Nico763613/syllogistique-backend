@@ -299,4 +299,52 @@ export class DriverAppService {
     await this.audit.log({ userId, action: 'CREATE', entity: 'HseIncident', entityId: inc.id, newValue: { kind, severity, tripId: trip?.id } });
     return { incidentId: inc.id, reference: inc.reference };
   }
+
+  // Mise à jour du profil : le téléphone est modifiable (nom et véhicule restent ceux du bureau)
+  async updateProfile(userId: string, phone: string) {
+    const driver = await this.driverOf(userId);
+    const clean = phone.trim();
+    await this.prisma.driver.update({ where: { id: driver.id }, data: { phone: clean } });
+    await this.prisma.user.update({ where: { id: userId }, data: { phone: clean } });
+    await this.audit.log({ userId, action: 'UPDATE', entity: 'Driver', entityId: driver.id, newValue: { phone: clean } });
+    return { phone: clean };
+  }
+
+  // Véhicules du site que le chauffeur peut prendre en charge (remplacement)
+  async availableVehicles(userId: string) {
+    const driver = await this.driverOf(userId);
+    const vehicles = await this.prisma.vehicle.findMany({
+      where: { siteId: driver.siteId, deletedAt: null, status: { in: ['AVAILABLE'] } },
+      include: { assignedDriver: { select: { firstName: true, lastName: true } } },
+      orderBy: { internalNumber: 'asc' },
+    });
+    return vehicles.map((v) => ({
+      id: v.id, number: v.internalNumber, plate: v.registrationNumber, label: [v.brand, v.model].filter(Boolean).join(' '),
+      type: v.vehicleType, currentDriver: v.assignedDriver ? `${v.assignedDriver.firstName} ${v.assignedDriver.lastName}` : null, mine: v.assignedDriverId === driver.id,
+    }));
+  }
+
+  // Remplacement : le nouveau chauffeur prend le véhicule (maladie, congé…), ses informations remplacent celles de l'ancien ;
+  // le gestionnaire de flotte est prévenu, les missions planifiées du véhicule passent au remplaçant.
+  async takeover(userId: string, vehicleId: string, reason: string, note?: string) {
+    const driver = await this.driverOf(userId);
+    const v = await this.prisma.vehicle.findUnique({ where: { id: vehicleId }, include: { assignedDriver: true } });
+    if (!v || v.deletedAt || v.siteId !== driver.siteId) throw new NotFoundException('Véhicule introuvable.');
+    if (v.assignedDriverId === driver.id) throw new BadRequestException('Ce véhicule vous est déjà affecté.');
+    const running = await this.prisma.trip.findFirst({ where: { vehicleId, status: 'IN_PROGRESS' } });
+    if (running) throw new BadRequestException('Ce véhicule est en mission : le remplacement est possible après son arrêt.');
+    const mine = await this.prisma.trip.findFirst({ where: { driverId: driver.id, status: 'IN_PROGRESS' } });
+    if (mine) throw new BadRequestException('Terminez votre mission en cours avant de changer de véhicule.');
+    const previous = v.assignedDriver;
+    await this.prisma.$transaction([
+      this.prisma.vehicle.updateMany({ where: { assignedDriverId: driver.id, id: { not: vehicleId } }, data: { assignedDriverId: null } }),
+      this.prisma.vehicle.update({ where: { id: vehicleId }, data: { assignedDriverId: driver.id } }),
+      this.prisma.trip.updateMany({ where: { vehicleId, status: 'PLANNED', ...(previous ? { driverId: previous.id } : {}) }, data: { driverId: driver.id } }),
+    ]);
+    const labels: Record<string, string> = { MALADIE: 'maladie', CONGE: 'congé', AUTRE: 'autre motif' };
+    const msg = `${driver.firstName} ${driver.lastName} remplace ${previous ? previous.firstName + ' ' + previous.lastName : 'aucun chauffeur'} sur ${v.registrationNumber} (${labels[reason]})${note ? ' : ' + note : ''}.`;
+    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: v.siteId, severity: 'WARNING', entity: 'Vehicle', entityId: v.id, title: `Remplacement de chauffeur — ${v.internalNumber}`, message: msg });
+    await this.audit.log({ userId, action: 'UPDATE', entity: 'Vehicle', entityId: v.id, oldValue: { assignedDriverId: v.assignedDriverId }, newValue: { assignedDriverId: driver.id }, reason: `Remplacement (${reason})${note ? ' : ' + note : ''}` });
+    return { vehicleId: v.id, plate: v.registrationNumber };
+  }
 }
