@@ -133,14 +133,15 @@ export class ReportsService {
       this.prisma.trip.findMany({
         where: { siteId, tripDate: { gte: start, lt: end } },
         include: {
-          vehicle: { select: { internalNumber: true } },
-          driver: { select: { firstName: true, lastName: true, licenseNumber: true } },
+          vehicle: { select: { internalNumber: true, registrationNumber: true, brand: true, model: true, vehicleType: true, referenceConsumption: true } },
+          driver: { select: { firstName: true, lastName: true, licenseNumber: true, phone: true } },
         },
         orderBy: { startTime: 'asc' },
       }),
       this.prisma.fuelTransaction.findMany({
         where: { siteId, transactionDate: { gte: start, lt: end } },
-        include: { vehicle: { select: { internalNumber: true } } },
+        include: { vehicle: { select: { internalNumber: true, registrationNumber: true } } },
+        orderBy: { transactionDate: 'asc' },
       }),
       this.prisma.fuelTransaction.findMany({ where: { siteId, transactionDate: { gte: monday, lt: weekEnd } } }),
       this.prisma.stockMovement.findMany({
@@ -199,18 +200,49 @@ export class ReportsService {
       trips: {
         count: trips.length,
         totalKm: sum(trips, (t) => t.distance ?? 0),
-        list: trips.map((t) => ({
-          vehicle: t.vehicle.internalNumber,
-          driver: `${t.driver.firstName} ${t.driver.lastName}${t.driver.licenseNumber ? ' (permis ' + t.driver.licenseNumber + ')' : ''}`,
-          destination: t.destination ?? '',
-          km: t.distance ?? 0,
-          closed: t.endMileage !== null,
-        })),
+        totalVoyages: sum(trips, (t) => t.tripsCount ?? 0),
+        list: trips.map((t) => {
+          // Carburant rattaché à la mission (sinon, ravitaillements du même véhicule le même jour)
+          const tf = fuel.filter((f) => (f.tripId ? f.tripId === t.id : f.vehicleId === t.vehicleId));
+          const liters = sum(tf, (f) => Number(f.quantityLiters));
+          const km = t.distance ?? 0;
+          const ref = t.vehicle.referenceConsumption ? Number(t.vehicle.referenceConsumption) : null;
+          const consumption = km >= 20 && liters > 0 ? Math.round((liters / km) * 1000) / 10 : null;
+          return {
+            vehicle: t.vehicle.internalNumber,
+            plate: t.vehicle.registrationNumber,
+            brand: [t.vehicle.brand, t.vehicle.model].filter(Boolean).join(' '),
+            kind: t.vehicle.vehicleType === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE',
+            driver: `${t.driver.firstName} ${t.driver.lastName}${t.driver.licenseNumber ? ' (permis ' + t.driver.licenseNumber + ')' : ''}`,
+            phone: t.driver.phone ?? '',
+            purposeType: t.purposeType ?? '',
+            destination: t.destination ?? '',
+            regions: t.regions,
+            cargo: t.cargo ?? '',
+            voyages: t.tripsCount,
+            startTime: t.startTime,
+            endTime: t.endTime,
+            startMileage: t.startMileage,
+            endMileage: t.endMileage,
+            fuelMileages: tf.map((f) => f.mileage),
+            km,
+            liters: Math.round(liters * 100) / 100,
+            fuelCost: sum(tf, (f) => Number(f.totalCost)),
+            consumption,
+            referenceConsumption: ref,
+            condition: t.preCondition ?? 'RAS',
+            anomalies: t.preAnomalies ?? '',
+            maintenanceNeeded: t.maintenanceNeeded === true,
+            maintenanceReason: t.maintenanceReason ?? '',
+            closed: t.endMileage !== null,
+          };
+        }),
       },
       fuel: {
         liters: sum(fuel, (f) => Number(f.quantityLiters)),
         cost: sum(fuel, (f) => Number(f.totalCost)),
         byVehicle: [...byVehicle.values()],
+        entries: fuel.map((f) => ({ vehicle: f.vehicle.internalNumber, plate: f.vehicle.registrationNumber, time: f.transactionDate, mileage: f.mileage, liters: Number(f.quantityLiters), cost: Number(f.totalCost), station: f.station ?? '' })),
         week: {
           from: monday.toISOString().slice(0, 10),
           liters: sum(weekFuel, (f) => Number(f.quantityLiters)),
@@ -274,11 +306,15 @@ export class ReportsService {
       '',
       `🚛 *Camions* : ${t.available}/${t.total} disponibles, ${t.onMission} en mission, ${t.maintenance} en maintenance, ${t.immobilized} immobilisés`,
       `🚙 *Véhicules de service* : ${sv.available}/${sv.total} disponibles, ${sv.onMission} en mission, ${sv.maintenance + sv.immobilized} indisponibles`,
-      `🛣️ *Missions* : ${r.trips.count} — ${n(r.trips.totalKm)} km`,
+      `🛣️ *Missions* : ${r.trips.count} — ${n(r.trips.totalKm)} km${r.trips.totalVoyages ? ` — ${r.trips.totalVoyages} voyage(s)` : ''}`,
       `⛽ *Carburant* : ${n(r.fuel.liters)} L — ${n(r.fuel.cost)} GNF`,
       `   Cumul semaine (lun→ven) : ${n(r.fuel.week.liters)} L — ${n(r.fuel.week.cost)} GNF`,
       `📦 *Stock* : ${r.stock.entries} entrée(s), ${r.stock.exits} sortie(s), ${r.stock.belowMinimum.length} article(s) sous le seuil`,
     ];
+    for (const x of r.trips.list) {
+      const hh = (d: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
+      lines.push(`   - ${x.plate} ${x.driver.split(' (')[0]} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' (' + x.cargo + ')' : ''}, ${hh(x.startTime)}→${hh(x.endTime)}, ${n(x.km)} km, ${x.liters} L${x.liters ? ' / ' + n(x.fuelCost) + ' GNF' : ''}${x.voyages ? ', ' + x.voyages + ' voyages' : ''}${x.maintenanceNeeded ? ' ⚠ maintenance : ' + x.maintenanceReason : ''}`);
+    }
     const present = r.attendance.counts['PRESENT'] ?? 0;
     lines.push(`👥 *Chauffeurs* : ${present} présent(s), ${r.attendance.absences.length} absent(s)/indisponible(s)`);
     for (const a of r.attendance.absences) lines.push(`   - ${a.driver} (${a.status}${a.reason ? ' : ' + a.reason : ''})`);

@@ -149,8 +149,17 @@ export class ExportService {
 
       title('Missions');
       line(`${report.trips.count} mission(s) — ${n(report.trips.totalKm)} km`);
+      if (report.trips.totalVoyages) line(`Voyages (camions) : ${report.trips.totalVoyages}`);
+      const hh = (d: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
       for (const x of report.trips.list) {
-        line(`• ${x.vehicle} — ${x.driver}${x.destination ? ' — ' + x.destination : ''} — ${n(x.km)} km${x.closed ? '' : ' (en cours)'}`);
+        doc.moveDown(0.3);
+        doc.fillColor(navy).text(`${x.plate} — ${x.brand || x.vehicle} — ${x.driver}${x.phone ? ' — ' + x.phone : ''}`).fillColor('#000000');
+        line(`   ${x.kind === 'TRUCK' ? 'Site / destination' : 'Destination'} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' — ' + x.cargo : ''}${x.purposeType ? ' — ' + x.purposeType.toLowerCase() : ''}`);
+        line(`   Horaires : ${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? ' — ' + x.voyages + ' voyage(s)' : ''}`);
+        line(`   Compteur : ${n(x.startMileage)} → ${x.endMileage !== null ? n(x.endMileage) : 'en cours'}${x.fuelMileages.length ? ' (plein à ' + x.fuelMileages.map(n).join(', ') + ')' : ''} — ${n(x.km)} km`);
+        line(`   Carburant : ${x.liters} L — ${n(x.fuelCost)} GNF${x.consumption !== null ? ' — ' + x.consumption + ' L/100 km' : ''}`);
+        if (x.condition === 'ANOMALIE') line(`   Anomalie avant départ : ${x.anomalies}`);
+        if (x.maintenanceNeeded) line(`   Maintenance : OUI — ${x.maintenanceReason}`);
       }
 
       title('Carburant');
