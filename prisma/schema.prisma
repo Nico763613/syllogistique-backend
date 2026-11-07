@@ -367,6 +367,7 @@ model Trip {
   tripsCount    Int?     @map("trips_count")
   preCondition  String?  @map("pre_condition") // RAS | ANOMALIE
   preAnomalies  String?  @map("pre_anomalies")
+  arrivalMileage Int? @map("arrival_mileage") // compteur à l'arrivée à destination (arrêt = endMileage)
   maintenanceNeeded Boolean? @map("maintenance_needed")
   maintenanceReason String?  @map("maintenance_reason")
   @@index([siteId, tripDate])
@@ -1535,4 +1536,34 @@ model TripLog {
 
   @@index([tripId, occurredAt])
   @@map("trip_logs")
+}
+
+// Maintenance effectuée / déclarée par le chauffeur (pneus, vidange, freins…)
+model DriverMaintenance {
+  id          String   @id @default(uuid())
+  driverId    String   @map("driver_id")
+  vehicleId   String   @map("vehicle_id")
+  tripId      String?  @map("trip_id")
+  date        DateTime
+  nature      String   // PNEUS | VIDANGE | FREINS | BATTERIE | ELECTRICITE | AUTRE
+  detail      String?  // ex. filtre à huile, huile moteur, crevaison
+  mileage     Int?
+  cost        Int?     // GNF
+  observations String?
+  clientOpId  String?  @unique @map("client_op_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  @@index([driverId, date])
+  @@map("driver_maintenance_entries")
+}
+
+// Fiche journalière du chauffeur : une par chauffeur et par jour ; une fois envoyée, elle n'est plus modifiable
+model DriverDailyReport {
+  id         String   @id @default(uuid())
+  driverId   String   @map("driver_id")
+  reportDate DateTime @map("report_date") @db.Date
+  status     String   @default("SENT")
+  sentAt     DateTime @default(now()) @map("sent_at")
+  sentBy     String?  @map("sent_by")
+  @@unique([driverId, reportDate])
+  @@map("driver_daily_reports")
 }

@@ -152,3 +152,21 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password boolean NOT NULL
 
 --#
 CREATE TABLE IF NOT EXISTS uploaded_files (name text PRIMARY KEY, mime text NOT NULL, size integer NOT NULL, data bytea NOT NULL, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS arrival_mileage integer;
+
+--#
+CREATE TABLE IF NOT EXISTS driver_maintenance_entries (id text PRIMARY KEY, driver_id text NOT NULL, vehicle_id text NOT NULL, trip_id text, date timestamp(3) NOT NULL, nature text NOT NULL, detail text, mileage integer, cost integer, observations text, client_op_id text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS driver_maintenance_entries_client_op_id_key ON driver_maintenance_entries (client_op_id);
+
+--#
+CREATE INDEX IF NOT EXISTS driver_maintenance_entries_driver_id_date_idx ON driver_maintenance_entries (driver_id, date);
+
+--#
+CREATE TABLE IF NOT EXISTS driver_daily_reports (id text PRIMARY KEY, driver_id text NOT NULL, report_date date NOT NULL, status text NOT NULL DEFAULT 'SENT', sent_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, sent_by text);
+
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS driver_daily_reports_driver_id_report_date_key ON driver_daily_reports (driver_id, report_date);

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { currentFuelPrice } from '../common/fuel-price';
 import { SyncOpDto } from './driver.dto';
+import { DriverSheetService, dayStart } from './driver-sheet.service';
 
 type P = Record<string, any>;
 const BLOCKED_VEHICLE = ['IMMOBILIZED', 'MAINTENANCE', 'OUT_OF_SERVICE'];
@@ -23,7 +24,7 @@ const when = (v: unknown): Date => {
 
 @Injectable()
 export class DriverAppService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private sheets: DriverSheetService) {}
 
   private async driverOf(userId: string) {
     const d = await this.prisma.driver.findFirst({ where: { userId, deletedAt: null } });
@@ -87,11 +88,14 @@ export class DriverAppService {
     for (const op of ops) {
       try {
         const p = (op.payload ?? {}) as P;
+        // Fiche du jour déjà envoyée : plus aucune modification possible
+        if (await this.sheets.isSent(driver.id, dayStart(when(p.occurredAt).toISOString().slice(0, 10)))) throw new BadRequestException('La fiche de cette journée a déjà été envoyée au responsable : elle ne peut plus être modifiée.');
         let r: { duplicate?: boolean; [k: string]: unknown };
         if (op.type === 'start') r = await this.start(driver, userId, op, p);
         else if (op.type === 'arrive') r = await this.arrive(driver, userId, op, p);
         else if (op.type === 'fuel') r = await this.fuel(driver, userId, organizationId, op, p);
         else if (op.type === 'breakdown') r = await this.breakdown(driver, userId, op, p);
+        else if (op.type === 'maintenance') r = await this.maintenance(driver, userId, op, p);
         else r = await this.incident(driver, userId, op, p);
         results.push({ clientOpId: op.clientOpId, ok: true, duplicate: r.duplicate, result: r });
       } catch (e: any) {
@@ -181,7 +185,7 @@ export class DriverAppService {
     await this.prisma.$transaction([
       this.prisma.trip.update({
         where: { id: trip.id },
-        data: { status: 'COMPLETED', endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endCondition: condition, delayReason, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
+        data: { status: 'COMPLETED', endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
       }),
       this.prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { currentMileage: odometer, status: condition === 'PANNE' || condition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' } }),
       this.prisma.tripLog.create({ data: { tripId: trip.id, driverId: driver.id, eventType: 'ARRIVE', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } }),
@@ -346,5 +350,38 @@ export class DriverAppService {
     await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: v.siteId, severity: 'WARNING', entity: 'Vehicle', entityId: v.id, title: `Remplacement de chauffeur — ${v.internalNumber}`, message: msg });
     await this.audit.log({ userId, action: 'UPDATE', entity: 'Vehicle', entityId: v.id, oldValue: { assignedDriverId: v.assignedDriverId }, newValue: { assignedDriverId: driver.id }, reason: `Remplacement (${reason})${note ? ' : ' + note : ''}` });
     return { vehicleId: v.id, plate: v.registrationNumber };
+  }
+
+  async sheet(userId: string, date?: string) {
+    const driver = await this.driverOf(userId);
+    return this.sheets.build(driver.id, date);
+  }
+
+  async sendSheet(userId: string, date: string) {
+    const driver = await this.driverOf(userId);
+    return this.sheets.send(driver.id, userId, date);
+  }
+
+  // Maintenance effectuée : pneus, vidange (filtres, huile), freins… avec compteur, date et coût en GNF
+  private async maintenance(driver: { id: string; siteId: string }, userId: string, op: SyncOpDto, p: P) {
+    if (await this.prisma.driverMaintenance.findUnique({ where: { clientOpId: op.clientOpId } })) return { duplicate: true };
+    const trip = op.tripId ? await this.tripOf(driver.id, op.tripId) : null;
+    const vehicleId = trip?.vehicleId ?? (await this.prisma.vehicle.findFirst({ where: { assignedDriverId: driver.id, deletedAt: null } }))?.id;
+    if (!vehicleId) throw new BadRequestException('Aucun véhicule associé à cette déclaration.');
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { id: vehicleId } });
+    if (!vehicle) throw new NotFoundException('Véhicule introuvable.');
+    const nature = ['PNEUS', 'VIDANGE', 'FREINS', 'BATTERIE', 'ELECTRICITE', 'AUTRE'].includes(p.nature) ? (p.nature as string) : 'AUTRE';
+    const detail = str(p.detail, 300);
+    if (nature === 'AUTRE' && !detail) throw new BadRequestException('Précisez la nature de la maintenance.');
+    const mileage = num(p.mileage);
+    const cost = num(p.cost);
+    if (cost !== undefined && (cost < 0 || !Number.isFinite(cost))) throw new BadRequestException('Coût invalide.');
+    const row = await this.prisma.driverMaintenance.create({
+      data: { driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), nature, detail, mileage: mileage !== undefined && Number.isInteger(mileage) ? mileage : vehicle.currentMileage, cost: cost !== undefined ? Math.round(cost) : undefined, observations: str(p.observations, 500), clientOpId: op.clientOpId },
+    });
+    const labels: Record<string, string> = { PNEUS: 'Pneus', VIDANGE: 'Vidange / entretien', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', AUTRE: 'Autre' };
+    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: 'INFO', entity: 'Vehicle', entityId: vehicle.id, title: `Maintenance déclarée — ${vehicle.registrationNumber}`, message: `${labels[nature]}${detail ? ' (' + detail + ')' : ''}${row.mileage ? ', ' + row.mileage + ' km' : ''}${row.cost ? ', ' + row.cost + ' GNF' : ''}.` });
+    await this.audit.log({ userId, action: 'CREATE', entity: 'DriverMaintenance', entityId: row.id, newValue: { nature, detail, cost: row.cost } });
+    return { maintenanceId: row.id };
   }
 }
