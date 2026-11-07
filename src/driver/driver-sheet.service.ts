@@ -88,7 +88,7 @@ export class DriverSheetService {
       this.prisma.driverDailyReport.findMany({ where: { driverId: { in: ids }, reportDate: day } }),
     ]);
     const active = new Set<string>([...t, ...f, ...m, ...r].map((x: any) => x.driverId));
-    const out = [];
+    const out: Awaited<ReturnType<DriverSheetService["build"]>>[] = [];
     for (const id of active) out.push(await this.build(id, date));
     return out.sort((a, b) => (a.status === b.status ? a.driver.name.localeCompare(b.driver.name) : a.status === 'SENT' ? -1 : 1));
   }
