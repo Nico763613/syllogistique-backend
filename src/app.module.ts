@@ -36,6 +36,7 @@ import { TransfersModule } from './transfers/transfers.module';
 import { StockLocationsModule } from './stock-locations/stock-locations.module';
 import { HseModule } from './hse/hse.module';
 import { DriverModule } from './driver/driver.module';
+import { BrandingModule } from './branding/branding.module';
 
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -77,6 +78,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     StockLocationsModule,
     HseModule,
     DriverModule,
+    BrandingModule,
   ],
   controllers: [HealthController],
   providers: [
