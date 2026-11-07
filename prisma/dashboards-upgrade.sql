@@ -170,3 +170,9 @@ CREATE TABLE IF NOT EXISTS driver_daily_reports (id text PRIMARY KEY, driver_id 
 
 --#
 CREATE UNIQUE INDEX IF NOT EXISTS driver_daily_reports_driver_id_report_date_key ON driver_daily_reports (driver_id, report_date);
+
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS route TEXT
+
+--#
+ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS next_service_km INTEGER

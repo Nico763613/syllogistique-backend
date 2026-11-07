@@ -67,7 +67,7 @@ export class DriverAppService {
       id: t.id, status: t.status, destination: t.destination, purpose: t.purpose, passengerName: t.passengerName, observations: t.observations,
       startTime: t.startTime, scheduledArrival: t.scheduledArrival, endTime: t.endTime, startMileage: t.startMileage, endMileage: t.endMileage, distance: t.distance,
       vehicle: `${t.vehicle.internalNumber} — ${t.vehicle.registrationNumber}`, vehicleId: t.vehicleId,
-      purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount,
+      purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, route: t.route,
     });
     return {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
@@ -143,7 +143,7 @@ export class DriverAppService {
     const preAnomalies = str(p.preAnomalies, 1000);
     if (preCondition === 'ANOMALIE' && !preAnomalies) throw new BadRequestException("Décrivez l'anomalie constatée avant le départ.");
     if (purposeType === 'MISSION' && vehicle.vehicleType === 'SERVICE_VEHICLE' && !regions.length && !destination) throw new BadRequestException('Indiquez la région (ou la destination) de la mission.');
-    const fiche = { destination, purposeType, regions, cargo, purpose: str(p.purpose, 300) ?? trip?.purpose ?? undefined, preCondition, preAnomalies };
+    const fiche = { destination, route: str(p.route, 300), purposeType, regions, cargo, purpose: str(p.purpose, 300) ?? trip?.purpose ?? undefined, preCondition, preAnomalies };
     const tripId = trip ? trip.id : (op.tripId as string);
     const logs = this.prisma.tripLog.create({ data: { tripId, driverId: driver.id, eventType: 'START', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } });
     const vehUp = this.prisma.vehicle.update({ where: { id: vehicle.id }, data: { status: 'ON_MISSION', currentMileage: odometer } });
@@ -226,7 +226,7 @@ export class DriverAppService {
     const liters = num(p.liters);
     if (!liters || liters <= 0 || liters > 2000) throw new BadRequestException('Quantité de carburant invalide.');
     const receipt = str(p.receiptImageUrl, 300);
-    if (!receipt || !receipt.startsWith('/uploads/')) throw new BadRequestException('La photo du reçu est obligatoire.');
+    if (receipt && !receipt.startsWith('/uploads/')) throw new BadRequestException('Justificatif invalide.');
     const declared = num(p.totalCost);
     const total = declared && declared > 0 ? declared : Number((liters * (await currentFuelPrice(this.prisma, organizationId))).toFixed(2));
     const price = Number((total / liters).toFixed(2));
@@ -234,7 +234,7 @@ export class DriverAppService {
     const row = await this.prisma.fuelTransaction.create({
       data: {
         vehicleId, driverId: driver.id, siteId: vehicle.siteId, transactionDate: when(p.occurredAt), mileage: odometer !== undefined && Number.isInteger(odometer) ? odometer : vehicle.currentMileage,
-        quantityLiters: liters, pricePerLiter: price, totalCost: total, station: str(p.station, 120), receiptImageUrl: receipt, observations: str(p.observations, 500), source: 'STATION', tripId: trip?.id, clientOpId: op.clientOpId,
+        quantityLiters: liters, pricePerLiter: price, totalCost: total, station: str(p.station, 120), receiptImageUrl: receipt ?? null, observations: str(p.observations, 500), source: 'STATION', tripId: trip?.id, clientOpId: op.clientOpId,
       },
     });
     if (trip) {
@@ -370,17 +370,17 @@ export class DriverAppService {
     if (!vehicleId) throw new BadRequestException('Aucun véhicule associé à cette déclaration.');
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle) throw new NotFoundException('Véhicule introuvable.');
-    const nature = ['PNEUS', 'VIDANGE', 'FREINS', 'BATTERIE', 'ELECTRICITE', 'AUTRE'].includes(p.nature) ? (p.nature as string) : 'AUTRE';
+    const nature = ['PNEUS', 'VIDANGE', 'FILTRE', 'HUILE', 'FREINS', 'BATTERIE', 'ELECTRICITE', 'ANOMALIE', 'AUTRE'].includes(p.nature) ? (p.nature as string) : 'AUTRE';
     const detail = str(p.detail, 300);
-    if (nature === 'AUTRE' && !detail) throw new BadRequestException('Précisez la nature de la maintenance.');
+    if ((nature === 'AUTRE' || nature === 'ANOMALIE') && !detail) throw new BadRequestException('Précisez la nature de la maintenance.');
     const mileage = num(p.mileage);
     const cost = num(p.cost);
     if (cost !== undefined && (cost < 0 || !Number.isFinite(cost))) throw new BadRequestException('Coût invalide.');
     const row = await this.prisma.driverMaintenance.create({
-      data: { driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), nature, detail, mileage: mileage !== undefined && Number.isInteger(mileage) ? mileage : vehicle.currentMileage, cost: cost !== undefined ? Math.round(cost) : undefined, observations: str(p.observations, 500), clientOpId: op.clientOpId },
+      data: { driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), nature, detail, mileage: mileage !== undefined && Number.isInteger(mileage) ? mileage : vehicle.currentMileage, cost: cost !== undefined ? Math.round(cost) : undefined, nextServiceKm: num(p.nextServiceKm) !== undefined && Number.isInteger(num(p.nextServiceKm)) && (num(p.nextServiceKm) as number) > 0 ? num(p.nextServiceKm) : undefined, observations: str(p.observations, 500), clientOpId: op.clientOpId },
     });
-    const labels: Record<string, string> = { PNEUS: 'Pneus', VIDANGE: 'Vidange / entretien', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', AUTRE: 'Autre' };
-    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: 'INFO', entity: 'Vehicle', entityId: vehicle.id, title: `Maintenance déclarée — ${vehicle.registrationNumber}`, message: `${labels[nature]}${detail ? ' (' + detail + ')' : ''}${row.mileage ? ', ' + row.mileage + ' km' : ''}${row.cost ? ', ' + row.cost + ' GNF' : ''}.` });
+    const labels: Record<string, string> = { PNEUS: 'Pneus', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', ANOMALIE: 'Anomalie signalée', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', AUTRE: 'Autre' };
+    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: nature === 'ANOMALIE' ? 'WARNING' : 'INFO', entity: 'Vehicle', entityId: vehicle.id, title: `${nature === 'ANOMALIE' ? 'Anomalie signalée' : 'Maintenance déclarée'} — ${vehicle.registrationNumber}`, message: `${labels[nature]}${detail ? ' (' + detail + ')' : ''}${row.mileage ? ', ' + row.mileage + ' km' : ''}${row.cost ? ', ' + row.cost + ' GNF' : ''}${row.nextServiceKm ? ', prochaine vidange à ' + row.nextServiceKm + ' km' : ''}.` });
     await this.audit.log({ userId, action: 'CREATE', entity: 'DriverMaintenance', entityId: row.id, newValue: { nature, detail, cost: row.cost } });
     return { maintenanceId: row.id };
   }

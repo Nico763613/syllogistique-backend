@@ -336,6 +336,7 @@ model Trip {
   endMileage    Int?     @map("end_mileage")
   distance      Int?     // calculé automatiquement = endMileage - startMileage
   destination   String?
+  route         String?
   purpose       String?
   passengerName String?  @map("passenger_name")
   observations  String?
@@ -1549,6 +1550,7 @@ model DriverMaintenance {
   detail      String?  // ex. filtre à huile, huile moteur, crevaison
   mileage     Int?
   cost        Int?     // GNF
+  nextServiceKm Int?   @map("next_service_km")
   observations String?
   clientOpId  String?  @unique @map("client_op_id")
   createdAt   DateTime @default(now()) @map("created_at")
