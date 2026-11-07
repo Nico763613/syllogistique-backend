@@ -21,7 +21,7 @@ export class ActivateDeviceDto {
   @IsOptional() @IsString() @MaxLength(120) os?: string;
 }
 
-export const OP_TYPES = ['start', 'arrive', 'fuel', 'breakdown', 'incident'] as const;
+export const OP_TYPES = ['start', 'arrive', 'fuel', 'breakdown', 'incident', 'maintenance'] as const;
 export type OpType = (typeof OP_TYPES)[number];
 
 export class SyncOpDto {
@@ -42,6 +42,10 @@ export class UpdateProfileDto {
 export class InviteDto {
   @IsString() driverId: string;
   @IsString() @MaxLength(200) appUrl: string;
+}
+
+export class SendSheetDto {
+  @IsString() @MaxLength(10) date: string;
 }
 
 export class TransferDeviceDto {

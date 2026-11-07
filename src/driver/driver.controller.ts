@@ -8,7 +8,8 @@ import { DriverDeviceGuard } from './driver-device.guard';
 import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
-import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { DriverSheetService } from './driver-sheet.service';
+import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -16,7 +17,7 @@ import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, 
 @UseGuards(RolesGuard)
 @Controller('driver')
 export class DriverController {
-  constructor(private app: DriverAppService, private devices: DriverDevicesService) {}
+  constructor(private app: DriverAppService, private devices: DriverDevicesService, private sheets: DriverSheetService) {}
 
   @Post('activate')
   @Roles(RoleName.CHAUFFEUR)
@@ -52,6 +53,20 @@ export class DriverController {
     return this.app.takeover(user.userId, dto.vehicleId, dto.reason, dto.note);
   }
 
+  @Get('sheet')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  sheet(@Query('date') date: string | undefined, @CurrentUser() user: any) {
+    return this.app.sheet(user.userId, date);
+  }
+
+  @Post('sheet/send')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  sendSheet(@Body() dto: SendSheetDto, @CurrentUser() user: any) {
+    return this.app.sendSheet(user.userId, dto.date);
+  }
+
   @Post('sync')
   @Roles(RoleName.CHAUFFEUR)
   @UseGuards(DriverDeviceGuard)
@@ -69,7 +84,7 @@ const MANAGERS = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GEST
 @Roles(...MANAGERS)
 @Controller('driver-admin')
 export class DriverAdminController {
-  constructor(private devices: DriverDevicesService, private history: DriverHistoryService) {}
+  constructor(private devices: DriverDevicesService, private history: DriverHistoryService, private sheets: DriverSheetService) {}
 
   @Get('overview')
   overview(@CurrentUser() actor: any, @Query('siteId') siteId?: string) {
@@ -109,6 +124,11 @@ export class DriverAdminController {
   @Post('devices/:id/revoke')
   revoke(@Param('id') id: string, @Body() dto: DeviceReasonDto, @CurrentUser() actor: any) {
     return this.devices.setStatus(id, 'REVOKED', dto.reason, actor);
+  }
+
+  @Get('sheets')
+  sheetsOfDay(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.sheets.listForDay(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);
   }
 
   @Get('history/vehicle/:id')
