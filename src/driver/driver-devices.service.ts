@@ -126,6 +126,14 @@ export class DriverDevicesService {
       await this.audit.log({ userId: actor.userId, action: 'CREATE', entity: 'User', entityId: u.id, newValue: { role: 'CHAUFFEUR', driverId: driver.id, via: 'invitation' } });
       userId = u.id;
     }
+    // Compte jamais utilisé (mot de passe provisoire pas encore remplacé) : on en génère un nouveau, pour qu'un message perdu ne bloque pas le chauffeur
+    if (!tempPassword && userId) {
+      const u = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (u && u.mustChangePassword) {
+        tempPassword = String(randomInt(100000, 1_000_000));
+        await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(tempPassword, 10) } });
+      }
+    }
     const prov = await this.provision(driver.id, actor);
     const lines = [
       `Bonjour ${driver.firstName},`,
