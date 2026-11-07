@@ -2608,8 +2608,13 @@ async function drvInviteSend(driverId) {
     const link = location.origin + location.pathname.replace(/index\.html$/, '');
     const r = await api('/driver-admin/invite', { method: 'POST', body: { driverId, appUrl: link } });
     const num = r.phone.length === 9 ? '224' + r.phone : r.phone;
-    window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(r.message), '_blank');
-    m.innerHTML = `<div class="msg ok">Message prêt pour ${esc(r.driver)}${r.newAccount ? ' (compte créé)' : ''}. Appuyez sur « Envoyer » dans WhatsApp.</div>`;
+    window._invMsg = r.message;
+    // Lien à toucher (les navigateurs bloquent l'ouverture automatique après un appel réseau) + copie du message
+    m.innerHTML = `<div class="msg ok">Message prêt pour ${esc(r.driver)} (${esc(num)})${r.newAccount ? ' — compte créé' : ''}.</div>
+      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Ouvrir WhatsApp</a>
+      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+      <pre class="mono" style="white-space:pre-wrap;margin-top:8px">${esc(r.message)}</pre>
+      <div class="desc">WhatsApp s'ouvre avec le message déjà écrit : appuyez sur « Envoyer ». Le système n'envoie pas le message tout seul.</div>`;
   } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function drvCreateAccount() {
