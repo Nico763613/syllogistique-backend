@@ -41,7 +41,7 @@ export class DriverSheetService {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, activity: driver.activity },
       trips: trips.map((t) => ({
         id: t.id, status: t.status, plate: t.vehicle.registrationNumber, brand: [t.vehicle.brand, t.vehicle.model].filter(Boolean).join(' '),
-        destination: t.destination, route: t.route, startFuelLiters: t.startFuelLiters, endFuelLiters: t.endFuelLiters, purpose: t.purpose, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, voyages: t.tripsCount,
+        reference: t.reference, destination: t.destination, route: t.route, startFuelLiters: t.startFuelLiters, endFuelLiters: t.endFuelLiters, purpose: t.purpose, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, voyages: t.tripsCount,
         startTime: t.startTime, endTime: t.endTime, startMileage: t.startMileage, arrivalMileage: t.arrivalMileage, endMileage: t.endMileage, km: n(t.distance),
         preCondition: t.preCondition, preAnomalies: t.preAnomalies, delayReason: t.delayReason, maintenanceNeeded: t.maintenanceNeeded, maintenanceReason: t.maintenanceReason,
       })),
@@ -102,6 +102,32 @@ export class DriverSheetService {
     }
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'DriverExpense', entityId: id, newValue: { status: decision, note } });
     return updated;
+  }
+
+  // Chronologie complète d'une mission (bureau, ou chauffeur propriétaire de la mission)
+  async timeline(tripId: string, onlyDriverId?: string) {
+    const t = await this.prisma.trip.findUnique({ where: { id: tripId }, include: { driver: true, vehicle: true } });
+    if (!t || (onlyDriverId && t.driverId !== onlyDriverId)) throw new BadRequestException('Mission introuvable.');
+    const [fuel, maint, exp, down, logs, rep] = await Promise.all([
+      this.prisma.fuelTransaction.findMany({ where: { tripId } }),
+      this.prisma.driverMaintenance.findMany({ where: { tripId } }),
+      this.prisma.driverExpense.findMany({ where: { tripId } }),
+      this.prisma.vehicleDowntime.findMany({ where: { tripId } }),
+      this.prisma.tripLog.findMany({ where: { tripId, eventType: { in: ['INCIDENT', 'PAUSE', 'RESUME'] } } }),
+      this.prisma.driverDailyReport.findUnique({ where: { driverId_reportDate: { driverId: t.driverId, reportDate: dayStart(t.tripDate.toISOString().slice(0, 10)) } } }),
+    ]);
+    const ev: { at: Date; type: string; title: string; detail?: string }[] = [];
+    ev.push({ at: t.createdAt, type: 'CREATION', title: 'Mission enregistrée' });
+    ev.push({ at: t.startTime, type: 'START', title: 'Départ', detail: `${t.startMileage} km${t.startFuelLiters != null ? ` · ${t.startFuelLiters} L dans le réservoir` : ''}${t.destination ? ` · vers ${t.destination}` : ''}${t.route ? ` (${t.route})` : ''}` });
+    for (const f of fuel) ev.push({ at: f.transactionDate, type: 'FUEL', title: 'Plein de carburant', detail: `${n(f.quantityLiters)} L · ${new Intl.NumberFormat('fr-FR').format(n(f.totalCost))} GNF · ${f.source === 'VOUCHER' ? 'Bon' : f.source === 'TANK' ? 'Pompe / dépôt' : 'Station'}${f.station ? ' · ' + f.station : ''}` });
+    for (const m of maint) ev.push({ at: m.date, type: 'MAINTENANCE', title: m.nature === 'ANOMALIE' ? 'Anomalie signalée' : 'Maintenance', detail: [m.detail, m.cost ? `${new Intl.NumberFormat('fr-FR').format(n(m.cost))} GNF` : ''].filter(Boolean).join(' · ') });
+    for (const e of exp) ev.push({ at: e.date, type: 'EXPENSE', title: 'Dépense déclarée', detail: `${e.category} · ${new Intl.NumberFormat('fr-FR').format(e.amount)} GNF · ${e.status === 'APPROVED' ? 'validée' : e.status === 'REJECTED' ? 'refusée' : 'en attente'}${e.description ? ' · ' + e.description : ''}` });
+    for (const d of down) ev.push({ at: d.startedAt, type: 'BREAKDOWN', title: 'Panne / immobilisation', detail: d.reason });
+    for (const l of logs) ev.push({ at: l.occurredAt, type: l.eventType, title: l.eventType === 'INCIDENT' ? 'Incident' : l.eventType === 'PAUSE' ? 'Pause' : 'Reprise' });
+    if (t.endTime) ev.push({ at: t.endTime, type: 'ARRIVE', title: 'Arrivée / retour', detail: `${t.endMileage ?? '—'} km${t.distance != null ? ` · ${t.distance} km parcourus` : ''}${t.endFuelLiters != null ? ` · ${t.endFuelLiters} L dans le réservoir` : ''}` });
+    if (rep) ev.push({ at: rep.sentAt, type: 'SHEET_SENT', title: 'Fiche du jour envoyée à la hiérarchie' });
+    ev.sort((a, b) => +a.at - +b.at);
+    return { id: t.id, reference: t.reference, status: t.status, driver: `${t.driver.firstName} ${t.driver.lastName}`, vehicle: t.vehicle.registrationNumber, events: ev };
   }
 
   // Tableau de bord bureau : un coup d'oeil sur chaque chauffeur du jour

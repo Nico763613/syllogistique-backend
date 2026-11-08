@@ -71,7 +71,7 @@ export class DriverAppService {
       id: t.id, status: t.status, destination: t.destination, purpose: t.purpose, passengerName: t.passengerName, observations: t.observations,
       startTime: t.startTime, scheduledArrival: t.scheduledArrival, endTime: t.endTime, startMileage: t.startMileage, endMileage: t.endMileage, distance: t.distance,
       vehicle: `${t.vehicle.internalNumber} — ${t.vehicle.registrationNumber}`, vehicleId: t.vehicleId,
-      purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, route: t.route,
+      reference: t.reference, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, route: t.route,
     });
     return {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
@@ -110,6 +110,11 @@ export class DriverAppService {
       }
     }
     return { results };
+  }
+
+  async timeline(userId: string, tripId: string) {
+    const driver = await this.driverOf(userId);
+    return this.sheets.timeline(tripId, driver.id);
   }
 
   private async tripOf(driverId: string, tripId?: string) {

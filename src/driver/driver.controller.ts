@@ -53,6 +53,13 @@ export class DriverController {
     return this.app.takeover(user.userId, dto.vehicleId, dto.reason, dto.note);
   }
 
+  @Get('trips/:id/timeline')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  async timeline(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.app.timeline(user.userId, id);
+  }
+
   @Get('sheet')
   @Roles(RoleName.CHAUFFEUR)
   @UseGuards(DriverDeviceGuard)
@@ -134,6 +141,11 @@ export class DriverAdminController {
   @Post('expenses/:id/decision')
   decideExpense(@Param('id') id: string, @Body() dto: ExpenseDecisionDto, @CurrentUser() actor: any) {
     return this.sheets.decideExpense(id, dto.decision, dto.note, actor.userId);
+  }
+
+  @Get('trips/:id/timeline')
+  tripTimeline(@Param('id') id: string) {
+    return this.sheets.timeline(id);
   }
 
   @Get('board')

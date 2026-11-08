@@ -326,6 +326,7 @@ enum VehicleStatus {
 
 model Trip {
   id            String   @id @default(uuid())
+  reference     String?  @unique // numéro unique de mission : TRP-AAAA-NNNN (attribué automatiquement)
   vehicleId     String   @map("vehicle_id")
   driverId      String   @map("driver_id")
   siteId        String   @map("site_id")
