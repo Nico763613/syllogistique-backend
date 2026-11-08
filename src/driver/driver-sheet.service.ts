@@ -44,7 +44,7 @@ export class DriverSheetService {
         startTime: t.startTime, endTime: t.endTime, startMileage: t.startMileage, arrivalMileage: t.arrivalMileage, endMileage: t.endMileage, km: n(t.distance),
         preCondition: t.preCondition, preAnomalies: t.preAnomalies, delayReason: t.delayReason, maintenanceNeeded: t.maintenanceNeeded, maintenanceReason: t.maintenanceReason,
       })),
-      fuel: fuel.map((f) => ({ time: f.transactionDate, plate: f.vehicle.registrationNumber, mileage: f.mileage, liters: n(f.quantityLiters), cost: n(f.totalCost), station: f.station })),
+      fuel: fuel.map((f) => ({ time: f.transactionDate, plate: f.vehicle.registrationNumber, mileage: f.mileage, liters: n(f.quantityLiters), cost: n(f.totalCost), station: f.station, source: f.source, notes: f.observations })),
       maintenance: maint.map((m) => ({ id: m.id, date: m.date, nature: m.nature, detail: m.detail, mileage: m.mileage, cost: m.cost, nextServiceKm: m.nextServiceKm, observations: m.observations })),
       totals: {
         km, liters: Math.round(liters * 100) / 100, fuelCost: fuel.reduce((s, f) => s + n(f.totalCost), 0), maintenanceCost: maint.reduce((s, m) => s + n(m.cost), 0),

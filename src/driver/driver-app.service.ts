@@ -239,7 +239,7 @@ export class DriverAppService {
     const row = await this.prisma.fuelTransaction.create({
       data: {
         vehicleId, driverId: driver.id, siteId: vehicle.siteId, transactionDate: when(p.occurredAt), mileage: odometer !== undefined && Number.isInteger(odometer) ? odometer : vehicle.currentMileage,
-        quantityLiters: liters, pricePerLiter: price, totalCost: total, station: str(p.station, 120), receiptImageUrl: receipt ?? null, observations: str(p.observations, 500), source: 'STATION', tripId: trip?.id, clientOpId: op.clientOpId,
+        quantityLiters: liters, pricePerLiter: price, totalCost: total, station: str(p.station, 120), receiptImageUrl: receipt ?? null, observations: [str(p.voucherNo, 40) ? `Bon n° ${str(p.voucherNo, 40)}` : '', str(p.observations, 500)].filter(Boolean).join(' | ') || undefined, source: ['STATION', 'TANK', 'VOUCHER'].includes(p.source) ? (p.source as string) : 'STATION', tripId: trip?.id, clientOpId: op.clientOpId,
       },
     });
     if (trip) {
