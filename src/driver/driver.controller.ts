@@ -9,7 +9,7 @@ import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
 import { DriverSheetService } from './driver-sheet.service';
-import { ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -124,6 +124,16 @@ export class DriverAdminController {
   @Post('devices/:id/revoke')
   revoke(@Param('id') id: string, @Body() dto: DeviceReasonDto, @CurrentUser() actor: any) {
     return this.devices.setStatus(id, 'REVOKED', dto.reason, actor);
+  }
+
+  @Get('expenses')
+  expenses(@Query('status') status: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.sheets.listExpenses(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, status);
+  }
+
+  @Post('expenses/:id/decision')
+  decideExpense(@Param('id') id: string, @Body() dto: ExpenseDecisionDto, @CurrentUser() actor: any) {
+    return this.sheets.decideExpense(id, dto.decision, dto.note, actor.userId);
   }
 
   @Get('board')

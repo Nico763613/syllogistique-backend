@@ -1571,3 +1571,25 @@ model DriverDailyReport {
   @@unique([driverId, reportDate])
   @@map("driver_daily_reports")
 }
+
+// Dépenses déclarées par le chauffeur (péage, réparation d'urgence, repas…) : validées ou refusées par le bureau
+model DriverExpense {
+  id           String   @id @default(uuid())
+  driverId     String   @map("driver_id")
+  vehicleId    String?  @map("vehicle_id")
+  tripId       String?  @map("trip_id")
+  date         DateTime
+  category     String   // PEAGE | REPARATION | REPAS | HEBERGEMENT | PARKING | LAVAGE | AUTRE
+  amount       Int      // GNF
+  description  String?
+  receiptUrl   String?  @map("receipt_url")
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  decidedBy    String?  @map("decided_by")
+  decidedAt    DateTime? @map("decided_at")
+  decisionNote String?  @map("decision_note")
+  clientOpId   String?  @unique @map("client_op_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  @@index([driverId, date])
+  @@index([status])
+  @@map("driver_expenses")
+}

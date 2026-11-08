@@ -246,6 +246,7 @@
         <span class="nav-icon">🚛</span> Camions &amp; Véhicules
       </div>
       <div class="nav-item" data-view="driver-board" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-board')"><span class="nav-icon">🧭</span> Suivi des chauffeurs</div>
+      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses chauffeurs</div>
       <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches chauffeurs</div>
       <div class="nav-item" data-view="driver-devices" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-devices')"><span class="nav-icon">📲</span> Appareils chauffeurs</div>
       <div class="nav-item" data-view="drivers" onclick="go('drivers')">
@@ -504,7 +505,7 @@ function updateSyncPill() {
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
-  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs', 'driver-board': 'Suivi des chauffeurs',
+  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs', 'driver-board': 'Suivi des chauffeurs', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Logistique & Approvisionnements', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
@@ -884,6 +885,7 @@ async function renderView(view) {
     if (view === 'vehicles') return renderVehicles();
     if (view === 'driver-devices') return renderDriverDevices();
     if (view === 'driver-board') return renderDriverBoard();
+    if (view === 'driver-expenses') return renderDriverExpenses();
     if (view === 'driver-sheets') return renderDriverSheets();
     if (view === 'drivers') return renderDrivers();
     if (view === 'fuel') return renderFuel();
@@ -2324,12 +2326,13 @@ function drvDeclareHtml(me) {
   return `<div class="drv-card"><h4>Déclarations</h4><div class="desc" style="font-size:12px;color:var(--muted)">${t ? 'Rattachées à la mission en cours : ' + esc(t.destination || '') : 'Aucune mission en cours : rattachées à votre véhicule.'}</div>
     <button class="drv-btn" onclick="drvFuelForm('${tid}')">⛽ Déclarer un plein de carburant</button>
     <button class="drv-btn" onclick="drvMaintForm('${tid}')">🔧 Maintenance / vidange effectuée</button>
+    <button class="drv-btn" onclick="drvExpenseForm('${tid}')">💵 Déclarer une dépense</button>
     <button class="drv-btn red" onclick="drvBreakdownForm('${tid}')">🛠 Déclarer une panne</button>
     <button class="drv-btn ghost" onclick="drvIncidentForm('${tid}')">⚠ Accident / contrôle de police / événement routier</button></div>`;
 }
 function drvQueueHtml() {
   const q = drvQueue();
-  const label = { start: 'Départ', arrive: 'Arrêt', fuel: 'Carburant', breakdown: 'Panne', incident: 'Incident', maintenance: 'Maintenance / anomalie' };
+  const label = { start: 'Départ', arrive: 'Arrêt', fuel: 'Carburant', breakdown: 'Panne', incident: 'Incident', maintenance: 'Maintenance / anomalie', expense: 'Dépense' };
   const rows = q.map((o) => `<div class="drv-row"><span>${esc(label[o.type])} · ${drvDt(o.createdAt)}</span><b>${o.rejected ? `<span class="badge bad">Refusé</span> <a href="#" onclick="drvDrop('${esc(o.clientOpId)}');return false;">supprimer</a>` : '<span class="badge warn">En attente</span>'}</b></div>${o.rejected ? `<div class="drv-warn" style="margin:4px 0">${esc(o.error)}</div>` : ''}`).join('');
   return `<div class="drv-card"><h4>Envois vers le bureau</h4>${rows || '<div class="drv-center">Tout est synchronisé ✔</div>'}
     <button class="drv-btn" onclick="drvSyncNow()">🔄 Synchroniser maintenant</button></div>`;
@@ -2416,8 +2419,8 @@ async function drvFlush() {
     for (const o of q) {
       if (o.rejected || !o.photos || !o.photos.length || o.uploaded) continue;
       o.uploaded = [];
-      for (const p of o.photos) o.uploaded.push(await drvUpload(p, o.type === 'fuel' ? 'fuel_receipt' : 'incident_photo'));
-      if (o.type === 'fuel') o.payload.receiptImageUrl = o.uploaded[0]; else o.payload.photoUrls = o.uploaded;
+      for (const p of o.photos) o.uploaded.push(await drvUpload(p, o.type === 'fuel' ? 'fuel_receipt' : o.type === 'expense' ? 'expense_receipt' : 'incident_photo'));
+      if (o.type === 'fuel' || o.type === 'expense') o.payload.receiptImageUrl = o.uploaded[0]; else o.payload.photoUrls = o.uploaded;
       o.photos = [];
       dset('queue', q);
     }
@@ -2882,6 +2885,21 @@ function drvMaintForm(tripId) {
   }, 'Enregistrer la maintenance');
 }
 const DRV_FAULTS = ['Plaquettes de frein', 'Freins', 'Pare-chocs', 'Pneumatiques / crevaison', 'Moteur / mécanique', 'Boîte de vitesses / transmission', 'Suspension / amortisseurs', 'Batterie / électricité', 'Phares / feux', 'Pare-brise / vitres', 'Rétroviseur', 'Fuite d\'huile ou de liquide', 'Climatisation', 'Accident', 'Autres'];
+const DRV_EXP = { PEAGE: 'Péage / taxes', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking', LAVAGE: 'Lavage', AUTRE: 'Autre' };
+const DRV_EXP_ST = { PENDING: ['warn', 'En attente'], APPROVED: ['ok', 'Validée'], REJECTED: ['bad', 'Refusée'] };
+function drvExpenseForm(tripId) {
+  drvSheet('💵 Déclarer une dépense', `
+    <label>Nature de la dépense</label><select id="e-cat">${Object.entries(DRV_EXP).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
+    <label>Montant (GNF)</label><input id="e-amount" type="number" inputmode="numeric">
+    <label>Précisions (obligatoire si « Autre »)</label><input id="e-desc" placeholder="Ex. péage Coyah, repas à Kindia…">
+    ${drvPhotoField('📷 Photo du reçu (facultatif — le reçu est à remettre au responsable)', false)}`, async () => {
+    const amount = drvNum('e-amount'), cat = drvEl('e-cat').value, desc = drvFix(drvEl('e-desc').value);
+    if (!amount || amount <= 0) throw new Error('Saisissez le montant de la dépense.');
+    if (cat === 'AUTRE' && !desc) throw new Error('Précisez la nature de la dépense.');
+    const g = await drvGeo();
+    drvEnqueue({ type: 'expense', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { category: cat, amount, description: desc || undefined, occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+  }, 'Enregistrer la dépense');
+}
 function drvFaultForm(tripId) {
   const tog = "const r=this.value;drvEl('x-box').style.display=r==='STOP'?'block':'none'";
   const boxes = DRV_FAULTS.map((x) => `<label style="display:flex;gap:10px;align-items:center;margin:6px 0;font-size:16px;color:var(--text)"><input type="checkbox" class="x-fault" value="${esc(x)}" style="width:22px;height:22px"> ${esc(x)}</label>`).join('');
@@ -2947,6 +2965,7 @@ function drvSheetHtml(sh, offline) {
   const maint = sh.maintenance.filter((m) => m.nature !== 'ANOMALIE'), anom = sh.maintenance.filter((m) => m.nature === 'ANOMALIE');
   const b4 = maint.map((m) => `<div class="drv-row"><span>${esc(DRV_NAT[m.nature] || m.nature)}${m.detail ? ' — ' + esc(m.detail) : ''}<br><small>${hh(m.date)} · km ${m.mileage != null ? fmt(m.mileage) : '—'}${m.nextServiceKm ? ' · prochaine vidange : ' + fmt(m.nextServiceKm) + ' km' : ''}</small></span><b>${m.cost != null ? fmt(m.cost) + ' GNF' : '—'}</b></div>`).join('');
   const b5 = anom.map((m) => `<div class="drv-warn">${hh(m.date)} · ${esc(m.detail || '')}</div>`).join('');
+  const b6 = (sh.expenses || []).map((e) => `<div class="drv-row"><span>${esc(DRV_EXP[e.category] || e.category)}${e.description ? ' — ' + esc(e.description) : ''}<br><small>${hh(e.time)} · <span class="badge ${DRV_EXP_ST[e.status][0]}">${DRV_EXP_ST[e.status][1]}</span>${e.note ? ' · ' + esc(e.note) : ''}</small></span><b>${fmt(e.amount)} GNF</b></div>`).join('');
   const btn = (txt, fn, cls) => (sent ? '' : `<button class="drv-btn ${cls || ''}" onclick="${fn}">${txt}</button>`);
   const blk = (title, body, action) => `<div class="drv-card"><h4>${title}</h4>${body || '<div style="font-size:13px;color:var(--muted)">Rien de saisi.</div>'}${action || ''}</div>`;
   const canStart = v && !act && !v.immobilized;
@@ -2962,7 +2981,8 @@ function drvSheetHtml(sh, offline) {
     ${blk('3 · Arrivée / retour', b3, act && !sent ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(act.id)}')">🏁 Déclarer l'arrivée / retour</button>` : '')}
     ${blk('4 · Maintenance <small style="font-weight:400">(facultatif)</small>', b4, btn('🔧 Ajouter une maintenance', `drvMaintForm('${act ? esc(act.id) : ''}')`, 'ghost'))}
     ${blk('5 · Panne ou anomalie <small style="font-weight:400">(facultatif)</small>', b5, btn('⚠ Signaler une panne / anomalie', `drvFaultForm('${act ? esc(act.id) : ''}')`, 'ghost'))}
-    <div class="drv-card"><h4>6 · Enregistrer et envoyer</h4>
+    ${blk('6 · Dépenses <small style="font-weight:400">(facultatif)</small>', b6, btn('💵 Ajouter une dépense', `drvExpenseForm('${act ? esc(act.id) : ''}')`, 'ghost'))}
+    <div class="drv-card"><h4>7 · Enregistrer et envoyer</h4>
       ${sent ? lock : `<div style="font-size:13px;color:var(--muted);margin-bottom:8px">La fiche est envoyée automatiquement à la hiérarchie. Les justificatifs (reçus de carburant, factures) sont à déposer au responsable logistique.</div>
       <button class="drv-btn gold" onclick="drvSheetSend('${esc(sh.date)}')" ${offline ? 'disabled' : ''}>📤 Enregistrer et envoyer</button>
       ${offline ? '<div style="font-size:12px;color:var(--muted);text-align:center;margin-top:6px">Connexion nécessaire pour envoyer.</div>' : ''}`}</div>`;
@@ -2996,6 +3016,24 @@ async function drvSheetSend(date) {
 
 /* ============ FICHES CHAUFFEURS (bureau) ============ */
 const BOARD_ST = { EN_MISSION: ['🟢', 'En mission', 'ok'], A_ENVOYER: ['🟠', 'Fiche à envoyer', 'warn'], ENVOYEE: ['✅', 'Fiche envoyée', 'ok'], RIEN: ['🔴', 'Rien de saisi', 'bad'] };
+async function renderDriverExpenses(status) {
+  const st = status || window._exSt || 'PENDING'; window._exSt = st;
+  const rows = await api('/driver-admin/expenses?status=' + st + '&siteId=' + state.siteId);
+  const stb = { PENDING: ['warn', 'En attente'], APPROVED: ['ok', 'Validée'], REJECTED: ['bad', 'Refusée'] };
+  const tr = rows.map((e) => `<tr><td>${esc(drvDt(e.date))}</td><td><b>${esc(e.driver)}</b><div style="font-size:11px;color:var(--muted)">${esc(e.vehicle || '')}</div></td>
+    <td>${esc(DRV_EXP[e.category] || e.category)}<div style="font-size:12px">${esc(e.description || '')}</div></td><td class="mono"><b>${fmt(e.amount)}</b> GNF</td>
+    <td><span class="badge ${stb[e.status][0]}">${stb[e.status][1]}</span>${e.note ? `<div style="font-size:11px">${esc(e.note)}</div>` : ''}</td>
+    <td>${e.status === 'PENDING' ? `<button class="btn small gold" onclick="decideExpense('${esc(e.id)}','APPROVED')">✔ Valider</button> <button class="btn small" onclick="decideExpense('${esc(e.id)}','REJECTED')">✖ Refuser</button>` : ''}</td></tr>`).join('');
+  root().innerHTML = `<div class="panel"><h3>💵 Dépenses déclarées par les chauffeurs</h3><div class="desc">Une dépense validée est ajoutée aux dépenses du véhicule. Les reçus papier restent à remettre au responsable.</div>
+    <label>Afficher</label><select onchange="renderDriverExpenses(this.value)" style="max-width:220px"><option value="PENDING" ${st === 'PENDING' ? 'selected' : ''}>En attente</option><option value="APPROVED" ${st === 'APPROVED' ? 'selected' : ''}>Validées</option><option value="REJECTED" ${st === 'REJECTED' ? 'selected' : ''}>Refusées</option></select></div>
+    <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="6" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
+}
+async function decideExpense(id, decision) {
+  let note;
+  if (decision === 'REJECTED') { note = prompt('Motif du refus (obligatoire) :'); if (!note || !note.trim()) return; }
+  try { await api('/driver-admin/expenses/' + id + '/decision', { method: 'POST', body: { decision, note } }); renderDriverExpenses(); }
+  catch (e) { alert(e.message); }
+}
 async function renderDriverBoard(date) {
   const d = date || window._bdDate || new Date().toISOString().slice(0, 10);
   window._bdDate = d;
