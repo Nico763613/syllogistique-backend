@@ -112,6 +112,11 @@ export class DriverAppService {
     return { results };
   }
 
+  async missionHistory(userId: string, page?: number, q?: string) {
+    const driver = await this.driverOf(userId);
+    return this.sheets.missions({ page, q }, driver.id);
+  }
+
   async timeline(userId: string, tripId: string) {
     const driver = await this.driverOf(userId);
     return this.sheets.timeline(tripId, driver.id);

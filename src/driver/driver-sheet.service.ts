@@ -104,6 +104,30 @@ export class DriverSheetService {
     return updated;
   }
 
+  // Historique des missions (bureau : tous les chauffeurs du site ; chauffeur : ses propres missions), filtres + pagination
+  async missions(f: { siteId?: string; driverId?: string; vehicleId?: string; status?: string; from?: string; to?: string; q?: string; page?: number }, onlyDriverId?: string) {
+    const take = 30, page = Math.max(1, Number(f.page) || 1);
+    const where: any = {};
+    if (onlyDriverId) where.driverId = onlyDriverId; else { if (f.siteId) where.siteId = f.siteId; if (f.driverId) where.driverId = f.driverId; }
+    if (f.vehicleId) where.vehicleId = f.vehicleId;
+    if (f.status && ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(f.status)) where.status = f.status;
+    if (f.from || f.to) where.startTime = { ...(f.from ? { gte: dayStart(f.from) } : {}), ...(f.to ? { lt: new Date(+dayStart(f.to) + 86400000) } : {}) };
+    const q = (f.q || '').trim();
+    if (q) where.OR = [{ reference: { contains: q, mode: 'insensitive' } }, { destination: { contains: q, mode: 'insensitive' } }, { purpose: { contains: q, mode: 'insensitive' } }];
+    const [total, rows] = await Promise.all([
+      this.prisma.trip.count({ where }),
+      this.prisma.trip.findMany({ where, orderBy: { startTime: 'desc' }, skip: (page - 1) * take, take, include: { driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { registrationNumber: true } } } }),
+    ]);
+    const fuel = rows.length ? await this.prisma.fuelTransaction.groupBy({ by: ['tripId'], where: { tripId: { in: rows.map((r) => r.id) } }, _sum: { quantityLiters: true, totalCost: true } }) : [];
+    return {
+      total, page, pages: Math.max(1, Math.ceil(total / take)),
+      missions: rows.map((t) => {
+        const fu = fuel.find((x) => x.tripId === t.id);
+        return { id: t.id, reference: t.reference, status: t.status, startTime: t.startTime, endTime: t.endTime, driver: `${t.driver.firstName} ${t.driver.lastName}`, vehicle: t.vehicle.registrationNumber, destination: t.destination, purpose: t.purpose, km: t.distance ?? null, liters: fu ? n(fu._sum.quantityLiters) : 0, fuelCost: fu ? n(fu._sum.totalCost) : 0 };
+      }),
+    };
+  }
+
   // Chronologie complète d'une mission (bureau, ou chauffeur propriétaire de la mission)
   async timeline(tripId: string, onlyDriverId?: string) {
     const t = await this.prisma.trip.findUnique({ where: { id: tripId }, include: { driver: true, vehicle: true } });

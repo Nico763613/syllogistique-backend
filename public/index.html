@@ -245,6 +245,7 @@
       <div class="nav-item" data-view="vehicles" onclick="go('vehicles')">
         <span class="nav-icon">🚛</span> Camions &amp; Véhicules
       </div>
+      <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
       <div class="nav-item" data-view="driver-board" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-board')"><span class="nav-icon">🧭</span> Suivi des chauffeurs</div>
       <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses chauffeurs</div>
       <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches chauffeurs</div>
@@ -505,7 +506,7 @@ function updateSyncPill() {
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
-  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs', 'driver-board': 'Suivi des chauffeurs', 'driver-expenses': 'Dépenses chauffeurs',
+  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Logistique & Approvisionnements', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
@@ -884,6 +885,7 @@ async function renderView(view) {
     if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
     if (view === 'vehicles') return renderVehicles();
     if (view === 'driver-devices') return renderDriverDevices();
+    if (view === 'driver-missions') return renderMissionHistory();
     if (view === 'driver-board') return renderDriverBoard();
     if (view === 'driver-expenses') return renderDriverExpenses();
     if (view === 'driver-sheets') return renderDriverSheets();
@@ -2244,12 +2246,14 @@ function drvTab(t, noPush) {
 }
 // Flèche ← (et bouton retour du téléphone) : ferme le formulaire ouvert, sinon revient à l'onglet précédent, sans quitter l'application.
 function drvBack(fromPop) {
+  const hov = drvEl('drv-hist-ov');
+  if (hov) { hov.remove(); if (!fromPop) drvHb(); return; }
   const sh = drvEl('drv-sheet');
   if (sh) { sh.remove(); if (!fromPop) { drvHb() } return; }
   if (DRV.hist.length) { const t = DRV.hist.pop(); DRV.tab = t; drvRender(); if (!fromPop) { drvHb() } return; }
   if (DRV.tab !== 'missions') { DRV.tab = 'missions'; drvRender(); }
 }
-window.addEventListener('popstate', () => { if (DRV.ign > 0) { DRV.ign--; return; } if (drvEl('driver-app') && drvEl('driver-app').style.display !== 'none' && (drvEl('drv-sheet') || DRV.hist.length)) drvBack(true); });
+window.addEventListener('popstate', () => { if (DRV.ign > 0) { DRV.ign--; return; } if (drvEl('driver-app') && drvEl('driver-app').style.display !== 'none' && (drvEl('drv-sheet') || drvEl('drv-hist-ov') || DRV.hist.length)) drvBack(true); });
 function drvBackBtn() { const b = drvEl('drv-back'); if (b) b.style.display = (DRV.tab !== 'missions' || DRV.hist.length || drvEl('drv-sheet')) ? '' : 'none'; }
 function drvRender() {
   drvPill(); drvBackBtn();
@@ -2287,7 +2291,8 @@ function drvMissionsHtml(me) {
     ${v ? `<div class="drv-row"><span>${v.type === 'TRUCK' ? 'Camion' : 'Véhicule'}</span><b>${esc(v.plate)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : ''} · ${fmt(v.mileage)} km</b></div>` : '<div class="drv-row"><span>Véhicule</span><b>Aucun véhicule affecté</b></div>'}
     ${v && !me.activeTrip && !v.immobilized ? `<button class="drv-btn gold" onclick="drvStartForm('')">➕ ${v.type === 'TRUCK' ? 'Commencer ma journée' : 'Nouvelle mission'}</button>` : ''}
     ${me.activeTrip ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(me.activeTrip.id)}')">🏁 Arrivée / retour</button>` : ''}
-    <div class="drv-actions" style="margin-top:8px"><button class="drv-btn ghost" onclick="drvFuelForm('${me.activeTrip ? esc(me.activeTrip.id) : ''}')">⛽ Carburant</button><button class="drv-btn ghost" onclick="drvTab('sheet')">📋 Ma fiche</button></div></div>`;
+    <div class="drv-actions" style="margin-top:8px"><button class="drv-btn ghost" onclick="drvFuelForm('${me.activeTrip ? esc(me.activeTrip.id) : ''}')">⛽ Carburant</button><button class="drv-btn ghost" onclick="drvTab('sheet')">📋 Ma fiche</button></div>
+    <button class="drv-btn ghost" style="margin-top:8px" onclick="drvMissionHistory()">📜 Mes missions passées</button></div>`;
   const list = trips.map((t) => `
     <div class="drv-card">
       <h4>${esc(t.destination || (t.regions && t.regions.join(', ')) || 'Mission')} ${late(t) ? '<span class="badge bad">En retard</span>' : ''}</h4>
@@ -3059,6 +3064,41 @@ async function renderDriverBoard(date) {
     <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverBoard(this.value)" style="max-width:220px">
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(S.total, 'Chauffeurs', 'var(--navy)')}${tile(S.enMission, 'En mission', '#2E8B57')}${tile(S.aEnvoyer, 'Fiche à envoyer', '#C98A0B')}${tile(S.envoyees, 'Fiches envoyées', '#2E8B57')}${tile(S.rien, 'Rien de saisi', '#C0392B')}</div></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Véhicule</th><th>Situation</th><th>Distance</th><th>Carburant</th><th>Alertes</th><th></th></tr>${rows || '<tr><td colspan="7" class="empty">Aucun chauffeur actif.</td></tr>'}</table></div></div>`;
+}
+const MS_ST = { PLANNED: ['warn', 'Planifiée'], IN_PROGRESS: ['ok', 'En cours'], COMPLETED: ['ok', 'Terminée'], CANCELLED: ['bad', 'Annulée'] };
+window._ms = { page: 1, from: '', to: '', status: '', q: '' };
+async function renderMissionHistory(reset) {
+  const f = window._ms; if (reset) f.page = 1;
+  const qs = new URLSearchParams({ siteId: state.siteId, page: f.page, ...(f.from ? { from: f.from } : {}), ...(f.to ? { to: f.to } : {}), ...(f.status ? { status: f.status } : {}), ...(f.q ? { q: f.q } : {}) });
+  const r = await api('/driver-admin/missions?' + qs);
+  const tr = r.missions.map((m) => `<tr><td><b>${esc(m.reference || '—')}</b><div style="font-size:11px;color:var(--muted)">${esc(drvDt(m.startTime))}</div></td>
+    <td>${esc(m.driver)}<div style="font-size:11px;color:var(--muted)">${esc(m.vehicle)}</div></td><td>${esc(m.destination || m.purpose || '—')}</td>
+    <td class="mono">${m.km != null ? fmt(m.km) + ' km' : '—'}</td><td class="mono">${m.liters ? m.liters + ' L' : '—'}</td>
+    <td><span class="badge ${MS_ST[m.status][0]}">${MS_ST[m.status][1]}</span></td><td><a href="#" onclick="tripTimeline('${esc(m.id)}');return false;">🕒</a></td></tr>`).join('');
+  root().innerHTML = `<div class="panel"><h3>📜 Historique des missions</h3><div class="desc">${r.total} mission(s) trouvée(s).</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div><label>Du</label><input type="date" value="${esc(f.from)}" onchange="window._ms.from=this.value;renderMissionHistory(1)"></div>
+      <div><label>Au</label><input type="date" value="${esc(f.to)}" onchange="window._ms.to=this.value;renderMissionHistory(1)"></div>
+      <div><label>Statut</label><select onchange="window._ms.status=this.value;renderMissionHistory(1)"><option value="">Tous</option>${Object.entries(MS_ST).map(([k, v]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${v[1]}</option>`).join('')}</select></div>
+      <div><label>Recherche (n° ou destination)</label><input value="${esc(f.q)}" placeholder="TRP-2026-0001, Kindia…" onkeydown="if(event.key==='Enter'){window._ms.q=this.value;renderMissionHistory(1)}" onchange="window._ms.q=this.value;renderMissionHistory(1)"></div>
+    </div></div>
+    <div class="panel"><div style="overflow:auto"><table><tr><th>N° / départ</th><th>Chauffeur / véhicule</th><th>Destination</th><th>Distance</th><th>Carburant</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="7" class="empty">Aucune mission.</td></tr>'}</table></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><button class="btn small" ${r.page <= 1 ? 'disabled' : ''} onclick="window._ms.page--;renderMissionHistory()">← Précédent</button><span style="font-size:13px">Page ${r.page} / ${r.pages}</span><button class="btn small" ${r.page >= r.pages ? 'disabled' : ''} onclick="window._ms.page++;renderMissionHistory()">Suivant →</button></div></div>`;
+}
+// Application chauffeur : mes missions passées
+async function drvMissionHistory(page) {
+  page = page || 1;
+  let r;
+  try { r = await api('/driver/history?page=' + page); } catch (e) { alert(e.message); return; }
+  const old = drvEl('drv-hist-ov'); if (old) old.remove();
+  const list = r.missions.map((m) => `<div style="padding:10px 0;border-bottom:1px dashed #D9E0E8"><div style="display:flex;justify-content:space-between"><b>${esc(m.reference || '—')}</b><span class="badge ${MS_ST[m.status][0]}">${MS_ST[m.status][1]}</span></div>
+    <div style="font-size:13px;color:#5A6B7D">${esc(drvDt(m.startTime))} · ${esc(m.destination || m.purpose || '—')}</div>
+    <div style="font-size:13px">${m.km != null ? fmt(m.km) + ' km' : ''}${m.liters ? ' · ' + m.liters + ' L' : ''} · ${esc(m.vehicle)} · <a href="#" onclick="drvTimeline('${esc(m.id)}');return false;">🕒 Chronologie</a></div></div>`).join('');
+  const o = document.createElement('div'); o.id = 'drv-hist-ov';
+  o.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9000;overflow:auto;padding:16px';
+  o.innerHTML = `<a href="#" onclick="document.getElementById('drv-hist-ov').remove();return false;" style="text-decoration:none;font-weight:700;color:#1B3A5E;font-size:16px">← Retour</a><h3>📜 Mes missions passées</h3><div style="font-size:13px;color:#5A6B7D">${r.total} mission(s)</div>${list || '<div style="padding:20px;color:#5A6B7D">Aucune mission.</div>'}
+    <div style="display:flex;justify-content:space-between;margin-top:14px"><button class="drv-btn ghost" style="width:auto" ${r.page <= 1 ? 'disabled' : ''} onclick="drvMissionHistory(${page - 1})">←</button><span>Page ${r.page}/${r.pages}</span><button class="drv-btn ghost" style="width:auto" ${r.page >= r.pages ? 'disabled' : ''} onclick="drvMissionHistory(${page + 1})">→</button></div>`;
+  document.body.appendChild(o); if (!page || page === 1) { try { history.pushState({ drv: 1 }, ''); } catch (e) {} }
 }
 const TL_ICON = { CREATION: '📝', START: '▶️', FUEL: '⛽', MAINTENANCE: '🔧', EXPENSE: '💵', BREAKDOWN: '🛠', INCIDENT: '⚠️', PAUSE: '⏸', RESUME: '▶️', ARRIVE: '🏁', SHEET_SENT: '📤' };
 function timelineHtml(r) {

@@ -53,6 +53,13 @@ export class DriverController {
     return this.app.takeover(user.userId, dto.vehicleId, dto.reason, dto.note);
   }
 
+  @Get('history')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  async missionHistory(@Query('page') page: string | undefined, @Query('q') q: string | undefined, @CurrentUser() user: any) {
+    return this.app.missionHistory(user.userId, page ? Number(page) : 1, q);
+  }
+
   @Get('trips/:id/timeline')
   @Roles(RoleName.CHAUFFEUR)
   @UseGuards(DriverDeviceGuard)
@@ -141,6 +148,11 @@ export class DriverAdminController {
   @Post('expenses/:id/decision')
   decideExpense(@Param('id') id: string, @Body() dto: ExpenseDecisionDto, @CurrentUser() actor: any) {
     return this.sheets.decideExpense(id, dto.decision, dto.note, actor.userId);
+  }
+
+  @Get('missions')
+  missions(@Query() q: Record<string, string>, @CurrentUser() actor: any) {
+    return this.sheets.missions({ ...q, siteId: actor.role === 'SUPER_ADMIN' ? q.siteId : actor.siteId ?? q.siteId, page: q.page ? Number(q.page) : 1 });
   }
 
   @Get('trips/:id/timeline')
