@@ -76,6 +76,50 @@ export class DriverSheetService {
   }
 
   // Côté bureau : fiches du jour (envoyées ou en cours) de tous les chauffeurs du site
+  // Tableau de bord bureau : un coup d'oeil sur chaque chauffeur du jour
+  async board(siteId: string | undefined, date?: string) {
+    const day = dayStart(date);
+    const next = new Date(+day + 86400000);
+    const drivers = await this.prisma.driver.findMany({ where: { deletedAt: null, status: 'ACTIVE', ...(siteId ? { siteId } : {}) }, orderBy: { lastName: 'asc' } });
+    const ids = drivers.map((d) => d.id);
+    const [vehicles, trips, fuel, maint, reports] = await Promise.all([
+      this.prisma.vehicle.findMany({ where: { assignedDriverId: { in: ids }, deletedAt: null } }),
+      this.prisma.trip.findMany({ where: { driverId: { in: ids }, OR: [{ startTime: { gte: day, lt: next } }, { status: 'IN_PROGRESS' }] }, include: { vehicle: true }, orderBy: { startTime: 'asc' } }),
+      this.prisma.fuelTransaction.findMany({ where: { driverId: { in: ids }, transactionDate: { gte: day, lt: next } } }),
+      this.prisma.driverMaintenance.findMany({ where: { driverId: { in: ids }, date: { gte: day, lt: next } } }),
+      this.prisma.driverDailyReport.findMany({ where: { driverId: { in: ids }, reportDate: day } }),
+    ]);
+    const now = Date.now();
+    const rows = drivers.map((d) => {
+      const veh = vehicles.find((v) => v.assignedDriverId === d.id);
+      const dt = trips.filter((t) => t.driverId === d.id);
+      const active = dt.find((t) => t.status === 'IN_PROGRESS');
+      const df = fuel.filter((f) => f.driverId === d.id), dm = maint.filter((m) => m.driverId === d.id);
+      const rep = reports.find((r) => r.driverId === d.id);
+      const km = dt.reduce((a, t) => a + n(t.distance), 0);
+      const liters = df.reduce((a, f) => a + n(f.quantityLiters), 0);
+      const hasActivity = dt.length > 0 || df.length > 0 || dm.length > 0;
+      const status = active ? 'EN_MISSION' : rep ? 'ENVOYEE' : hasActivity ? 'A_ENVOYER' : 'RIEN';
+      const alerts: string[] = [];
+      if (d.licenseExpiryDate) {
+        const days = Math.ceil((+d.licenseExpiryDate - now) / 86400000);
+        if (days < 0) alerts.push('Permis expiré'); else if (days <= 60) alerts.push(`Permis : expire dans ${days} j`);
+      } else alerts.push('Permis non renseigné');
+      if (!veh) alerts.push('Aucun véhicule affecté');
+      else if (['IMMOBILIZED', 'MAINTENANCE', 'OUT_OF_SERVICE'].includes(veh.status)) alerts.push('Véhicule immobilisé');
+      if (dm.some((m) => m.nature === 'ANOMALIE')) alerts.push('Anomalie signalée');
+      return {
+        id: d.id, name: `${d.firstName} ${d.lastName}`, phone: d.phone,
+        vehicle: veh ? veh.registrationNumber : null, status,
+        destination: active ? (active.destination ?? (active.regions || []).join(', ')) : null,
+        tripsCount: dt.length, km, liters: Math.round(liters * 100) / 100, fuelCost: df.reduce((a, f) => a + n(f.totalCost), 0),
+        sentAt: rep?.sentAt ?? null, alerts,
+      };
+    });
+    const count = (st: string) => rows.filter((r) => r.status === st).length;
+    return { date: day.toISOString().slice(0, 10), summary: { total: rows.length, enMission: count('EN_MISSION'), aEnvoyer: count('A_ENVOYER'), envoyees: count('ENVOYEE'), rien: count('RIEN') }, drivers: rows };
+  }
+
   async listForDay(siteId: string | undefined, date?: string) {
     const day = dayStart(date);
     const next = new Date(+day + 86400000);
