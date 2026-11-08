@@ -126,6 +126,11 @@ export class DriverAdminController {
     return this.devices.setStatus(id, 'REVOKED', dto.reason, actor);
   }
 
+  @Get('board')
+  board(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.sheets.board(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);
+  }
+
   @Get('sheets')
   sheetsOfDay(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
     return this.sheets.listForDay(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);

@@ -245,6 +245,7 @@
       <div class="nav-item" data-view="vehicles" onclick="go('vehicles')">
         <span class="nav-icon">🚛</span> Camions &amp; Véhicules
       </div>
+      <div class="nav-item" data-view="driver-board" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-board')"><span class="nav-icon">🧭</span> Suivi des chauffeurs</div>
       <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches chauffeurs</div>
       <div class="nav-item" data-view="driver-devices" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-devices')"><span class="nav-icon">📲</span> Appareils chauffeurs</div>
       <div class="nav-item" data-view="drivers" onclick="go('drivers')">
@@ -503,7 +504,7 @@ function updateSyncPill() {
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
-  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs',
+  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs', 'driver-board': 'Suivi des chauffeurs',
   'dash-logistics': 'Logistique & Approvisionnements', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
@@ -882,6 +883,7 @@ async function renderView(view) {
     if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
     if (view === 'vehicles') return renderVehicles();
     if (view === 'driver-devices') return renderDriverDevices();
+    if (view === 'driver-board') return renderDriverBoard();
     if (view === 'driver-sheets') return renderDriverSheets();
     if (view === 'drivers') return renderDrivers();
     if (view === 'fuel') return renderFuel();
@@ -2993,6 +2995,31 @@ async function drvSheetSend(date) {
 }
 
 /* ============ FICHES CHAUFFEURS (bureau) ============ */
+const BOARD_ST = { EN_MISSION: ['🟢', 'En mission', 'ok'], A_ENVOYER: ['🟠', 'Fiche à envoyer', 'warn'], ENVOYEE: ['✅', 'Fiche envoyée', 'ok'], RIEN: ['🔴', 'Rien de saisi', 'bad'] };
+async function renderDriverBoard(date) {
+  const d = date || window._bdDate || new Date().toISOString().slice(0, 10);
+  window._bdDate = d;
+  const r = await api('/driver-admin/board?date=' + d + '&siteId=' + state.siteId);
+  const S = r.summary;
+  const tile = (n, l, c) => `<div style="flex:1;min-width:120px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center"><div style="font-size:26px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+  const wa = (x) => {
+    if (!x.phone) return '';
+    const num = String(x.phone).replace(/\D/g, ''); const full = num.length === 9 ? '224' + num : num;
+    const msg = x.status === 'A_ENVOYER' ? `Bonjour ${x.name}, merci de compléter et d'envoyer votre fiche de bord du jour dans l'application.` : `Bonjour ${x.name}, merci de renseigner votre fiche de bord du jour (départ, carburant, arrivée) dans l'application.`;
+    return `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">💬 Relancer</a>`;
+  };
+  const rows = r.drivers.map((x) => { const st = BOARD_ST[x.status]; return `<tr>
+    <td><b>${esc(x.name)}</b><div style="font-size:11px;color:var(--muted)">${esc(x.phone || '')}</div></td>
+    <td>${esc(x.vehicle || '—')}</td>
+    <td><span class="badge ${st[2]}">${st[0]} ${st[1]}</span>${x.destination ? `<div style="font-size:11px">${esc(x.destination)}</div>` : ''}</td>
+    <td class="mono">${fmt(x.km)} km</td><td class="mono">${x.liters} L</td>
+    <td>${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C">⚠ ${esc(a)}</div>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
+    <td>${x.status === 'RIEN' || x.status === 'A_ENVOYER' ? wa(x) : ''}</td></tr>`; }).join('');
+  root().innerHTML = `<div class="panel"><h3>🧭 Suivi des chauffeurs</h3><div class="desc">Situation de chaque chauffeur pour la journée choisie.</div>
+    <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverBoard(this.value)" style="max-width:220px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(S.total, 'Chauffeurs', 'var(--navy)')}${tile(S.enMission, 'En mission', '#2E8B57')}${tile(S.aEnvoyer, 'Fiche à envoyer', '#C98A0B')}${tile(S.envoyees, 'Fiches envoyées', '#2E8B57')}${tile(S.rien, 'Rien de saisi', '#C0392B')}</div></div>
+    <div class="panel"><div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Véhicule</th><th>Situation</th><th>Distance</th><th>Carburant</th><th>Alertes</th><th></th></tr>${rows || '<tr><td colspan="7" class="empty">Aucun chauffeur actif.</td></tr>'}</table></div></div>`;
+}
 async function renderDriverSheets(date) {
   const d = date || window._shDate || new Date().toISOString().slice(0, 10);
   window._shDate = d;
