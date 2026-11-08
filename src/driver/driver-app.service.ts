@@ -373,16 +373,16 @@ export class DriverAppService {
     if (!vehicleId) throw new BadRequestException('Aucun véhicule associé à cette déclaration.');
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle) throw new NotFoundException('Véhicule introuvable.');
-    const nature = ['PNEUS', 'VIDANGE', 'FILTRE', 'HUILE', 'FREINS', 'BATTERIE', 'ELECTRICITE', 'ANOMALIE', 'AUTRE'].includes(p.nature) ? (p.nature as string) : 'AUTRE';
-    const detail = str(p.detail, 300);
-    if ((nature === 'AUTRE' || nature === 'ANOMALIE') && !detail) throw new BadRequestException('Précisez la nature de la maintenance.');
+    const nature = ['PIECES', 'PNEUS', 'VIDANGE', 'FILTRE', 'HUILE', 'FREINS', 'BATTERIE', 'ELECTRICITE', 'ANOMALIE', 'AUTRE'].includes(p.nature) ? (p.nature as string) : 'AUTRE';
+    const detail = str(p.detail, 500);
+    if ((nature === 'AUTRE' || nature === 'ANOMALIE' || nature === 'PIECES') && !detail) throw new BadRequestException('Précisez la nature de la maintenance.');
     const mileage = num(p.mileage);
     const cost = num(p.cost);
     if (cost !== undefined && (cost < 0 || !Number.isFinite(cost))) throw new BadRequestException('Coût invalide.');
     const row = await this.prisma.driverMaintenance.create({
       data: { driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), nature, detail, mileage: mileage !== undefined && Number.isInteger(mileage) ? mileage : vehicle.currentMileage, cost: cost !== undefined ? Math.round(cost) : undefined, nextServiceKm: num(p.nextServiceKm) !== undefined && Number.isInteger(num(p.nextServiceKm)) && (num(p.nextServiceKm) as number) > 0 ? num(p.nextServiceKm) : undefined, observations: str(p.observations, 500), clientOpId: op.clientOpId },
     });
-    const labels: Record<string, string> = { PNEUS: 'Pneus', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', ANOMALIE: 'Anomalie signalée', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', AUTRE: 'Autre' };
+    const labels: Record<string, string> = { PIECES: 'Pièces / entretien', PNEUS: 'Pneus', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', ANOMALIE: 'Anomalie signalée', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', AUTRE: 'Autre' };
     await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: nature === 'ANOMALIE' ? 'WARNING' : 'INFO', entity: 'Vehicle', entityId: vehicle.id, title: `${nature === 'ANOMALIE' ? 'Anomalie signalée' : 'Maintenance déclarée'} — ${vehicle.registrationNumber}`, message: `${labels[nature]}${detail ? ' (' + detail + ')' : ''}${row.mileage ? ', ' + row.mileage + ' km' : ''}${row.cost ? ', ' + row.cost + ' GNF' : ''}${row.nextServiceKm ? ', prochaine vidange à ' + row.nextServiceKm + ' km' : ''}.` });
     await this.audit.log({ userId, action: 'CREATE', entity: 'DriverMaintenance', entityId: row.id, newValue: { nature, detail, cost: row.cost } });
     return { maintenanceId: row.id };
