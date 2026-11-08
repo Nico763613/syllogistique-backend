@@ -289,6 +289,7 @@
       <div class="topbar">
         <div style="display:flex; align-items:center;">
           <div class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</div>
+          <button id="back-btn" class="btn-ghost" style="display:none; font-size:20px; padding:2px 10px; margin-right:6px;" onclick="goBack()" aria-label="Retour">←</button>
           <h2 id="view-title">Tableau de bord</h2>
         </div>
         <div class="user-chip">
@@ -439,7 +440,7 @@ async function login() {
 
 function logout() {
   ['syllo_access_token', 'syllo_refresh_token', 'syllo_user'].forEach((k) => localStorage.removeItem(k));
-  state.accessToken = ''; state.user = null;
+  state.accessToken = ''; state.user = null; state.hist = []; state.view = null;
   document.getElementById('app').style.display = 'none';
   const da = document.getElementById('driver-app'); if (da) da.style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
@@ -507,8 +508,20 @@ const titles = {
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
 
-function go(view) {
+state.hist = []; state.ign = 0;
+function goBackBtn() { const b = document.getElementById('back-btn'); if (b) b.style.display = state.hist.length ? '' : 'none'; }
+// Flèche ← (et bouton retour du téléphone) : revient à l'écran précédent sans quitter l'application.
+function goBack(fromPop) {
+  if (!state.hist.length) return;
+  const v = state.hist.pop();
+  go(v, true);
+  if (!fromPop) { try { state.ign++; history.back(); } catch (e) { state.ign = 0; } }
+}
+window.addEventListener('popstate', () => { if (state.ign > 0) { state.ign--; return; } if (state.hist.length && document.getElementById('back-btn') && !(window.DRV && DRV.hist && DRV.hist.length)) goBack(true); });
+function go(view, noPush) {
+  if (!noPush && state.view && state.view !== view) { state.hist.push(state.view); if (state.hist.length > 30) state.hist.shift(); try { history.pushState({ off: 1 }, ''); } catch (e) {} }
   state.view = view;
+  goBackBtn();
   document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === view));
   document.getElementById('view-title').textContent = titles[view];
   document.getElementById('sidebar').classList.remove('open');
