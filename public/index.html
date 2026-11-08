@@ -2837,7 +2837,7 @@ function drvMaintForm(tripId) {
     <label>Kilométrage lors de la maintenance (km)</label><input id="m-km" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
     <label>Coût total (GNF)</label><input id="m-cost" type="number" inputmode="numeric">
     <label>Rappel — prochaine vidange à (km)</label><input id="m-next" type="number" inputmode="numeric" placeholder="Ex. ${me.vehicle ? Number(me.vehicle.mileage || 0) + 10000 : '120000'}">`, async () => {
-    const picked = [...document.querySelectorAll('.m-part:checked')].map((x) => x.value), det = drvEl('m-det').value.trim();
+    const picked = [...document.querySelectorAll('.m-part:checked')].map((x) => x.value), det = drvFix(drvEl('m-det').value);
     if (!picked.length) throw new Error('Cochez au moins une pièce ou un entretien.');
     if (picked.includes('Autres') && !det) throw new Error('Précisez ce que vous avez changé (champ « Précisions »).');
     const detail = picked.join(', ') + (det ? ' — ' + det : '');
@@ -2845,21 +2845,50 @@ function drvMaintForm(tripId) {
     drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature: 'PIECES', detail, mileage: drvNum('m-km'), cost: drvNum('m-cost'), nextServiceKm: drvNum('m-next'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
   }, 'Enregistrer la maintenance');
 }
+const DRV_FAULTS = ['Plaquettes de frein', 'Freins', 'Pare-chocs', 'Pneumatiques / crevaison', 'Moteur / mécanique', 'Boîte de vitesses / transmission', 'Suspension / amortisseurs', 'Batterie / électricité', 'Phares / feux', 'Pare-brise / vitres', 'Rétroviseur', 'Fuite d\'huile ou de liquide', 'Climatisation', 'Accident', 'Autres'];
 function drvFaultForm(tripId) {
   const tog = "const r=this.value;drvEl('x-box').style.display=r==='STOP'?'block':'none'";
+  const boxes = DRV_FAULTS.map((x) => `<label style="display:flex;gap:10px;align-items:center;margin:6px 0;font-size:16px;color:var(--text)"><input type="checkbox" class="x-fault" value="${esc(x)}" style="width:22px;height:22px"> ${esc(x)}</label>`).join('');
   drvSheet('5 · Panne ou anomalie (facultatif)', `
-    <label>Type</label><select id="x-type"><option>Pneumatiques</option><option>Mécanique / moteur</option><option>Freins</option><option>Électricité / batterie</option><option value="ACCIDENT">Accident</option><option>Autre anomalie</option></select>
+    <label>Nature — cochez une ou plusieurs</label>${boxes}
     <label>Le véhicule peut-il rouler ?</label><select id="x-roll" onchange="${tog}"><option value="OK">Oui — simple anomalie à signaler</option><option value="STOP">Non — véhicule immobilisé</option></select>
-    <label>Description</label><textarea id="x-desc" rows="3" placeholder="Que se passe-t-il ? Voyants, bruit, crevaison, fuite…"></textarea>
+    <label>Description / précisions (obligatoire si « Autres » est coché)</label><textarea id="x-desc" rows="3" placeholder="Que se passe-t-il ? Voyants, bruit, crevaison, fuite…"></textarea>
     <div id="x-box" style="display:none">${drvPhotoField('📷 Photos (jusqu’à 4)', true)}<div class="desc" style="font-size:12px;color:var(--muted);margin-top:8px">Le véhicule sera immobilisé et le gestionnaire de flotte alerté avec votre position GPS.</div></div>`, async () => {
-    const type = drvEl('x-type').value, desc = drvEl('x-desc').value.trim(), stop = drvEl('x-roll').value === 'STOP';
-    if (!desc) throw new Error('Décrivez la panne ou l\'anomalie.');
+    const picked = [...document.querySelectorAll('.x-fault:checked')].map((x) => x.value), desc = drvFix(drvEl('x-desc').value, true), stop = drvEl('x-roll').value === 'STOP';
+    if (!picked.length) throw new Error('Cochez au moins une nature de panne ou d\'anomalie.');
+    if (picked.includes('Autres') && !desc) throw new Error('Précisez la panne ou l\'anomalie (champ « Description »).');
+    const accident = picked.includes('Accident'), type = picked.join(', ');
     const g = await drvGeo(), base = { occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g };
-    if (type === 'ACCIDENT') drvEnqueue({ type: 'incident', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { kind: 'ACCIDENT', severity: stop ? 'HIGH' : 'MEDIUM', description: desc, ...base } });
-    else if (stop) drvEnqueue({ type: 'breakdown', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { severity: 'HIGH', description: type + ' — ' + desc, ...base } });
-    else drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature: 'ANOMALIE', detail: type + ' — ' + desc, ...base } });
+    const full = type + (desc ? ' — ' + desc : '');
+    if (accident) drvEnqueue({ type: 'incident', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { kind: 'ACCIDENT', severity: stop ? 'HIGH' : 'MEDIUM', description: full, ...base } });
+    else if (stop) drvEnqueue({ type: 'breakdown', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { severity: 'HIGH', description: full, ...base } });
+    else drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature: 'ANOMALIE', detail: full, ...base } });
   }, 'Enregistrer');
 }
+
+/* ---------- Correction automatique (orthographe / majuscules) des saisies ---------- */
+const DRV_FIXES = { usee: 'usée', usees: 'usées', cassee: 'cassée', cassees: 'cassées', verin: 'vérin', verins: 'vérins', plaquete: 'plaquette', plaquetes: 'plaquettes', plaquet: 'plaquette', pnue: 'pneu', pneue: 'pneu', pneux: 'pneus', pneumatique: 'pneumatique', parchoc: 'pare-chocs', parechoc: 'pare-chocs', parechocs: 'pare-chocs', 'pare-choc': 'pare-chocs', parbrise: 'pare-brise', parebrise: 'pare-brise', vidanje: 'vidange', vidanges: 'vidanges', baterie: 'batterie', batrie: 'batterie', batteri: 'batterie', acident: 'accident', accidant: 'accident', moteure: 'moteur', mottur: 'moteur', echappement: 'échappement', electrique: 'électrique', electricite: 'électricité', mecanique: 'mécanique', mecanicien: 'mécanicien', reparation: 'réparation', reparer: 'réparer', kilometrage: 'kilométrage', creve: 'crevé', crevaison: 'crevaison', creuvaison: 'crevaison', suspention: 'suspension', amortisseur: 'amortisseur', amortiseur: 'amortisseur', radiateur: 'radiateur', radiatteur: 'radiateur', carburent: 'carburant', carburan: 'carburant', gazoil: 'gasoil', gazole: 'gasoil', demarrage: 'démarrage', demarrer: 'démarrer', demarre: 'démarre', probleme: 'problème', problem: 'problème', vehicule: 'véhicule', vehicul: 'véhicule', degat: 'dégât', degats: 'dégâts', fuite: 'fuite', liquid: 'liquide', embrayage: 'embrayage', embrayaje: 'embrayage', boite: 'boîte', cardant: 'cardan', cardant_: 'cardan', rétroviseur: 'rétroviseur', retroviseur: 'rétroviseur', phar: 'phare', 'a cause': 'à cause', apre: 'après', aprés: 'après', deja: 'déjà', tres: 'très', pres: 'près', recu: 'reçu', mission: 'mission', livraision: 'livraison', livraisson: 'livraison', chargment: 'chargement', chargemant: 'chargement' };
+const DRV_FIXRE = new RegExp('(^|[^A-Za-zÀ-ÿ_\\-])(' + Object.keys(DRV_FIXES).filter((k) => !k.includes('_')).sort((a, b) => b.length - a.length).map((k) => k.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![A-Za-zÀ-ÿ\\-])', 'gi');
+// long = zone de description : ajoute le point final
+function drvFix(txt, long) {
+  let t = String(txt || '').replace(/\s+/g, ' ').trim();
+  if (!t) return '';
+  t = t.replace(DRV_FIXRE, (m, pre, w) => { const r = DRV_FIXES[w.toLowerCase()]; return pre + (w[0] === w[0].toUpperCase() && w.length > 1 && w === w.toUpperCase() ? r.toUpperCase() : r); });
+  t = t.replace(/\s+([,.;:!?])/g, '$1').replace(/([,;:!?])(?=[^\s\d])/g, '$1 ');
+  t = t.replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (m, a, c) => a + c.toUpperCase());
+  if (long && t.length > 15 && !/[.!?…]$/.test(t)) t += '.';
+  return t;
+}
+document.addEventListener('focusout', (e) => {
+  const el = e.target;
+  if (!el || !el.closest || !el.closest('#drv-sheet')) return;
+  const ok = el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (!el.type || el.type === 'text'));
+  if (ok && el.value) el.value = drvFix(el.value, el.tagName === 'TEXTAREA');
+});
+document.addEventListener('focusin', (e) => {
+  const el = e.target;
+  if (el && el.closest && el.closest('#drv-sheet') && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (!el.type || el.type === 'text')))) { el.setAttribute('spellcheck', 'true'); el.setAttribute('lang', 'fr'); el.setAttribute('autocapitalize', 'sentences'); el.setAttribute('autocorrect', 'on'); }
+});
 
 /* ---------- Fiche journalière (fiche de bord) ---------- */
 const DRV_NAT = { PIECES: 'Pièces / entretien', PNEUS: 'Pneumatiques', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', ANOMALIE: 'Anomalie signalée', AUTRE: 'Autre' };
