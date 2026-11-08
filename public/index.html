@@ -310,7 +310,7 @@
 <!-- ============ APPLICATION CHAUFFEUR ============ -->
 <div id="driver-app">
   <div class="drv-head">
-    <div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div>
+    <div style="display:flex;align-items:center;gap:10px"><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
     <div style="display:flex; align-items:center; gap:8px;"><span class="drv-pill" id="drv-pill">…</span><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()">⎋</button></div>
   </div>
   <div id="drv-root"></div>
@@ -2218,9 +2218,24 @@ function drvView() {
 
 function drvIsTruck(me) { return me && ((me.vehicle && me.vehicle.type === 'TRUCK') || (!me.vehicle && me.driver.activity === 'TRUCK')); }
 function drvKind(me) { return (BRAND.name && BRAND.name !== 'SYLLOGISTIQUE' ? BRAND.name + ' · ' : '') + (drvIsTruck(me) ? 'Chauffeur de camion' : 'Chauffeur de véhicule de service') + (me.vehicle && me.vehicle.registrationType === 'IT' ? ' · plaque IT' : ''); }
-function drvTab(t) { DRV.tab = t; drvRender(); }
+DRV.hist = []; DRV.ign = 0;
+function drvHb() { try { DRV.ign++; history.back(); } catch (e) { DRV.ign = 0; } }
+function drvTab(t, noPush) {
+  if (t === DRV.tab) return;
+  if (!noPush) { DRV.hist.push(DRV.tab); if (DRV.hist.length > 20) DRV.hist.shift(); try { history.pushState({ drv: 1 }, ''); } catch (e) {} }
+  DRV.tab = t; drvRender();
+}
+// Flèche ← (et bouton retour du téléphone) : ferme le formulaire ouvert, sinon revient à l'onglet précédent, sans quitter l'application.
+function drvBack(fromPop) {
+  const sh = drvEl('drv-sheet');
+  if (sh) { sh.remove(); if (!fromPop) { drvHb() } return; }
+  if (DRV.hist.length) { const t = DRV.hist.pop(); DRV.tab = t; drvRender(); if (!fromPop) { drvHb() } return; }
+  if (DRV.tab !== 'missions') { DRV.tab = 'missions'; drvRender(); }
+}
+window.addEventListener('popstate', () => { if (DRV.ign > 0) { DRV.ign--; return; } if (drvEl('driver-app') && drvEl('driver-app').style.display !== 'none' && (drvEl('drv-sheet') || DRV.hist.length)) drvBack(true); });
+function drvBackBtn() { const b = drvEl('drv-back'); if (b) b.style.display = (DRV.tab !== 'missions' || DRV.hist.length || drvEl('drv-sheet')) ? '' : 'none'; }
 function drvRender() {
-  drvPill();
+  drvPill(); drvBackBtn();
   if (DRV.me) drvEl('drv-sub').textContent = drvKind(DRV.me);
   document.querySelectorAll('#drv-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.t === DRV.tab));
   const root = drvEl('drv-root');
@@ -2417,11 +2432,11 @@ function drvSheet(title, html, onSubmit, submitLabel) {
   const old = drvEl('drv-sheet'); if (old) old.remove();
   const s = document.createElement('div');
   s.id = 'drv-sheet'; s.className = 'drv-sheet';
-  s.innerHTML = `<div><h3>${esc(title)}</h3>${html}<div id="drv-sheet-msg"></div><button class="drv-btn gold" id="drv-sheet-ok">${esc(submitLabel || 'Enregistrer')}</button><button class="drv-btn ghost" onclick="drvEl('drv-sheet').remove()">Annuler</button></div>`;
-  document.body.appendChild(s);
+  s.innerHTML = `<div><a href="#" onclick="drvBack();return false;" style="font-size:15px;text-decoration:none;color:var(--navy);font-weight:700">← Retour</a><h3>${esc(title)}</h3>${html}<div id="drv-sheet-msg"></div><button class="drv-btn gold" id="drv-sheet-ok">${esc(submitLabel || 'Enregistrer')}</button><button class="drv-btn ghost" onclick="drvBack()">Annuler</button></div>`;
+  document.body.appendChild(s); drvBackBtn(); try { history.pushState({ drv: 1 }, ''); } catch (e) {}
   drvEl('drv-sheet-ok').onclick = async () => {
     const btn = drvEl('drv-sheet-ok'); btn.disabled = true; btn.textContent = 'Position GPS…';
-    try { await onSubmit(); s.remove(); } catch (e) { drvEl('drv-sheet-msg').innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = submitLabel || 'Enregistrer'; }
+    try { await onSubmit(); s.remove(); drvHb() } catch (e) { drvEl('drv-sheet-msg').innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; btn.disabled = false; btn.textContent = submitLabel || 'Enregistrer'; }
   };
 }
 const drvPhotoField = (label, multiple) => `<label>${label}</label><input type="file" accept="image/*" capture="environment" ${multiple ? 'multiple' : ''} onchange="drvPickPhotos(this)"><div class="drv-thumbs" id="drv-thumbs"></div>`;
@@ -2812,18 +2827,22 @@ async function forcePasswordSave() {
 }
 
 /* ---------- Maintenance effectuée ---------- */
+const DRV_PARTS = ['Huile moteur', 'Filtre à huile', 'Filtre à air', 'Filtre à gasoil', 'Pneumatiques', 'Huile de vérin', 'Huile de boîte', 'Huile de pont', 'Liquide de frein', 'Plaquettes / freins', 'Croix de transmission (cardan)', 'Batterie', 'Courroie', 'Amortisseurs', 'Ampoules / feux', 'Autres'];
 function drvMaintForm(tripId) {
   const me = drvView();
-  drvSheet('4 · Maintenance (facultatif)', `
-    <label>Nature</label><select id="m-nat"><option value="VIDANGE">Vidange complète (huile + filtres)</option><option value="FILTRE">Changement de filtre</option><option value="HUILE">Huile (appoint / changement)</option><option value="PNEUS">Pneumatiques</option><option value="FREINS">Freins</option><option value="BATTERIE">Batterie</option><option value="AUTRE">Autre (à préciser)</option></select>
-    <label>Précisions (ex. filtre à huile + filtre à air)</label><input id="m-det">
+  const parts = DRV_PARTS.map((x) => `<label style="display:flex;gap:10px;align-items:center;margin:6px 0;font-size:16px;color:var(--text)"><input type="checkbox" class="m-part" value="${esc(x)}" style="width:22px;height:22px"> ${esc(x)}</label>`).join('');
+  drvSheet('4 · Maintenance / vidange (facultatif)', `
+    <label>Pièces changées ou entretien effectué — cochez une ou plusieurs</label>${parts}
+    <label>Précisions (facultatif ; obligatoire si « Autres » est coché)</label><input id="m-det">
     <label>Kilométrage lors de la maintenance (km)</label><input id="m-km" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
-    <label>Coût (GNF)</label><input id="m-cost" type="number" inputmode="numeric">
+    <label>Coût total (GNF)</label><input id="m-cost" type="number" inputmode="numeric">
     <label>Rappel — prochaine vidange à (km)</label><input id="m-next" type="number" inputmode="numeric" placeholder="Ex. ${me.vehicle ? Number(me.vehicle.mileage || 0) + 10000 : '120000'}">`, async () => {
-    const nature = drvEl('m-nat').value, det = drvEl('m-det').value.trim();
-    if (nature === 'AUTRE' && !det) throw new Error('Précisez la nature de la maintenance.');
+    const picked = [...document.querySelectorAll('.m-part:checked')].map((x) => x.value), det = drvEl('m-det').value.trim();
+    if (!picked.length) throw new Error('Cochez au moins une pièce ou un entretien.');
+    if (picked.includes('Autres') && !det) throw new Error('Précisez ce que vous avez changé (champ « Précisions »).');
+    const detail = picked.join(', ') + (det ? ' — ' + det : '');
     const g = await drvGeo();
-    drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature, detail: det || undefined, mileage: drvNum('m-km'), cost: drvNum('m-cost'), nextServiceKm: drvNum('m-next'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+    drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature: 'PIECES', detail, mileage: drvNum('m-km'), cost: drvNum('m-cost'), nextServiceKm: drvNum('m-next'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
   }, 'Enregistrer la maintenance');
 }
 function drvFaultForm(tripId) {
@@ -2843,7 +2862,7 @@ function drvFaultForm(tripId) {
 }
 
 /* ---------- Fiche journalière (fiche de bord) ---------- */
-const DRV_NAT = { PNEUS: 'Pneumatiques', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', ANOMALIE: 'Anomalie signalée', AUTRE: 'Autre' };
+const DRV_NAT = { PIECES: 'Pièces / entretien', PNEUS: 'Pneumatiques', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', ANOMALIE: 'Anomalie signalée', AUTRE: 'Autre' };
 function drvSheetHtml(sh, offline) {
   const me = drvView(), v = me.vehicle, act = me.activeTrip, sent = sh.status === 'SENT';
   const hh = (d) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
