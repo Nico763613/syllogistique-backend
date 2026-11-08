@@ -284,6 +284,7 @@
 
       <div class="sidebar-footer">
         <div class="sync-pill"><span class="dot" id="sync-dot"></span> <span id="sync-label">Synchronisé</span></div>
+        <div id="live-label" style="font-size:11px;color:#9FB3CC;margin-top:4px"></div>
         <div style="margin-top:10px;"><button class="btn-ghost" style="color:#C9D6E8; border-color:rgba(255,255,255,.2);" onclick="logout()">Déconnexion</button></div>
       </div>
     </aside>
@@ -531,6 +532,38 @@ function go(view, noPush) {
   renderView(view);
 }
 
+/* ---------- Actualisation automatique du bureau (toutes les 30 s, écran ouvert et visible uniquement) ---------- */
+const LIVE_VIEWS = ['dashboard', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance'];
+const LIVE = { since: null, timer: null, busy: false };
+function liveCanRun() {
+  return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR';
+}
+async function liveTick() {
+  if (LIVE.busy || !liveCanRun()) return;
+  LIVE.busy = true;
+  try {
+    const r = await api('/driver-admin/changes?siteId=' + encodeURIComponent(state.siteId || '') + (LIVE.since ? '&since=' + encodeURIComponent(LIVE.since) : ''));
+    const first = !LIVE.since; LIVE.since = r.now;
+    const lab = document.getElementById('live-label');
+    if (lab) lab.textContent = '🔄 Actualisé à ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + (r.pendingExpenses ? ' · ' + r.pendingExpenses + ' dépense(s) à valider' : '');
+    const a = document.activeElement, typing = a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName);
+    if (!first && r.changed && LIVE_VIEWS.includes(state.view) && !typing) {
+      const sc = document.querySelector('.main'); const top = sc ? sc.scrollTop : 0; const wy = window.scrollY;
+      window._silent = true;
+      try { await renderView(state.view); } finally { window._silent = false; }
+      if (sc) sc.scrollTop = top; window.scrollTo(0, wy);
+      if (typeof loadAlerts === 'function') loadAlerts();
+    }
+  } catch (e) { /* silencieux : on réessaiera au prochain tour */ }
+  LIVE.busy = false;
+}
+function liveStart() {
+  if (LIVE.timer) return;
+  LIVE.timer = setInterval(liveTick, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') liveTick(); });
+  setTimeout(liveTick, 3000);
+}
+liveStart();
 function root() { return document.getElementById('view-root'); }
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR'); }
 // Échappe toute donnée texte avant insertion dans le HTML (protection XSS)
@@ -879,7 +912,7 @@ function applyRoleNav() {
 
 /* ---------------- DASHBOARD ---------------- */
 async function renderView(view) {
-  root().innerHTML = '<div class="empty">Chargement…</div>';
+  if (!window._silent) root().innerHTML = '<div class="empty">Chargement…</div>';
   try {
     if (view === 'dashboard') return renderDashboard();
     if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));

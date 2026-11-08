@@ -162,6 +162,11 @@ export class DriverAdminController {
     return this.sheets.processSheet(dto.driverId, dto.date, dto.note, actor.userId);
   }
 
+  @Get('changes')
+  changes(@Query('since') since: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.sheets.changes(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, since);
+  }
+
   @Get('missions')
   missions(@Query() q: Record<string, string>, @CurrentUser() actor: any) {
     return this.sheets.missions({ ...q, siteId: actor.role === 'SUPER_ADMIN' ? q.siteId : actor.siteId ?? q.siteId, page: q.page ? Number(q.page) : 1 });
