@@ -181,3 +181,7 @@ ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS next_service_km 
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS start_fuel_level TEXT;
 --#
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS end_fuel_level TEXT;
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS start_fuel_liters DOUBLE PRECISION;
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS end_fuel_liters DOUBLE PRECISION;

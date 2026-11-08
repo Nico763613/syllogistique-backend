@@ -2451,9 +2451,10 @@ function drvToggleStart() {
 const DRV_REGIONS = ['Conakry', 'Boké', 'Kindia', 'Mamou', 'Labé', 'Faranah', 'Kankan', "N'Zérékoré"];
 const drvHM = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const drvAt = (hm) => { if (!hm) return new Date().toISOString(); const [h, m] = hm.split(':'); const d = new Date(); d.setHours(+h, +m, 0, 0); return (d > new Date() ? new Date() : d).toISOString(); };
-const DRV_FUEL = [['VIDE','Vide / réserve'],['1/4','1/4'],['1/2','1/2'],['3/4','3/4'],['PLEIN','Plein']];
-const drvFuelSel = (id) => `<label>Niveau de carburant — obligatoire</label><select id="${id}"><option value="">— Choisir —</option>${DRV_FUEL.map((x) => `<option value="${x[0]}">${x[1]}</option>`).join('')}</select>`;
-const drvFuelTxt = (v) => (DRV_FUEL.find((x) => x[0] === v) || [0, '—'])[1];
+const drvFuelSel = (id, label) => `<label>${label || 'Carburant dans le réservoir (litres) — obligatoire'}</label><input id="${id}" type="number" inputmode="decimal" step="0.1" min="0" placeholder="Ex. 45">`;
+const drvFuelTxt = (v) => (v == null ? '—' : fmt(v) + ' L');
+const drvPrice = () => Number((drvView() || {}).fuelPrice) || 12000;
+function drvFuelCalc() { const l = drvNum('f-liters'), b = drvEl('f-amount'); if (b) b.textContent = l > 0 ? fmt(Math.round(l * drvPrice())) + ' GNF' : '—'; }
 function drvStartForm(tripId) {
   const me = drvView(), v = me.vehicle, t = tripId ? drvTripOf(tripId) : null, truck = drvIsTruck(me);
   const id = tripId || drvUid();
@@ -2474,7 +2475,7 @@ function drvStartForm(tripId) {
     <div id="f-anom-box" style="display:none"><label>Description des anomalies</label><textarea id="f-anom" rows="3" placeholder="Pneu usé, feux cassés, fuite, rétroviseur…"></textarea></div>`, async () => {
     const odometer = drvNum('f-odo');
     if (odometer === undefined || odometer < 0) throw new Error('Saisissez le kilométrage au départ.');
-    if (!drvEl('f-fuel').value) throw new Error('Indiquez le niveau de carburant au départ.');
+    if (drvNum('f-fuel') === undefined || drvNum('f-fuel') < 0) throw new Error('Indiquez les litres de carburant dans le réservoir au départ.');
     const cond = drvEl('f-cond').value, anom = drvEl('f-anom').value.trim();
     if (cond === 'ANOMALIE' && !anom) throw new Error("Décrivez l'anomalie constatée.");
     const regions = [...document.querySelectorAll('.f-reg:checked')].map((x) => x.value);
@@ -2483,7 +2484,7 @@ function drvStartForm(tripId) {
     if (!dest && !regions.length) throw new Error('Indiquez au moins une destination.');
     dset('lastDest', dest);
     const g = await drvGeo();
-    drvEnqueue({ type: 'start', tripId: id, payload: { odometer, fuelLevel: drvEl('f-fuel').value, occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route').value.trim() || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
+    drvEnqueue({ type: 'start', tripId: id, payload: { odometer, fuelLiters: drvNum('f-fuel'), occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route').value.trim() || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
   }, 'Enregistrer le départ');
   drvToggleStart();
 }
@@ -2513,11 +2514,11 @@ function drvArriveForm(tripId) {
     const odometer = drvNum('f-odo');
     if (odometer === undefined) throw new Error("Saisissez le kilométrage de retour / d'arrêt.");
     if (odometer < t.startMileage) throw new Error(`Le kilométrage doit être supérieur ou égal à ${t.startMileage}.`);
-    if (!drvEl('f-fuel').value) throw new Error("Indiquez le niveau de carburant à l'arrivée.");
+    if (drvNum('f-fuel') === undefined || drvNum('f-fuel') < 0) throw new Error("Indiquez les litres de carburant dans le réservoir à l'arrivée.");
     const g = await drvGeo();
     const sig = drvEl('f-sig') ? drvSigData() : undefined;
     const arr = drvEl('f-arrdt') && drvEl('f-arrdt').value ? new Date(drvEl('f-arrdt').value).toISOString() : new Date().toISOString();
-    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLevel: drvEl('f-fuel').value, tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
+    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
   }, 'Enregistrer l\'arrivée');
   if (drvEl('f-sig')) drvSigInit();
 }
@@ -2542,14 +2543,14 @@ function drvFuelForm(tripId) {
   const me = drvView();
   drvSheet('2 · Plein de carburant', `
     <label>Kilométrage au moment du plein (km)</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
-    <label>Quantité (litres)</label><input id="f-liters" type="number" inputmode="decimal" step="0.01">
-    <label>Montant payé (GNF)</label><input id="f-cost" type="number" inputmode="numeric">
-    <label>Station / dépôt (facultatif)</label><input id="f-station">
+    <label>Quantité (litres)</label><input id="f-liters" type="number" inputmode="decimal" step="0.01" oninput="drvFuelCalc()">
+    <div class="drv-row" style="margin:8px 0"><span>Montant (calculé à ${fmt(drvPrice())} GNF le litre)</span><b id="f-amount">—</b></div>
+    <label>Station ou pompe (facultatif)</label><input id="f-station">
     ${drvPhotoField('📷 Photo du reçu (facultatif — les justificatifs sont à déposer au responsable)', false)}`, async () => {
     const liters = drvNum('f-liters');
     if (!liters || liters <= 0) throw new Error('Saisissez les litres.');
     const g = await drvGeo();
-    drvEnqueue({ type: 'fuel', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { liters, totalCost: drvNum('f-cost'), station: drvEl('f-station').value, odometer: drvNum('f-odo'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+    drvEnqueue({ type: 'fuel', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { liters, station: drvEl('f-station').value, odometer: drvNum('f-odo'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
   }, 'Enregistrer le plein');
 }
 function drvBreakdownForm(tripId) {
@@ -2899,14 +2900,14 @@ function drvSheetHtml(sh, offline) {
   const lock = '<div style="font-size:12px;color:var(--muted)">🔒 Fiche envoyée : modification impossible.</div>';
   const motifOf = (t) => [({ MISSION: 'Mission', AUTRE: 'Autre', TRANSPORT: 'Transport' })[t.purposeType], t.cargo, t.purpose].filter(Boolean).join(' — ') || '—';
   const b1 = sh.trips.map((t) => `<div class="drv-row"><span>${hh(t.startTime)} · ${esc(t.plate)}</span><b>km ${fmt(t.startMileage)}</b></div>
-    <div class="drv-row"><span>Carburant au départ</span><b>${esc(drvFuelTxt(t.startFuelLevel))}</b></div>
+    <div class="drv-row"><span>Carburant au départ</span><b>${esc(drvFuelTxt(t.startFuelLiters))}</b></div>
     <div class="drv-row"><span>Destination(s)</span><b style="text-align:right">${esc(t.destination || (t.regions || []).join(', ') || '—')}</b></div>
     ${t.route ? `<div class="drv-row"><span>Trajet</span><b style="text-align:right">${esc(t.route)}</b></div>` : ''}
     <div class="drv-row"><span>Motif</span><b style="text-align:right">${esc(motifOf(t))}</b></div>
     ${t.preCondition === 'ANOMALIE' ? `<div class="drv-warn">Anomalie au départ : ${esc(t.preAnomalies)}</div>` : ''}`).join('<hr style="border:0;border-top:1px dashed #d8dee8">');
   const b2 = sh.fuel.map((f) => `<div class="drv-row"><span>${hh(f.time)} · km ${fmt(f.mileage)}${f.station ? ' · ' + esc(f.station) : ''}</span><b>${f.liters} L · ${fmt(f.cost)} GNF</b></div>`).join('');
   const b3 = sh.trips.filter((t) => t.status === 'COMPLETED').map((t) => `<div class="drv-row"><span>${drvOutside(t) ? 'Arrivée ' + drvDt(t.endTime) + ' · ' : ''}Retour / arrêt</span><b>km ${fmt(t.endMileage)}</b></div>
-    <div class="drv-row"><span>Carburant à l'arrivée</span><b>${esc(drvFuelTxt(t.endFuelLevel))}</b></div>
+    <div class="drv-row"><span>Carburant à l'arrivée</span><b>${esc(drvFuelTxt(t.endFuelLiters))}</b></div>
     <div class="drv-row"><span>Distance</span><b>${fmt(t.km)} km</b></div>${t.voyages != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.voyages)}</b></div>` : ''}`).join('');
   const maint = sh.maintenance.filter((m) => m.nature !== 'ANOMALIE'), anom = sh.maintenance.filter((m) => m.nature === 'ANOMALIE');
   const b4 = maint.map((m) => `<div class="drv-row"><span>${esc(DRV_NAT[m.nature] || m.nature)}${m.detail ? ' — ' + esc(m.detail) : ''}<br><small>${hh(m.date)} · km ${m.mileage != null ? fmt(m.mileage) : '—'}${m.nextServiceKm ? ' · prochaine vidange : ' + fmt(m.nextServiceKm) + ' km' : ''}</small></span><b>${m.cost != null ? fmt(m.cost) + ' GNF' : '—'}</b></div>`).join('');
