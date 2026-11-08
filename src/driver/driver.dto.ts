@@ -44,6 +44,12 @@ export class InviteDto {
   @IsString() @MaxLength(200) appUrl: string;
 }
 
+export class ProcessSheetDto {
+  @IsString() @MaxLength(36) driverId: string;
+  @IsString() @MaxLength(10) date: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
+}
+
 export class SendSheetDto {
   @IsString() @MaxLength(10) date: string;
 }
