@@ -1569,6 +1569,11 @@ model DriverDailyReport {
   status     String   @default("SENT")
   sentAt     DateTime @default(now()) @map("sent_at")
   sentBy     String?  @map("sent_by")
+  receivedAt DateTime? @map("received_at")   // ouverte par le bureau
+  receivedBy String?  @map("received_by")
+  processedAt DateTime? @map("processed_at") // marquée « traitée » par le bureau
+  processedBy String?  @map("processed_by")
+  processNote String?  @map("process_note")
   @@unique([driverId, reportDate])
   @@map("driver_daily_reports")
 }

@@ -9,7 +9,7 @@ import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
 import { DriverSheetService } from './driver-sheet.service';
-import { ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -51,6 +51,13 @@ export class DriverController {
   @UseGuards(DriverDeviceGuard)
   takeover(@Body() dto: TakeoverDto, @CurrentUser() user: any) {
     return this.app.takeover(user.userId, dto.vehicleId, dto.reason, dto.note);
+  }
+
+  @Get('transmissions')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  async transmissions(@CurrentUser() user: any) {
+    return this.app.transmissions(user.userId);
   }
 
   @Get('history')
@@ -150,6 +157,11 @@ export class DriverAdminController {
     return this.sheets.decideExpense(id, dto.decision, dto.note, actor.userId);
   }
 
+  @Post('sheets/process')
+  processSheet(@Body() dto: ProcessSheetDto, @CurrentUser() actor: any) {
+    return this.sheets.processSheet(dto.driverId, dto.date, dto.note, actor.userId);
+  }
+
   @Get('missions')
   missions(@Query() q: Record<string, string>, @CurrentUser() actor: any) {
     return this.sheets.missions({ ...q, siteId: actor.role === 'SUPER_ADMIN' ? q.siteId : actor.siteId ?? q.siteId, page: q.page ? Number(q.page) : 1 });
@@ -167,7 +179,7 @@ export class DriverAdminController {
 
   @Get('sheets')
   sheetsOfDay(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
-    return this.sheets.listForDay(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);
+    return this.sheets.listForDay(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date, actor.userId);
   }
 
   @Get('history/vehicle/:id')

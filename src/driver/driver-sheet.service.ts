@@ -37,7 +37,7 @@ export class DriverSheetService {
       date: day.toISOString().slice(0, 10),
       day: DAYS[day.getUTCDay()],
       status: rep ? 'SENT' : 'DRAFT',
-      sentAt: rep?.sentAt ?? null,
+      sentAt: rep?.sentAt ?? null, receivedAt: rep?.receivedAt ?? null, processedAt: rep?.processedAt ?? null, processNote: rep?.processNote ?? null,
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, activity: driver.activity },
       trips: trips.map((t) => ({
         id: t.id, status: t.status, plate: t.vehicle.registrationNumber, brand: [t.vehicle.brand, t.vehicle.model].filter(Boolean).join(' '),
@@ -56,6 +56,28 @@ export class DriverSheetService {
   }
 
   // Envoi au responsable : la fiche est verrouillée, le chauffeur ne peut plus rien modifier pour ce jour
+  async processSheet(driverId: string, date: string | undefined, note: string | undefined, actorId: string) {
+    const day = dayStart(date);
+    const rep = await this.prisma.driverDailyReport.findUnique({ where: { driverId_reportDate: { driverId, reportDate: day } } });
+    if (!rep) throw new BadRequestException("Cette fiche n'a pas été envoyée.");
+    if (rep.processedAt) throw new BadRequestException('Cette fiche est déjà traitée.');
+    const u = await this.prisma.driverDailyReport.update({ where: { id: rep.id }, data: { processedAt: new Date(), processedBy: actorId, processNote: note?.trim() || null, receivedAt: rep.receivedAt ?? new Date(), receivedBy: rep.receivedBy ?? actorId } });
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'DriverDailyReport', entityId: rep.id, newValue: { processed: true, note } });
+    return u;
+  }
+
+  // Suivi des transmissions du chauffeur : fiches envoyées (reçue / traitée) et dépenses (validée / refusée)
+  async transmissions(driverId: string) {
+    const [reps, exps] = await Promise.all([
+      this.prisma.driverDailyReport.findMany({ where: { driverId }, orderBy: { reportDate: 'desc' }, take: 30 }),
+      this.prisma.driverExpense.findMany({ where: { driverId }, orderBy: { date: 'desc' }, take: 30 }),
+    ]);
+    return {
+      sheets: reps.map((r) => ({ date: r.reportDate.toISOString().slice(0, 10), sentAt: r.sentAt, receivedAt: r.receivedAt, processedAt: r.processedAt, note: r.processNote })),
+      expenses: exps.map((e) => ({ id: e.id, date: e.date, category: e.category, amount: e.amount, status: e.status, decidedAt: e.decidedAt, note: e.decisionNote })),
+    };
+  }
+
   async send(driverId: string, userId: string, date?: string) {
     const day = dayStart(date);
     if (await this.isSent(driverId, day)) throw new BadRequestException('Cette fiche a déjà été envoyée.');
@@ -198,7 +220,7 @@ export class DriverSheetService {
     return { date: day.toISOString().slice(0, 10), summary: { total: rows.length, enMission: count('EN_MISSION'), aEnvoyer: count('A_ENVOYER'), envoyees: count('ENVOYEE'), rien: count('RIEN') }, drivers: rows };
   }
 
-  async listForDay(siteId: string | undefined, date?: string) {
+  async listForDay(siteId: string | undefined, date?: string, actorId?: string) {
     const day = dayStart(date);
     const next = new Date(+day + 86400000);
     const drivers = await this.prisma.driver.findMany({ where: { deletedAt: null, ...(siteId ? { siteId } : {}) }, select: { id: true } });
@@ -211,6 +233,8 @@ export class DriverSheetService {
     ]);
     const active = new Set<string>([...t, ...f, ...m, ...r].map((x: any) => x.driverId));
     const out: Awaited<ReturnType<DriverSheetService["build"]>>[] = [];
+    // La consultation par le bureau vaut accusé de réception
+    if (actorId && r.length) await this.prisma.driverDailyReport.updateMany({ where: { driverId: { in: ids }, reportDate: day, receivedAt: null }, data: { receivedAt: new Date(), receivedBy: actorId } });
     for (const id of active) out.push(await this.build(id, date));
     return out.sort((a, b) => (a.status === b.status ? a.driver.name.localeCompare(b.driver.name) : a.status === 'SENT' ? -1 : 1));
   }

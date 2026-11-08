@@ -218,3 +218,13 @@ DROP TRIGGER IF EXISTS trips_set_reference_trg ON trips
 CREATE TRIGGER trips_set_reference_trg BEFORE INSERT ON trips FOR EACH ROW EXECUTE FUNCTION trips_set_reference()
 --#
 DO $bf$ DECLARE r record; BEGIN FOR r IN SELECT id, trip_date FROM trips WHERE reference IS NULL ORDER BY created_at, id LOOP UPDATE trips SET reference = next_trip_ref(r.trip_date) WHERE id = r.id; END LOOP; END $bf$
+--#
+ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS received_at TIMESTAMP(3)
+--#
+ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS received_by TEXT
+--#
+ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP(3)
+--#
+ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS processed_by TEXT
+--#
+ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS process_note TEXT
