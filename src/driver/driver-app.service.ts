@@ -22,8 +22,7 @@ const when = (v: unknown): Date => {
   return Number.isNaN(+d) || +d > now + 10 * 60_000 ? new Date(now) : d;
 };
 
-const FUEL_LEVELS = ['VIDE', '1/4', '1/2', '3/4', 'PLEIN'];
-const fuelLevel = (v: unknown): string | undefined => (typeof v === 'string' && FUEL_LEVELS.includes(v) ? v : undefined);
+const tankLiters = (v: unknown): number | undefined => { const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN; return Number.isFinite(n) && n >= 0 && n <= 2000 ? Math.round(n * 10) / 10 : undefined; };
 
 @Injectable()
 export class DriverAppService {
@@ -57,6 +56,8 @@ export class DriverAppService {
   // Profil du chauffeur : missions, véhicule, appareil
   async me(userId: string, device: { id: string; model?: string | null; activatedAt?: Date | null }) {
     const driver = await this.driverOf(userId);
+    const orgUser = await this.prisma.user.findUnique({ where: { id: userId }, select: { organizationId: true } });
+    const fuelPrice = orgUser ? await currentFuelPrice(this.prisma, orgUser.organizationId) : 12000;
     const trips = await this.prisma.trip.findMany({
       where: { driverId: driver.id, OR: [{ status: { in: ['PLANNED', 'IN_PROGRESS'] } }, { status: 'COMPLETED', endTime: { gte: new Date(Date.now() - 3 * 86400000) } }] },
       include: { vehicle: true },
@@ -80,6 +81,7 @@ export class DriverAppService {
         : null,
       activeTrip: active ? fmtTrip(active) : null,
       trips: trips.map(fmtTrip),
+      fuelPrice,
       serverTime: new Date(),
     };
   }
@@ -146,7 +148,7 @@ export class DriverAppService {
     const preAnomalies = str(p.preAnomalies, 1000);
     if (preCondition === 'ANOMALIE' && !preAnomalies) throw new BadRequestException("Décrivez l'anomalie constatée avant le départ.");
     if (purposeType === 'MISSION' && vehicle.vehicleType === 'SERVICE_VEHICLE' && !regions.length && !destination) throw new BadRequestException('Indiquez la région (ou la destination) de la mission.');
-    const fiche = { destination, route: str(p.route, 300), startFuelLevel: fuelLevel(p.fuelLevel), purposeType, regions, cargo, purpose: str(p.purpose, 300) ?? trip?.purpose ?? undefined, preCondition, preAnomalies };
+    const fiche = { destination, route: str(p.route, 300), startFuelLiters: tankLiters(p.fuelLiters), purposeType, regions, cargo, purpose: str(p.purpose, 300) ?? trip?.purpose ?? undefined, preCondition, preAnomalies };
     const tripId = trip ? trip.id : (op.tripId as string);
     const logs = this.prisma.tripLog.create({ data: { tripId, driverId: driver.id, eventType: 'START', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } });
     const vehUp = this.prisma.vehicle.update({ where: { id: vehicle.id }, data: { status: 'ON_MISSION', currentMileage: odometer } });
@@ -188,7 +190,7 @@ export class DriverAppService {
     await this.prisma.$transaction([
       this.prisma.trip.update({
         where: { id: trip.id },
-        data: { status: 'COMPLETED', endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endFuelLevel: fuelLevel(p.fuelLevel), endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
+        data: { status: 'COMPLETED', endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endFuelLiters: tankLiters(p.fuelLiters), endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
       }),
       this.prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { currentMileage: odometer, status: condition === 'PANNE' || condition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' } }),
       this.prisma.tripLog.create({ data: { tripId: trip.id, driverId: driver.id, eventType: 'ARRIVE', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } }),

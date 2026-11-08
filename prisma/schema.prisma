@@ -337,8 +337,8 @@ model Trip {
   distance      Int?     // calculé automatiquement = endMileage - startMileage
   destination   String?
   route         String?
-  startFuelLevel String? @map("start_fuel_level") // VIDE | 1/4 | 1/2 | 3/4 | PLEIN
-  endFuelLevel  String?  @map("end_fuel_level")
+  startFuelLiters Float? @map("start_fuel_liters") // litres dans le réservoir au départ
+  endFuelLiters   Float? @map("end_fuel_liters")   // litres dans le réservoir à l'arrivée
   purpose       String?
   passengerName String?  @map("passenger_name")
   observations  String?
