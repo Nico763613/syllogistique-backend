@@ -2319,12 +2319,25 @@ function drvQueueHtml() {
   return `<div class="drv-card"><h4>Envois vers le bureau</h4>${rows || '<div class="drv-center">Tout est synchronisé ✔</div>'}
     <button class="drv-btn" onclick="drvSyncNow()">🔄 Synchroniser maintenant</button></div>`;
 }
+function drvLicenseHtml(me) {
+  const l = (me.driver && me.driver.license) || {};
+  const exp = l.expiry ? new Date(l.expiry) : null;
+  const days = exp ? Math.ceil((+exp - Date.now()) / 86400000) : null;
+  const badge = !exp ? '<span class="badge warn">Non renseignée</span>' : days < 0 ? '<span class="badge bad">Expiré</span>' : days <= 60 ? `<span class="badge warn">Expire dans ${days} j</span>` : '<span class="badge ok">Valide</span>';
+  return `<div style="margin:12px 0 4px;font-weight:700;color:var(--navy)">🪪 Permis de conduire</div>
+    <div class="drv-row"><span>Numéro</span><b>${esc(l.number || '—')}</b></div>
+    <div class="drv-row"><span>Catégorie</span><b>${esc(l.category || '—')}</b></div>
+    <div class="drv-row"><span>Expiration</span><b>${exp ? exp.toLocaleDateString('fr-FR') : '—'}</b></div>
+    <div class="drv-row"><span>Statut</span><b>${badge}</b></div>
+    ${l.number ? '' : '<div style="font-size:12px;color:var(--muted)">À compléter par le gestionnaire de flotte (fiche chauffeur).</div>'}`;
+}
 function drvProfileHtml(me) {
   const v = me.vehicle;
   return `<div class="drv-card"><h4>👤 Mon profil</h4>
     <div class="drv-row"><span>Nom</span><b>${esc(me.driver.name)}</b></div>
     <label>Téléphone</label><input id="p-phone" inputmode="tel" value="${esc(me.driver.phone || '')}">
     <button class="drv-btn" onclick="drvSavePhone()">Enregistrer le téléphone</button><div id="p-msg1"></div>
+    ${drvLicenseHtml(me)}
     <div class="drv-row" style="margin-top:10px"><span>Véhicule affecté</span><b>${v ? esc(v.plate) + ' · ' + esc(v.label || '') : 'Aucun'}</b></div>
     <div style="font-size:12px;color:var(--muted);margin-top:4px">Ces informations sont déjà enregistrées : vous ne les ressaisissez pas chaque jour.</div></div>
     <div class="drv-card"><h4>🔁 Je remplace un collègue</h4>

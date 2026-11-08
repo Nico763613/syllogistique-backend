@@ -74,7 +74,7 @@ export class DriverAppService {
       purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, route: t.route,
     });
     return {
-      driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
+      driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
       device: { id: device.id, model: device.model, activatedAt: device.activatedAt },
       vehicle: vehicleRow
         ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
