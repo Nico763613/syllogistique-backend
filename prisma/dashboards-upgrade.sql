@@ -193,3 +193,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS driver_expenses_client_op_id_key ON driver_exp
 CREATE INDEX IF NOT EXISTS driver_expenses_driver_id_date_idx ON driver_expenses (driver_id, date);
 --#
 CREATE INDEX IF NOT EXISTS driver_expenses_status_idx ON driver_expenses (status);
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS reference TEXT
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS trips_reference_key ON trips (reference)
+--#
+CREATE TABLE IF NOT EXISTS trip_ref_counters (year integer PRIMARY KEY, n integer NOT NULL DEFAULT 0)
+--#
+CREATE OR REPLACE FUNCTION next_trip_ref(d date) RETURNS text AS $fn$
+DECLARE y integer := EXTRACT(YEAR FROM COALESCE(d, CURRENT_DATE))::integer; k integer;
+BEGIN
+  INSERT INTO trip_ref_counters (year, n) VALUES (y, 1) ON CONFLICT (year) DO UPDATE SET n = trip_ref_counters.n + 1 RETURNING n INTO k;
+  RETURN 'TRP-' || y || '-' || lpad(k::text, 4, '0');
+END $fn$ LANGUAGE plpgsql
+--#
+CREATE OR REPLACE FUNCTION trips_set_reference() RETURNS trigger AS $fn$
+BEGIN
+  IF NEW.reference IS NULL THEN NEW.reference := next_trip_ref(NEW.trip_date); END IF;
+  RETURN NEW;
+END $fn$ LANGUAGE plpgsql
+--#
+DROP TRIGGER IF EXISTS trips_set_reference_trg ON trips
+--#
+CREATE TRIGGER trips_set_reference_trg BEFORE INSERT ON trips FOR EACH ROW EXECUTE FUNCTION trips_set_reference()
+--#
+DO $bf$ DECLARE r record; BEGIN FOR r IN SELECT id, trip_date FROM trips WHERE reference IS NULL ORDER BY created_at, id LOOP UPDATE trips SET reference = next_trip_ref(r.trip_date) WHERE id = r.id; END LOOP; END $bf$
