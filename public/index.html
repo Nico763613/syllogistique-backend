@@ -363,7 +363,11 @@ async function refreshSession() {
   return refreshing;
 }
 async function api(path, options = {}, retried = false) {
-  const res = await fetch(state.apiUrl.replace(/\/$/, '') + path, {
+  const res = await apiFetch(path, options);
+  return apiHandle(res, path, options, retried);
+}
+async function apiFetch(path, options) {
+  const go = () => fetch(state.apiUrl.replace(/\/$/, '') + path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -373,6 +377,17 @@ async function api(path, options = {}, retried = false) {
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
+  // Serveur gratuit endormi ou réseau instable : on réessaie (lectures seulement) avant d'afficher une erreur claire.
+  const safe = !options.method || options.method === 'GET';
+  const waits = safe && navigator.onLine ? [0, 4000, 9000, 15000] : [0];
+  let last;
+  for (const w of waits) {
+    if (w) await new Promise((r) => setTimeout(r, w));
+    try { return await go(); } catch (e) { last = e; }
+  }
+  throw new TypeError(navigator.onLine ? 'Le serveur met quelques secondes à se réveiller. Patientez puis touchez « Actualiser » ou rechargez la page.' : 'Pas de connexion internet. Vérifiez votre réseau puis réessayez.');
+}
+async function apiHandle(res, path, options, retried) {
   if (res.status === 401 && !retried && !path.startsWith('/auth/')) {
     if (await refreshSession()) return api(path, options, true);
     logout();
@@ -2421,6 +2436,9 @@ function drvToggleStart() {
 const DRV_REGIONS = ['Conakry', 'Boké', 'Kindia', 'Mamou', 'Labé', 'Faranah', 'Kankan', "N'Zérékoré"];
 const drvHM = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const drvAt = (hm) => { if (!hm) return new Date().toISOString(); const [h, m] = hm.split(':'); const d = new Date(); d.setHours(+h, +m, 0, 0); return (d > new Date() ? new Date() : d).toISOString(); };
+const DRV_FUEL = [['VIDE','Vide / réserve'],['1/4','1/4'],['1/2','1/2'],['3/4','3/4'],['PLEIN','Plein']];
+const drvFuelSel = (id) => `<label>Niveau de carburant — obligatoire</label><select id="${id}"><option value="">— Choisir —</option>${DRV_FUEL.map((x) => `<option value="${x[0]}">${x[1]}</option>`).join('')}</select>`;
+const drvFuelTxt = (v) => (DRV_FUEL.find((x) => x[0] === v) || [0, '—'])[1];
 function drvStartForm(tripId) {
   const me = drvView(), v = me.vehicle, t = tripId ? drvTripOf(tripId) : null, truck = drvIsTruck(me);
   const id = tripId || drvUid();
@@ -2432,6 +2450,7 @@ function drvStartForm(tripId) {
     <div class="drv-card" style="margin:0 0 6px"><div class="drv-row"><span>Date</span><b>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</b></div><div class="drv-row"><span>${truck ? 'Camion' : 'Véhicule'}</span><b>${esc(v ? v.plate : '')} ${esc(v ? v.label || '' : '')}</b></div></div>
     <label>Heure de départ</label><input id="f-hm" type="time" value="${drvHM()}">
     <label>Kilométrage au départ (km) — obligatoire</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(v ? v.mileage : '')}">
+    ${drvFuelSel('f-fuel')}
     <label>Destination(s) — séparées par des virgules</label><input id="f-dest" value="${esc(t ? t.destination || '' : dget('lastDest', ''))}" placeholder="${truck ? 'Site minier de…' : 'Ex. Kindia, Mamou'}">
     <label>Trajet</label><input id="f-route" value="${esc(t && t.route ? t.route : '')}" placeholder="Ex. Conakry → Coyah → Kindia">
     ${regs}${motif}
@@ -2440,6 +2459,7 @@ function drvStartForm(tripId) {
     <div id="f-anom-box" style="display:none"><label>Description des anomalies</label><textarea id="f-anom" rows="3" placeholder="Pneu usé, feux cassés, fuite, rétroviseur…"></textarea></div>`, async () => {
     const odometer = drvNum('f-odo');
     if (odometer === undefined || odometer < 0) throw new Error('Saisissez le kilométrage au départ.');
+    if (!drvEl('f-fuel').value) throw new Error('Indiquez le niveau de carburant au départ.');
     const cond = drvEl('f-cond').value, anom = drvEl('f-anom').value.trim();
     if (cond === 'ANOMALIE' && !anom) throw new Error("Décrivez l'anomalie constatée.");
     const regions = [...document.querySelectorAll('.f-reg:checked')].map((x) => x.value);
@@ -2448,7 +2468,7 @@ function drvStartForm(tripId) {
     if (!dest && !regions.length) throw new Error('Indiquez au moins une destination.');
     dset('lastDest', dest);
     const g = await drvGeo();
-    drvEnqueue({ type: 'start', tripId: id, payload: { odometer, occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route').value.trim() || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
+    drvEnqueue({ type: 'start', tripId: id, payload: { odometer, fuelLevel: drvEl('f-fuel').value, occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route').value.trim() || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
   }, 'Enregistrer le départ');
   drvToggleStart();
 }
@@ -2467,6 +2487,7 @@ function drvArriveForm(tripId) {
   drvSheet('3 · Arrivée / retour — ' + (t.destination || 'mission'), `
     ${outside ? `<label>Date et heure d'arrivée à destination</label><input id="f-arrdt" type="datetime-local" value="${nowLocal}">` : ''}
     <label>Kilométrage au retour / à l'arrêt (km) — obligatoire (départ : ${esc(t.startMileage)})</label><input id="f-odo" type="number" inputmode="numeric" oninput="drvArriveCalc(${Number(t.startMileage)})">
+ ${drvFuelSel('f-fuel')}
     <div id="f-calc" class="drv-warn" style="background:#eef4fb;color:#163A5F;border-color:#c9daf0"></div>
     ${truck ? '<label>Nombre de voyages effectués</label><input id="f-voy" type="number" inputmode="numeric" value="1">' : ''}
     <label>Nom de la personne qui réceptionne</label><input id="f-recipient">
@@ -2477,10 +2498,11 @@ function drvArriveForm(tripId) {
     const odometer = drvNum('f-odo');
     if (odometer === undefined) throw new Error("Saisissez le kilométrage de retour / d'arrêt.");
     if (odometer < t.startMileage) throw new Error(`Le kilométrage doit être supérieur ou égal à ${t.startMileage}.`);
+    if (!drvEl('f-fuel').value) throw new Error("Indiquez le niveau de carburant à l'arrivée.");
     const g = await drvGeo();
     const sig = drvEl('f-sig') ? drvSigData() : undefined;
     const arr = drvEl('f-arrdt') && drvEl('f-arrdt').value ? new Date(drvEl('f-arrdt').value).toISOString() : new Date().toISOString();
-    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
+    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLevel: drvEl('f-fuel').value, tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
   }, 'Enregistrer l\'arrivée');
   if (drvEl('f-sig')) drvSigInit();
 }
@@ -2829,12 +2851,14 @@ function drvSheetHtml(sh, offline) {
   const lock = '<div style="font-size:12px;color:var(--muted)">🔒 Fiche envoyée : modification impossible.</div>';
   const motifOf = (t) => [({ MISSION: 'Mission', AUTRE: 'Autre', TRANSPORT: 'Transport' })[t.purposeType], t.cargo, t.purpose].filter(Boolean).join(' — ') || '—';
   const b1 = sh.trips.map((t) => `<div class="drv-row"><span>${hh(t.startTime)} · ${esc(t.plate)}</span><b>km ${fmt(t.startMileage)}</b></div>
+    <div class="drv-row"><span>Carburant au départ</span><b>${esc(drvFuelTxt(t.startFuelLevel))}</b></div>
     <div class="drv-row"><span>Destination(s)</span><b style="text-align:right">${esc(t.destination || (t.regions || []).join(', ') || '—')}</b></div>
     ${t.route ? `<div class="drv-row"><span>Trajet</span><b style="text-align:right">${esc(t.route)}</b></div>` : ''}
     <div class="drv-row"><span>Motif</span><b style="text-align:right">${esc(motifOf(t))}</b></div>
     ${t.preCondition === 'ANOMALIE' ? `<div class="drv-warn">Anomalie au départ : ${esc(t.preAnomalies)}</div>` : ''}`).join('<hr style="border:0;border-top:1px dashed #d8dee8">');
   const b2 = sh.fuel.map((f) => `<div class="drv-row"><span>${hh(f.time)} · km ${fmt(f.mileage)}${f.station ? ' · ' + esc(f.station) : ''}</span><b>${f.liters} L · ${fmt(f.cost)} GNF</b></div>`).join('');
   const b3 = sh.trips.filter((t) => t.status === 'COMPLETED').map((t) => `<div class="drv-row"><span>${drvOutside(t) ? 'Arrivée ' + drvDt(t.endTime) + ' · ' : ''}Retour / arrêt</span><b>km ${fmt(t.endMileage)}</b></div>
+    <div class="drv-row"><span>Carburant à l'arrivée</span><b>${esc(drvFuelTxt(t.endFuelLevel))}</b></div>
     <div class="drv-row"><span>Distance</span><b>${fmt(t.km)} km</b></div>${t.voyages != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.voyages)}</b></div>` : ''}`).join('');
   const maint = sh.maintenance.filter((m) => m.nature !== 'ANOMALIE'), anom = sh.maintenance.filter((m) => m.nature === 'ANOMALIE');
   const b4 = maint.map((m) => `<div class="drv-row"><span>${esc(DRV_NAT[m.nature] || m.nature)}${m.detail ? ' — ' + esc(m.detail) : ''}<br><small>${hh(m.date)} · km ${m.mileage != null ? fmt(m.mileage) : '—'}${m.nextServiceKm ? ' · prochaine vidange : ' + fmt(m.nextServiceKm) + ' km' : ''}</small></span><b>${m.cost != null ? fmt(m.cost) + ' GNF' : '—'}</b></div>`).join('');
@@ -2842,7 +2866,7 @@ function drvSheetHtml(sh, offline) {
   const btn = (txt, fn, cls) => (sent ? '' : `<button class="drv-btn ${cls || ''}" onclick="${fn}">${txt}</button>`);
   const blk = (title, body, action) => `<div class="drv-card"><h4>${title}</h4>${body || '<div style="font-size:13px;color:var(--muted)">Rien de saisi.</div>'}${action || ''}</div>`;
   const canStart = v && !act && !v.immobilized;
-  return `<div class="drv-card"><h4>📋 Fiche de bord — ${esc(sh.day)} ${esc(sh.date)}</h4>
+  return `<div class="drv-card"><h4>📋 Fiche de bord — ${esc(sh.day)} ${esc(sh.date.split('-').reverse().join('/'))}</h4>
       <div class="drv-row"><span>Chauffeur</span><b>${esc(me.driver.name)}</b></div>
       <div class="drv-row"><span>Véhicule</span><b>${esc(v ? v.plate : '—')}</b></div>
       <div class="drv-row"><span>Statut</span><b>${sent ? '<span class="badge ok">Envoyée ' + drvDt(sh.sentAt) + '</span>' : '<span class="badge warn">À envoyer</span>'}</b></div>

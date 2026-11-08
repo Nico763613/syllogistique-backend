@@ -176,3 +176,8 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS route TEXT
 
 --#
 ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS next_service_km INTEGER
+
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS start_fuel_level TEXT;
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS end_fuel_level TEXT;
