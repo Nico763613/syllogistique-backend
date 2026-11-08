@@ -101,6 +101,7 @@ export class DriverAppService {
         else if (op.type === 'fuel') r = await this.fuel(driver, userId, organizationId, op, p);
         else if (op.type === 'breakdown') r = await this.breakdown(driver, userId, op, p);
         else if (op.type === 'maintenance') r = await this.maintenance(driver, userId, op, p);
+        else if (op.type === 'expense') r = await this.expense(driver, userId, op, p);
         else r = await this.incident(driver, userId, op, p);
         results.push({ clientOpId: op.clientOpId, ok: true, duplicate: r.duplicate, result: r });
       } catch (e: any) {
@@ -368,6 +369,24 @@ export class DriverAppService {
   }
 
   // Maintenance effectuée : pneus, vidange (filtres, huile), freins… avec compteur, date et coût en GNF
+  private async expense(driver: { id: string; siteId: string }, userId: string, op: SyncOpDto, p: P) {
+    if (await this.prisma.driverExpense.findUnique({ where: { clientOpId: op.clientOpId } })) return { duplicate: true };
+    const trip = op.tripId ? await this.tripOf(driver.id, op.tripId) : null;
+    const vehicleId = trip?.vehicleId ?? (await this.prisma.vehicle.findFirst({ where: { assignedDriverId: driver.id, deletedAt: null } }))?.id;
+    const category = ['PEAGE', 'REPARATION', 'REPAS', 'HEBERGEMENT', 'PARKING', 'LAVAGE', 'AUTRE'].includes(p.category) ? (p.category as string) : 'AUTRE';
+    const amount = num(p.amount);
+    if (amount === undefined || !Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) throw new BadRequestException('Montant de la dépense invalide.');
+    const description = str(p.description, 500);
+    if (category === 'AUTRE' && !description) throw new BadRequestException('Précisez la nature de la dépense.');
+    const receipt = str(p.receiptImageUrl, 300);
+    if (receipt && !receipt.startsWith('/uploads/')) throw new BadRequestException('Justificatif invalide.');
+    const row = await this.prisma.driverExpense.create({ data: { driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), category, amount: Math.round(amount), description, receiptUrl: receipt ?? null, clientOpId: op.clientOpId } });
+    const labels: Record<string, string> = { PEAGE: 'Péage / taxes', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking', LAVAGE: 'Lavage', AUTRE: 'Autre' };
+    await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: driver.siteId, severity: 'INFO', entity: 'DriverExpense', entityId: row.id, title: 'Dépense à valider', message: `${labels[category]} : ${new Intl.NumberFormat('fr-FR').format(row.amount)} GNF${description ? ' — ' + description.slice(0, 120) : ''}.` });
+    await this.audit.log({ userId, action: 'CREATE', entity: 'DriverExpense', entityId: row.id, newValue: { category, amount: row.amount } });
+    return { expenseId: row.id };
+  }
+
   private async maintenance(driver: { id: string; siteId: string }, userId: string, op: SyncOpDto, p: P) {
     if (await this.prisma.driverMaintenance.findUnique({ where: { clientOpId: op.clientOpId } })) return { duplicate: true };
     const trip = op.tripId ? await this.tripOf(driver.id, op.tripId) : null;

@@ -24,11 +24,12 @@ export class DriverSheetService {
     const next = new Date(+day + 86400000);
     const driver = await this.prisma.driver.findUnique({ where: { id: driverId } });
     if (!driver) throw new BadRequestException('Chauffeur introuvable.');
-    const [trips, fuel, maint, rep] = await Promise.all([
+    const [trips, fuel, maint, rep, expenses] = await Promise.all([
       this.prisma.trip.findMany({ where: { driverId, startTime: { gte: day, lt: next } }, include: { vehicle: { select: { registrationNumber: true, brand: true, model: true, internalNumber: true } } }, orderBy: { startTime: 'asc' } }),
       this.prisma.fuelTransaction.findMany({ where: { driverId, transactionDate: { gte: day, lt: next } }, include: { vehicle: { select: { registrationNumber: true } } }, orderBy: { transactionDate: 'asc' } }),
       this.prisma.driverMaintenance.findMany({ where: { driverId, date: { gte: day, lt: next } }, orderBy: { date: 'asc' } }),
       this.prisma.driverDailyReport.findUnique({ where: { driverId_reportDate: { driverId, reportDate: day } } }),
+      this.prisma.driverExpense.findMany({ where: { driverId, date: { gte: day, lt: next } }, orderBy: { date: 'asc' } }),
     ]);
     const km = trips.reduce((s, t) => s + n(t.distance), 0);
     const liters = fuel.reduce((s, f) => s + n(f.quantityLiters), 0);
@@ -46,6 +47,7 @@ export class DriverSheetService {
       })),
       fuel: fuel.map((f) => ({ time: f.transactionDate, plate: f.vehicle.registrationNumber, mileage: f.mileage, liters: n(f.quantityLiters), cost: n(f.totalCost), station: f.station, source: f.source, notes: f.observations })),
       maintenance: maint.map((m) => ({ id: m.id, date: m.date, nature: m.nature, detail: m.detail, mileage: m.mileage, cost: m.cost, nextServiceKm: m.nextServiceKm, observations: m.observations })),
+      expenses: expenses.map((e) => ({ id: e.id, time: e.date, category: e.category, amount: e.amount, description: e.description, status: e.status, note: e.decisionNote })),
       totals: {
         km, liters: Math.round(liters * 100) / 100, fuelCost: fuel.reduce((s, f) => s + n(f.totalCost), 0), maintenanceCost: maint.reduce((s, m) => s + n(m.cost), 0),
         consumption: km >= 20 && liters > 0 ? Math.round((liters / km) * 1000) / 10 : null, voyages: trips.reduce((s, t) => s + n(t.tripsCount), 0),
@@ -76,6 +78,32 @@ export class DriverSheetService {
   }
 
   // Côté bureau : fiches du jour (envoyées ou en cours) de tous les chauffeurs du site
+  // Dépenses déclarées par les chauffeurs : liste et décision du bureau
+  async listExpenses(siteId: string | undefined, status?: string) {
+    const where: any = { ...(status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status) ? { status } : {}) };
+    if (siteId) { const ds = await this.prisma.driver.findMany({ where: { siteId }, select: { id: true } }); where.driverId = { in: ds.map((d) => d.id) }; }
+    const rows = await this.prisma.driverExpense.findMany({ where, orderBy: { date: 'desc' }, take: 200 });
+    const drivers = await this.prisma.driver.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.driverId))] } }, select: { id: true, firstName: true, lastName: true } });
+    const vehicles = await this.prisma.vehicle.findMany({ where: { id: { in: rows.map((r) => r.vehicleId).filter((x): x is string => !!x) } }, select: { id: true, registrationNumber: true } });
+    return rows.map((r) => {
+      const d = drivers.find((x) => x.id === r.driverId), v = vehicles.find((x) => x.id === r.vehicleId);
+      return { id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
+    });
+  }
+
+  async decideExpense(id: string, decision: string, note: string | undefined, actorId: string) {
+    const e = await this.prisma.driverExpense.findUnique({ where: { id } });
+    if (!e) throw new BadRequestException('Dépense introuvable.');
+    if (e.status !== 'PENDING') throw new BadRequestException('Cette dépense a déjà été traitée.');
+    if (decision === 'REJECTED' && !note?.trim()) throw new BadRequestException('Indiquez le motif du refus.');
+    const updated = await this.prisma.driverExpense.update({ where: { id }, data: { status: decision, decidedBy: actorId, decidedAt: new Date(), decisionNote: note?.trim() || null } });
+    if (decision === 'APPROVED') {
+      await this.prisma.expense.create({ data: { vehicleId: e.vehicleId ?? undefined, category: 'OTHER', amount: e.amount, expenseDate: e.date, description: `Dépense chauffeur (${e.category})${e.description ? ' — ' + e.description : ''}` } });
+    }
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'DriverExpense', entityId: id, newValue: { status: decision, note } });
+    return updated;
+  }
+
   // Tableau de bord bureau : un coup d'oeil sur chaque chauffeur du jour
   async board(siteId: string | undefined, date?: string) {
     const day = dayStart(date);

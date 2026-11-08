@@ -185,3 +185,11 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS end_fuel_level TEXT;
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS start_fuel_liters DOUBLE PRECISION;
 --#
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS end_fuel_liters DOUBLE PRECISION;
+--#
+CREATE TABLE IF NOT EXISTS driver_expenses (id text PRIMARY KEY, driver_id text NOT NULL, vehicle_id text, trip_id text, date timestamp(3) NOT NULL, category text NOT NULL, amount integer NOT NULL, description text, receipt_url text, status text NOT NULL DEFAULT 'PENDING', decided_by text, decided_at timestamp(3), decision_note text, client_op_id text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS driver_expenses_client_op_id_key ON driver_expenses (client_op_id);
+--#
+CREATE INDEX IF NOT EXISTS driver_expenses_driver_id_date_idx ON driver_expenses (driver_id, date);
+--#
+CREATE INDEX IF NOT EXISTS driver_expenses_status_idx ON driver_expenses (status);

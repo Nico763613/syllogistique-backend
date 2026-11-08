@@ -21,7 +21,7 @@ export class ActivateDeviceDto {
   @IsOptional() @IsString() @MaxLength(120) os?: string;
 }
 
-export const OP_TYPES = ['start', 'arrive', 'fuel', 'breakdown', 'incident', 'maintenance'] as const;
+export const OP_TYPES = ['start', 'arrive', 'fuel', 'breakdown', 'incident', 'maintenance', 'expense'] as const;
 export type OpType = (typeof OP_TYPES)[number];
 
 export class SyncOpDto {
@@ -51,6 +51,11 @@ export class SendSheetDto {
 export class TransferDeviceDto {
   @IsString() driverId: string;
   @IsOptional() @IsIn(['MALADIE', 'CONGE', 'AUTRE']) reason?: string;
+}
+
+export class ExpenseDecisionDto {
+  @IsIn(['APPROVED', 'REJECTED']) decision: string;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 
 export class TakeoverDto {
