@@ -176,6 +176,30 @@ export class DriverSheetService {
     return { id: t.id, reference: t.reference, status: t.status, driver: `${t.driver.firstName} ${t.driver.lastName}`, vehicle: t.vehicle.registrationNumber, events: ev };
   }
 
+  // Actualisation automatique du bureau : requête très légère, interrogée toutes les 30 s seulement quand l'écran est visible
+  async changes(siteId: string | undefined, since?: string) {
+    const now = new Date();
+    const d = since && !Number.isNaN(+new Date(since)) ? new Date(since) : null;
+    const sf = siteId ? { siteId } : {};
+    const ids = siteId ? (await this.prisma.driver.findMany({ where: { siteId }, select: { id: true } })).map((x) => x.id) : null;
+    const byDriver = ids ? { driverId: { in: ids } } : {};
+    const [pending, unread] = await Promise.all([
+      this.prisma.driverExpense.count({ where: { status: 'PENDING', ...byDriver } }),
+      this.prisma.notification.count({ where: { isRead: false, ...sf } }),
+    ]);
+    if (!d) return { now, changed: false, pendingExpenses: pending, unreadAlerts: unread };
+    const [t, f, m, e, r, dt, nt] = await Promise.all([
+      this.prisma.trip.count({ where: { ...sf, updatedAt: { gt: d } } }),
+      this.prisma.fuelTransaction.count({ where: { ...sf, createdAt: { gt: d } } }),
+      this.prisma.driverMaintenance.count({ where: { ...byDriver, createdAt: { gt: d } } }),
+      this.prisma.driverExpense.count({ where: { ...byDriver, OR: [{ createdAt: { gt: d } }, { decidedAt: { gt: d } }] } }),
+      this.prisma.driverDailyReport.count({ where: { ...byDriver, OR: [{ sentAt: { gt: d } }, { processedAt: { gt: d } }] } }),
+      this.prisma.vehicleDowntime.count({ where: { ...sf, OR: [{ startedAt: { gt: d } }, { endedAt: { gt: d } }] } }),
+      this.prisma.notification.count({ where: { ...sf, createdAt: { gt: d } } }),
+    ]);
+    return { now, changed: t + f + m + e + r + dt + nt > 0, pendingExpenses: pending, unreadAlerts: unread };
+  }
+
   // Tableau de bord bureau : un coup d'oeil sur chaque chauffeur du jour
   async board(siteId: string | undefined, date?: string) {
     const day = dayStart(date);
