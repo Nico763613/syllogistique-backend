@@ -120,18 +120,18 @@ export class ReportsService {
     return { monday, saturday };
   }
 
-  async dailyReport(siteId: string, date?: string) {
+  async dailyReport(siteId: string, date?: string, kind: 'SERVICE_VEHICLE' | 'TRUCK' = 'SERVICE_VEHICLE') {
     if (!siteId) throw new BadRequestException('Le site (siteId) est obligatoire.');
     const day = date || new Date().toISOString().slice(0, 10);
     const { start, end } = this.dayBounds(day);
     const { monday, saturday } = this.workWeek(start);
     const weekEnd = end < saturday ? end : saturday;
 
-    const [site, vehicles, trips, fuel, weekFuel, movements, items, attendance] = await Promise.all([
+    const [site, vehicles, trips, fuel, weekFuel, attendance] = await Promise.all([
       this.prisma.site.findUnique({ where: { id: siteId }, include: { organization: { select: { name: true } } } }),
-      this.prisma.vehicle.findMany({ where: { siteId, deletedAt: null } }),
+      this.prisma.vehicle.findMany({ where: { siteId, deletedAt: null, vehicleType: kind } }),
       this.prisma.trip.findMany({
-        where: { siteId, tripDate: { gte: start, lt: end } },
+        where: { siteId, tripDate: { gte: start, lt: end }, vehicle: { vehicleType: kind } },
         include: {
           vehicle: { select: { internalNumber: true, registrationNumber: true, brand: true, model: true, vehicleType: true, referenceConsumption: true, registrationType: true, itExpiryDate: true } },
           driver: { select: { firstName: true, lastName: true, licenseNumber: true, phone: true } },
@@ -139,17 +139,11 @@ export class ReportsService {
         orderBy: { startTime: 'asc' },
       }),
       this.prisma.fuelTransaction.findMany({
-        where: { siteId, transactionDate: { gte: start, lt: end } },
+        where: { siteId, transactionDate: { gte: start, lt: end }, vehicle: { vehicleType: kind } },
         include: { vehicle: { select: { internalNumber: true, registrationNumber: true } } },
         orderBy: { transactionDate: 'asc' },
       }),
-      this.prisma.fuelTransaction.findMany({ where: { siteId, transactionDate: { gte: monday, lt: weekEnd } } }),
-      this.prisma.stockMovement.findMany({
-        where: { siteId, createdAt: { gte: start, lt: end } },
-        include: { item: { select: { name: true, unit: true } } },
-        orderBy: { createdAt: 'asc' },
-      }),
-      this.prisma.inventoryItem.findMany({ where: { siteId } }),
+      this.prisma.fuelTransaction.findMany({ where: { siteId, transactionDate: { gte: monday, lt: weekEnd }, vehicle: { vehicleType: kind } } }),
       this.prisma.driverAttendance.findMany({
         where: { siteId, date: { gte: start, lt: end } },
         include: { driver: { select: { firstName: true, lastName: true, licenseNumber: true } } },
@@ -157,8 +151,7 @@ export class ReportsService {
     ]);
     if (!site) throw new NotFoundException('Site introuvable.');
 
-    const count = (type: string, status?: string) =>
-      vehicles.filter((v) => v.vehicleType === type && (!status || v.status === status)).length;
+    const count = (status?: string) => vehicles.filter((v) => !status || v.status === status).length;
     const sum = (arr: any[], f: (x: any) => number) => arr.reduce((s, x) => s + f(x), 0);
 
     // Consommation du jour par véhicule
@@ -178,21 +171,14 @@ export class ReportsService {
       date: day,
       organization: site.organization?.name ?? 'SYLLOGISTIQUE',
       site: site.name,
+      kind,
+      kindLabel: kind === 'TRUCK' ? 'Camions' : 'Véhicules de service',
       fleet: {
-        trucks: {
-          total: count('TRUCK'),
-          available: count('TRUCK', 'AVAILABLE'),
-          onMission: count('TRUCK', 'ON_MISSION'),
-          maintenance: count('TRUCK', 'MAINTENANCE'),
-          immobilized: count('TRUCK', 'IMMOBILIZED') + count('TRUCK', 'OUT_OF_SERVICE'),
-        },
-        serviceVehicles: {
-          total: count('SERVICE_VEHICLE'),
-          available: count('SERVICE_VEHICLE', 'AVAILABLE'),
-          onMission: count('SERVICE_VEHICLE', 'ON_MISSION'),
-          maintenance: count('SERVICE_VEHICLE', 'MAINTENANCE'),
-          immobilized: count('SERVICE_VEHICLE', 'IMMOBILIZED') + count('SERVICE_VEHICLE', 'OUT_OF_SERVICE'),
-        },
+        total: count(),
+        available: count('AVAILABLE'),
+        onMission: count('ON_MISSION'),
+        maintenance: count('MAINTENANCE'),
+        immobilized: count('IMMOBILIZED') + count('OUT_OF_SERVICE'),
         unavailable: vehicles
           .filter((v) => ['MAINTENANCE', 'IMMOBILIZED', 'OUT_OF_SERVICE'].includes(v.status))
           .map((v) => ({ vehicle: v.internalNumber, registration: v.registrationNumber, status: v.status })),
@@ -207,7 +193,12 @@ export class ReportsService {
           const liters = sum(tf, (f) => Number(f.quantityLiters));
           const km = t.distance ?? 0;
           const ref = t.vehicle.referenceConsumption ? Number(t.vehicle.referenceConsumption) : null;
-          const consumption = km >= 20 && liters > 0 ? Math.round((liters / km) * 1000) / 10 : null;
+          // Réservoir : niveau déclaré au départ et à l'arrivée ; carburant utilisé = départ + pleins − arrivée
+          const tankStart = t.startFuelLiters ?? null;
+          const tankEnd = t.endFuelLiters ?? null;
+          const tankUsed = tankStart !== null && tankEnd !== null && tankStart + liters - tankEnd >= 0 ? Math.round((tankStart + liters - tankEnd) * 10) / 10 : null;
+          const usedLiters = tankUsed !== null && tankUsed > 0 ? tankUsed : liters;
+          const consumption = km >= 20 && usedLiters > 0 ? Math.round((usedLiters / km) * 1000) / 10 : null;
           return {
             vehicle: t.vehicle.internalNumber,
             plate: t.vehicle.registrationNumber,
@@ -228,6 +219,9 @@ export class ReportsService {
             fuelMileages: tf.map((f) => f.mileage),
             km,
             liters: Math.round(liters * 100) / 100,
+            tankStart,
+            tankEnd,
+            tankUsed,
             fuelCost: sum(tf, (f) => Number(f.totalCost)),
             consumption,
             referenceConsumption: ref,
@@ -250,20 +244,7 @@ export class ReportsService {
           cost: sum(weekFuel, (f) => Number(f.totalCost)),
         },
       },
-      stock: {
-        entries: movements.filter((m) => m.movementType === 'IN').length,
-        exits: movements.filter((m) => m.movementType === 'OUT').length,
-        movements: movements.map((m) => ({
-          type: m.movementType,
-          item: m.item.name,
-          quantity: Number(m.quantity),
-          unit: m.item.unit,
-          reason: m.reason ?? '',
-        })),
-        belowMinimum: items
-          .filter((i) => Number(i.currentQuantity) < Number(i.minimumQuantity))
-          .map((i) => ({ item: i.name, quantity: Number(i.currentQuantity), minimum: Number(i.minimumQuantity), unit: i.unit })),
-      },
+      drivers: { onDuty: new Set(trips.map((t) => t.driverId)).size },
       attendance: {
         counts: attendanceCount,
         absences: attendance
@@ -295,50 +276,41 @@ export class ReportsService {
     };
   }
 
-  // Texte prêt à coller/partager sur WhatsApp
+  // Texte du rapport (corps de l'e-mail envoyé à la hiérarchie)
   dailyReportText(r: Awaited<ReturnType<ReportsService['dailyReport']>>, issuer: { name: string; phone: string; service: string }) {
     const [y, m, d] = r.date.split('-');
     const n = (v: number) => Math.round(v).toLocaleString('fr-FR');
-    const t = r.fleet.trucks;
-    const sv = r.fleet.serviceVehicles;
+    const f = r.fleet;
+    const hh = (x: Date | null) => (x ? new Date(x).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
     const lines = [
-      `*${r.organization} — Rapport journalier*`,
-      `${r.site} • ${d}/${m}/${y}`,
+      `${r.organization} — Rapport du jour : ${r.kindLabel.toLowerCase()}`,
+      `${r.site} — ${d}/${m}/${y}`,
       '',
-      `🚛 *Camions* : ${t.available}/${t.total} disponibles, ${t.onMission} en mission, ${t.maintenance} en maintenance, ${t.immobilized} immobilisés`,
-      `🚙 *Véhicules de service* : ${sv.available}/${sv.total} disponibles, ${sv.onMission} en mission, ${sv.maintenance + sv.immobilized} indisponibles`,
-      `🛣️ *Missions* : ${r.trips.count} — ${n(r.trips.totalKm)} km${r.trips.totalVoyages ? ` — ${r.trips.totalVoyages} voyage(s)` : ''}`,
-      `⛽ *Carburant* : ${n(r.fuel.liters)} L — ${n(r.fuel.cost)} GNF`,
-      `   Cumul semaine (lun→ven) : ${n(r.fuel.week.liters)} L — ${n(r.fuel.week.cost)} GNF`,
-      `📦 *Stock* : ${r.stock.entries} entrée(s), ${r.stock.exits} sortie(s), ${r.stock.belowMinimum.length} article(s) sous le seuil`,
+      `${r.kindLabel} : ${f.available}/${f.total} disponibles, ${f.onMission} en mission, ${f.maintenance + f.immobilized} indisponibles`,
+      `Missions : ${r.trips.count} — ${n(r.trips.totalKm)} km${r.trips.totalVoyages ? ` — ${r.trips.totalVoyages} voyage(s)` : ''}`,
+      `Carburant (pleins) : ${n(r.fuel.liters)} L — ${n(r.fuel.cost)} GNF`,
+      `Cumul semaine (lun→ven) : ${n(r.fuel.week.liters)} L — ${n(r.fuel.week.cost)} GNF`,
+      `Chauffeurs en service : ${r.drivers.onDuty}`,
     ];
+    if (r.trips.list.length) lines.push('');
     for (const x of r.trips.list) {
-      const hh = (d: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
-      lines.push(`   - ${x.kind === 'TRUCK' ? '🚛' : '🚙'} ${x.plate}${x.plateIT ? ' (IT)' : ''} ${x.driver.split(' (')[0]} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' (' + x.cargo + ')' : ''}, ${hh(x.startTime)}→${hh(x.endTime)}, ${n(x.km)} km, ${x.liters} L${x.liters ? ' / ' + n(x.fuelCost) + ' GNF' : ''}${x.voyages ? ', ' + x.voyages + ' voyages' : ''}${x.maintenanceNeeded ? ' ⚠ maintenance : ' + x.maintenanceReason : ''}`);
+      const tank = x.tankStart !== null || x.tankEnd !== null ? `, réservoir ${x.tankStart ?? '?'} → ${x.tankEnd ?? '?'} L` : '';
+      lines.push(`- ${x.plate}${x.plateIT ? ' (IT)' : ''} ${x.driver.split(' (')[0]} : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' (' + x.cargo + ')' : ''}, ${hh(x.startTime)}→${hh(x.endTime)}, ${n(x.km)} km, pleins ${x.liters} L${x.liters ? ' / ' + n(x.fuelCost) + ' GNF' : ''}${tank}${x.maintenanceNeeded ? ' — maintenance à prévoir : ' + x.maintenanceReason : ''}`);
     }
-    const present = r.attendance.counts['PRESENT'] ?? 0;
-    lines.push(`👥 *Chauffeurs* : ${present} présent(s), ${r.attendance.absences.length} absent(s)/indisponible(s)`);
-    for (const a of r.attendance.absences) lines.push(`   - ${a.driver} (${a.status}${a.reason ? ' : ' + a.reason : ''})`);
+    if (r.attendance.absences.length) {
+      lines.push('', `Absents / indisponibles : ${r.attendance.absences.length}`);
+      for (const a of r.attendance.absences) lines.push(`- ${a.driver} (${a.status}${a.reason ? ' : ' + a.reason : ''})`);
+    }
     if (r.fleet.unavailable.length) {
-      lines.push('', '⚠️ *Indisponibles* : ' + r.fleet.unavailable.map((v) => `${v.vehicle} (${v.status})`).join(', '));
+      lines.push('', 'Véhicules indisponibles : ' + r.fleet.unavailable.map((v) => `${v.vehicle} (${v.status})`).join(', '));
     }
     lines.push('', `Établi par : ${issuer.name}${issuer.service ? ' — ' + issuer.service : ''}${issuer.phone ? ' — ' + issuer.phone : ''}`);
     return lines.join('\n');
   }
 
-  // Liens WhatsApp vers la hiérarchie : numéros dans le paramètre REPORT_WHATSAPP_NUMBERS
-  // (séparés par des virgules, format international). Sans numéro, WhatsApp laisse choisir le contact.
-  async whatsappLinks(organizationId: string, text: string) {
-    const setting = await this.prisma.setting.findUnique({
-      where: { organizationId_key: { organizationId, key: 'REPORT_WHATSAPP_NUMBERS' } },
-    });
-    const numbers = (setting?.value ?? '')
-      .split(',')
-      .map((x) => x.replace(/\D/g, ''))
-      .filter((x) => x.length >= 8);
-    const encoded = encodeURIComponent(text);
-    return numbers.length
-      ? numbers.map((num) => ({ number: num, url: `https://wa.me/${num}?text=${encoded}` }))
-      : [{ number: '', url: `https://wa.me/?text=${encoded}` }];
+  // E-mails habituels de la hiérarchie (paramètre REPORT_EMAIL_RECIPIENTS)
+  async hierarchyEmails(organizationId: string) {
+    const st = await this.prisma.setting.findUnique({ where: { organizationId_key: { organizationId, key: 'REPORT_EMAIL_RECIPIENTS' } } });
+    return st?.value ?? '';
   }
 }
