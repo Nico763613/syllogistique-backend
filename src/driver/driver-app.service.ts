@@ -398,7 +398,7 @@ export class DriverAppService {
     if (!receipt) throw new BadRequestException('La photo du reçu ou de la facture est obligatoire.');
     if (!receipt.startsWith('/uploads/')) throw new BadRequestException('Justificatif invalide.');
     const row = await this.prisma.driverExpense.create({ data: { insured: category === 'DEPANNAGE' && typeof p.insured === 'boolean' ? p.insured : undefined, driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), category, amount: Math.round(amount), description, receiptUrl: receipt ?? null, clientOpId: op.clientOpId } });
-    const labels: Record<string, string> = { PEAGE: 'Péages et taxes', AMENDE: 'Contravention / amende', DEPANNAGE: 'Dépannage d\'urgence', LAVAGE: 'Lavage', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking', LAVAGE: 'Lavage', AUTRE: 'Autre' };
+    const labels: Record<string, string> = { PEAGE: 'Péages et taxes', AMENDE: 'Contravention / amende', DEPANNAGE: 'Dépannage d\'urgence', LAVAGE: 'Lavage', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking', AUTRE: 'Autre' };
     await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: driver.siteId, severity: 'INFO', entity: 'DriverExpense', entityId: row.id, title: 'Dépense à valider', message: `${labels[category]} : ${new Intl.NumberFormat('fr-FR').format(row.amount)} GNF${description ? ' — ' + description.slice(0, 120) : ''}.` });
     await this.audit.log({ userId, action: 'CREATE', entity: 'DriverExpense', entityId: row.id, newValue: { category, amount: row.amount } });
     return { expenseId: row.id };
