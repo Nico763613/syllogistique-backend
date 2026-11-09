@@ -25,27 +25,28 @@ export class ReportsController {
     return this.reportsService.dashboard(siteId);
   }
 
-  // Rapport journalier (JSON + texte WhatsApp) — date au format AAAA-MM-JJ (aujourd'hui par défaut)
+  // Rapport du jour (véhicules de service par défaut ; ?kind=TRUCK pour les camions) — date AAAA-MM-JJ (aujourd'hui par défaut)
   @Get('daily')
-  async daily(@Query('siteId') siteId: string, @Query('date') date: string, @CurrentUser() actor: any) {
-    const report = await this.reportsService.dailyReport(siteId, date);
+  async daily(@Query('siteId') siteId: string, @Query('date') date: string, @Query('kind') kind: string, @CurrentUser() actor: any) {
+    const report = await this.reportsService.dailyReport(siteId, date, kind === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE');
     const issuer = await this.reportsService.issuer(actor.userId);
-    return { report, issuer, whatsappText: this.reportsService.dailyReportText(report, issuer) };
+    return { report, issuer, text: this.reportsService.dailyReportText(report, issuer) };
   }
 
   @Get('daily/export/pdf')
   async dailyPdf(
     @Query('siteId') siteId: string,
     @Query('date') date: string,
+    @Query('kind') kind: string,
     @CurrentUser() actor: any,
     @Res() res: Response,
   ) {
-    const report = await this.reportsService.dailyReport(siteId, date);
+    const report = await this.reportsService.dailyReport(siteId, date, kind === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE');
     const issuer = await this.reportsService.issuer(actor.userId);
     const buffer = await this.exportService.dailyReportPdf(report, issuer);
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="rapport_journalier_${report.date}.pdf"`,
+      'Content-Disposition': `attachment; filename="rapport_du_jour_${report.date}.pdf"`,
     });
     res.send(buffer);
   }
@@ -60,6 +61,10 @@ export class ReportsController {
     @Body('date') date: string,
     @CurrentUser() actor: any,
   ) {
+    if (!String(to ?? '').trim()) {
+      // Sans adresse saisie : e-mails habituels de la hiérarchie (paramètre REPORT_EMAIL_RECIPIENTS)
+      to = await this.reportsService.hierarchyEmails(actor.organizationId);
+    }
     const recipients = String(to ?? '')
       .split(/[,;\s]+/)
       .map((x) => x.trim())
@@ -67,27 +72,18 @@ export class ReportsController {
     if (recipients.length === 0 || recipients.length > 10 || !recipients.every((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))) {
       throw new BadRequestException('Adresse(s) e-mail invalide(s) (10 maximum, séparées par des virgules).');
     }
-    const report = await this.reportsService.dailyReport(siteId, date);
+    const report = await this.reportsService.dailyReport(siteId, date, 'SERVICE_VEHICLE');
     const issuer = await this.reportsService.issuer(actor.userId);
     const buffer = await this.exportService.dailyReportPdf(report, issuer);
     const result = await this.messaging.sendEmailWithAttachment({
       to: recipients.join(', '),
-      subject: `${report.organization} — Rapport journalier du ${report.date} (${report.site})`,
-      text: `Bonjour,\n\nVeuillez trouver ci-joint le rapport journalier du ${report.date}.\n\n${this.reportsService.dailyReportText(report, issuer)}\n\nCordialement,\n${issuer.name}`,
-      filename: `rapport_journalier_${report.date}.pdf`,
+      subject: `${report.organization} — Rapport du jour (${report.kindLabel.toLowerCase()}) du ${report.date} — ${report.site}`,
+      text: `Bonjour,\n\nVeuillez trouver ci-joint le rapport du jour (${report.kindLabel.toLowerCase()}) du ${report.date}.\n\n${this.reportsService.dailyReportText(report, issuer)}\n\nCordialement,\n${issuer.name}`,
+      filename: `rapport_du_jour_${report.date}.pdf`,
       buffer,
       contentType: 'application/pdf',
     });
     return { ...result, recipients };
-  }
-
-  // Liens WhatsApp (hiérarchie : paramètre REPORT_WHATSAPP_NUMBERS) avec le texte du rapport
-  @Get('daily/whatsapp')
-  async dailyWhatsapp(@Query('siteId') siteId: string, @Query('date') date: string, @CurrentUser() actor: any) {
-    const report = await this.reportsService.dailyReport(siteId, date);
-    const issuer = await this.reportsService.issuer(actor.userId);
-    const text = this.reportsService.dailyReportText(report, issuer);
-    return { text, links: await this.reportsService.whatsappLinks(actor.organizationId, text) };
   }
 
   @Get('period')
