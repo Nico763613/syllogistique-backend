@@ -1054,6 +1054,25 @@ async function renderVehicles(kind) {
   } catch (e) {}
   window._vehicles = list;
   const canTarget = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  let drvList = []; if (kind === 'TRUCK') { try { drvList = await api('/drivers?siteId=' + state.siteId); } catch (e) {} }
+  const insBadge = (i) => !i || i.status === 'NONE' ? '<span class="badge bad">Aucune assurance</span>'
+    : i.status === 'EXPIRED' ? `<span class="badge bad">Non valide — expirée le ${new Date(i.expiryDate).toLocaleDateString('fr-FR')}</span>`
+    : i.status === 'EXPIRING' ? `<span class="badge warn">⚠ Expire dans ${i.daysLeft} j (${new Date(i.expiryDate).toLocaleDateString('fr-FR')})</span>`
+    : `<span class="badge ok">Valide${i.expiryDate ? ' → ' + new Date(i.expiryDate).toLocaleDateString('fr-FR') : ''}</span>`;
+  const insAlerts = kind === 'TRUCK' ? list.filter(v => v.insurance && (v.insurance.status === 'EXPIRING' || v.insurance.status === 'EXPIRED')) : [];
+  const truckRows = list.map(v => `
+    <tr>
+      <td><b>${esc(v.internalNumber)}</b></td>
+      <td>${esc(v.registrationNumber)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : ''}</td>
+      <td>${esc([v.brand, v.model].filter(Boolean).join(' ') || '—')}</td>
+      <td>${v.wheels != null ? esc(v.wheels) : '—'}</td>
+      <td>${esc(v.capacity || '—')}</td>
+      <td>${v.assignedDriver ? `<b>${esc(v.assignedDriver.lastName)}</b> ${esc(v.assignedDriver.firstName)}<br><small>${esc(v.assignedDriver.phone || '—')} · permis ${esc(v.assignedDriver.licenseNumber || '—')}</small>` : '—'}</td>
+      <td>${insBadge(v.insurance)}</td>
+      <td class="mono">${fmt(v.currentMileage)} km</td>
+      <td>${statusBadge(v.status)}</td>
+      <td><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button></td>
+    </tr>`).join('') || `<tr><td colspan="10" class="empty">Aucun camion enregistré.</td></tr>`;
   const rows = list.map(v => `
     <tr>
       <td><b>${esc(v.internalNumber)}</b></td>
@@ -1075,6 +1094,12 @@ async function renderVehicles(kind) {
         <div><label>Marque / Modèle</label><input id="v-brand" placeholder="Toyota Hilux" /></div>
         <div><label>Immatriculation</label><select id="v-regtype"><option value="NORMALE">Normale</option><option value="IT">IT (Immatriculation Temporaire)</option></select></div>
         <div><label>Fin de validité plaque IT</label><input id="v-itexp" type="date" /></div>
+        ${kind === 'TRUCK' ? `
+        <div><label>Nombre de roues</label><input id="v-wheels" type="number" min="0" inputmode="numeric" placeholder="6, 10, 12…" /></div>
+        <div><label>Capacité (tonnes ou m³)</label><input id="v-cap" placeholder="Ex. 30 t" /></div>
+        <div><label>Chauffeur affecté</label><select id="v-driver"><option value="">— Aucun —</option>${drvList.map(d => `<option value="${esc(d.id)}">${esc(d.lastName + ' ' + d.firstName)}${d.activity === 'SERVICE_VEHICLE' ? ' (véhicule de service)' : ''}</option>`).join('')}</select></div>
+        <div><label>Assurance — N° de police</label><input id="v-insref" /></div>
+        <div><label>Assurance — date d'expiration</label><input id="v-insexp" type="date" /></div>` : ''}
       </div>
       <button class="btn gold" onclick="createVehicle()">Enregistrer</button>
       <div id="v-msg"></div>
@@ -1083,7 +1108,9 @@ async function renderVehicles(kind) {
       <h3>${kind === 'TRUCK' ? 'Camions' : kind === 'SERVICE_VEHICLE' ? 'Véhicules de service' : 'Parc'} (${list.length}${kind ? '' : ' / ' + fleetTarget + ' prévus'})
         ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})">✏️ Objectif</button>` : ''}</h3>
       ${!kind && list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
-      <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+      ${insAlerts.length ? `<div class="msg err" style="margin-bottom:10px">🛡 Assurance à renouveler : ${insAlerts.map(v => esc(v.internalNumber) + (v.insurance.status === 'EXPIRED' ? ' (expirée)' : ' (dans ' + v.insurance.daysLeft + ' j)')).join(', ')}</div>` : ''}
+      ${kind === 'TRUCK' ? `<table><thead><tr><th>N° interne</th><th>Plaque</th><th>Marque / modèle</th><th>Roues</th><th>Capacité</th><th>Chauffeur</th><th>Assurance</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${truckRows}</tbody></table>`
+      : `<table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}
     </div>
     <div class="panel">
       <h3>🧭 Missions et fiches de bord</h3>
@@ -1150,13 +1177,13 @@ async function startTrip() {
       tripDate: now.slice(0, 10), startTime: now, startMileage: Number(document.getElementById('tr-km').value || 0),
       destination: document.getElementById('tr-dest').value.trim() || undefined, purpose: document.getElementById('tr-purpose').value.trim() || undefined,
     } });
-    renderVehicles();
+    renderView(state.view);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function closeTrip(id) {
   const km = prompt('Kilométrage au retour :');
   if (km === null || km === '') return;
-  try { await api('/trips/' + id + '/close', { method: 'PATCH', body: { endTime: new Date().toISOString(), endMileage: Number(km) } }); renderVehicles(); } catch (e) { alert(e.message); }
+  try { await api('/trips/' + id + '/close', { method: 'PATCH', body: { endTime: new Date().toISOString(), endMileage: Number(km) } }); renderView(state.view); } catch (e) { alert(e.message); }
 }
 async function tripPdf(id) {
   try {
@@ -1190,13 +1217,13 @@ async function addVehicleDoc() {
   try {
     const exp = document.getElementById('dc-exp').value;
     await api('/documents', { method: 'POST', body: { vehicleId: document.getElementById('dc-vehicle').value, type: document.getElementById('dc-type').value, fileUrl: document.getElementById('dc-ref').value.trim() || '—', ...(exp ? { expiryDate: exp } : {}) } });
-    renderVehicles();
+    renderView(state.view);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function editFleetTarget(current) {
   const v = prompt('Nombre de véhicules prévus dans le parc :', current);
   if (v === null || !(Number(v) > 0)) return;
-  try { await api('/settings/FLEET_TARGET', { method: 'PUT', body: { value: String(Math.round(Number(v))) } }); renderVehicles(); } catch (e) { alert(e.message); }
+  try { await api('/settings/FLEET_TARGET', { method: 'PUT', body: { value: String(Math.round(Number(v))) } }); renderView(state.view); } catch (e) { alert(e.message); }
 }
 async function loadDowntimes() {
   const box = document.getElementById('dt-list');
@@ -1214,7 +1241,7 @@ async function reportDowntime() {
   try {
     const cost = document.getElementById('dt-cost').value;
     await api('/downtimes', { method: 'POST', body: { vehicleId: document.getElementById('dt-vehicle').value, category: document.getElementById('dt-cat').value, reason: document.getElementById('dt-reason').value.trim(), ...(cost ? { estimatedCost: Number(cost) } : {}) } });
-    renderVehicles();
+    renderView(state.view);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function resolveDowntime(id) {
@@ -1223,7 +1250,7 @@ async function resolveDowntime(id) {
   const cost = prompt('Coût réel en GNF (facultatif) :');
   try {
     await api('/downtimes/' + id + '/resolve', { method: 'POST', body: { ...(note ? { resolutionNote: note } : {}), ...(cost ? { actualCost: Number(cost) } : {}) } });
-    renderVehicles();
+    renderView(state.view);
   } catch (e) { alert(e.message); }
 }
 function statusBadge(s) {
@@ -1234,8 +1261,12 @@ function statusBadge(s) {
 async function createVehicle() {
   const msg = document.getElementById('v-msg');
   try {
-    await api('/vehicles', { method: 'POST', body: {
+    const g = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
+    const created = await api('/vehicles', { method: 'POST', body: {
       siteId: state.siteId,
+      ...(g('v-wheels') ? { wheels: Math.round(Number(g('v-wheels'))) } : {}),
+      ...(g('v-cap') ? { capacity: g('v-cap') } : {}),
+      ...(g('v-driver') ? { assignedDriverId: g('v-driver') } : {}),
       vehicleType: document.getElementById('v-type').value,
       internalNumber: document.getElementById('v-internal').value,
       registrationNumber: document.getElementById('v-plate').value,
@@ -1243,8 +1274,12 @@ async function createVehicle() {
       registrationType: document.getElementById('v-regtype').value,
       ...(document.getElementById('v-regtype').value === 'IT' && document.getElementById('v-itexp').value ? { itExpiryDate: document.getElementById('v-itexp').value } : {}),
     }});
+    // L'assurance est enregistrée une seule fois, comme document du véhicule
+    if (g('v-insexp') || g('v-insref')) {
+      await api('/documents', { method: 'POST', body: { vehicleId: created.id, type: 'ASSURANCE', fileUrl: g('v-insref') || '—', ...(g('v-insexp') ? { expiryDate: g('v-insexp') } : {}) } });
+    }
     msg.innerHTML = '<div class="msg ok">Véhicule ajouté.</div>';
-    renderVehicles();
+    renderVehicles(document.getElementById('v-type') && document.getElementById('v-type').disabled ? document.getElementById('v-type').value : undefined);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
@@ -1284,10 +1319,11 @@ async function editVehicle(id) {
     { key: 'registrationNumber', label: 'Plaque', value: v.registrationNumber },
     { key: 'brand', label: 'Marque', value: v.brand }, { key: 'model', label: 'Modèle', value: v.model },
     { key: 'year', label: 'Année', type: 'number', value: v.year },
+    { key: 'wheels', label: 'Nombre de roues', type: 'number', value: v.wheels }, { key: 'capacity', label: 'Capacité', value: v.capacity },
     { key: 'status', label: 'Statut', value: v.status, options: [['AVAILABLE', 'Disponible'], ['ON_MISSION', 'En mission'], ['MAINTENANCE', 'Maintenance'], ['IMMOBILIZED', 'Immobilisé'], ['OUT_OF_SERVICE', 'Hors service']] },
     { key: 'assignedDriverId', label: 'Chauffeur affecté', value: v.assignedDriverId || '', options: [['', '— inchangé / aucun —']].concat(drv.map(d => [d.id, d.firstName + ' ' + d.lastName])) },
     { key: 'observations', label: 'Observations', value: v.observations },
-  ], async (d) => { await api('/vehicles/' + id, { method: 'PATCH', body: d }); renderVehicles(); });
+  ], async (d) => { await api('/vehicles/' + id, { method: 'PATCH', body: d }); renderView(state.view); });
 }
 function editDriver(id) {
   const d0 = (window._drivers || []).find(x => x.id === id); if (!d0) return;

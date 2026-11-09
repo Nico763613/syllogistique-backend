@@ -19,16 +19,35 @@ export class VehiclesService {
     return vehicle;
   }
 
-  findAll(params: { siteId?: string; vehicleType?: VehicleType; status?: string }) {
-    return this.prisma.vehicle.findMany({
+  async findAll(params: { siteId?: string; vehicleType?: VehicleType; status?: string }) {
+    const rows = await this.prisma.vehicle.findMany({
       where: {
         deletedAt: null,
         ...(params.siteId ? { siteId: params.siteId } : {}),
         ...(params.vehicleType ? { vehicleType: params.vehicleType } : {}),
         ...(params.status ? { status: params.status as any } : {}),
       },
-      include: { assignedDriver: { select: { id: true, firstName: true, lastName: true } } },
+      include: {
+        assignedDriver: { select: { id: true, firstName: true, lastName: true, phone: true, licenseNumber: true } },
+        documents: { where: { type: 'ASSURANCE' }, select: { id: true, expiryDate: true, fileUrl: true } },
+      },
       orderBy: { internalNumber: 'asc' },
+    });
+    // Assurance : une seule source (les documents du véhicule), reprise ici automatiquement
+    const now = Date.now();
+    return rows.map(({ documents, ...v }) => {
+      const dated = documents.filter((d) => d.expiryDate).sort((a, b) => +(b.expiryDate as Date) - +(a.expiryDate as Date));
+      const last = dated[0] ?? documents[0];
+      let status: 'NONE' | 'VALID' | 'EXPIRING' | 'EXPIRED' = 'NONE';
+      let daysLeft: number | null = null;
+      if (last) {
+        if (!last.expiryDate) status = 'VALID';
+        else {
+          daysLeft = Math.ceil((+last.expiryDate - now) / 86400000);
+          status = daysLeft < 0 ? 'EXPIRED' : daysLeft <= 7 ? 'EXPIRING' : 'VALID';
+        }
+      }
+      return { ...v, insurance: { status, expiryDate: last?.expiryDate ?? null, reference: last && last.fileUrl !== '—' ? last.fileUrl : null, daysLeft } };
     });
   }
 

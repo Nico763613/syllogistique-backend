@@ -238,3 +238,5 @@ ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS latitude DOUBLE 
 ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION
 --#
 ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS insured BOOLEAN
+--#
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS wheels INTEGER
