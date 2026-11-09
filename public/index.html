@@ -316,15 +316,15 @@
 <div id="driver-app">
   <div class="drv-head">
     <div style="display:flex;align-items:center;gap:10px"><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
-    <div style="display:flex; align-items:center; gap:8px;"><span class="drv-pill" id="drv-pill">…</span><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()">⎋</button></div>
+    <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil">👤</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
   <nav class="drv-tabs" id="drv-tabs">
     <button data-t="missions" onclick="drvTab('missions')"><span>📍</span>Missions</button>
-    <button data-t="sheet" onclick="drvTab('sheet')"><span>📋</span>Fiche</button>
-    <button data-t="declare" onclick="drvTab('declare')"><span>📝</span>Déclarer</button>
-    <button data-t="queue" onclick="drvTab('queue')"><span>🔄</span>Envois</button>
-    <button data-t="profile" onclick="drvTab('profile')"><span>👤</span>Profil</button>
+    <button data-t="fuel" onclick="drvTab('fuel')"><span>⛽</span>Carburant</button>
+    <button data-t="maint" onclick="drvTab('maint')"><span>🔧</span>Maintenance</button>
+    <button data-t="expenses" onclick="drvTab('expenses')"><span>💵</span>Dépenses</button>
+    <button data-t="sheet" onclick="drvTab('sheet')"><span>📋</span>Ma fiche</button>
   </nav>
 </div>
 
@@ -2304,8 +2304,10 @@ function drvRender() {
   const banner = (DRV.error ? `<div class="drv-warn">${esc(DRV.error)}</div>` : '') + (v && v.immobilized ? `<div class="drv-warn">🚫 Véhicule immobilisé${v.downtimeReason ? ' : ' + esc(v.downtimeReason) : ''}. Départ impossible tant que l'atelier n'a pas validé la levée de réserve.</div>` : '');
   if (DRV.tab === 'missions') root.innerHTML = banner + drvMissionsHtml(me);
   else if (DRV.tab === 'sheet') { root.innerHTML = banner + '<div class="drv-card drv-center">Chargement de la fiche…</div>'; drvSheetLoad(); }
-  else if (DRV.tab === 'declare') root.innerHTML = banner + drvDeclareHtml(me);
-  else if (DRV.tab === 'profile') root.innerHTML = drvVehicleHtml(me) + drvProfileHtml(me);
+  else if (DRV.tab === 'fuel') { root.innerHTML = banner + '<div class="drv-card drv-center">Chargement…</div>'; drvModuleLoad('fuel', banner); }
+  else if (DRV.tab === 'maint') { root.innerHTML = banner + '<div class="drv-card drv-center">Chargement…</div>'; drvModuleLoad('maint', banner); }
+  else if (DRV.tab === 'expenses') { root.innerHTML = banner + '<div class="drv-card drv-center">Chargement…</div>'; drvModuleLoad('expenses', banner); }
+  else if (DRV.tab === 'profile') root.innerHTML = drvProfileHtml(me);
   else { root.innerHTML = drvQueueHtml(); setTimeout(drvTxLoad, 0); }
 }
 
@@ -2324,7 +2326,6 @@ function drvMissionsHtml(me) {
     ${v ? `<div class="drv-row"><span>${v.type === 'TRUCK' ? 'Camion' : 'Véhicule'}</span><b>${esc(v.plate)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : ''} · ${fmt(v.mileage)} km</b></div>` : '<div class="drv-row"><span>Véhicule</span><b>Aucun véhicule affecté</b></div>'}
     ${v && !me.activeTrip && !v.immobilized ? `<button class="drv-btn gold" onclick="drvStartForm('')">➕ ${v.type === 'TRUCK' ? 'Commencer ma journée' : 'Nouvelle mission'}</button>` : ''}
     ${me.activeTrip ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(me.activeTrip.id)}')">🏁 Arrivée / retour</button>` : ''}
-    <div class="drv-actions" style="margin-top:8px"><button class="drv-btn ghost" onclick="drvFuelForm('${me.activeTrip ? esc(me.activeTrip.id) : ''}')">⛽ Carburant</button><button class="drv-btn ghost" onclick="drvTab('sheet')">📋 Ma fiche</button></div>
     <button class="drv-btn ghost" style="margin-top:8px" onclick="drvMissionHistory()">📜 Mes missions passées</button></div>`;
   const list = trips.map((t) => `
     <div class="drv-card">
@@ -2345,37 +2346,18 @@ function drvMissionsHtml(me) {
       ${t.tripsCount != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.tripsCount)}</b></div>` : ''}
       </details>
       ${t.status === 'PLANNED' ? `<button class="drv-btn gold" onclick="drvStartForm('${esc(t.id)}')">▶ Déclarer le départ</button>` : ''}
-      ${t.status === 'IN_PROGRESS' ? `<div class="drv-actions" style="margin-top:8px"><button class="drv-btn ghost" onclick="drvBreakdownForm('${esc(t.id)}')">🛠 Panne</button><button class="drv-btn ghost" onclick="drvIncidentForm('${esc(t.id)}')">⚠ Incident</button></div>` : ''}
+      ${t.status === 'IN_PROGRESS' ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(t.id)}')">🏁 Arrivée / retour</button>` : ''}
     </div>`).join('');
   return id + (list || '<div class="drv-card drv-center">Aucune mission pour le moment.<button class="drv-btn ghost" onclick="drvLoad()">Actualiser</button></div>');
-}
-function drvVehicleHtml(me) {
-  const v = me.vehicle;
-  if (!v) return `<div class="drv-card drv-center">Aucun véhicule affecté.</div>`;
-  return `<div class="drv-card"><h4>${esc(v.number)} — ${esc(v.plate)}</h4>
-    <div class="drv-row"><span>Modèle</span><b>${esc(v.label || '—')}</b></div>
-    <div class="drv-row"><span>État</span><b>${v.immobilized ? '🚫 Immobilisé' : v.status === 'ON_MISSION' ? 'En mission' : 'Disponible'}</b></div>
-    <div class="drv-row"><span>Compteur</span><b>${fmt(v.mileage)} km</b></div>
-    <div class="drv-row"><span>Capacité</span><b>${esc(v.capacity || '—')}</b></div>
-    ${v.equipment ? `<div class="drv-row"><span>Équipements / notes</span><b style="text-align:right">${esc(v.equipment)}</b></div>` : ''}</div>
-    <div class="drv-card"><h4>Chauffeur</h4><div class="drv-row"><span>Nom</span><b>${esc(me.driver.name)}</b></div><div class="drv-row"><span>Appareil</span><b>${esc(me.device.model || 'activé')}</b></div></div>`;
-}
-function drvDeclareHtml(me) {
-  const t = me.activeTrip;
-  const tid = t ? esc(t.id) : '';
-  return `<div class="drv-card"><h4>Déclarations</h4><div class="desc" style="font-size:12px;color:var(--muted)">${t ? 'Rattachées à la mission en cours : ' + esc(t.destination || '') : 'Aucune mission en cours : rattachées à votre véhicule.'}</div>
-    <button class="drv-btn" onclick="drvFuelForm('${tid}')">⛽ Déclarer un plein de carburant</button>
-    <button class="drv-btn" onclick="drvMaintForm('${tid}')">🔧 Maintenance / vidange effectuée</button>
-    <button class="drv-btn" onclick="drvExpenseForm('${tid}')">💵 Déclarer une dépense</button>
-    <button class="drv-btn red" onclick="drvBreakdownForm('${tid}')">🛠 Déclarer une panne</button>
-    <button class="drv-btn ghost" onclick="drvIncidentForm('${tid}')">⚠ Accident / contrôle de police / événement routier</button></div>`;
 }
 function drvQueueHtml() {
   const q = drvQueue();
   const label = { start: 'Départ', arrive: 'Arrêt', fuel: 'Carburant', breakdown: 'Panne', incident: 'Incident', maintenance: 'Maintenance / anomalie', expense: 'Dépense' };
   const rows = q.map((o) => `<div class="drv-row"><span>${esc(label[o.type])} · ${drvDt(o.createdAt)}</span><b>${o.rejected ? `<span class="badge bad">Refusé</span> <a href="#" onclick="drvDrop('${esc(o.clientOpId)}');return false;">supprimer</a>` : '<span class="badge warn">En attente</span>'}</b></div>${o.rejected ? `<div class="drv-warn" style="margin:4px 0">${esc(o.error)}</div>` : ''}`).join('');
-  return `<div class="drv-card"><h4>Envois vers le bureau</h4>${rows || '<div class="drv-center">Tout est synchronisé ✔</div>'}
-    <button class="drv-btn" onclick="drvSyncNow()">🔄 Synchroniser maintenant</button></div>
+  return `<div class="drv-card"><h4>🔄 Envois vers le bureau</h4>
+    <button class="drv-btn gold" style="font-size:18px;padding:16px" onclick="drvSyncNow()">🔄 Synchroniser maintenant</button>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 10px">Hors connexion, vos saisies restent sur le téléphone et partent dès le retour du réseau.</div>
+    ${rows || '<div class="drv-center">Tout est synchronisé ✔</div>'}</div>
     <div class="drv-card" id="drv-tx"><h4>📬 Suivi de mes transmissions</h4><div class="drv-center">Chargement…</div></div>`;
 }
 async function drvTxLoad() {
@@ -2402,13 +2384,17 @@ function drvLicenseHtml(me) {
 }
 function drvProfileHtml(me) {
   const v = me.vehicle;
+  const dispo = !v ? 'Sans véhicule' : v.immobilized ? '🚫 Immobilisé' : me.activeTrip || v.status === 'ON_MISSION' ? '🟢 En mission' : '✅ Disponible';
   return `<div class="drv-card"><h4>👤 Mon profil</h4>
     <div class="drv-row"><span>Nom</span><b>${esc(me.driver.name)}</b></div>
+    <div class="drv-row"><span>Rôle</span><b>${esc(drvKind(me))}</b></div>
+    <div class="drv-row"><span>Disponibilité</span><b>${dispo}</b></div>
+    <div class="drv-row"><span>Véhicule</span><b>${v ? esc(v.plate) + ' · ' + esc(v.label || '—') : 'Aucun'}</b></div>
+    ${v ? `<div class="drv-row"><span>Compteur</span><b>${fmt(v.mileage)} km</b></div>` : ''}
+    <div class="drv-row"><span>Appareil Android</span><b>${esc((me.device && me.device.model) || 'activé')}</b></div>
     <label>Téléphone</label><input id="p-phone" inputmode="tel" value="${esc(me.driver.phone || '')}">
-    <button class="drv-btn" onclick="drvSavePhone()">Enregistrer le téléphone</button><div id="p-msg1"></div>
-    ${drvLicenseHtml(me)}
-    <div class="drv-row" style="margin-top:10px"><span>Véhicule affecté</span><b>${v ? esc(v.plate) + ' · ' + esc(v.label || '') : 'Aucun'}</b></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:4px">Ces informations sont déjà enregistrées : vous ne les ressaisissez pas chaque jour.</div></div>
+    <button class="drv-btn" onclick="drvSavePhone()">Enregistrer le téléphone</button><div id="p-msg1"></div></div>
+    <div class="drv-card">${drvLicenseHtml(me)}</div>
     <div class="drv-card"><h4>🔁 Je remplace un collègue</h4>
     <div style="font-size:13px;color:var(--muted)">Si le chauffeur habituel est malade ou absent, prenez le véhicule : il passe sur votre compte et le gestionnaire est prévenu.</div>
     <button class="drv-btn ghost" onclick="drvTakeoverForm()">Choisir le véhicule à reprendre</button></div>
@@ -2533,6 +2519,18 @@ function drvToggleStart() {
   const an = drvEl('f-cond').value === 'ANOMALIE'; drvEl('f-anom-box').style.display = an ? 'block' : 'none';
   const m = drvEl('f-ptype'); if (m) drvEl('f-reg-box').style.display = m.value === 'MISSION' ? 'block' : 'none';
 }
+/* ---------- Géographie standardisée (listes à cocher) ---------- */
+const GEO_CONAKRY = ['Kaloum', 'Almamya', 'Boulbinet', 'Sans-Fil', 'Tombo', 'Coronthie', 'Dixinn', 'Dixinn-Port', 'Camayenne', 'Landréah', 'Minière', 'Taouyah', 'Hafia', 'Belle-Vue', 'Cameroun', 'Matam', 'Madina', 'Kobaya', 'Ratoma', 'Kipé', 'Nongo', 'Lambanyi', 'Hamdallaye', 'Bambeto', 'Cosa', 'Kaporo', 'Sonfonia', 'Koloma', 'Simbaya', 'Dar-es-Salam', 'Matoto', 'Gbessia', 'Dabompa', 'Enta', 'Yimbaya', 'Tombolia', 'Sangoyah', 'Coléah', 'Kagbélen', 'Sanoyah'];
+const GEO_INTERIEUR = { 'Boké': ['Boké', 'Boffa', 'Fria', 'Gaoual', 'Koundara', 'Kamsar'], 'Kindia': ['Kindia', 'Coyah', 'Dubréka', 'Forécariah', 'Télimélé'], 'Mamou': ['Mamou', 'Dalaba', 'Pita'], 'Labé': ['Labé', 'Koubia', 'Lélouma', 'Mali', 'Tougué'], 'Faranah': ['Faranah', 'Dabola', 'Dinguiraye', 'Kissidougou'], 'Kankan': ['Kankan', 'Kérouané', 'Kouroussa', 'Mandiana', 'Siguiri'], "N'Zérékoré": ["N'Zérékoré", 'Beyla', 'Guéckédou', 'Lola', 'Macenta', 'Yomou'] };
+const GEO_REGION_OF = {}; Object.entries(GEO_INTERIEUR).forEach(([r, l]) => l.forEach((c) => { GEO_REGION_OF[c] = r; }));
+const GEO_VILLES = Object.values(GEO_INTERIEUR).flat();
+// Liste déroulante à cases à cocher (une ou plusieurs valeurs)
+function drvMulti(id, title, items) {
+  return `<details class="msel" id="${id}" style="border:1px solid #D9E0E8;border-radius:10px;margin:6px 0;background:#fff"><summary style="padding:12px;font-size:16px;cursor:pointer;color:var(--text)">${esc(title)} <b class="msel-n" style="color:var(--navy)"></b></summary>
+    <div style="max-height:240px;overflow:auto;padding:4px 12px 10px">${items.map((x) => `<label style="display:flex;gap:10px;align-items:center;margin:6px 0;font-size:16px;color:var(--text)"><input type="checkbox" value="${esc(x)}" style="width:22px;height:22px" onchange="drvMultiUpd('${id}')"> ${esc(x)}</label>`).join('')}</div></details>`;
+}
+function drvMultiUpd(id) { const d = drvEl(id), n = d.querySelectorAll('input:checked').length; d.querySelector('.msel-n').textContent = n ? '(' + n + ' choisi' + (n > 1 ? 's' : '') + ')' : ''; }
+const drvMultiVal = (id) => [...drvEl(id).querySelectorAll('input:checked')].map((x) => x.value);
 const DRV_REGIONS = ['Conakry', 'Boké', 'Kindia', 'Mamou', 'Labé', 'Faranah', 'Kankan', "N'Zérékoré"];
 const drvHM = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const drvAt = (hm) => { if (!hm) return new Date().toISOString(); const [h, m] = hm.split(':'); const d = new Date(); d.setHours(+h, +m, 0, 0); return (d > new Date() ? new Date() : d).toISOString(); };
@@ -2540,12 +2538,11 @@ const drvFuelSel = (id, label) => `<label>${label || 'Carburant dans le réservo
 const drvFuelTxt = (v) => (v == null ? '—' : fmt(v) + ' L');
 const drvPrice = () => Number((drvView() || {}).fuelPrice) || 12000;
 function drvFuelCalc() { const l = drvNum('f-liters'), b = drvEl('f-cost'); if (b && !b.dataset.manual) b.value = l > 0 ? Math.round(l * drvPrice()) : ''; }
-function drvFuelSrc() { drvEl('f-bon').style.display = drvEl('f-src').value === 'VOUCHER' ? 'block' : 'none'; }
-const drvSrc = (f) => ({ TANK: 'Pompe / dépôt', VOUCHER: 'Bon' }[f.source] || 'Station') + (f.station ? ' · ' + f.station : '') + (f.notes ? ' · ' + f.notes : '');
+const drvSrc = (f) => ({ TANK: 'Dépôt', VOUCHER: 'Bon' }[f.source] || 'Station') + (f.station && f.source !== 'TANK' ? ' · ' + f.station : '') + (f.notes ? ' · ' + f.notes : '');
 function drvStartForm(tripId) {
   const me = drvView(), v = me.vehicle, t = tripId ? drvTripOf(tripId) : null, truck = drvIsTruck(me);
   const id = tripId || drvUid();
-  const regs = `<label>Région(s) de destination — cochez si hors de Conakry</label>${DRV_REGIONS.map((r) => `<label style="display:inline-flex;gap:6px;align-items:center;margin:4px 12px 4px 0;font-size:15px;color:var(--text)"><input type="checkbox" class="f-reg" value="${esc(r)}" style="width:auto"> ${esc(r)}</label>`).join('')}`;
+  const regs = `<label>Destinations — cochez une ou plusieurs</label>${drvMulti('g-con', '📍 Conakry — quartiers', GEO_CONAKRY)}${drvMulti('g-int', '🛣 Hors Conakry — villes et préfectures', GEO_VILLES)}<label>Autre destination (facultatif)</label><input id="f-dest" placeholder="${truck ? 'Site minier de…' : 'Précisez si absente des listes'}" value="${esc(t ? t.destination || '' : '')}">`;
   const motif = truck
     ? `<label>Motif — transport de</label><select id="f-cargo"><option>Sable</option><option>Bauxite</option><option>Gravier</option><option value="Autre">Autre (à préciser)</option></select>`
     : `<label>Motif du déplacement</label><select id="f-ptype"><option value="MISSION">Mission</option><option value="AUTRE">Autre</option></select>`;
@@ -2554,7 +2551,6 @@ function drvStartForm(tripId) {
     <label>Heure de départ</label><input id="f-hm" type="time" value="${drvHM()}">
     <label>Kilométrage au départ (km) — obligatoire</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(v ? v.mileage : '')}">
     ${drvFuelSel('f-fuel')}
-    <label>Destination(s) — séparées par des virgules</label><input id="f-dest" value="${esc(t ? t.destination || '' : dget('lastDest', ''))}" placeholder="${truck ? 'Site minier de…' : 'Ex. Kindia, Mamou'}">
     <label>Trajet</label><input id="f-route" value="${esc(t && t.route ? t.route : '')}" placeholder="Ex. Conakry → Coyah → Kindia">
     ${regs}${motif}
     <label>Précisions sur le motif</label><input id="f-purpose" placeholder="${truck ? 'Matériau, client, chantier…' : 'Objet de la mission'}">
@@ -2565,11 +2561,11 @@ function drvStartForm(tripId) {
     if (drvNum('f-fuel') === undefined || drvNum('f-fuel') < 0) throw new Error('Indiquez les litres de carburant dans le réservoir au départ.');
     const cond = drvEl('f-cond').value, anom = drvEl('f-anom').value.trim();
     if (cond === 'ANOMALIE' && !anom) throw new Error("Décrivez l'anomalie constatée.");
-    const regions = [...document.querySelectorAll('.f-reg:checked')].map((x) => x.value);
+    const quartiers = drvMultiVal('g-con'), villes = drvMultiVal('g-int');
+    const regions = [...new Set([...(quartiers.length ? ['Conakry'] : []), ...villes.map((c) => GEO_REGION_OF[c]).filter(Boolean)])];
     const ptype = truck ? 'TRANSPORT' : drvEl('f-ptype').value;
-    const dest = drvEl('f-dest').value.trim();
-    if (!dest && !regions.length) throw new Error('Indiquez au moins une destination.');
-    dset('lastDest', dest);
+    const dest = [...quartiers, ...villes, drvFix(drvEl('f-dest').value)].filter(Boolean).join(', ');
+    if (!dest) throw new Error('Choisissez au moins une destination.');
     const g = await drvGeo();
     drvEnqueue({ type: 'start', tripId: id, payload: { odometer, fuelLiters: drvNum('f-fuel'), occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route').value.trim() || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
   }, 'Enregistrer le départ');
@@ -2626,21 +2622,35 @@ function drvSigData() {
   const x = s.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 300, 130); x.drawImage(c, 0, 0, 300, 130);
   return s.toDataURL('image/png');
 }
+const DRV_STATIONS = ['Shell', 'TotalEnergies', 'Star Oil', 'Tradex', 'Autre'];
+function drvFuelSrc() {
+  const src = drvEl('f-src').value;
+  drvEl('f-bon').style.display = src === 'VOUCHER' ? 'block' : 'none';
+  drvEl('f-stbox').style.display = src === 'STATION' ? 'block' : 'none';
+  drvFuelStOther();
+}
+function drvFuelStOther() { drvEl('f-stother').style.display = drvEl('f-src').value === 'STATION' && drvEl('f-st').value === 'Autre' ? 'block' : 'none'; }
 function drvFuelForm(tripId) {
   const me = drvView();
-  drvSheet('2 · Plein de carburant', `
-    <label>Kilométrage au moment du plein (km)</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
+  drvSheet('⛽ Plein de carburant', `
+    <label>Kilométrage actuel (km)</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
     <label>Quantité (litres)</label><input id="f-liters" type="number" inputmode="decimal" step="0.01" oninput="drvFuelCalc()">
-    <label>Montant (GNF) — calculé à ${fmt(drvPrice())} GNF le litre ; corrigez-le s'il diffère du reçu</label><input id="f-cost" type="number" inputmode="numeric" oninput="this.dataset.manual='1'">
-    <label>Origine du carburant</label><select id="f-src" onchange="drvFuelSrc()"><option value="STATION">Station</option><option value="TANK">Pompe / dépôt de l'entreprise</option><option value="VOUCHER">Bon (remis par l'entreprise)</option></select>
+    <label>Montant total (GNF) — calculé à ${fmt(drvPrice())} GNF le litre, modifiable s'il diffère du reçu</label><input id="f-cost" type="number" inputmode="numeric" oninput="this.dataset.manual='1'">
+    <label>Origine du carburant</label><select id="f-src" onchange="drvFuelSrc()"><option value="STATION">Station</option><option value="TANK">Dépôt de l'entreprise</option><option value="VOUCHER">Bon (remis par l'entreprise)</option></select>
+    <div id="f-stbox"><label>Station</label><select id="f-st" onchange="drvFuelStOther()">${DRV_STATIONS.map((x) => `<option>${esc(x)}</option>`).join('')}</select>
+      <div id="f-stother" style="display:none"><label>Préciser la station</label><input id="f-stname" placeholder="Nom de la station"></div></div>
     <div id="f-bon" style="display:none"><label>Numéro du bon (facultatif)</label><input id="f-bonno"></div>
-    <label>Nom de la station ou du dépôt (facultatif)</label><input id="f-station">
-    ${drvPhotoField('📷 Photo du reçu (facultatif — les justificatifs sont à déposer au responsable)', false)}`, async () => {
+    ${drvPhotoField('📷 Photo du reçu ou du ticket de caisse — obligatoire', false)}`, async () => {
     const liters = drvNum('f-liters');
     if (!liters || liters <= 0) throw new Error('Saisissez les litres.');
+    const src = drvEl('f-src').value;
+    let station = src === 'STATION' ? drvEl('f-st').value : "Dépôt de l'entreprise";
+    if (src === 'STATION' && station === 'Autre') { station = drvFix(drvEl('f-stname').value); if (!station) throw new Error('Précisez le nom de la station.'); }
+    if (!DRV_PHOTOS.length) throw new Error('La photo du reçu est obligatoire.');
     const g = await drvGeo();
-    drvEnqueue({ type: 'fuel', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { liters, totalCost: drvNum('f-cost'), source: drvEl('f-src').value, voucherNo: drvEl('f-bonno').value.trim() || undefined, station: drvEl('f-station').value, odometer: drvNum('f-odo'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+    drvEnqueue({ type: 'fuel', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { liters, totalCost: drvNum('f-cost'), source: src, voucherNo: drvEl('f-bonno').value.trim() || undefined, station, odometer: drvNum('f-odo'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
   }, 'Enregistrer le plein');
+  drvFuelSrc();
 }
 function drvBreakdownForm(tripId) {
   drvSheet('🛠 Déclarer une panne', `
@@ -2936,41 +2946,48 @@ function drvMaintForm(tripId) {
   }, 'Enregistrer la maintenance');
 }
 const DRV_FAULTS = ['Plaquettes de frein', 'Freins', 'Pare-chocs', 'Pneumatiques / crevaison', 'Moteur / mécanique', 'Boîte de vitesses / transmission', 'Suspension / amortisseurs', 'Batterie / électricité', 'Phares / feux', 'Pare-brise / vitres', 'Rétroviseur', 'Fuite d\'huile ou de liquide', 'Climatisation', 'Accident', 'Autres'];
-const DRV_EXP = { PEAGE: 'Péage / taxes', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking', LAVAGE: 'Lavage', AUTRE: 'Autre' };
+const DRV_EXP = { PEAGE: 'Péages et taxes routières', AMENDE: 'Contravention / amende (police)', DEPANNAGE: "Dépannage d'urgence", LAVAGE: 'Lavage du véhicule', AUTRE: 'Autre', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking' };
+const DRV_EXP_FORM = ['PEAGE', 'AMENDE', 'DEPANNAGE', 'LAVAGE', 'AUTRE'];
 const DRV_EXP_ST = { PENDING: ['warn', 'En attente'], APPROVED: ['ok', 'Validée'], REJECTED: ['bad', 'Refusée'] };
 function drvExpenseForm(tripId) {
   drvSheet('💵 Déclarer une dépense', `
-    <label>Nature de la dépense</label><select id="e-cat">${Object.entries(DRV_EXP).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select>
+    <label>Nature de la dépense</label><select id="e-cat" onchange="drvEl('e-ins-box').style.display=this.value==='DEPANNAGE'?'block':'none'">${DRV_EXP_FORM.map((k) => `<option value="${k}">${esc(DRV_EXP[k])}</option>`).join('')}</select>
+    <div id="e-ins-box" style="display:none"><label>Dépannage couvert par la police d'assurance ?</label><select id="e-ins"><option value="">— Choisir —</option><option value="yes">Oui, couvert par l'assurance</option><option value="no">Non, à la charge de l'entreprise</option></select></div>
     <label>Montant (GNF)</label><input id="e-amount" type="number" inputmode="numeric">
-    <label>Précisions (obligatoire si « Autre »)</label><input id="e-desc" placeholder="Ex. péage Coyah, repas à Kindia…">
-    ${drvPhotoField('📷 Photo du reçu (facultatif — le reçu est à remettre au responsable)', false)}`, async () => {
+    <label>Précisions (obligatoire si « Autre »)</label><input id="e-desc" placeholder="Ex. péage Coyah, amende excès de vitesse, remorquage à Kindia…">
+    ${drvPhotoField('📷 Photo du reçu ou de la facture — obligatoire', false)}`, async () => {
     const amount = drvNum('e-amount'), cat = drvEl('e-cat').value, desc = drvFix(drvEl('e-desc').value);
     if (!amount || amount <= 0) throw new Error('Saisissez le montant de la dépense.');
     if (cat === 'AUTRE' && !desc) throw new Error('Précisez la nature de la dépense.');
+    if (cat === 'DEPANNAGE' && !drvEl('e-ins').value) throw new Error("Indiquez si le dépannage est couvert par l'assurance.");
+    if (!DRV_PHOTOS.length) throw new Error('La photo du reçu ou de la facture est obligatoire.');
     const g = await drvGeo();
-    drvEnqueue({ type: 'expense', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { category: cat, amount, description: desc || undefined, occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+    drvEnqueue({ type: 'expense', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { category: cat, amount, description: desc || undefined, insured: cat === 'DEPANNAGE' ? drvEl('e-ins').value === 'yes' : undefined, occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
   }, 'Enregistrer la dépense');
 }
+const DRV_SYMPTOMS = ['Voyant allumé', 'Bruit anormal', 'Fuite (huile, eau, carburant)', 'Fumée', 'Vibrations', 'Perte de puissance'];
+const DRV_ORGANS = ['Plaquettes de frein', 'Freins', 'Pneumatiques / crevaison', 'Moteur', 'Boîte de vitesses / transmission', 'Suspension / amortisseurs', 'Batterie / électricité', 'Phares / feux', 'Pare-brise / vitres', 'Pare-chocs / carrosserie', 'Rétroviseur', 'Climatisation', 'Accident', 'Autres'];
 function drvFaultForm(tripId) {
-  const tog = "const r=this.value;drvEl('x-box').style.display=r==='STOP'?'block':'none'";
-  const boxes = DRV_FAULTS.map((x) => `<label style="display:flex;gap:10px;align-items:center;margin:6px 0;font-size:16px;color:var(--text)"><input type="checkbox" class="x-fault" value="${esc(x)}" style="width:22px;height:22px"> ${esc(x)}</label>`).join('');
-  drvSheet('5 · Panne ou anomalie (facultatif)', `
-    <label>Nature — cochez une ou plusieurs</label>${boxes}
-    <label>Le véhicule peut-il rouler ?</label><select id="x-roll" onchange="${tog}"><option value="OK">Oui — simple anomalie à signaler</option><option value="STOP">Non — véhicule immobilisé</option></select>
-    <label>Description / précisions (obligatoire si « Autres » est coché)</label><textarea id="x-desc" rows="3" placeholder="Que se passe-t-il ? Voyants, bruit, crevaison, fuite…"></textarea>
-    <div id="x-box" style="display:none">${drvPhotoField('📷 Photos (jusqu’à 4)', true)}<div class="desc" style="font-size:12px;color:var(--muted);margin-top:8px">Le véhicule sera immobilisé et le gestionnaire de flotte alerté avec votre position GPS.</div></div>`, async () => {
-    const picked = [...document.querySelectorAll('.x-fault:checked')].map((x) => x.value), desc = drvFix(drvEl('x-desc').value, true), stop = drvEl('x-roll').value === 'STOP';
-    if (!picked.length) throw new Error('Cochez au moins une nature de panne ou d\'anomalie.');
+  const chk = (c, x) => `<label style="display:flex;gap:10px;align-items:center;margin:6px 0;font-size:16px;color:var(--text)"><input type="checkbox" class="${c}" value="${esc(x)}" style="width:22px;height:22px"> ${esc(x)}</label>`;
+  drvSheet('🛠 Signaler une panne ou une anomalie', `
+    <label>Niveau de gravité</label><select id="x-sev"><option value="LEGERE">🟡 Légère — je peux rouler</option><option value="MOYENNE">🟠 Moyenne — je peux rouler avec prudence</option><option value="GRAVE">🔴 Grave — véhicule immobilisé</option></select>
+    <label>Ce que je constate (cochez)</label>${DRV_SYMPTOMS.map((x) => chk('x-sym', x)).join('')}
+    <label>Élément concerné (cochez)</label>${DRV_ORGANS.map((x) => chk('x-fault', x)).join('')}
+    <label>Description / précisions (obligatoire si « Autres »)</label><textarea id="x-desc" rows="3" placeholder="Où, quand, depuis combien de temps…"></textarea>
+    ${drvPhotoField('📷 Photos justificatives (jusqu’à 4) — obligatoires si gravité moyenne ou grave', true)}
+    <div class="desc" style="font-size:12px;color:var(--muted);margin-top:8px">Votre position GPS est transmise immédiatement au gestionnaire de flotte.</div>`, async () => {
+    const sev = drvEl('x-sev').value, sym = [...document.querySelectorAll('.x-sym:checked')].map((x) => x.value), picked = [...document.querySelectorAll('.x-fault:checked')].map((x) => x.value), desc = drvFix(drvEl('x-desc').value, true);
+    if (!sym.length && !picked.length) throw new Error('Cochez au moins un symptôme ou un élément concerné.');
     if (picked.includes('Autres') && !desc) throw new Error('Précisez la panne ou l\'anomalie (champ « Description »).');
-    const accident = picked.includes('Accident'), type = picked.join(', ');
+    if (sev !== 'LEGERE' && !DRV_PHOTOS.length) throw new Error('Ajoutez au moins une photo pour une panne moyenne ou grave.');
     const g = await drvGeo(), base = { occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g };
-    const full = type + (desc ? ' — ' + desc : '');
-    if (accident) drvEnqueue({ type: 'incident', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { kind: 'ACCIDENT', severity: stop ? 'HIGH' : 'MEDIUM', description: full, ...base } });
-    else if (stop) drvEnqueue({ type: 'breakdown', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { severity: 'HIGH', description: full, ...base } });
-    else drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature: 'ANOMALIE', detail: full, ...base } });
-  }, 'Enregistrer');
+    const full = [...sym, ...picked].join(', ') + (desc ? ' — ' + desc : '');
+    const gl = { LEGERE: 'légère', MOYENNE: 'moyenne', GRAVE: 'grave' }[sev];
+    if (picked.includes('Accident')) drvEnqueue({ type: 'incident', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { kind: 'ACCIDENT', severity: sev === 'GRAVE' ? 'HIGH' : 'MEDIUM', description: `Gravité ${gl} — ${full}`, ...base } });
+    else if (sev === 'GRAVE') drvEnqueue({ type: 'breakdown', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { severity: 'HIGH', description: full, ...base } });
+    else drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { nature: 'ANOMALIE', detail: full, severity: sev, ...base } });
+  }, 'Envoyer le signalement');
 }
-
 /* ---------- Correction automatique (orthographe / majuscules) des saisies ---------- */
 const DRV_FIXES = { usee: 'usée', usees: 'usées', cassee: 'cassée', cassees: 'cassées', verin: 'vérin', verins: 'vérins', plaquete: 'plaquette', plaquetes: 'plaquettes', plaquet: 'plaquette', pnue: 'pneu', pneue: 'pneu', pneux: 'pneus', pneumatique: 'pneumatique', parchoc: 'pare-chocs', parechoc: 'pare-chocs', parechocs: 'pare-chocs', 'pare-choc': 'pare-chocs', parbrise: 'pare-brise', parebrise: 'pare-brise', vidanje: 'vidange', vidanges: 'vidanges', baterie: 'batterie', batrie: 'batterie', batteri: 'batterie', acident: 'accident', accidant: 'accident', moteure: 'moteur', mottur: 'moteur', echappement: 'échappement', electrique: 'électrique', electricite: 'électricité', mecanique: 'mécanique', mecanicien: 'mécanicien', reparation: 'réparation', reparer: 'réparer', kilometrage: 'kilométrage', creve: 'crevé', crevaison: 'crevaison', creuvaison: 'crevaison', suspention: 'suspension', amortisseur: 'amortisseur', amortiseur: 'amortisseur', radiateur: 'radiateur', radiatteur: 'radiateur', carburent: 'carburant', carburan: 'carburant', gazoil: 'gasoil', gazole: 'gasoil', demarrage: 'démarrage', demarrer: 'démarrer', demarre: 'démarre', probleme: 'problème', problem: 'problème', vehicule: 'véhicule', vehicul: 'véhicule', degat: 'dégât', degats: 'dégâts', fuite: 'fuite', liquid: 'liquide', embrayage: 'embrayage', embrayaje: 'embrayage', boite: 'boîte', cardant: 'cardan', cardant_: 'cardan', rétroviseur: 'rétroviseur', retroviseur: 'rétroviseur', phar: 'phare', 'a cause': 'à cause', apre: 'après', aprés: 'après', deja: 'déjà', tres: 'très', pres: 'près', recu: 'reçu', mission: 'mission', livraision: 'livraison', livraisson: 'livraison', chargment: 'chargement', chargemant: 'chargement' };
 const DRV_FIXRE = new RegExp('(^|[^A-Za-zÀ-ÿ_\\-])(' + Object.keys(DRV_FIXES).filter((k) => !k.includes('_')).sort((a, b) => b.length - a.length).map((k) => k.replace(/[-.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')(?![A-Za-zÀ-ÿ\\-])', 'gi');
@@ -2995,47 +3012,88 @@ document.addEventListener('focusin', (e) => {
   if (el && el.closest && el.closest('#drv-sheet') && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && (!el.type || el.type === 'text')))) { el.setAttribute('spellcheck', 'true'); el.setAttribute('lang', 'fr'); el.setAttribute('autocapitalize', 'sentences'); el.setAttribute('autocorrect', 'on'); }
 });
 
+/* ---------- Modules du jour : Carburant, Maintenance & pannes, Dépenses ---------- */
+async function drvDayData() {
+  const d = new Date().toISOString().slice(0, 10);
+  let sh = null;
+  try { await drvFlush(); sh = await api('/driver/sheet?date=' + d); dset('sheet_' + d, sh); } catch (e) { sh = dget('sheet_' + d); }
+  DRV.lastSheet = sh;
+  return sh;
+}
+const drvPendingRows = (types, txt) => drvQueue().filter((o) => types.includes(o.type) && !o.rejected).map((o) => `<div class="drv-row"><span>${esc(txt(o))}</span><b><span class="badge warn">⏳ À envoyer</span></b></div>`).join('');
+async function drvModuleLoad(kind, banner) {
+  const tabAtStart = DRV.tab;
+  const sh = await drvDayData();
+  if (DRV.tab !== tabAtStart) return;
+  const root = drvEl('drv-root'), me = drvView(), act = me.activeTrip, tid = act ? esc(act.id) : '';
+  const hh = (d) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
+  const sent = sh && sh.status === 'SENT';
+  const lock = sent ? '<div style="font-size:12px;color:var(--muted);margin-top:6px">🔒 La fiche du jour est envoyée : nouvelles saisies impossibles aujourd\'hui.</div>' : '';
+  const T = (sh && sh.totals) || { liters: 0, fuelCost: 0, expenses: 0, maintenanceCost: 0 };
+  if (kind === 'fuel') {
+    const rows = ((sh && sh.fuel) || []).map((f) => `<div class="drv-row"><span>${hh(f.time)} · km ${fmt(f.mileage)} · ${esc(drvSrc(f))}</span><b>${f.liters} L · ${fmt(f.cost)} GNF</b></div>`).join('') + drvPendingRows(['fuel'], (o) => `Plein de ${o.payload.liters} L`);
+    root.innerHTML = banner + `<div class="drv-card"><h4>⛽ Carburant du jour</h4><div class="drv-row"><span>Total</span><b>${T.liters} L · ${fmt(T.fuelCost)} GNF</b></div>${rows || '<div style="font-size:13px;color:var(--muted)">Aucun plein aujourd\'hui.</div>'}
+      ${sent ? '' : `<button class="drv-btn gold" onclick="drvFuelForm('${tid}')">➕ Enregistrer un plein</button>`}${lock}</div>`;
+  } else if (kind === 'maint') {
+    const m = ((sh && sh.maintenance) || []).filter((x) => x.nature !== 'ANOMALIE'), an = ((sh && sh.maintenance) || []).filter((x) => x.nature === 'ANOMALIE'), bd = (sh && sh.breakdowns) || [];
+    const r1 = m.map((x) => `<div class="drv-row"><span>${esc(DRV_NAT[x.nature] || x.nature)}${x.detail ? ' — ' + esc(x.detail) : ''}<br><small>${hh(x.date)} · km ${x.mileage != null ? fmt(x.mileage) : '—'}${x.nextServiceKm ? ' · prochaine vidange : ' + fmt(x.nextServiceKm) + ' km' : ''}</small></span><b>${x.cost != null ? fmt(x.cost) + ' GNF' : '—'}</b></div>`).join('') + drvPendingRows(['maintenance'], () => 'Maintenance / anomalie');
+    const r2 = an.map((x) => `<div class="drv-warn">${hh(x.date)} · ${x.severity ? '[' + (x.severity === 'MOYENNE' ? 'Moyenne' : 'Légère') + '] ' : ''}${esc(x.detail || '')}</div>`).join('') + bd.map((x) => `<div class="drv-warn">🔴 ${hh(x.time)} · Panne grave : ${esc(x.reason || '')}</div>`).join('');
+    root.innerHTML = banner + `<div class="drv-card"><h4>🔧 Entretien et vidange</h4>${r1 || '<div style="font-size:13px;color:var(--muted)">Aucun entretien aujourd\'hui.</div>'}
+      ${sent ? '' : `<button class="drv-btn gold" onclick="drvMaintForm('${tid}')">➕ Enregistrer un entretien</button>`}</div>
+      <div class="drv-card"><h4>🛠 Pannes et anomalies</h4>${r2 || '<div style="font-size:13px;color:var(--muted)">Aucun signalement aujourd\'hui.</div>'}
+      ${sent ? '' : `<button class="drv-btn" style="background:#C0392B" onclick="drvFaultForm('${tid}')">⚠ Signaler une panne</button>`}${lock}</div>`;
+  } else {
+    const rows = ((sh && sh.expenses) || []).map((e) => `<div class="drv-row"><span>${esc(DRV_EXP[e.category] || e.category)}${e.description ? ' — ' + esc(e.description) : ''}${e.category === 'DEPANNAGE' && e.insured != null ? ' (assurance : ' + (e.insured ? 'oui' : 'non') + ')' : ''}<br><small>${hh(e.time)} · <span class="badge ${DRV_EXP_ST[e.status][0]}">${DRV_EXP_ST[e.status][1]}</span>${e.note ? ' · ' + esc(e.note) : ''}</small></span><b>${fmt(e.amount)} GNF</b></div>`).join('') + drvPendingRows(['expense'], (o) => `Dépense de ${fmt(o.payload.amount)} GNF`);
+    root.innerHTML = banner + `<div class="drv-card"><h4>💵 Dépenses diverses du jour</h4><div class="drv-row"><span>Total</span><b>${fmt(T.expenses || 0)} GNF</b></div>${rows || '<div style="font-size:13px;color:var(--muted)">Aucune dépense aujourd\'hui.</div>'}
+      <div style="font-size:12px;color:var(--muted);margin:6px 0">Péages, contraventions, dépannage d'urgence, lavage. La photo du reçu est obligatoire.</div>
+      ${sent ? '' : `<button class="drv-btn gold" onclick="drvExpenseForm('${tid}')">➕ Ajouter une dépense</button>`}${lock}</div>`;
+  }
+}
 /* ---------- Fiche journalière (fiche de bord) ---------- */
 const DRV_NAT = { PIECES: 'Pièces / entretien', PNEUS: 'Pneumatiques', VIDANGE: 'Vidange complète', FILTRE: 'Filtre', HUILE: 'Huile', FREINS: 'Freins', BATTERIE: 'Batterie', ELECTRICITE: 'Électricité', ANOMALIE: 'Anomalie signalée', AUTRE: 'Autre' };
 function drvSheetHtml(sh, offline) {
-  const me = drvView(), v = me.vehicle, act = me.activeTrip, sent = sh.status === 'SENT';
+  const me = drvView(), v = me.vehicle, sent = sh.status === 'SENT';
   const hh = (d) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
   const T = sh.totals;
   const lock = '<div style="font-size:12px;color:var(--muted)">🔒 Fiche envoyée : modification impossible.</div>';
   const motifOf = (t) => [({ MISSION: 'Mission', AUTRE: 'Autre', TRANSPORT: 'Transport' })[t.purposeType], t.cargo, t.purpose].filter(Boolean).join(' — ') || '—';
-  const b1 = sh.trips.map((t) => `${t.reference ? `<div class="drv-row"><span>N° de mission</span><b>${esc(t.reference)} <a href="#" onclick="drvTimeline('${esc(t.id)}');return false;" style="font-size:13px">🕒 Chronologie</a></b></div>` : ''}<div class="drv-row"><span>${hh(t.startTime)} · ${esc(t.plate)}</span><b>km ${fmt(t.startMileage)}</b></div>
-    <div class="drv-row"><span>Carburant au départ</span><b>${esc(drvFuelTxt(t.startFuelLiters))}</b></div>
+  const blk = (title, body) => `<div class="drv-card"><h4>${title}</h4>${body || '<div style="font-size:13px;color:var(--muted)">Rien de saisi.</div>'}</div>`;
+  const missions = sh.trips.map((t) => `${t.reference ? `<div class="drv-row"><span>N° de mission</span><b>${esc(t.reference)} <a href="#" onclick="drvTimeline('${esc(t.id)}');return false;" style="font-size:13px">🕒 Chronologie</a></b></div>` : ''}
+    <div class="drv-row"><span>Départ ${hh(t.startTime)} · ${esc(t.plate)}</span><b>km ${fmt(t.startMileage)}${t.startFuelLiters != null ? ' · ' + esc(drvFuelTxt(t.startFuelLiters)) : ''}</b></div>
     <div class="drv-row"><span>Destination(s)</span><b style="text-align:right">${esc(t.destination || (t.regions || []).join(', ') || '—')}</b></div>
-    ${t.route ? `<div class="drv-row"><span>Trajet</span><b style="text-align:right">${esc(t.route)}</b></div>` : ''}
     <div class="drv-row"><span>Motif</span><b style="text-align:right">${esc(motifOf(t))}</b></div>
-    ${t.preCondition === 'ANOMALIE' ? `<div class="drv-warn">Anomalie au départ : ${esc(t.preAnomalies)}</div>` : ''}`).join('<hr style="border:0;border-top:1px dashed #d8dee8">');
-  const b2 = sh.fuel.map((f) => `<div class="drv-row"><span>${hh(f.time)} · km ${fmt(f.mileage)}${' · ' + esc(drvSrc(f))}</span><b>${f.liters} L · ${fmt(f.cost)} GNF</b></div>`).join('');
-  const b3 = sh.trips.filter((t) => t.status === 'COMPLETED').map((t) => `<div class="drv-row"><span>${drvOutside(t) ? 'Arrivée ' + drvDt(t.endTime) + ' · ' : ''}Retour / arrêt</span><b>km ${fmt(t.endMileage)}</b></div>
-    <div class="drv-row"><span>Carburant à l'arrivée</span><b>${esc(drvFuelTxt(t.endFuelLiters))}</b></div>
-    <div class="drv-row"><span>Distance</span><b>${fmt(t.km)} km</b></div>${t.voyages != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.voyages)}</b></div>` : ''}`).join('');
-  const maint = sh.maintenance.filter((m) => m.nature !== 'ANOMALIE'), anom = sh.maintenance.filter((m) => m.nature === 'ANOMALIE');
-  const b4 = maint.map((m) => `<div class="drv-row"><span>${esc(DRV_NAT[m.nature] || m.nature)}${m.detail ? ' — ' + esc(m.detail) : ''}<br><small>${hh(m.date)} · km ${m.mileage != null ? fmt(m.mileage) : '—'}${m.nextServiceKm ? ' · prochaine vidange : ' + fmt(m.nextServiceKm) + ' km' : ''}</small></span><b>${m.cost != null ? fmt(m.cost) + ' GNF' : '—'}</b></div>`).join('');
-  const b5 = anom.map((m) => `<div class="drv-warn">${hh(m.date)} · ${esc(m.detail || '')}</div>`).join('');
-  const b6 = (sh.expenses || []).map((e) => `<div class="drv-row"><span>${esc(DRV_EXP[e.category] || e.category)}${e.description ? ' — ' + esc(e.description) : ''}<br><small>${hh(e.time)} · <span class="badge ${DRV_EXP_ST[e.status][0]}">${DRV_EXP_ST[e.status][1]}</span>${e.note ? ' · ' + esc(e.note) : ''}</small></span><b>${fmt(e.amount)} GNF</b></div>`).join('');
-  const btn = (txt, fn, cls) => (sent ? '' : `<button class="drv-btn ${cls || ''}" onclick="${fn}">${txt}</button>`);
-  const blk = (title, body, action) => `<div class="drv-card"><h4>${title}</h4>${body || '<div style="font-size:13px;color:var(--muted)">Rien de saisi.</div>'}${action || ''}</div>`;
-  const canStart = v && !act && !v.immobilized;
-  return `<div class="drv-card"><h4>📋 Fiche de bord — ${esc(sh.day)} ${esc(sh.date.split('-').reverse().join('/'))}</h4>
+    ${t.preCondition === 'ANOMALIE' ? `<div class="drv-warn">Anomalie au départ : ${esc(t.preAnomalies)}</div>` : ''}
+    ${t.status === 'COMPLETED' ? `<div class="drv-row"><span>${drvOutside(t) ? 'Arrivée ' + drvDt(t.endTime) : 'Retour / arrêt'}</span><b>km ${fmt(t.endMileage)}${t.endFuelLiters != null ? ' · ' + esc(drvFuelTxt(t.endFuelLiters)) : ''}</b></div><div class="drv-row"><span>Distance</span><b>${fmt(t.km)} km</b></div>${t.voyages != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.voyages)}</b></div>` : ''}` : '<div class="drv-warn">Mission non terminée : déclarez l\'arrivée avant d\'envoyer la fiche.</div>'}`).join('<hr style="border:0;border-top:1px dashed #d8dee8">');
+  const fuel = sh.fuel.map((f) => `<div class="drv-row"><span>${hh(f.time)} · km ${fmt(f.mileage)} · ${esc(drvSrc(f))}</span><b>${f.liters} L · ${fmt(f.cost)} GNF</b></div>`).join('');
+  const maint = sh.maintenance.filter((m) => m.nature !== 'ANOMALIE').map((m) => `<div class="drv-row"><span>${esc(DRV_NAT[m.nature] || m.nature)}${m.detail ? ' — ' + esc(m.detail) : ''}<br><small>${hh(m.date)} · km ${m.mileage != null ? fmt(m.mileage) : '—'}${m.nextServiceKm ? ' · prochaine vidange : ' + fmt(m.nextServiceKm) + ' km' : ''}</small></span><b>${m.cost != null ? fmt(m.cost) + ' GNF' : '—'}</b></div>`).join('');
+  const pannes = sh.maintenance.filter((m) => m.nature === 'ANOMALIE').map((m) => `<div class="drv-warn">${hh(m.date)} · ${m.severity ? '[' + (m.severity === 'MOYENNE' ? 'Moyenne' : 'Légère') + '] ' : ''}${esc(m.detail || '')}</div>`).join('') + (sh.breakdowns || []).map((b) => `<div class="drv-warn">🔴 ${hh(b.time)} · Panne grave : ${esc(b.reason || '')}</div>`).join('');
+  const exps = (sh.expenses || []).map((e) => `<div class="drv-row"><span>${esc(DRV_EXP[e.category] || e.category)}${e.description ? ' — ' + esc(e.description) : ''}${e.category === 'DEPANNAGE' && e.insured != null ? ' (assurance : ' + (e.insured ? 'oui' : 'non') + ')' : ''}<br><small>${hh(e.time)} · <span class="badge ${DRV_EXP_ST[e.status][0]}">${DRV_EXP_ST[e.status][1]}</span></small></span><b>${fmt(e.amount)} GNF</b></div>`).join('');
+  const photos = [];
+  sh.fuel.forEach((f) => f.receiptUrl && photos.push(['Carburant ' + hh(f.time), f.receiptUrl]));
+  sh.maintenance.forEach((m) => (m.photoUrls || []).forEach((u) => photos.push(['Maintenance / anomalie ' + hh(m.date), u])));
+  (sh.breakdowns || []).forEach((b) => (b.photoUrls || []).forEach((u) => photos.push(['Panne ' + hh(b.time), u])));
+  (sh.expenses || []).forEach((e) => e.receiptUrl && photos.push([(DRV_EXP[e.category] || 'Dépense') + ' ' + hh(e.time), e.receiptUrl]));
+  const base = (state.apiUrl || '').replace(/\/$/, '');
+  const gallery = photos.length ? `<div style="display:flex;flex-wrap:wrap;gap:8px">${photos.map((x) => `<a href="${esc(base + x[1])}" target="_blank" rel="noopener" style="width:30%;min-width:96px;text-decoration:none;color:var(--text);font-size:11px"><img src="${esc(base + x[1])}" alt="" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid #D9E0E8"><div>${esc(x[0])}</div></a>`).join('')}</div>` : '';
+  return `<div class="drv-card"><h4>📋 Ma fiche — ${esc(sh.day)} ${esc(sh.date.split('-').reverse().join('/'))}</h4>
       <div class="drv-row"><span>Chauffeur</span><b>${esc(me.driver.name)}</b></div>
       <div class="drv-row"><span>Véhicule</span><b>${esc(v ? v.plate : '—')}</b></div>
       <div class="drv-row"><span>Statut</span><b>${sent ? '<span class="badge ok">Envoyée ' + drvDt(sh.sentAt) + '</span>' : '<span class="badge warn">À envoyer</span>'}</b></div>
       <div class="drv-row"><span>Distance totale</span><b>${fmt(T.km)} km</b></div>
       <div class="drv-row"><span>Carburant</span><b>${T.liters} L · ${fmt(T.fuelCost)} GNF</b></div>
-      <div class="drv-row"><span>Consommation</span><b>${T.consumption !== null ? T.consumption + ' L/100 km' : 'calculée après l\'arrivée'}</b></div></div>
-    ${blk('1 · Départ', b1, canStart && !sent ? `<button class="drv-btn gold" onclick="drvStartForm('')">➕ Déclarer le départ</button>` : '')}
-    ${blk('2 · Carburant', b2, btn('+ Ajouter un plein', `drvFuelForm('${act ? esc(act.id) : ''}')`, ''))}
-    ${blk('3 · Arrivée / retour', b3, act && !sent ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(act.id)}')">🏁 Déclarer l'arrivée / retour</button>` : '')}
-    ${blk('4 · Maintenance <small style="font-weight:400">(facultatif)</small>', b4, btn('🔧 Ajouter une maintenance', `drvMaintForm('${act ? esc(act.id) : ''}')`, 'ghost'))}
-    ${blk('5 · Panne ou anomalie <small style="font-weight:400">(facultatif)</small>', b5, btn('⚠ Signaler une panne / anomalie', `drvFaultForm('${act ? esc(act.id) : ''}')`, 'ghost'))}
-    ${blk('6 · Dépenses <small style="font-weight:400">(facultatif)</small>', b6, btn('💵 Ajouter une dépense', `drvExpenseForm('${act ? esc(act.id) : ''}')`, 'ghost'))}
-    <div class="drv-card"><h4>7 · Enregistrer et envoyer</h4>
-      ${sent ? lock : `<div style="font-size:13px;color:var(--muted);margin-bottom:8px">La fiche est envoyée automatiquement à la hiérarchie. Les justificatifs (reçus de carburant, factures) sont à déposer au responsable logistique.</div>
-      <button class="drv-btn gold" onclick="drvSheetSend('${esc(sh.date)}')" ${offline ? 'disabled' : ''}>📤 Enregistrer et envoyer</button>
+      <div class="drv-row"><span>Consommation</span><b>${T.consumption !== null ? T.consumption + ' L/100 km' : 'calculée après l\'arrivée'}</b></div>
+      <div class="drv-row"><span>Entretien</span><b>${fmt(T.maintenanceCost || 0)} GNF</b></div>
+      <div class="drv-row"><span>Dépenses diverses</span><b>${fmt(T.expenses || 0)} GNF</b></div>
+      <div class="drv-row" style="font-weight:700"><span>Total des frais</span><b>${fmt((T.fuelCost || 0) + (T.maintenanceCost || 0) + (T.expenses || 0))} GNF</b></div></div>
+    ${blk('📍 Missions et destinations', missions)}
+    ${blk('⛽ Carburant', fuel)}
+    ${blk('🔧 Entretien', maint)}
+    ${blk('🛠 Pannes et anomalies', pannes)}
+    ${blk('💵 Dépenses diverses', exps)}
+    ${blk('📷 Pièces jointes (' + photos.length + ')', gallery)}
+    <div class="drv-card"><h4>📤 Vérifier et envoyer</h4>
+      ${sent ? lock : `<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Relisez votre journée. Une fois envoyée, la fiche est transmise à la hiérarchie et ne peut plus être modifiée.</div>
+      <button class="drv-btn gold" onclick="drvSheetSend('${esc(sh.date)}')" ${offline ? 'disabled' : ''}>📤 Valider et envoyer ma fiche</button>
       ${offline ? '<div style="font-size:12px;color:var(--muted);text-align:center;margin-top:6px">Connexion nécessaire pour envoyer.</div>' : ''}`}</div>`;
 }
 async function drvSheetLoad(date) {

@@ -228,3 +228,13 @@ ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP
 ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS processed_by TEXT
 --#
 ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS process_note TEXT
+--#
+ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS severity TEXT
+--#
+ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS photo_urls TEXT[] NOT NULL DEFAULT '{}'
+--#
+ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION
+--#
+ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION
+--#
+ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS insured BOOLEAN

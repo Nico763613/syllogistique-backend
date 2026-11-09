@@ -1554,6 +1554,10 @@ model DriverMaintenance {
   mileage     Int?
   cost        Int?     // GNF
   nextServiceKm Int?   @map("next_service_km")
+  severity    String?  // LEGERE | MOYENNE (anomalies signalées)
+  photoUrls   String[] @default([]) @map("photo_urls")
+  latitude    Float?
+  longitude   Float?
   observations String?
   clientOpId  String?  @unique @map("client_op_id")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -1589,6 +1593,7 @@ model DriverExpense {
   amount       Int      // GNF
   description  String?
   receiptUrl   String?  @map("receipt_url")
+  insured      Boolean? // dépannage : couvert par l'assurance ?
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
   decidedBy    String?  @map("decided_by")
   decidedAt    DateTime? @map("decided_at")
