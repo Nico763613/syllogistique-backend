@@ -73,6 +73,7 @@
   .nav-item:hover{background:rgba(255,255,255,.06); color:#fff;}
   .nav-item.active{background:rgba(224,167,46,.12); border-left-color:var(--gold); color:#fff;}
   .nav-icon{width:18px; text-align:center;}
+  .nav-sub-label{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:rgba(224,167,46,.7); padding:10px 20px 2px 26px;}
   .nav-section-label{font-size:10px; text-transform:uppercase; letter-spacing:1px; color:rgba(255,255,255,.35); padding:16px 20px 6px;}
 
   .sidebar-footer{margin-top:auto; padding:14px 20px 0; border-top:1px solid rgba(255,255,255,.12);}
@@ -237,45 +238,34 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
-      <div class="nav-section-label" id="nav-dept-label">Départements</div>
-      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">🧭</span> Logistique &amp; Appro.</div>
-      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">🏬</span> Entrepôt &amp; Stocks</div>
-      <div class="nav-item" data-view="dash-commercial" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,RESPONSABLE_COMMERCIAL,CAISSIER,LECTEUR" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
-      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">🚚</span> Charroi &amp; Flotte</div>
-      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
-
-      <div class="nav-section-label">Flotte</div>
-      <div class="nav-item" data-view="vehicles" onclick="go('vehicles')">
-        <span class="nav-icon">🚛</span> Camions &amp; Véhicules
-      </div>
-      <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
+      <div class="nav-section-label" id="nav-dept-label">🚚 Logistique &amp; Flotte</div>
+      <div class="nav-sub-label">Flotte</div>
+      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
+      <div class="nav-item" data-view="trucks" onclick="go('trucks')"><span class="nav-icon">🚛</span> Camions</div>
+      <div class="nav-item" data-view="service-vehicles" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
+      <div class="nav-item" data-view="drivers" onclick="go('drivers')"><span class="nav-icon">👨‍✈️</span> Chauffeurs</div>
       <div class="nav-item" data-view="driver-board" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-board')"><span class="nav-icon">🧭</span> Suivi des chauffeurs</div>
-      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses chauffeurs</div>
-      <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches chauffeurs</div>
+      <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches de bord</div>
       <div class="nav-item" data-view="driver-devices" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-devices')"><span class="nav-icon">📲</span> Appareils chauffeurs</div>
-      <div class="nav-item" data-view="drivers" onclick="go('drivers')">
-        <span class="nav-icon">👨‍✈️</span> Chauffeurs
-      </div>
+      <div class="nav-sub-label">Opérations</div>
+      <div class="nav-item" data-view="fuel" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant</div>
+      <div class="nav-item" data-view="maintenance" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
+      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses chauffeurs</div>
+      <div class="nav-item" data-view="daily" onclick="go('daily')"><span class="nav-icon">📋</span> Rapports journaliers</div>
+      <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
 
-      <div class="nav-section-label">Opérations</div>
-      <div class="nav-item" data-view="fuel" onclick="go('fuel')">
-        <span class="nav-icon">⛽</span> Carburant
-      </div>
-      <div class="nav-item" data-view="maintenance" onclick="go('maintenance')">
-        <span class="nav-icon">🔧</span> Maintenance
-      </div>
-      <div class="nav-item" data-view="stock" onclick="go('stock')">
-        <span class="nav-icon">📦</span> Stocks
-      </div>
-      <div class="nav-item" data-view="purchases" onclick="go('purchases')">
-        <span class="nav-icon">🛒</span> Achats
-      </div>
-      <div class="nav-item" data-view="needs" onclick="go('needs')">
-        <span class="nav-icon">📝</span> États des besoins
-      </div>
-      <div class="nav-item" data-view="daily" onclick="go('daily')">
-        <span class="nav-icon">📋</span> Rapport du jour
-      </div>
+      <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
+      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
+      <div class="nav-item" data-view="stock" onclick="go('stock')"><span class="nav-icon">📦</span> Stocks</div>
+
+      <div class="nav-section-label">🛒 Achats &amp; Approvisionnement</div>
+      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
+      <div class="nav-item" data-view="purchases" onclick="go('purchases')"><span class="nav-icon">🛒</span> Achats</div>
+      <div class="nav-item" data-view="needs" onclick="go('needs')"><span class="nav-icon">📝</span> États des besoins</div>
+      <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL,CAISSIER" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
+
+      <div class="nav-section-label">🦺 HSE</div>
+      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
 
       <div class="nav-section-label">Système</div>
       <div class="nav-item" data-view="sync" onclick="go('sync')">
@@ -298,6 +288,10 @@
           <div class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</div>
           <button id="back-btn" class="btn-ghost" style="display:none; font-size:20px; padding:2px 10px; margin-right:6px;" onclick="goBack()" aria-label="Retour">←</button>
           <h2 id="view-title">Tableau de bord</h2>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;margin-right:12px">
+          <span id="draft-note" style="font-size:11px;color:var(--muted)"></span>
+          <button id="hist-btn" class="btn-ghost" style="font-size:13px;padding:4px 10px" onclick="openHistory()" aria-label="Historique">🕘 Historique</button>
         </div>
         <div class="user-chip">
           <select id="site-switch" style="display:none; max-width:170px; margin-right:8px;" onchange="switchSite(this.value)" title="Entrepôt / site actif"></select>
@@ -372,7 +366,10 @@ async function refreshSession() {
 }
 async function api(path, options = {}, retried = false) {
   const res = await apiFetch(path, options);
-  return apiHandle(res, path, options, retried);
+  const out = await apiHandle(res, path, options, retried);
+  // Enregistrement réussi : le brouillon de l'écran n'a plus lieu d'être
+  if (options.method && options.method !== 'GET' && !path.startsWith('/auth') && typeof draftKey === 'function') { try { localStorage.removeItem(draftKey()); } catch (e) {} }
+  return out;
 }
 async function apiFetch(path, options) {
   const go = () => fetch(state.apiUrl.replace(/\/$/, '') + path, {
@@ -508,12 +505,74 @@ function updateSyncPill() {
 }
 
 const titles = {
-  dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapport du jour',
-  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches chauffeurs', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
-  'dash-logistics': 'Logistique & Approvisionnements', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
+  dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers',
+  sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
+  'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
 };
+
+
+/* ---------- Historique (journal des modifications de l'écran) et sauvegarde automatique des saisies ---------- */
+const HIST_ENT = {
+  trucks: ['Vehicle', 'Document', 'VehicleDowntime'], 'service-vehicles': ['Vehicle', 'Document', 'VehicleDowntime'], vehicles: ['Vehicle', 'Document', 'VehicleDowntime'],
+  drivers: ['Driver', 'DriverDevice'], 'driver-devices': ['DriverDevice'], fuel: ['FuelTransaction'], maintenance: ['Maintenance', 'DriverMaintenance'],
+  'driver-expenses': ['DriverExpense'], 'driver-sheets': ['DriverDailyReport'], 'driver-board': ['DriverDailyReport', 'Trip'], 'driver-missions': ['Trip'], daily: ['DriverDailyReport', 'Trip'],
+  stock: ['InventoryItem', 'StockMovement'], purchases: ['PurchaseOrder', 'GoodsReceipt'], needs: ['Need'], 'dash-hse': ['HseIncident', 'HseInspection'],
+};
+const HIST_LAB = { CREATE: 'Création', UPDATE: 'Modification', DELETE: 'Suppression' };
+async function openHistory() {
+  const old = document.getElementById('hist-overlay'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'hist-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
+  ov.innerHTML = `<div class="panel" style="max-width:720px;width:100%;margin:20px auto;"><h3>🕘 Historique — ${esc(titles[state.view] || '')}</h3><div id="hist-body" class="empty">Chargement…</div><div style="margin-top:12px"><button class="btn" onclick="document.getElementById('hist-overlay').remove()">← Retour</button></div></div>`;
+  document.body.appendChild(ov);
+  const ents = HIST_ENT[state.view];
+  const body = document.getElementById('hist-body');
+  try {
+    const rows = await api('/audit?limit=60' + (ents ? '&entities=' + encodeURIComponent(ents.join(',')) : ''));
+    const keys = (r) => { const n = r.newValue && typeof r.newValue === 'object' ? Object.keys(r.newValue) : []; return n.slice(0, 6).join(', '); };
+    body.className = '';
+    body.innerHTML = rows.length ? `<table><thead><tr><th>Date</th><th>Par</th><th>Action</th><th>Élément</th><th>Champs</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${new Date(r.createdAt).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td><td>${esc(r.user ? r.user.firstName + ' ' + r.user.lastName : 'Chauffeur / système')}</td><td>${esc(HIST_LAB[r.action] || r.action)}</td><td>${esc(r.entity)}</td><td style="font-size:12px;color:var(--muted)">${esc(keys(r))}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">Aucune modification enregistrée pour cet écran.</div>';
+  } catch (e) { body.className = ''; body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+// Sauvegarde automatique : les champs saisis sont gardés sur l'appareil (par écran) et restaurés si la page est rechargée ou fermée par erreur.
+const DRAFT = { t: null };
+const draftKey = () => 'syllo_draft_' + (state.user ? state.user.id : '') + '_' + state.view;
+function draftSkip(el) { return !el.id && !el.dataset.k || el.type === 'password' || el.type === 'file' || el.type === 'hidden' || el.type === 'button' || el.disabled || el.closest('#login-screen,#driver-app,#hist-overlay'); }
+function draftSave() {
+  try {
+    const data = {};
+    document.querySelectorAll('#view-root input, #view-root select, #view-root textarea, #editor-overlay input, #editor-overlay select').forEach((el) => {
+      if (draftSkip(el)) return;
+      const k = (el.closest('#editor-overlay') ? 'E:' : '') + (el.id || el.dataset.k);
+      if (el.type === 'checkbox' || el.type === 'radio') data[k] = el.checked;
+      else if (el.value !== '' && el.value != null) data[k] = el.value;
+    });
+    const n = Object.keys(data).length;
+    if (n) localStorage.setItem(draftKey(), JSON.stringify({ at: Date.now(), data }));
+    const note = document.getElementById('draft-note'); if (note) note.textContent = n ? '💾 Brouillon enregistré' : '';
+  } catch (e) {}
+}
+function draftRestore() {
+  try {
+    const raw = localStorage.getItem(draftKey()); if (!raw) return;
+    const { at, data } = JSON.parse(raw);
+    if (Date.now() - at > 7 * 864e5) { localStorage.removeItem(draftKey()); return; }
+    let n = 0;
+    document.querySelectorAll('#view-root input, #view-root select, #view-root textarea').forEach((el) => {
+      if (draftSkip(el) || !(el.id in data) ) return;
+      const v = data[el.id];
+      if (el.type === 'checkbox' || el.type === 'radio') { if (el.checked !== v) { el.checked = v; n++; } }
+      else if (typeof v === 'string' && el.value !== v && (el.tagName === 'SELECT' ? [...el.options].some((o) => o.value === v) : !el.value)) { el.value = v; n++; }
+    });
+    const note = document.getElementById('draft-note');
+    if (note && n) note.innerHTML = '💾 Brouillon restauré · <a href="#" onclick="draftClear(true);return false;">effacer</a>';
+  } catch (e) {}
+}
+function draftClear(reload) { try { localStorage.removeItem(draftKey()); } catch (e) {} const note = document.getElementById('draft-note'); if (note) note.textContent = ''; if (reload) renderView(state.view); }
+document.addEventListener('input', () => { clearTimeout(DRAFT.t); DRAFT.t = setTimeout(draftSave, 800); }, true);
+document.addEventListener('change', () => { clearTimeout(DRAFT.t); DRAFT.t = setTimeout(draftSave, 300); }, true);
 
 state.hist = []; state.ign = 0;
 function goBackBtn() { const b = document.getElementById('back-btn'); if (b) b.style.display = state.hist.length ? '' : 'none'; }
@@ -535,8 +594,11 @@ function go(view, noPush) {
   renderView(view);
 }
 
+// Après chaque affichage d'écran : restauration du brouillon éventuel
+{ const _rv = renderView; renderView = async function (view) { const r = await _rv(view); draftRestore(); return r; }; }
+
 /* ---------- Actualisation automatique du bureau (toutes les 30 s, écran ouvert et visible uniquement) ---------- */
-const LIVE_VIEWS = ['dashboard', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance'];
+const LIVE_VIEWS = ['dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance'];
 const LIVE = { since: null, timer: null, busy: false };
 function liveCanRun() {
   return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR';
@@ -920,6 +982,8 @@ async function renderView(view) {
     if (view === 'dashboard') return renderDashboard();
     if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
     if (view === 'vehicles') return renderVehicles();
+    if (view === 'trucks') return renderVehicles('TRUCK');
+    if (view === 'service-vehicles') return renderVehicles('SERVICE_VEHICLE');
     if (view === 'driver-devices') return renderDriverDevices();
     if (view === 'driver-missions') return renderMissionHistory();
     if (view === 'driver-board') return renderDriverBoard();
@@ -978,8 +1042,10 @@ async function markAlertRead(id) {
 }
 
 /* ---------------- VEHICLES ---------------- */
-async function renderVehicles() {
-  const list = await api('/vehicles?siteId=' + state.siteId);
+async function renderVehicles(kind) {
+  const all = await api('/vehicles?siteId=' + state.siteId);
+  const list = kind ? all.filter(v => v.vehicleType === kind) : all;
+  const kindLabel = kind === 'TRUCK' ? 'camion' : kind === 'SERVICE_VEHICLE' ? 'véhicule de service' : 'véhicule';
   let fleetTarget = 10;
   try {
     const st = await api('/settings');
@@ -997,13 +1063,13 @@ async function renderVehicles() {
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
       <td><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button></td>
-    </tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun véhicule enregistré.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun ${kindLabel} enregistré.</td></tr>`;
 
   root().innerHTML = `
     <div class="panel">
-      <h3>➕ Ajouter un véhicule</h3>
+      <h3>➕ Ajouter un ${kindLabel}</h3>
       <div class="grid-2">
-        <div><label>Type</label><select id="v-type"><option value="TRUCK">Camion</option><option value="SERVICE_VEHICLE">Véhicule de service</option></select></div>
+        ${kind ? `<div><label>Type</label><select id="v-type" disabled><option value="${kind}">${kind === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</option></select></div>` : `<div><label>Type</label><select id="v-type"><option value="TRUCK">Camion</option><option value="SERVICE_VEHICLE">Véhicule de service</option></select></div>`}
         <div><label>N° interne</label><input id="v-internal" placeholder="TRUCK-001" /></div>
         <div><label>Plaque</label><input id="v-plate" placeholder="RC 1234 A" /></div>
         <div><label>Marque / Modèle</label><input id="v-brand" placeholder="Toyota Hilux" /></div>
@@ -1014,9 +1080,9 @@ async function renderVehicles() {
       <div id="v-msg"></div>
     </div>
     <div class="panel">
-      <h3>Parc (${list.length} / ${fleetTarget} prévus)
+      <h3>${kind === 'TRUCK' ? 'Camions' : kind === 'SERVICE_VEHICLE' ? 'Véhicules de service' : 'Parc'} (${list.length}${kind ? '' : ' / ' + fleetTarget + ' prévus'})
         ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})">✏️ Objectif</button>` : ''}</h3>
-      ${list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
+      ${!kind && list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
       <table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>
     <div class="panel">
