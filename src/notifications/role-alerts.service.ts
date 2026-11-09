@@ -123,6 +123,14 @@ export class RoleAlertsService {
       const expired = +(d.expiryDate as Date) < +now;
       await emit({ role: 'GESTIONNAIRE_FLOTTE', siteId: d.vehicle.siteId, title: expired ? 'Document véhicule expiré' : 'Document véhicule à renouveler', message: `${d.type} du véhicule ${d.vehicle.internalNumber} : échéance le ${fr(d.expiryDate as Date)}.`, severity: expired ? 'CRITICAL' : 'WARNING', entity: 'Document', entityId: d.id });
     }
+    // Assurance : avertissement renforcé à 7 jours de l'échéance (et après)
+    for (const d of docs) {
+      if (d.type !== 'ASSURANCE' || +(d.expiryDate as Date) >= +now + 7 * DAY) continue;
+      const expired = +(d.expiryDate as Date) < +now;
+      for (const role of ['GESTIONNAIRE_FLOTTE', 'ADMIN_LOGISTIQUE'] as const) {
+        await emit({ role, siteId: d.vehicle.siteId, title: expired ? 'Assurance expirée' : 'Assurance : moins de 7 jours', message: `Véhicule ${d.vehicle.internalNumber} : assurance ${expired ? 'expirée' : 'expire'} le ${fr(d.expiryDate as Date)}.`, severity: 'CRITICAL', entity: 'AssuranceUrgente-' + role, entityId: d.id });
+      }
+    }
     const lateTrips = await this.prisma.trip.findMany({ where: { status: 'IN_PROGRESS', startTime: { lt: new Date(+now - DAY) } }, include: { vehicle: { select: { internalNumber: true } } } });
     for (const t of lateTrips) {
       await emit({ role: 'GESTIONNAIRE_FLOTTE', siteId: t.siteId, title: 'Mission en cours depuis plus de 24 h', message: `Véhicule ${t.vehicle.internalNumber} : retour non enregistré.`, severity: 'WARNING', entity: 'Trip', entityId: t.id });

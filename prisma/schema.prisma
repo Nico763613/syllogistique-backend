@@ -275,6 +275,7 @@ model Vehicle {
   model              String?
   year               Int?
   capacity           String?
+  wheels             Int?        // nombre de roues (camions)
   currentMileage     Int         @default(0) @map("current_mileage")
   status             VehicleStatus @default(AVAILABLE)
   assignedDriverId   String?     @map("assigned_driver_id")
