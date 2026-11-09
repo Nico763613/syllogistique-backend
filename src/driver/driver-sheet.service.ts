@@ -24,12 +24,13 @@ export class DriverSheetService {
     const next = new Date(+day + 86400000);
     const driver = await this.prisma.driver.findUnique({ where: { id: driverId } });
     if (!driver) throw new BadRequestException('Chauffeur introuvable.');
-    const [trips, fuel, maint, rep, expenses] = await Promise.all([
+    const [trips, fuel, maint, rep, expenses, downs] = await Promise.all([
       this.prisma.trip.findMany({ where: { driverId, startTime: { gte: day, lt: next } }, include: { vehicle: { select: { registrationNumber: true, brand: true, model: true, internalNumber: true } } }, orderBy: { startTime: 'asc' } }),
       this.prisma.fuelTransaction.findMany({ where: { driverId, transactionDate: { gte: day, lt: next } }, include: { vehicle: { select: { registrationNumber: true } } }, orderBy: { transactionDate: 'asc' } }),
       this.prisma.driverMaintenance.findMany({ where: { driverId, date: { gte: day, lt: next } }, orderBy: { date: 'asc' } }),
       this.prisma.driverDailyReport.findUnique({ where: { driverId_reportDate: { driverId, reportDate: day } } }),
       this.prisma.driverExpense.findMany({ where: { driverId, date: { gte: day, lt: next } }, orderBy: { date: 'asc' } }),
+      driver.userId ? this.prisma.vehicleDowntime.findMany({ where: { createdById: driver.userId, startedAt: { gte: day, lt: next } }, orderBy: { startedAt: 'asc' } }) : Promise.resolve([] as any[]),
     ]);
     const km = trips.reduce((s, t) => s + n(t.distance), 0);
     const liters = fuel.reduce((s, f) => s + n(f.quantityLiters), 0);
@@ -45,10 +46,12 @@ export class DriverSheetService {
         startTime: t.startTime, endTime: t.endTime, startMileage: t.startMileage, arrivalMileage: t.arrivalMileage, endMileage: t.endMileage, km: n(t.distance),
         preCondition: t.preCondition, preAnomalies: t.preAnomalies, delayReason: t.delayReason, maintenanceNeeded: t.maintenanceNeeded, maintenanceReason: t.maintenanceReason,
       })),
-      fuel: fuel.map((f) => ({ time: f.transactionDate, plate: f.vehicle.registrationNumber, mileage: f.mileage, liters: n(f.quantityLiters), cost: n(f.totalCost), station: f.station, source: f.source, notes: f.observations })),
-      maintenance: maint.map((m) => ({ id: m.id, date: m.date, nature: m.nature, detail: m.detail, mileage: m.mileage, cost: m.cost, nextServiceKm: m.nextServiceKm, observations: m.observations })),
-      expenses: expenses.map((e) => ({ id: e.id, time: e.date, category: e.category, amount: e.amount, description: e.description, status: e.status, note: e.decisionNote })),
+      fuel: fuel.map((f) => ({ time: f.transactionDate, plate: f.vehicle.registrationNumber, mileage: f.mileage, liters: n(f.quantityLiters), cost: n(f.totalCost), station: f.station, source: f.source, notes: f.observations, receiptUrl: f.receiptImageUrl })),
+      maintenance: maint.map((m) => ({ id: m.id, date: m.date, nature: m.nature, detail: m.detail, mileage: m.mileage, cost: m.cost, nextServiceKm: m.nextServiceKm, observations: m.observations, severity: m.severity, photoUrls: m.photoUrls })),
+      breakdowns: downs.map((d) => ({ id: d.id, time: d.startedAt, reason: d.reason, severity: d.severity, photoUrls: d.photoUrls })),
+      expenses: expenses.map((e) => ({ id: e.id, time: e.date, category: e.category, amount: e.amount, description: e.description, status: e.status, note: e.decisionNote, receiptUrl: e.receiptUrl, insured: e.insured })),
       totals: {
+        expenses: expenses.reduce((s, e) => s + e.amount, 0),
         km, liters: Math.round(liters * 100) / 100, fuelCost: fuel.reduce((s, f) => s + n(f.totalCost), 0), maintenanceCost: maint.reduce((s, m) => s + n(m.cost), 0),
         consumption: km >= 20 && liters > 0 ? Math.round((liters / km) * 1000) / 10 : null, voyages: trips.reduce((s, t) => s + n(t.tripsCount), 0),
       },
@@ -109,7 +112,7 @@ export class DriverSheetService {
     const vehicles = await this.prisma.vehicle.findMany({ where: { id: { in: rows.map((r) => r.vehicleId).filter((x): x is string => !!x) } }, select: { id: true, registrationNumber: true } });
     return rows.map((r) => {
       const d = drivers.find((x) => x.id === r.driverId), v = vehicles.find((x) => x.id === r.vehicleId);
-      return { id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
+      return { id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, insured: r.insured, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
     });
   }
 
