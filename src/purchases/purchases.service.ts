@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreatePurchaseOrderDto, ReceivePurchaseOrderDto, CreatePurchaseInvoiceDto, CreateReorderDraftsDto, CancelPurchaseOrderDto } from './dto/purchase.dto';
