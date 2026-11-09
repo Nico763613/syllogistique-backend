@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import { ReportsService } from './reports.service';
 
 // Export PDF/Excel des rapports périodiques (§23 du cahier des charges).

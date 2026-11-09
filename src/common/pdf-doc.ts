@@ -1,4 +1,4 @@
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 
 export const NAVY = '#163A5F';
 export const GOLD = '#E0A72E';
