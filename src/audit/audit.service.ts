@@ -58,10 +58,11 @@ export class AuditService {
   }
 
   // Consultation du journal (Administrateur) avec filtres
-  async search(params: { entity?: string; entityId?: string; userId?: string; from?: string; to?: string; limit?: number }) {
-    return this.prisma.auditLog.findMany({
+  async search(params: { entity?: string; entities?: string[]; entityId?: string; userId?: string; from?: string; to?: string; limit?: number }) {
+    const rows = await this.prisma.auditLog.findMany({
       where: {
         ...(params.entity ? { entity: params.entity } : {}),
+        ...(params.entities && params.entities.length ? { entity: { in: params.entities } } : {}),
         ...(params.entityId ? { entityId: params.entityId } : {}),
         ...(params.userId ? { userId: params.userId } : {}),
         ...(params.from || params.to
@@ -77,5 +78,15 @@ export class AuditService {
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(params.limit ?? 100, 1), 500),
     });
+    // Jamais de mots de passe, jetons ou codes dans les réponses
+    const SECRET = /pass|hash|token|secret|code|pin/i;
+    const clean = (v: unknown): unknown => {
+      if (!v || typeof v !== 'object') return v;
+      if (Array.isArray(v)) return v.map(clean);
+      const o: Record<string, unknown> = {};
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) o[k] = SECRET.test(k) ? '••••' : clean(x);
+      return o;
+    };
+    return rows.map((r) => ({ ...r, oldValue: clean(r.oldValue), newValue: clean(r.newValue), ipAddress: undefined }));
   }
 }
