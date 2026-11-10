@@ -92,6 +92,15 @@
   .topbar h2{margin:0; font-size:18px;}
   .user-chip{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);}
   .user-avatar{width:32px; height:32px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;}
+  .pill-row{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
+  .pill-row .btn.small{border-radius:999px; padding:5px 12px; font-size:12px; line-height:1.3; white-space:nowrap; margin-top:0;}
+  .powered{text-align:center; font-size:10px; color:#9AA7B8; padding:14px 0 10px; letter-spacing:.3px; user-select:none;}
+  .login-card .powered{padding:12px 0 0;}
+  #bell-wrap{position:relative; margin-right:8px;}
+  #bell-btn{position:relative; font-size:16px; padding:3px 9px; line-height:1.2;}
+  #bell-count{position:absolute; top:-6px; right:-6px; background:var(--danger); color:#fff; border-radius:10px; font-size:10px; font-weight:700; min-width:16px; height:16px; line-height:16px; text-align:center; padding:0 4px; display:none;}
+  #bell-panel{display:none; position:absolute; right:0; top:34px; width:min(340px,86vw); max-height:60vh; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); z-index:60; padding:8px;}
+  #bell-panel .msg{margin-top:0; margin-bottom:6px;}
   .btn-ghost{background:none; border:1px solid var(--line); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); cursor:pointer;}
   .btn-ghost:hover{border-color:var(--navy); color:var(--navy);}
 
@@ -222,6 +231,7 @@
     <button class="btn gold" style="width:100%" onclick="login()">Se connecter</button>
     <div id="login-msg"></div>
     <button id="install-btn-login" class="btn-ghost" style="display:none; width:100%; margin-top:12px; text-align:center;" onclick="installApp()">⬇ Installer sur cet appareil</button>
+    <div class="powered">Powered by Syllogistique</div>
   </div>
 </div>
 
@@ -293,6 +303,7 @@
           <span id="draft-note" style="font-size:11px;color:var(--muted)"></span>
           <button id="hist-btn" class="btn-ghost" style="font-size:13px;padding:4px 10px" onclick="openHistory()" aria-label="Historique">🕘 Historique</button>
         </div>
+        <div id="bell-wrap"><button id="bell-btn" class="btn-ghost" onclick="bellToggle()" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel"></div></div>
         <div class="user-chip">
           <select id="site-switch" style="display:none; max-width:170px; margin-right:8px;" onchange="switchSite(this.value)" title="Entrepôt / site actif"></select>
           <button id="install-btn" class="btn-ghost" style="display:none;" onclick="installApp()">⬇ Installer l'application</button>
@@ -304,6 +315,7 @@
         </div>
       </div>
       <div class="content" id="view-root"></div>
+      <div class="powered">Powered by Syllogistique</div>
     </div>
   </div>
 </div>
@@ -316,6 +328,7 @@
     <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil">👤</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
+  <div class="powered" style="padding-bottom:18px">Powered by Syllogistique</div>
   <nav class="drv-tabs" id="drv-tabs">
     <button data-t="missions" onclick="drvTab('missions')"><span>📍</span>Missions</button>
     <button data-t="fuel" onclick="drvTab('fuel')"><span>⛽</span>Carburant</button>
@@ -629,6 +642,64 @@ function liveStart() {
   setTimeout(liveTick, 3000);
 }
 liveStart();
+
+/* ---------- Cloche de notification : alerte immédiate (vérification toutes les 20 s) ---------- */
+const BELL = { ids: null, list: [], timer: null, busy: false };
+function bellBeep() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    BELL.ac = BELL.ac || new AC(); const ac = BELL.ac; if (ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.25, t + .02); g.gain.linearRampToValueAtTime(0, t + .3);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + .32);
+  } catch (e) {}
+}
+function bellToast(text) {
+  let t = document.getElementById('bell-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'bell-toast'; t.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw;cursor:pointer'; t.onclick = () => { t.style.display = 'none'; bellToggle(); }; document.body.appendChild(t); }
+  t.textContent = text; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 6000);
+}
+function bellRender() {
+  const c = document.getElementById('bell-count'), p = document.getElementById('bell-panel');
+  if (c) { c.textContent = BELL.list.length > 99 ? '99+' : BELL.list.length; c.style.display = BELL.list.length ? 'block' : 'none'; }
+  if (p) p.innerHTML = BELL.list.slice(0, 20).map(n => `
+    <div class="msg ${n.severity === 'INFO' ? 'ok' : 'err'}" style="display:flex; justify-content:space-between; gap:8px;">
+      <span>${n.severity === 'CRITICAL' ? '🔴' : n.severity === 'WARNING' ? '🟠' : '🔵'} <b>${esc(n.title)}</b> — ${esc(n.message)}</span>
+      <button class="btn small" onclick="bellRead('${esc(n.id)}')">✓</button>
+    </div>`).join('') || '<div class="desc" style="padding:8px">Aucune alerte non lue.</div>';
+}
+async function bellTick() {
+  if (BELL.busy || !state.accessToken || !state.user || state.user.role === 'CHAUFFEUR' || !navigator.onLine) return;
+  BELL.busy = true;
+  try {
+    const list = await api('/notifications?unreadOnly=true');
+    const ids = new Set(list.map(n => n.id));
+    const fresh = BELL.ids ? list.filter(n => !BELL.ids.has(n.id)) : [];
+    BELL.ids = ids; BELL.list = list; bellRender();
+    if (fresh.length) {
+      bellBeep();
+      const f = fresh[0];
+      bellToast('🔔 ' + f.title + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ')' : ''));
+    }
+  } catch (e) { /* silencieux */ }
+  BELL.busy = false;
+}
+function bellToggle() {
+  const p = document.getElementById('bell-panel'); if (!p) return;
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') bellTick();
+}
+async function bellRead(id) {
+  try { await api('/notifications/' + id + '/read', { method: 'PATCH' }); } catch (e) {}
+  BELL.list = BELL.list.filter(n => n.id !== id); bellRender();
+  if (typeof loadAlerts === 'function') loadAlerts();
+}
+document.addEventListener('click', (e) => {
+  const w = document.getElementById('bell-wrap'), p = document.getElementById('bell-panel');
+  if (p && w && !w.contains(e.target)) p.style.display = 'none';
+});
+BELL.timer = setInterval(bellTick, 20000);
+setTimeout(bellTick, 4000);
 function root() { return document.getElementById('view-root'); }
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR'); }
 // Échappe toute donnée texte avant insertion dans le HTML (protection XSS)
@@ -720,7 +791,7 @@ async function renderDeptDashboard(key) {
     <span class="desc" style="margin-left:auto;">${d.access.scope === 'session' ? 'Vue « ma session de caisse » · ' : ''}Période : ${new Date(d.period.from).toLocaleDateString('fr-FR')} → ${new Date(d.period.to).toLocaleDateString('fr-FR')}</span></div>`;
   const kpis = `<div class="kpi-grid">${(d.kpis || []).map(deptKpiCard).join('')}</div>`;
   const allowed = (d.actions || []).filter((a) => a.allowed && a.available !== false);
-  const actions = allowed.length ? `<div class="panel"><h3 style="margin-top:0;">Actions rapides</h3><div style="display:flex; flex-wrap:wrap; gap:8px;">${allowed.map((a) => `<button class="btn small ${ACTION_FORMS[a.key] ? '' : 'gold'}" style="${ACTION_FORMS[a.key] ? '' : 'opacity:.75;'}" onclick="runAction('${esc(a.key)}')">${esc(a.label)}</button>`).join('')}</div></div>` : '';
+  const actions = allowed.length ? `<div class="panel"><h3 style="margin-top:0;">Actions rapides</h3><div class="pill-row">${allowed.map((a) => `<button class="btn small ${ACTION_FORMS[a.key] ? '' : 'gold'}" style="${ACTION_FORMS[a.key] ? '' : 'opacity:.75;'}" title="${esc(a.label)}" onclick="runAction('${esc(a.key)}')">${esc(key === 'hse' && HSE_SHORT[a.key] ? HSE_SHORT[a.key] : a.label)}</button>`).join('')}</div></div>` : '';
   const wl = Object.entries(d.worklists || {}).map(([k, rows]) => deptWorklist(WL_TITLES[k] || k, rows)).join('');
   const ch = `<div class="grid-2">${Object.entries(d.charts || {}).map(([k, rows]) => deptChart(CH_TITLES[k] || k, rows)).join('')}</div>`;
   root().innerHTML = bar + kpis + actions + ch + wl;
@@ -732,7 +803,46 @@ const nowIso = () => new Date().toISOString();
 const optList = (rows, v, l) => rows.map((r) => [String(v(r)), String(l(r))]);
 const needOpt = (opts, what) => { if (!opts.length) throw new Error(`Aucun(e) ${what} disponible : créez-en d'abord.`); return opts; };
 
+const HSE_SHORT = { declare_incident: 'Incidents', corrective_action: 'Actions correctives', toolbox_talk: 'Causeries', inspection: 'Inspections', ppe: 'EPI', training: 'Formations / Habilitations', worked_hours: 'Heures travaillées' };
+// Personnes suivies nominativement (chauffeurs et agents) pour les EPI et les formations
+async function hsePeople() {
+  const [dr, us] = await Promise.all([api('/drivers?siteId=' + state.siteId).catch(() => []), api('/users').catch(() => [])]);
+  const out = [];
+  (Array.isArray(dr) ? dr : []).forEach((x) => out.push(['D:' + x.id, `🚛 ${x.firstName} ${x.lastName} (chauffeur)`]));
+  (Array.isArray(us) ? us : []).filter((x) => x.role !== 'CHAUFFEUR').forEach((x) => out.push(['U:' + x.id, `👤 ${x.firstName} ${x.lastName}`]));
+  return needOpt(out, 'agent ou chauffeur');
+}
+const hsePerson = (v) => (v && v.startsWith('D:') ? { driverId: v.slice(2) } : v && v.startsWith('U:') ? { userId: v.slice(2) } : {});
+const plusMonths = (n) => { const d = new Date(); d.setMonth(d.getMonth() + n); return d.toISOString().slice(0, 10); };
 const ACTION_FORMS = {
+  async ppe() {
+    const people = await hsePeople();
+    openEditor('Remettre un EPI', [
+      { key: 'person', label: 'Agent / chauffeur', options: people },
+      { key: 'ppeType', label: "Type d'EPI", options: [['CASQUE', 'Casque'], ['GILET', 'Gilet haute visibilité'], ['CHAUSSURES', 'Chaussures de sécurité'], ['GANTS', 'Gants'], ['LUNETTES', 'Lunettes de protection'], ['BOUCHONS', "Bouchons d'oreilles"], ['MASQUE', 'Masque anti-poussière'], ['HARNAIS', 'Harnais'], ['AUTRE', 'Autre']] },
+      { key: 'issuedAt', label: 'Date de remise', type: 'date', value: today10() },
+      { key: 'renewalDue', label: 'À renouveler le', type: 'date', value: plusMonths(12) },
+      { key: 'compliant', label: 'État', options: [['true', 'Conforme'], ['false', 'À remplacer']] },
+    ], async (d) => {
+      await api('/hse/ppe', { method: 'POST', body: { siteId: state.siteId, ppeType: d.ppeType, issuedAt: new Date(d.issuedAt).toISOString(), ...(d.renewalDue ? { renewalDue: new Date(d.renewalDue).toISOString() } : {}), compliant: d.compliant !== 'false', ...hsePerson(d.person) } });
+      refreshDept();
+    });
+  },
+  async training() {
+    const people = await hsePeople();
+    openEditor('Enregistrer une formation / habilitation', [
+      { key: 'person', label: 'Agent / chauffeur', options: people },
+      { key: 'kind', label: 'Formation / habilitation', options: [['Secourisme (SST)', 'Secourisme (SST)'], ['Conduite défensive', 'Conduite défensive'], ['Habilitation électrique', 'Habilitation électrique'], ['Travail en hauteur', 'Travail en hauteur'], ['Lutte contre l\'incendie', "Lutte contre l'incendie"], ['Matières dangereuses (ADR)', 'Matières dangereuses (ADR)'], ['Manutention / engins', 'Manutention / engins'], ['Accueil sécurité', 'Accueil sécurité'], ['', 'Autre (précisez ci-dessous)']] },
+      { key: 'other', label: 'Intitulé si « Autre »' },
+      { key: 'obtainedAt', label: "Date d'obtention", type: 'date', value: today10() },
+      { key: 'expiresAt', label: "Date d'expiration (si elle existe)", type: 'date' },
+    ], async (d) => {
+      const title = (d.kind || d.other || '').trim();
+      if (!title) throw new Error("Choisissez ou précisez l'intitulé de la formation.");
+      await api('/hse/trainings', { method: 'POST', body: { title, obtainedAt: new Date(d.obtainedAt).toISOString(), ...(d.expiresAt ? { expiresAt: new Date(d.expiresAt).toISOString() } : {}), ...hsePerson(d.person) } });
+      refreshDept();
+    });
+  },
   async new_order() {
     const [sup, items] = await Promise.all([api('/suppliers'), api('/inventory/items?siteId=' + state.siteId)]);
     openEditor('Nouveau bon de commande', [
@@ -922,13 +1032,15 @@ const ACTION_FORMS = {
 
 async function stockMove(dir) {
   const items = await api('/inventory/items?siteId=' + state.siteId);
+  const fleet = dir === 'out' ? await api('/vehicles?siteId=' + state.siteId).catch(() => []) : [];
   const fields = [
     { key: 'itemId', label: 'Article', options: needOpt(optList(items, (x) => x.id, (x) => `${x.name} (${x.currentQuantity} ${x.unit || ''})`), 'article') },
     { key: 'quantity', label: 'Quantité', type: 'number' },
     { key: 'reason', label: 'Motif' },
   ];
   if (dir === 'in') fields.push({ key: 'unitPrice', label: 'Prix unitaire (GNF)', type: 'number' }, { key: 'lotNumber', label: 'N° de lot (obligatoire si périssable)' }, { key: 'expiryDate', label: 'Date de péremption', type: 'date' });
-  else fields.push({ key: 'reasonCode', label: 'Nature de la sortie', options: [['CONSUMPTION', 'Consommation'], ['SALE', 'Vente'], ['LOSS', 'Perte / vol'], ['BREAKAGE', 'Casse'], ['SCRAP', 'Rebut'], ['DONATION', 'Don']] });
+  else fields.push({ key: 'reasonCode', label: 'Nature de la sortie', options: [['CONSUMPTION', 'Consommation'], ['SALE', 'Vente'], ['LOSS', 'Perte / vol'], ['BREAKAGE', 'Casse'], ['SCRAP', 'Rebut'], ['DONATION', 'Don']] },
+    { key: 'vehicleId', label: 'Imputer à (camion / véhicule, facultatif)', options: [['', '— Aucun —'], ...(Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1)).map(v => [String(v.id), `${v.vehicleType === 'TRUCK' ? '🚛' : '🚙'} ${v.internalNumber || ''} — ${v.registrationNumber || ''}`])] });
   openEditor(dir === 'in' ? 'Entrée de stock' : 'Sortie de stock', fields, async (d) => {
     const body = { ...d, siteId: state.siteId };
     if (body.expiryDate) body.expiryDate = new Date(body.expiryDate).toISOString();
@@ -947,8 +1059,6 @@ const ACTION_FALLBACK = {
   locations: 'L\'écran des emplacements arrive dans une prochaine version.',
   reorder: 'Utilisez le menu Achats (réapprovisionnement).',
   supplier_invoice: 'Utilisez le menu Achats.',
-  ppe: 'L\'écran de remise d\'EPI arrive dans une prochaine version.',
-  training: 'L\'écran des formations arrive dans une prochaine version.',
 };
 function refreshDept() { if (state.view && state.view.startsWith('dash-')) renderView(state.view); }
 async function runAction(key) {
@@ -1513,11 +1623,44 @@ async function createMaintenance() {
 }
 
 /* ---------------- STOCK ---------------- */
+/* ---------------- Catalogue logistique pré-rempli (saisie libre toujours possible) ---------------- */
+const STOCK_UNITS = ['Pièce', 'Carton', 'Sac', 'Litre', 'Fût', 'Bidon', 'Kg', 'Tonne', 'Mètre', 'Palette', 'Boîte', 'Rouleau', 'Paire', 'Jeu', 'Bouteille', 'Autre…'];
+const STOCK_CATALOG = [
+  ['Filtre à huile', 'Pièce'], ['Filtre à air', 'Pièce'], ['Filtre à gasoil', 'Pièce'], ['Filtre hydraulique', 'Pièce'],
+  ['Huile moteur 15W40', 'Litre'], ['Huile hydraulique', 'Fût'], ['Huile de boîte / pont', 'Litre'], ['Graisse', 'Kg'],
+  ['Liquide de refroidissement', 'Bidon'], ['Liquide de frein', 'Bouteille'], ['Gasoil', 'Litre'], ['AdBlue', 'Bidon'],
+  ['Pneu camion', 'Pièce'], ['Pneu véhicule léger', 'Pièce'], ['Chambre à air', 'Pièce'], ['Batterie 12V', 'Pièce'],
+  ['Plaquettes de frein', 'Jeu'], ['Disque de frein', 'Pièce'], ['Courroie', 'Pièce'], ['Ampoule / phare', 'Pièce'],
+  ['Fusible', 'Boîte'], ['Câble électrique', 'Rouleau'], ['Boulonnerie', 'Boîte'], ['Joint', 'Pièce'],
+  ['Casque de sécurité', 'Pièce'], ['Gants de protection', 'Paire'], ['Chaussures de sécurité', 'Paire'], ['Gilet haute visibilité', 'Pièce'],
+  ['Lunettes de protection', 'Pièce'], ['Bouchons d\'oreilles', 'Boîte'], ['Masque anti-poussière', 'Boîte'], ['Extincteur', 'Pièce'],
+  ['Trousse de premiers secours', 'Pièce'], ['Triangle de signalisation', 'Pièce'], ['Sangle d\'arrimage', 'Pièce'], ['Bâche', 'Pièce'],
+  ['Ciment', 'Sac'], ['Sable', 'Tonne'], ['Gravier', 'Tonne'], ['Fer à béton', 'Pièce'], ['Carton d\'emballage', 'Carton'],
+  ['Palette bois', 'Palette'], ['Film étirable', 'Rouleau'], ['Papier / fournitures de bureau', 'Carton'],
+];
+function stockUnitPick() {
+  const sel = document.getElementById('i-unit'), other = document.getElementById('i-unit-other');
+  if (other) other.style.display = sel && sel.value === 'Autre…' ? 'block' : 'none';
+}
+function stockUnitValue() {
+  const sel = document.getElementById('i-unit'); if (!sel) return 'pièce';
+  if (sel.value === 'Autre…') return (document.getElementById('i-unit-other').value || '').trim() || 'pièce';
+  return sel.value.toLowerCase() === 'pièce' ? 'pièce' : sel.value;
+}
+function stockNamePick() {
+  const n = (document.getElementById('i-name').value || '').trim().toLowerCase();
+  const hit = STOCK_CATALOG.find(c => c[0].toLowerCase() === n);
+  const sel = document.getElementById('i-unit');
+  if (hit && sel) { sel.value = hit[1]; stockUnitPick(); }
+}
 async function renderStock() {
-  const [items, valuation] = await Promise.all([
+  const [items, valuation, fleet] = await Promise.all([
     api('/inventory/items?siteId=' + state.siteId),
     api('/inventory/valuation?siteId=' + state.siteId),
+    api('/vehicles?siteId=' + state.siteId).catch(() => []),
   ]);
+  const vehOptions = (Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1))
+    .map(v => `<option value="${esc(v.id)}">${v.vehicleType === 'TRUCK' ? '🚛' : '🚙'} ${esc(v.internalNumber || '')} — ${esc(v.registrationNumber || '')}</option>`).join('');
   const rows = items.map(i => `
     <tr><td><b>${esc(i.sku)}</b></td><td>${esc(i.name)}</td>
     <td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td>
@@ -1526,7 +1669,7 @@ async function renderStock() {
     <td>${esc(i.location || '—')}</td>
     <td>${Number(i.currentQuantity) <= 0 ? '<span class="badge bad">Rupture</span>' : Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge bad">Sous seuil</span>' : (i.maximumQuantity !== null && i.maximumQuantity !== undefined && Number(i.currentQuantity) > Number(i.maximumQuantity)) ? '<span class="badge">Au-dessus du max</span>' : '<span class="badge ok">OK</span>'}</td>
     <td><button class="btn small" onclick="editThresholds('${esc(i.id)}', ${Number(i.minimumQuantity)}, ${i.maximumQuantity === null || i.maximumQuantity === undefined ? 'null' : Number(i.maximumQuantity)})">Seuils</button></td></tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun article enregistré.</td></tr>`;
-  const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)}</option>`).join('');
+  const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)} (${fmt(i.currentQuantity)} ${esc(i.unit)})</option>`).join('');
 
   root().innerHTML = `
     <div class="kpi-grid">
@@ -1538,8 +1681,10 @@ async function renderStock() {
       <h3>➕ Nouvel article</h3>
       <div class="grid-2">
         <div><label>Code (SKU)</label><input id="i-sku" /></div>
-        <div><label>Désignation</label><input id="i-name" /></div>
-        <div><label>Unité</label><input id="i-unit" placeholder="pièce, litre, kg…" /></div>
+        <div><label>Désignation</label><input id="i-name" list="stock-catalog" autocomplete="off" placeholder="Saisie libre ou choisir dans la liste" oninput="stockNamePick()" />
+          <datalist id="stock-catalog">${STOCK_CATALOG.map(c => `<option value="${esc(c[0])}"></option>`).join('')}</datalist></div>
+        <div><label>Unité</label><select id="i-unit" onchange="stockUnitPick()">${STOCK_UNITS.map(u => `<option>${esc(u)}</option>`).join('')}</select>
+          <input id="i-unit-other" placeholder="Précisez l'unité" style="display:none; margin-top:6px;" /></div>
         <div><label>Seuil minimum (alerte)</label><input id="i-min" type="number" /></div>
         <div><label>Seuil maximum (alerte, optionnel)</label><input id="i-max" type="number" /></div>
         <div><label>Entrepôt / emplacement</label><input id="i-loc" placeholder="Ex : Entrepôt A, citerne 1…" /></div>
@@ -1553,9 +1698,12 @@ async function renderStock() {
         <div><label>Article</label><select id="mv-item">${itemOptions}</select></div>
         <div><label>Quantité</label><input id="mv-qty" type="number" step="0.01" /></div>
         <div><label>Motif (obligatoire)</label><input id="mv-reason" placeholder="Ex : approvisionnement, livraison, dépotage…" /></div>
+        <div><label>Imputer à (sortie : camion / véhicule)</label><select id="mv-veh"><option value="">— Aucun —</option>${vehOptions}</select></div>
       </div>
-      <button class="btn" onclick="stockMove('in')">➕ Entrée</button>
-      <button class="btn" style="background:var(--danger); margin-left:8px;" onclick="stockMove('out')">➖ Sortie</button>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn small" style="background:var(--success); margin-top:0;" onclick="stockMovePanel('in')" aria-label="Entrée de stock">＋ Entrée</button>
+        <button class="btn small" style="background:var(--danger); margin-top:0;" onclick="stockMovePanel('out')" aria-label="Sortie de stock">－ Sortie</button>
+      </div>
       <div id="mv-msg"></div>
     </div>
     <div class="panel">
@@ -1607,7 +1755,7 @@ async function createItem() {
       siteId: state.siteId,
       sku: document.getElementById('i-sku').value,
       name: document.getElementById('i-name').value,
-      unit: document.getElementById('i-unit').value || 'pièce',
+      unit: stockUnitValue(),
       minimumQuantity: Number(document.getElementById('i-min').value) || 0,
       ...(document.getElementById('i-max').value ? { maximumQuantity: Number(document.getElementById('i-max').value) } : {}),
       ...(document.getElementById('i-loc').value.trim() ? { location: document.getElementById('i-loc').value.trim() } : {}),
@@ -1665,14 +1813,16 @@ async function transferStock() {
     setTimeout(renderStock, 1800);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
-async function stockMove(direction) {
+async function stockMovePanel(direction) {
   const msg = document.getElementById('mv-msg');
   try {
+    const veh = document.getElementById('mv-veh') ? document.getElementById('mv-veh').value : '';
     await api('/inventory/movements/' + direction, { method: 'POST', body: {
       itemId: document.getElementById('mv-item').value,
       siteId: state.siteId,
       quantity: Number(document.getElementById('mv-qty').value),
       reason: document.getElementById('mv-reason').value,
+      ...(direction === 'out' && veh ? { vehicleId: veh } : {}),
     }});
     msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
     renderStock();
