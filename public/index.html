@@ -991,13 +991,15 @@ const ACTION_FORMS = {
 
 async function stockMove(dir) {
   const items = await api('/inventory/items?siteId=' + state.siteId);
+  const fleet = dir === 'out' ? await api('/vehicles?siteId=' + state.siteId).catch(() => []) : [];
   const fields = [
     { key: 'itemId', label: 'Article', options: needOpt(optList(items, (x) => x.id, (x) => `${x.name} (${x.currentQuantity} ${x.unit || ''})`), 'article') },
     { key: 'quantity', label: 'Quantité', type: 'number' },
     { key: 'reason', label: 'Motif' },
   ];
   if (dir === 'in') fields.push({ key: 'unitPrice', label: 'Prix unitaire (GNF)', type: 'number' }, { key: 'lotNumber', label: 'N° de lot (obligatoire si périssable)' }, { key: 'expiryDate', label: 'Date de péremption', type: 'date' });
-  else fields.push({ key: 'reasonCode', label: 'Nature de la sortie', options: [['CONSUMPTION', 'Consommation'], ['SALE', 'Vente'], ['LOSS', 'Perte / vol'], ['BREAKAGE', 'Casse'], ['SCRAP', 'Rebut'], ['DONATION', 'Don']] });
+  else fields.push({ key: 'reasonCode', label: 'Nature de la sortie', options: [['CONSUMPTION', 'Consommation'], ['SALE', 'Vente'], ['LOSS', 'Perte / vol'], ['BREAKAGE', 'Casse'], ['SCRAP', 'Rebut'], ['DONATION', 'Don']] },
+    { key: 'vehicleId', label: 'Imputer à (camion / véhicule, facultatif)', options: [['', '— Aucun —'], ...(Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1)).map(v => [String(v.id), `${v.vehicleType === 'TRUCK' ? '🚛' : '🚙'} ${v.internalNumber || ''} — ${v.registrationNumber || ''}`])] });
   openEditor(dir === 'in' ? 'Entrée de stock' : 'Sortie de stock', fields, async (d) => {
     const body = { ...d, siteId: state.siteId };
     if (body.expiryDate) body.expiryDate = new Date(body.expiryDate).toISOString();
@@ -1582,11 +1584,44 @@ async function createMaintenance() {
 }
 
 /* ---------------- STOCK ---------------- */
+/* ---------------- Catalogue logistique pré-rempli (saisie libre toujours possible) ---------------- */
+const STOCK_UNITS = ['Pièce', 'Carton', 'Sac', 'Litre', 'Fût', 'Bidon', 'Kg', 'Tonne', 'Mètre', 'Palette', 'Boîte', 'Rouleau', 'Paire', 'Jeu', 'Bouteille', 'Autre…'];
+const STOCK_CATALOG = [
+  ['Filtre à huile', 'Pièce'], ['Filtre à air', 'Pièce'], ['Filtre à gasoil', 'Pièce'], ['Filtre hydraulique', 'Pièce'],
+  ['Huile moteur 15W40', 'Litre'], ['Huile hydraulique', 'Fût'], ['Huile de boîte / pont', 'Litre'], ['Graisse', 'Kg'],
+  ['Liquide de refroidissement', 'Bidon'], ['Liquide de frein', 'Bouteille'], ['Gasoil', 'Litre'], ['AdBlue', 'Bidon'],
+  ['Pneu camion', 'Pièce'], ['Pneu véhicule léger', 'Pièce'], ['Chambre à air', 'Pièce'], ['Batterie 12V', 'Pièce'],
+  ['Plaquettes de frein', 'Jeu'], ['Disque de frein', 'Pièce'], ['Courroie', 'Pièce'], ['Ampoule / phare', 'Pièce'],
+  ['Fusible', 'Boîte'], ['Câble électrique', 'Rouleau'], ['Boulonnerie', 'Boîte'], ['Joint', 'Pièce'],
+  ['Casque de sécurité', 'Pièce'], ['Gants de protection', 'Paire'], ['Chaussures de sécurité', 'Paire'], ['Gilet haute visibilité', 'Pièce'],
+  ['Lunettes de protection', 'Pièce'], ['Bouchons d\'oreilles', 'Boîte'], ['Masque anti-poussière', 'Boîte'], ['Extincteur', 'Pièce'],
+  ['Trousse de premiers secours', 'Pièce'], ['Triangle de signalisation', 'Pièce'], ['Sangle d\'arrimage', 'Pièce'], ['Bâche', 'Pièce'],
+  ['Ciment', 'Sac'], ['Sable', 'Tonne'], ['Gravier', 'Tonne'], ['Fer à béton', 'Pièce'], ['Carton d\'emballage', 'Carton'],
+  ['Palette bois', 'Palette'], ['Film étirable', 'Rouleau'], ['Papier / fournitures de bureau', 'Carton'],
+];
+function stockUnitPick() {
+  const sel = document.getElementById('i-unit'), other = document.getElementById('i-unit-other');
+  if (other) other.style.display = sel && sel.value === 'Autre…' ? 'block' : 'none';
+}
+function stockUnitValue() {
+  const sel = document.getElementById('i-unit'); if (!sel) return 'pièce';
+  if (sel.value === 'Autre…') return (document.getElementById('i-unit-other').value || '').trim() || 'pièce';
+  return sel.value.toLowerCase() === 'pièce' ? 'pièce' : sel.value;
+}
+function stockNamePick() {
+  const n = (document.getElementById('i-name').value || '').trim().toLowerCase();
+  const hit = STOCK_CATALOG.find(c => c[0].toLowerCase() === n);
+  const sel = document.getElementById('i-unit');
+  if (hit && sel) { sel.value = hit[1]; stockUnitPick(); }
+}
 async function renderStock() {
-  const [items, valuation] = await Promise.all([
+  const [items, valuation, fleet] = await Promise.all([
     api('/inventory/items?siteId=' + state.siteId),
     api('/inventory/valuation?siteId=' + state.siteId),
+    api('/vehicles?siteId=' + state.siteId).catch(() => []),
   ]);
+  const vehOptions = (Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1))
+    .map(v => `<option value="${esc(v.id)}">${v.vehicleType === 'TRUCK' ? '🚛' : '🚙'} ${esc(v.internalNumber || '')} — ${esc(v.registrationNumber || '')}</option>`).join('');
   const rows = items.map(i => `
     <tr><td><b>${esc(i.sku)}</b></td><td>${esc(i.name)}</td>
     <td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td>
@@ -1595,7 +1630,7 @@ async function renderStock() {
     <td>${esc(i.location || '—')}</td>
     <td>${Number(i.currentQuantity) <= 0 ? '<span class="badge bad">Rupture</span>' : Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge bad">Sous seuil</span>' : (i.maximumQuantity !== null && i.maximumQuantity !== undefined && Number(i.currentQuantity) > Number(i.maximumQuantity)) ? '<span class="badge">Au-dessus du max</span>' : '<span class="badge ok">OK</span>'}</td>
     <td><button class="btn small" onclick="editThresholds('${esc(i.id)}', ${Number(i.minimumQuantity)}, ${i.maximumQuantity === null || i.maximumQuantity === undefined ? 'null' : Number(i.maximumQuantity)})">Seuils</button></td></tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun article enregistré.</td></tr>`;
-  const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)}</option>`).join('');
+  const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)} (${fmt(i.currentQuantity)} ${esc(i.unit)})</option>`).join('');
 
   root().innerHTML = `
     <div class="kpi-grid">
@@ -1607,8 +1642,10 @@ async function renderStock() {
       <h3>➕ Nouvel article</h3>
       <div class="grid-2">
         <div><label>Code (SKU)</label><input id="i-sku" /></div>
-        <div><label>Désignation</label><input id="i-name" /></div>
-        <div><label>Unité</label><input id="i-unit" placeholder="pièce, litre, kg…" /></div>
+        <div><label>Désignation</label><input id="i-name" list="stock-catalog" autocomplete="off" placeholder="Saisie libre ou choisir dans la liste" oninput="stockNamePick()" />
+          <datalist id="stock-catalog">${STOCK_CATALOG.map(c => `<option value="${esc(c[0])}"></option>`).join('')}</datalist></div>
+        <div><label>Unité</label><select id="i-unit" onchange="stockUnitPick()">${STOCK_UNITS.map(u => `<option>${esc(u)}</option>`).join('')}</select>
+          <input id="i-unit-other" placeholder="Précisez l'unité" style="display:none; margin-top:6px;" /></div>
         <div><label>Seuil minimum (alerte)</label><input id="i-min" type="number" /></div>
         <div><label>Seuil maximum (alerte, optionnel)</label><input id="i-max" type="number" /></div>
         <div><label>Entrepôt / emplacement</label><input id="i-loc" placeholder="Ex : Entrepôt A, citerne 1…" /></div>
@@ -1622,9 +1659,12 @@ async function renderStock() {
         <div><label>Article</label><select id="mv-item">${itemOptions}</select></div>
         <div><label>Quantité</label><input id="mv-qty" type="number" step="0.01" /></div>
         <div><label>Motif (obligatoire)</label><input id="mv-reason" placeholder="Ex : approvisionnement, livraison, dépotage…" /></div>
+        <div><label>Imputer à (sortie : camion / véhicule)</label><select id="mv-veh"><option value="">— Aucun —</option>${vehOptions}</select></div>
       </div>
-      <button class="btn" onclick="stockMove('in')">➕ Entrée</button>
-      <button class="btn" style="background:var(--danger); margin-left:8px;" onclick="stockMove('out')">➖ Sortie</button>
+      <div style="display:flex; gap:8px; margin-top:14px;">
+        <button class="btn small" style="background:var(--success); margin-top:0;" onclick="stockMovePanel('in')" aria-label="Entrée de stock">＋ Entrée</button>
+        <button class="btn small" style="background:var(--danger); margin-top:0;" onclick="stockMovePanel('out')" aria-label="Sortie de stock">－ Sortie</button>
+      </div>
       <div id="mv-msg"></div>
     </div>
     <div class="panel">
@@ -1676,7 +1716,7 @@ async function createItem() {
       siteId: state.siteId,
       sku: document.getElementById('i-sku').value,
       name: document.getElementById('i-name').value,
-      unit: document.getElementById('i-unit').value || 'pièce',
+      unit: stockUnitValue(),
       minimumQuantity: Number(document.getElementById('i-min').value) || 0,
       ...(document.getElementById('i-max').value ? { maximumQuantity: Number(document.getElementById('i-max').value) } : {}),
       ...(document.getElementById('i-loc').value.trim() ? { location: document.getElementById('i-loc').value.trim() } : {}),
@@ -1734,14 +1774,16 @@ async function transferStock() {
     setTimeout(renderStock, 1800);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
-async function stockMove(direction) {
+async function stockMovePanel(direction) {
   const msg = document.getElementById('mv-msg');
   try {
+    const veh = document.getElementById('mv-veh') ? document.getElementById('mv-veh').value : '';
     await api('/inventory/movements/' + direction, { method: 'POST', body: {
       itemId: document.getElementById('mv-item').value,
       siteId: state.siteId,
       quantity: Number(document.getElementById('mv-qty').value),
       reason: document.getElementById('mv-reason').value,
+      ...(direction === 'out' && veh ? { vehicleId: veh } : {}),
     }});
     msg.innerHTML = `<div class="msg ok">${direction === 'in' ? 'Entrée' : 'Sortie'} enregistrée — stock recalculé.</div>`;
     renderStock();
