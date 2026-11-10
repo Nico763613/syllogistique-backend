@@ -1,0 +1,13 @@
+{
+  "name": "syllogistique-master",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SYLLOGISTIQUE MASTER — tableau de bord privé du propriétaire (licences, clients, appareils)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "NODE_PATH=test/shim_modules node --test test/master.test.js"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": { "pg": "^8.11.3" }
+}
