@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>SYLLOGISTIQUE — Gestion Logistique &amp; Flotte</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#163A5F">
@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="SYLLOGISTIQUE">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -92,6 +92,11 @@
   .topbar h2{margin:0; font-size:18px;}
   .user-chip{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);}
   .user-avatar{width:32px; height:32px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;}
+  .drv-tabs{padding-bottom:env(safe-area-inset-bottom);}
+  #driver-app{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
+  #install-help .step{display:flex; gap:10px; align-items:flex-start; margin:8px 0; font-size:13px; line-height:1.4;}
+  #install-help .step b.n{background:var(--navy); color:#fff; border-radius:50%; min-width:22px; height:22px; line-height:22px; text-align:center; font-size:12px;}
+  #install-help h4{margin:14px 0 4px; font-size:13px; color:var(--navy);}
   .pill-row{display:flex; flex-wrap:wrap; gap:6px; align-items:center;}
   .pill-row .btn.small{border-radius:999px; padding:5px 12px; font-size:12px; line-height:1.3; white-space:nowrap; margin-top:0;}
   .powered{text-align:center; font-size:10px; color:#9AA7B8; padding:14px 0 10px; letter-spacing:.3px; user-select:none;}
@@ -2416,36 +2421,54 @@ if ('serviceWorker' in navigator) {
 }
 
 let deferredInstallPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-  deferredInstallPrompt = e;
-  document.getElementById('install-btn').style.display = 'inline-flex';
-  document.getElementById('install-btn-login').style.display = 'block';
-});
-
-async function installApp() {
-  if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  await deferredInstallPrompt.userChoice;
-  deferredInstallPrompt = null;
-  document.getElementById('install-btn').style.display = 'none';
-  document.getElementById('install-btn-login').style.display = 'none';
-}
-
-window.addEventListener('appinstalled', () => {
-  document.getElementById('install-btn').style.display = 'none';
-  document.getElementById('install-btn-login').style.display = 'none';
-});
-
-// iOS Safari ne déclenche pas beforeinstallprompt : instructions manuelles
-const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isAndroid = /Android/i.test(navigator.userAgent);
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-if (isIOS && !isStandalone) {
-  const hint = document.getElementById('install-btn-login');
-  hint.style.display = 'block';
-  hint.textContent = '📲 Installer : bouton Partager → "Sur l\'écran d\'accueil"';
-  hint.onclick = null;
+// Navigateur intégré (WhatsApp, Facebook…) : l'installation n'y est pas possible, il faut ouvrir le lien dans Chrome ou Safari
+const inAppBrowser = /; wv\)|FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(navigator.userAgent) || (isIOS && !/Safari\//.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent));
+function installBtns(show) {
+  ['install-btn', 'install-btn-login'].forEach((id) => {
+    const b = document.getElementById(id); if (!b) return;
+    b.style.display = show ? (id === 'install-btn' ? 'inline-flex' : 'block') : 'none';
+    if (show) b.textContent = id === 'install-btn' ? '⬇ Installer l\'application' : '⬇ Installer l\'application sur cet appareil';
+  });
 }
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredInstallPrompt = e; installBtns(true); });
+async function installApp() {
+  if (deferredInstallPrompt && !inAppBrowser) {
+    deferredInstallPrompt.prompt();
+    const r = await deferredInstallPrompt.userChoice.catch(() => null);
+    deferredInstallPrompt = null;
+    if (r && r.outcome === 'accepted') installBtns(false);
+    return;
+  }
+  installHelp();
+}
+function installHelp() {
+  const old = document.getElementById('install-help'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'install-help';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1500;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
+  const url = location.href.split('#')[0];
+  const step = (n, t) => `<div class="step"><b class="n">${n}</b><span>${t}</span></div>`;
+  const me = inAppBrowser ? `<div class="msg err" style="margin-top:0">Vous êtes dans un navigateur intégré (WhatsApp, Facebook…) : l'installation n'y fonctionne pas.<br><b>Copiez le lien, puis ouvrez-le dans ${isIOS ? 'Safari' : 'Chrome'}.</b>
+      <div style="margin-top:8px"><button class="btn small" onclick="installCopy()">📋 Copier le lien</button></div></div>` : '';
+  const android = `<h4>📱 Android (téléphone ou tablette)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b>.')}${step(2, 'Appuyez sur le menu <b>⋮</b> (en haut à droite).')}${step(3, 'Choisissez <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>, puis confirmez.')}`;
+  const ios = `<h4>🍎 iPhone / iPad</h4>${step(1, 'Ouvrez le lien dans <b>Safari</b> (pas dans WhatsApp ni Chrome).')}${step(2, 'Appuyez sur <b>Partager</b> (le carré avec une flèche vers le haut).')}${step(3, 'Faites défiler et choisissez <b>« Sur l\'écran d\'accueil »</b>, puis <b>Ajouter</b>.')}`;
+  const pc = `<h4>💻 Ordinateur (Windows, Mac, Linux)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b> ou <b>Edge</b>.')}${step(2, 'Cliquez sur l\'icône <b>Installer</b> (un écran avec une flèche) à droite de la barre d\'adresse.')}${step(3, 'Cliquez sur <b>Installer</b> : l\'application s\'ouvre dans sa propre fenêtre.')}`;
+  const order = isIOS ? [ios, android, pc] : isAndroid ? [android, ios, pc] : [pc, android, ios];
+  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;margin:20px auto;"><h3 style="margin-top:0">📲 Installer l'application</h3>${me}${order.join('')}
+    <div class="desc" style="margin-top:12px">Une fois installée, l'application s'ouvre comme une application normale et garde vos saisies hors connexion.</div>
+    <div style="margin-top:12px"><button class="btn gold" onclick="document.getElementById('install-help').remove()">Fermer</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function installCopy() {
+  const url = location.href.split('#')[0];
+  try { await navigator.clipboard.writeText(url); alert('Lien copié. Ouvrez-le maintenant dans ' + (isIOS ? 'Safari' : 'Chrome') + '.'); }
+  catch (e) { prompt('Copiez ce lien puis ouvrez-le dans ' + (isIOS ? 'Safari' : 'Chrome') + ' :', url); }
+}
+window.addEventListener('appinstalled', () => installBtns(false));
+// Toujours proposer l'installation tant que l'application n'est pas installée (aide pas à pas si le navigateur ne propose pas l'invite)
+if (!isStandalone) installBtns(true);
 </script>
 <script>
 /* ============================================================
