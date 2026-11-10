@@ -2,12 +2,13 @@
 // Met en cache uniquement l'interface (HTML/manifest/icônes), pas les données de l'API.
 // Les données restent toujours à jour car chaque appel /api reste en direct (network).
 
-const CACHE_NAME = 'syllogistique-shell-v38';
+const CACHE_NAME = 'syllogistique-shell-v39';
 const SHELL_FILES = [
   './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
+  './icon-180.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -29,6 +30,8 @@ self.addEventListener('fetch', (event) => {
 
   // Ne jamais intercepter les appels vers l'API (autre origine ou /api) : toujours en direct.
   if (url.origin !== self.location.origin) return;
+  // Seules les lectures sont mises en cache (jamais les envois de données).
+  if (event.request.method !== 'GET') return;
 
   // Interface (même origine) : RÉSEAU D'ABORD pour toujours afficher la dernière version ;
   // le cache ne sert qu'en secours hors connexion.
@@ -41,6 +44,6 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request)),
+      .catch(() => caches.match(event.request).then((r) => r || (event.request.mode === 'navigate' ? caches.match('./index.html') : undefined))),
   );
 });
