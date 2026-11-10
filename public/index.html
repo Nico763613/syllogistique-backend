@@ -92,6 +92,13 @@
   .topbar h2{margin:0; font-size:18px;}
   .user-chip{display:flex; align-items:center; gap:10px; font-size:13px; color:var(--muted);}
   .user-avatar{width:32px; height:32px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;}
+  .powered{text-align:center; font-size:10px; color:#9AA7B8; padding:14px 0 10px; letter-spacing:.3px; user-select:none;}
+  .login-card .powered{padding:12px 0 0;}
+  #bell-wrap{position:relative; margin-right:8px;}
+  #bell-btn{position:relative; font-size:16px; padding:3px 9px; line-height:1.2;}
+  #bell-count{position:absolute; top:-6px; right:-6px; background:var(--danger); color:#fff; border-radius:10px; font-size:10px; font-weight:700; min-width:16px; height:16px; line-height:16px; text-align:center; padding:0 4px; display:none;}
+  #bell-panel{display:none; position:absolute; right:0; top:34px; width:min(340px,86vw); max-height:60vh; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); z-index:60; padding:8px;}
+  #bell-panel .msg{margin-top:0; margin-bottom:6px;}
   .btn-ghost{background:none; border:1px solid var(--line); border-radius:8px; padding:6px 12px; font-size:12px; color:var(--muted); cursor:pointer;}
   .btn-ghost:hover{border-color:var(--navy); color:var(--navy);}
 
@@ -222,6 +229,7 @@
     <button class="btn gold" style="width:100%" onclick="login()">Se connecter</button>
     <div id="login-msg"></div>
     <button id="install-btn-login" class="btn-ghost" style="display:none; width:100%; margin-top:12px; text-align:center;" onclick="installApp()">⬇ Installer sur cet appareil</button>
+    <div class="powered">Powered by Syllogistique</div>
   </div>
 </div>
 
@@ -293,6 +301,7 @@
           <span id="draft-note" style="font-size:11px;color:var(--muted)"></span>
           <button id="hist-btn" class="btn-ghost" style="font-size:13px;padding:4px 10px" onclick="openHistory()" aria-label="Historique">🕘 Historique</button>
         </div>
+        <div id="bell-wrap"><button id="bell-btn" class="btn-ghost" onclick="bellToggle()" aria-label="Notifications">🔔<span id="bell-count"></span></button><div id="bell-panel"></div></div>
         <div class="user-chip">
           <select id="site-switch" style="display:none; max-width:170px; margin-right:8px;" onchange="switchSite(this.value)" title="Entrepôt / site actif"></select>
           <button id="install-btn" class="btn-ghost" style="display:none;" onclick="installApp()">⬇ Installer l'application</button>
@@ -304,6 +313,7 @@
         </div>
       </div>
       <div class="content" id="view-root"></div>
+      <div class="powered">Powered by Syllogistique</div>
     </div>
   </div>
 </div>
@@ -316,6 +326,7 @@
     <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil">👤</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
+  <div class="powered" style="padding-bottom:18px">Powered by Syllogistique</div>
   <nav class="drv-tabs" id="drv-tabs">
     <button data-t="missions" onclick="drvTab('missions')"><span>📍</span>Missions</button>
     <button data-t="fuel" onclick="drvTab('fuel')"><span>⛽</span>Carburant</button>
@@ -629,6 +640,64 @@ function liveStart() {
   setTimeout(liveTick, 3000);
 }
 liveStart();
+
+/* ---------- Cloche de notification : alerte immédiate (vérification toutes les 20 s) ---------- */
+const BELL = { ids: null, list: [], timer: null, busy: false };
+function bellBeep() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    BELL.ac = BELL.ac || new AC(); const ac = BELL.ac; if (ac.state === 'suspended') ac.resume();
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+    o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.25, t + .02); g.gain.linearRampToValueAtTime(0, t + .3);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + .32);
+  } catch (e) {}
+}
+function bellToast(text) {
+  let t = document.getElementById('bell-toast');
+  if (!t) { t = document.createElement('div'); t.id = 'bell-toast'; t.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13px;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw;cursor:pointer'; t.onclick = () => { t.style.display = 'none'; bellToggle(); }; document.body.appendChild(t); }
+  t.textContent = text; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = 'none'; }, 6000);
+}
+function bellRender() {
+  const c = document.getElementById('bell-count'), p = document.getElementById('bell-panel');
+  if (c) { c.textContent = BELL.list.length > 99 ? '99+' : BELL.list.length; c.style.display = BELL.list.length ? 'block' : 'none'; }
+  if (p) p.innerHTML = BELL.list.slice(0, 20).map(n => `
+    <div class="msg ${n.severity === 'INFO' ? 'ok' : 'err'}" style="display:flex; justify-content:space-between; gap:8px;">
+      <span>${n.severity === 'CRITICAL' ? '🔴' : n.severity === 'WARNING' ? '🟠' : '🔵'} <b>${esc(n.title)}</b> — ${esc(n.message)}</span>
+      <button class="btn small" onclick="bellRead('${esc(n.id)}')">✓</button>
+    </div>`).join('') || '<div class="desc" style="padding:8px">Aucune alerte non lue.</div>';
+}
+async function bellTick() {
+  if (BELL.busy || !state.accessToken || !state.user || state.user.role === 'CHAUFFEUR' || !navigator.onLine) return;
+  BELL.busy = true;
+  try {
+    const list = await api('/notifications?unreadOnly=true');
+    const ids = new Set(list.map(n => n.id));
+    const fresh = BELL.ids ? list.filter(n => !BELL.ids.has(n.id)) : [];
+    BELL.ids = ids; BELL.list = list; bellRender();
+    if (fresh.length) {
+      bellBeep();
+      const f = fresh[0];
+      bellToast('🔔 ' + f.title + (fresh.length > 1 ? ' (+' + (fresh.length - 1) + ')' : ''));
+    }
+  } catch (e) { /* silencieux */ }
+  BELL.busy = false;
+}
+function bellToggle() {
+  const p = document.getElementById('bell-panel'); if (!p) return;
+  p.style.display = p.style.display === 'block' ? 'none' : 'block';
+  if (p.style.display === 'block') bellTick();
+}
+async function bellRead(id) {
+  try { await api('/notifications/' + id + '/read', { method: 'PATCH' }); } catch (e) {}
+  BELL.list = BELL.list.filter(n => n.id !== id); bellRender();
+  if (typeof loadAlerts === 'function') loadAlerts();
+}
+document.addEventListener('click', (e) => {
+  const w = document.getElementById('bell-wrap'), p = document.getElementById('bell-panel');
+  if (p && w && !w.contains(e.target)) p.style.display = 'none';
+});
+BELL.timer = setInterval(bellTick, 20000);
+setTimeout(bellTick, 4000);
 function root() { return document.getElementById('view-root'); }
 function fmt(n) { return Number(n || 0).toLocaleString('fr-FR'); }
 // Échappe toute donnée texte avant insertion dans le HTML (protection XSS)
