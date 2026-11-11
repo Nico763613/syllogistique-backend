@@ -377,6 +377,13 @@ model Trip {
   arrivalMileage Int? @map("arrival_mileage") // compteur à l'arrivée à destination (arrêt = endMileage)
   maintenanceNeeded Boolean? @map("maintenance_needed")
   maintenanceReason String?  @map("maintenance_reason")
+  // Fiche de bord camion : sites d'opération, produits, lieux de chargement/déchargement, pause
+  operationSites String[] @default([]) @map("operation_sites")
+  products      String[] @default([])
+  loadPlaces    String[] @default([]) @map("load_places")
+  unloadPlaces  String[] @default([]) @map("unload_places")
+  pauseMileage  Int?     @map("pause_mileage")
+  pauseAt       DateTime? @map("pause_at")
   @@index([siteId, tripDate])
   @@index([vehicleId])
   @@map("trips")

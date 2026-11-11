@@ -538,6 +538,7 @@ const TRUCK_TYPES = [['BENNE', 'Camion benne'], ['REMORQUE', 'Camion remorque'],
 const TRUCK_WHEELS = [6, 8, 10, 12, 14, 16, 18, 20];
 const TRUCK_CAPS = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70];
 const TON_CHOICES = [40, 45, 50, 55, 60];
+const TRUCK_PRODUCTS = ['Bauxite', 'Gravier', 'Agrégats', 'Sable', 'Autre'];
 const ttLabel = (c) => (TRUCK_TYPES.find(t => t[0] === c) || [0, c || '—'])[1];
 function otherSel(id, opts, fmtOpt, ph, cur) {
   const has = cur !== undefined && cur !== null && cur !== '' && opts.map(String).includes(String(cur));
@@ -2568,9 +2569,10 @@ function drvView() {
   for (const o of drvQueue()) {
     if (o.rejected) continue;
     let t = (me.trips || []).find((x) => x.id === o.tripId);
-    if (o.type === 'start' && !t) { t = { id: o.tripId, status: 'PLANNED', destination: o.payload.destination, regions: o.payload.regions, cargo: o.payload.cargo, purposeType: o.payload.purposeType, vehicle: me.vehicle ? me.vehicle.number + ' — ' + me.vehicle.plate : '', vehicleId: me.vehicle && me.vehicle.id }; me.trips.unshift(t); }
+    if (o.type === 'start' && !t) { t = { id: o.tripId, status: 'PLANNED', destination: o.payload.destination, regions: o.payload.regions, cargo: o.payload.cargo || (o.payload.products || []).join(', '), operationSites: o.payload.operationSites, purposeType: o.payload.purposeType, vehicle: me.vehicle ? me.vehicle.number + ' — ' + me.vehicle.plate : '', vehicleId: me.vehicle && me.vehicle.id }; me.trips.unshift(t); }
     if (o.type === 'start' && t) { t.status = 'IN_PROGRESS'; t.startMileage = o.payload.odometer; t.startTime = o.payload.occurredAt; me.activeTrip = t; }
-    if (o.type === 'arrive' && t) { t.status = 'COMPLETED'; t.endMileage = o.payload.odometer; t.endTime = o.payload.occurredAt; if (me.activeTrip && me.activeTrip.id === t.id) me.activeTrip = null; }
+    if (o.type === 'pause' && t) { t.pauseMileage = o.payload.odometer; t.pauseAt = o.payload.occurredAt; }
+    if (o.type === 'arrive' && t) { t.status = 'COMPLETED'; t.loadPlaces = o.payload.loadPlaces; t.unloadPlaces = o.payload.unloadPlaces; t.endMileage = o.payload.odometer; t.endTime = o.payload.occurredAt; if (me.activeTrip && me.activeTrip.id === t.id) me.activeTrip = null; }
   }
   return me;
 }
@@ -2632,7 +2634,8 @@ function drvMissionsHtml(me) {
     <div class="drv-row"><span>${state}</span><b></b></div>
     ${v ? `<div class="drv-row"><span>${v.type === 'TRUCK' ? 'Camion' : 'Véhicule'}</span><b>${esc(v.plate)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : ''} · ${fmt(v.mileage)} km</b></div>` : '<div class="drv-row"><span>Véhicule</span><b>Aucun véhicule affecté</b></div>'}
     ${v && !me.activeTrip && !v.immobilized ? `<button class="drv-btn gold" onclick="drvStartForm('')">➕ ${v.type === 'TRUCK' ? 'Commencer ma journée' : 'Nouvelle mission'}</button>` : ''}
-    ${me.activeTrip ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(me.activeTrip.id)}')">🏁 Arrivée / retour</button>` : ''}
+    ${me.activeTrip && v && v.type === 'TRUCK' ? `<button class="drv-btn" onclick="drvPauseForm('${esc(me.activeTrip.id)}')">⏸ Pause${me.activeTrip.pauseMileage != null ? ' (dernière : ' + fmt(me.activeTrip.pauseMileage) + ' km)' : ''}</button>` : ''}
+    ${me.activeTrip ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(me.activeTrip.id)}')">🏁 ${v && v.type === 'TRUCK' ? 'Arrêt de la journée' : 'Arrivée / retour'}</button>` : ''}
     <button class="drv-btn ghost" style="margin-top:8px" onclick="drvMissionHistory()">📜 Mes missions passées</button></div>`;
   const list = trips.map((t) => `
     <div class="drv-card">
@@ -2650,6 +2653,9 @@ function drvMissionsHtml(me) {
       ${t.observations ? `<div class="drv-row"><span>Notes</span><b style="text-align:right">${esc(t.observations)}</b></div>` : ''}
       ${t.scheduledArrival ? `<div class="drv-row"><span>Arrivée prévue</span><b>${drvDt(t.scheduledArrival)}</b></div>` : ''}
       ${t.status !== 'PLANNED' ? `<div class="drv-row"><span>Compteur départ → arrêt</span><b>${esc(t.startMileage)} → ${t.endMileage ?? '…'}</b></div>` : ''}
+      ${t.operationSites && t.operationSites.length ? `<div class="drv-row"><span>Sites d'opération</span><b style="text-align:right">${esc(t.operationSites.join(', '))}</b></div>` : ''}
+      ${t.pauseMileage != null ? `<div class="drv-row"><span>Pause</span><b>${fmt(t.pauseMileage)} km</b></div>` : ''}
+      ${t.loadPlaces && t.loadPlaces.length ? `<div class="drv-row"><span>Chargement → déchargement</span><b style="text-align:right">${esc(t.loadPlaces.join(', '))} → ${esc((t.unloadPlaces || []).join(', '))}</b></div>` : ''}
       ${t.tripsCount != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.tripsCount)}${t.tonnagePerTrip ? ' × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.tripsCount * t.tonnagePerTrip * 10) / 10) + ' t' : ''}</b></div>` : ''}
       </details>
       ${t.status === 'PLANNED' ? `<button class="drv-btn gold" onclick="drvStartForm('${esc(t.id)}')">▶ Déclarer le départ</button>` : ''}
@@ -2864,16 +2870,18 @@ const drvSrc = (f) => ({ TANK: 'Dépôt', VOUCHER: 'Bon' }[f.source] || 'Station
 function drvStartForm(tripId) {
   const me = drvView(), v = me.vehicle, t = tripId ? drvTripOf(tripId) : null, truck = drvIsTruck(me);
   const id = tripId || drvUid();
-  const regs = `<label>Destinations — cochez une ou plusieurs</label>${drvMulti('g-con', '📍 Conakry — quartiers', GEO_CONAKRY)}${drvMulti('g-int', '🛣 Hors Conakry — villes et préfectures', GEO_VILLES)}<label>Autre destination (facultatif)</label><input id="f-dest" placeholder="${truck ? 'Site minier de…' : 'Précisez si absente des listes'}" value="${esc(t ? t.destination || '' : '')}">`;
+  const sitesList = (me.operationSites || []).slice();
+  const truckRegs = `<label>Site(s) d'opération — cochez un ou plusieurs *</label>${sitesList.length ? drvMulti('g-site', "🏗 Sites d'opération", sitesList) : ''}<label>Autre site (facultatif)</label><input id="f-dest" placeholder="Site non listé">`;
+  const regs = truck ? truckRegs : `<label>Destinations — cochez une ou plusieurs</label>${drvMulti('g-con', '📍 Conakry — quartiers', GEO_CONAKRY)}${drvMulti('g-int', '🛣 Hors Conakry — villes et préfectures', GEO_VILLES)}<label>Autre destination (facultatif)</label><input id="f-dest" placeholder="${truck ? 'Site minier de…' : 'Précisez si absente des listes'}" value="${esc(t ? t.destination || '' : '')}">`;
   const motif = truck
-    ? `<label>Motif — transport de</label><select id="f-cargo"><option>Sable</option><option>Bauxite</option><option>Gravier</option><option value="Autre">Autre (à préciser)</option></select>`
+    ? `<label>Produit transporté — cochez un ou plusieurs *</label>${drvMulti('g-prod', '🪨 Produit transporté', TRUCK_PRODUCTS)}<label>Autre produit (si « Autre » coché)</label><input id="f-prodo" placeholder="Précisez le produit">`
     : `<label>Motif du déplacement</label><select id="f-ptype"><option value="MISSION">Mission</option><option value="AUTRE">Autre</option></select>`;
   drvSheet('1 · Départ', `
     <div class="drv-card" style="margin:0 0 6px"><div class="drv-row"><span>Date</span><b>${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</b></div><div class="drv-row"><span>${truck ? 'Camion' : 'Véhicule'}</span><b>${esc(v ? v.plate : '')} ${esc(v ? v.label || '' : '')}</b></div></div>
     <label>Heure de départ</label><input id="f-hm" type="time" value="${drvHM()}">
     <label>Kilométrage au départ (km) — obligatoire</label><input id="f-odo" type="number" inputmode="numeric" value="${esc(v ? v.mileage : '')}">
     ${drvFuelSel('f-fuel')}
-    <label>Trajet</label><input id="f-route" value="${esc(t && t.route ? t.route : '')}" placeholder="Ex. Conakry → Coyah → Kindia">
+    ${truck ? '' : `<label>Trajet</label><input id="f-route" value="${esc(t && t.route ? t.route : '')}" placeholder="Ex. Conakry → Coyah → Kindia">`}
     ${regs}${motif}
     <label>Précisions sur le motif</label><input id="f-purpose" placeholder="${truck ? 'Matériau, client, chantier…' : 'Objet de la mission'}">
     <label>État du véhicule avant le départ</label><select id="f-cond" onchange="drvToggleStart()"><option value="RAS">Bon état (RAS)</option><option value="ANOMALIE">Signaler une anomalie</option></select>
@@ -2883,17 +2891,30 @@ function drvStartForm(tripId) {
     if (drvNum('f-fuel') === undefined || drvNum('f-fuel') < 0) throw new Error('Indiquez les litres de carburant dans le réservoir au départ.');
     const cond = drvEl('f-cond').value, anom = drvEl('f-anom').value.trim();
     if (cond === 'ANOMALIE' && !anom) throw new Error("Décrivez l'anomalie constatée.");
-    const quartiers = drvMultiVal('g-con'), villes = drvMultiVal('g-int');
+    const sites = truck ? drvMultiVal('g-site') : [];
+    const prods = truck ? drvMultiVal('g-prod').map((x) => (x === 'Autre' ? drvFix(drvEl('f-prodo').value) || 'Autre' : x)) : [];
+    if (truck && !sites.length && !drvFix(drvEl('f-dest').value)) throw new Error("Cochez au moins un site d'opération.");
+    if (truck && !prods.length) throw new Error('Cochez le produit transporté.');
+    const quartiers = truck ? [] : drvMultiVal('g-con'), villes = truck ? [] : drvMultiVal('g-int');
     const regions = [...new Set([...(quartiers.length ? ['Conakry'] : []), ...villes.map((c) => GEO_REGION_OF[c]).filter(Boolean)])];
     const ptype = truck ? 'TRANSPORT' : drvEl('f-ptype').value;
-    const dest = [...quartiers, ...villes, drvFix(drvEl('f-dest').value)].filter(Boolean).join(', ');
+    const dest = [...sites, ...quartiers, ...villes, drvFix(drvEl('f-dest').value)].filter(Boolean).join(', ');
     if (!dest) throw new Error('Choisissez au moins une destination.');
     const g = await drvGeo();
-    drvEnqueue({ type: 'start', tripId: id, payload: { odometer, fuelLiters: drvNum('f-fuel'), occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route').value.trim() || undefined, cargo: truck ? drvEl('f-cargo').value : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
+    drvEnqueue({ type: 'start', tripId: id, payload: { odometer, fuelLiters: drvNum('f-fuel'), occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine, purposeType: ptype, regions, destination: dest || undefined, route: drvEl('f-route') ? drvEl('f-route').value.trim() || undefined : undefined, operationSites: truck ? [...sites, drvFix(drvEl('f-dest').value)].filter(Boolean) : undefined, products: truck ? prods : undefined, purpose: drvEl('f-purpose').value.trim() || undefined, preCondition: cond, preAnomalies: cond === 'ANOMALIE' ? anom : undefined, ...g } });
   }, 'Enregistrer le départ');
   drvToggleStart();
 }
 const drvOutside = (t) => (t.regions || []).some((r) => r !== 'Conakry');
+function drvPauseForm(tripId) {
+  const t = drvTripOf(tripId);
+  drvSheet('⏸ Pause', `<label>Heure de la pause</label><input id="f-hm" type="time" value="${drvHM()}">
+    <label>Kilométrage à la pause (km) — obligatoire (départ : ${esc(t.startMileage)})</label><input id="f-odo" type="number" inputmode="numeric">`, async () => {
+    const odometer = drvNum('f-odo');
+    if (odometer === undefined || odometer < t.startMileage) throw new Error(`Le kilométrage doit être supérieur ou égal à ${t.startMileage}.`);
+    drvEnqueue({ type: 'pause', tripId, payload: { odometer, occurredAt: drvAt(drvEl('f-hm').value), offline: !navigator.onLine } });
+  }, 'Enregistrer la pause');
+}
 function drvArriveCalc(startKm) {
   const km = drvNum('f-odo'), box = drvEl('f-calc'); if (!box) return;
   if (km === undefined || km < startKm) { box.textContent = ''; return; }
@@ -2904,13 +2925,16 @@ function drvArriveCalc(startKm) {
 function drvArriveForm(tripId) {
   const t = drvTripOf(tripId), truck = drvIsTruck(drvView()), outside = drvOutside(t);
   const late = t.scheduledArrival && Date.now() > +new Date(t.scheduledArrival) + 15 * 60000;
+  const places = (drvView().operationSites || []).concat(['Autre lieu']);
   const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   drvSheet('3 · Arrivée / retour — ' + (t.destination || 'mission'), `
-    ${outside ? `<label>Date et heure d'arrivée à destination</label><input id="f-arrdt" type="datetime-local" value="${nowLocal}">` : ''}
+    ${outside || truck ? `<label>${truck ? "Heure d'arrêt" : "Date et heure d'arrivée à destination"}</label><input id="f-arrdt" type="datetime-local" value="${nowLocal}">` : ''}
     <label>Kilométrage au retour / à l'arrêt (km) — obligatoire (départ : ${esc(t.startMileage)})</label><input id="f-odo" type="number" inputmode="numeric" oninput="drvArriveCalc(${Number(t.startMileage)})">
  ${drvFuelSel('f-fuel')}
     <div id="f-calc" class="drv-warn" style="background:#eef4fb;color:#163A5F;border-color:#c9daf0"></div>
-    ${truck ? '<label>Nombre de voyages effectués</label><input id="f-voy" type="number" inputmode="numeric" value="1">' : ''}
+    ${truck ? `<label>Nombre de mouvements (chargement → déchargement) *</label><input id="f-voy" type="number" inputmode="numeric" value="1">
+      <label>Lieu de chargement — cochez *</label>${drvMulti('g-load', '⬆ Lieu de chargement', places)}<label>Lieu de déchargement — cochez *</label>${drvMulti('g-unload', '⬇ Lieu de déchargement', places)}
+      ${t.pauseMileage != null ? `<div class="drv-warn" style="background:#eef4fb;color:#163A5F;border-color:#c9daf0">Pause enregistrée : ${fmt(t.pauseMileage)} km${t.pauseAt ? ' à ' + new Date(t.pauseAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</div>` : ''}` : ''}
     ${truck ? `<label>Tonnage par voyage (cochez) *</label><div onchange="document.getElementById('f-ton-o').style.display=(document.querySelector('input[name=f-ton]:checked')||{}).value==='o'?'block':'none'" style="display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0">${TON_CHOICES.map(n => `<label style="display:flex;align-items:center;gap:5px;margin:0"><input type="radio" name="f-ton" value="${n}" style="width:auto"> ${n} t</label>`).join('')}<label style="display:flex;align-items:center;gap:5px;margin:0"><input type="radio" name="f-ton" value="o" style="width:auto"> Autre</label></div><input id="f-ton-o" inputmode="decimal" placeholder="Tonnage (ex. 38)" style="display:none">` : ''}
     <label>Nom de la personne qui réceptionne</label><input id="f-recipient">
     <label>État du véhicule</label><select id="f-cond"><option value="RAS">RAS</option><option value="DOMMAGE_MINEUR">Dommage mineur</option><option value="DOMMAGE_MAJEUR">Dommage majeur</option><option value="PANNE">Panne</option></select>
@@ -2927,10 +2951,12 @@ function drvArriveForm(tripId) {
       tonnage = r ? (r.value === 'o' ? Number(String(drvEl('f-ton-o').value).replace(',', '.')) : Number(r.value)) : undefined;
       if (!tonnage || !(tonnage > 0)) throw new Error('Cochez le tonnage transporté (pour le contrôle avec les pointeurs).');
     }
+    const loadPlaces = drvEl('g-load') ? drvMultiVal('g-load') : undefined, unloadPlaces = drvEl('g-unload') ? drvMultiVal('g-unload') : undefined;
+    if (drvEl('g-load') && (!loadPlaces.length || !unloadPlaces.length)) throw new Error('Cochez le lieu de chargement et le lieu de déchargement.');
     const g = await drvGeo();
     const sig = drvEl('f-sig') ? drvSigData() : undefined;
     const arr = drvEl('f-arrdt') && drvEl('f-arrdt').value ? new Date(drvEl('f-arrdt').value).toISOString() : new Date().toISOString();
-    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, tonnagePerTrip: tonnage, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
+    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, tonnagePerTrip: tonnage, loadPlaces, unloadPlaces, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
   }, 'Enregistrer l\'arrivée');
   if (drvEl('f-sig')) drvSigInit();
 }
@@ -3558,7 +3584,7 @@ async function renderDriverSheets(date) {
   const blocks = list.map((sh) => `<div class="panel"><h3>${esc(sh.driver.name)} ${sh.status === 'SENT' ? '<span class="badge ok">Envoyée ' + drvDt(sh.sentAt) + '</span> ' + (sh.processedAt ? '<span class="badge ok">✔ Traitée ' + drvDt(sh.processedAt) + '</span>' : '<span class="badge warn">À traiter</span> <button class="btn small gold" onclick="processSheet(\'' + esc(sh.driver.id) + '\',\'' + esc(sh.date) + '\')">✔ Marquer comme traitée</button>') : '<span class="badge warn">Non envoyée</span>'}</h3>
     <div class="desc">${esc(sh.day)} ${esc(sh.date)} · ${esc(sh.driver.phone || '')} · ${sh.driver.activity === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service'} — <b>${fmt(sh.totals.km)} km</b> · ${sh.totals.liters} L (${fmt(sh.totals.fuelCost)} GNF)${sh.totals.consumption !== null ? ' · ' + sh.totals.consumption + ' L/100 km' : ''}${sh.totals.voyages ? ' · ' + sh.totals.voyages + ' voyage(s)' : ''}${sh.totals.maintenanceCost ? ' · maintenance ' + fmt(sh.totals.maintenanceCost) + ' GNF' : ''}</div>
     <div style="overflow:auto"><table><tr><th>Véhicule</th><th>Destination / motif</th><th>Horaires</th><th>Km départ</th><th>Km arrivée</th><th>Km arrêt</th><th>Distance</th><th>Observations</th></tr>
-    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:11px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:11px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:11px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:11px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
+    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:11px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:11px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:11px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:11px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.loadPlaces && t.loadPlaces.length ? '<br>⬆ ' + esc(t.loadPlaces.join(', ')) + ' → ⬇ ' + esc((t.unloadPlaces || []).join(', ')) : ''}${t.pauseMileage != null ? '<br>⏸ pause ' + fmt(t.pauseMileage) + ' km' : ''}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
     ${sh.fuel.length ? `<h4 style="margin:10px 0 4px">⛽ Carburant</h4><table><tr><th>Heure</th><th>Station</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${f.liters}</td><td class="mono">${fmt(f.cost)}</td></tr>`).join('')}</table>` : ''}
     ${sh.maintenance.length ? `<h4 style="margin:10px 0 4px">🔧 Maintenance</h4><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${sh.maintenance.map((m) => `<tr><td>${esc(DRV_NAT[m.nature] || m.nature)}</td><td>${esc(m.detail || '')}</td><td class="mono">${m.mileage != null ? fmt(m.mileage) : '—'}</td><td class="mono">${m.nextServiceKm ? fmt(m.nextServiceKm) + ' km' : '—'}</td><td class="mono">${m.cost != null ? fmt(m.cost) : '—'}</td></tr>`).join('')}</table>` : ''}
   </div>`).join('');

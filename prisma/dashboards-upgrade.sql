@@ -261,3 +261,6 @@ CREATE TABLE IF NOT EXISTS pointer_counts (
 CREATE UNIQUE INDEX IF NOT EXISTS pointer_counts_vehicle_id_day_key ON pointer_counts (vehicle_id, day)
 --#
 CREATE INDEX IF NOT EXISTS pointer_counts_site_id_day_idx ON pointer_counts (site_id, day)
+
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS operation_sites TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS products TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS load_places TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS unload_places TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS pause_mileage INTEGER, ADD COLUMN IF NOT EXISTS pause_at TIMESTAMP(3)
