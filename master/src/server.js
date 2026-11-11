@@ -4,6 +4,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const auth = require('./auth');
+const lic = require('./license');
 const { makePool, migrate } = require('./db');
 
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
@@ -14,6 +15,8 @@ function createApp(pool, cfg) {
   const secret = cfg.sessionSecret;
   const secure = !cfg.insecureCookies;
   const tries = new Map(); // limitation par adresse IP
+  const v1tries = new Map();
+  let keysP = null; const keys = () => (keysP = keysP || lic.loadKeys(pool, secret));
 
   const ip = (req) => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
   const audit = (adminId, action, detail, req) =>
@@ -44,10 +47,59 @@ function createApp(pool, cfg) {
   }
   const startSession = (res, p, minutes) => cookie(auth.signSession({ ...p, exp: Date.now() + minutes * 60000 }, secret), minutes * 60);
 
+
+  // ---------- API appelée par les installations clientes (sans cookie) ----------
+  function v1Limited(req) {
+    const k = ip(req), now = Date.now(); const e = v1tries.get(k) || { n: 0, t: now };
+    if (now - e.t > 60000) { e.n = 0; e.t = now; } e.n++; v1tries.set(k, e); return e.n > 60;
+  }
+  async function licenseToken(l, c) {
+    const { privateKey } = await keys();
+    const st = lic.effectiveStatus(l);
+    return lic.signToken({ lid: Number(l.id), cid: Number(c.id), status: st, plan: l.plan, maxDevices: l.max_devices, permanent: l.permanent, expiresAt: l.expires_at || null,
+      iid: l.instance_id, brand: { name: c.name, logoUrl: c.logo_url || null, color: c.brand_color || null }, iat: Date.now(), exp: Date.now() + 24 * 3600 * 1000 }, privateKey);
+  }
+  async function handleV1(req, res, p) {
+    if (req.method === 'GET' && p === '/v1/public-key') return send(res, 200, { publicKey: (await keys()).publicPem });
+    if (req.method !== 'POST') return send(res, 404, { error: 'Introuvable' });
+    if (v1Limited(req)) return send(res, 429, { error: 'Trop de requêtes.' });
+    const b = await readBody(req);
+    if (p === '/v1/activate') {
+      const instanceId = String(b.instanceId || '').slice(0, 100);
+      if (instanceId.length < 8 || !b.code) return send(res, 400, { error: 'Code ou identifiant d\'installation manquant.' });
+      const { rows } = await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.code_hash=$1', [lic.hashActivation(b.code)]);
+      const l = rows[0];
+      if (!l) { await audit(null, 'ACTIVATION_REFUSEE', 'code inconnu', req); return send(res, 404, { error: 'Code d\'activation invalide.' }); }
+      if (l.status === 'REVOKED' || l.status === 'SUSPENDED') return send(res, 403, { error: 'Cette licence n\'est pas active. Contactez votre fournisseur.' });
+      if (lic.effectiveStatus({ ...l, status: 'ACTIVE' }) === 'EXPIRED') return send(res, 403, { error: 'Cette licence a expiré.' });
+      if (l.status === 'ACTIVE' && l.instance_id !== instanceId) { await audit(null, 'ACTIVATION_REFUSEE', 'code déjà utilisé (licence ' + l.id + ')', req); return send(res, 409, { error: 'Ce code a déjà été utilisé sur une autre installation.' }); }
+      let instanceKey = null;
+      if (l.status === 'PENDING') {
+        instanceKey = lic.newInstanceKey();
+        await pool.query("update master_licenses set status='ACTIVE', instance_id=$2, instance_url=$3, instance_key_hash=$4, app_version=$5, activated_at=now(), last_check_at=now(), last_check_ip=$6 where id=$1 returning id",
+          [l.id, instanceId, String(b.instanceUrl || '').slice(0, 200) || null, lic.hashKey(instanceKey), String(b.appVersion || '').slice(0, 30) || null, ip(req)]);
+        await audit(null, 'LICENCE_ACTIVEE', `client ${l.cname} · licence ${l.id}`, req);
+      } else return send(res, 409, { error: 'Ce code a déjà été utilisé. Si la réponse a été perdue, demandez un nouveau code à votre fournisseur.' });
+      const fresh = (await pool.query('select l.*, c.id as cid from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [l.id])).rows[0];
+      const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
+      return send(res, 200, { licenseId: Number(l.id), instanceKey, token: await licenseToken(fresh, c), publicKey: (await keys()).publicPem });
+    }
+    if (p === '/v1/check') {
+      const { rows } = await pool.query('select * from master_licenses where id=$1', [Number(b.licenseId) || 0]);
+      const l = rows[0];
+      if (!l || !l.instance_key_hash || !lic.safeEqual(lic.hashKey(b.instanceKey || ''), l.instance_key_hash) || l.instance_id !== String(b.instanceId || '')) return send(res, 401, { error: 'Licence non reconnue.' });
+      await pool.query('update master_licenses set last_check_at=now(), last_check_ip=$2, app_version=coalesce($3, app_version) where id=$1 returning id', [l.id, ip(req), String(b.appVersion || '').slice(0, 30) || null]);
+      const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
+      return send(res, 200, { status: lic.effectiveStatus(l), token: await licenseToken(l, c) });
+    }
+    return send(res, 404, { error: 'Introuvable' });
+  }
+
   async function handle(req, res) {
     const url = new URL(req.url, 'http://x'); const p = url.pathname;
     if (req.method === 'GET' && p === '/health') return send(res, 200, { ok: true });
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, UI);
+    if (p.startsWith('/v1/')) return handleV1(req, res, p);
     if (!p.startsWith('/api/')) return send(res, 404, { error: 'Introuvable' });
 
     // Protection contre les requêtes venues d'un autre site
@@ -130,6 +182,63 @@ function createApp(pool, cfg) {
     if (req.method === 'GET' && p === '/api/audit') {
       const { rows } = await pool.query('select l.id, l.at, l.action, l.detail, l.ip, a.email from master_audit_log l left join master_admins a on a.id=l.admin_id order by l.id desc limit 50');
       return send(res, 200, rows);
+    }
+
+    // ---------- clients et licences ----------
+    const str = (v, n = 200) => (v === undefined || v === null || String(v).trim() === '' ? null : String(v).trim().slice(0, n));
+    const color = (v) => (/^#[0-9A-Fa-f]{6}$/.test(String(v || '')) ? v : null);
+    const clientFields = (b) => [str(b.name, 120), str(b.contactName), str(b.email), str(b.phone, 40), str(b.country, 60), color(b.brandColor), str(b.logoUrl, 400), str(b.notes, 1000)];
+    if (req.method === 'GET' && p === '/api/clients') {
+      const { rows } = await pool.query(`select c.*, (select coalesce(json_agg(json_build_object('id', l.id, 'status', l.status, 'plan', l.plan, 'hint', l.code_hint, 'permanent', l.permanent,
+          'expiresAt', l.expires_at, 'activatedAt', l.activated_at, 'lastCheckAt', l.last_check_at, 'maxDevices', l.max_devices, 'instanceUrl', l.instance_url, 'appVersion', l.app_version, 'reason', l.status_reason) order by l.id), '[]'::json)
+          from master_licenses l where l.client_id=c.id) as licenses from master_clients c order by c.id desc`);
+      return send(res, 200, rows.map((c) => ({ ...c, licenses: (typeof c.licenses === 'string' ? JSON.parse(c.licenses) : c.licenses).map((l) => ({ ...l, effective: lic.effectiveStatus({ status: l.status, permanent: l.permanent, expires_at: l.expiresAt }) })) })));
+    }
+    if (req.method === 'POST' && p === '/api/clients') {
+      const f = clientFields(body); if (!f[0]) return send(res, 400, { error: 'Le nom du client est obligatoire.' });
+      const { rows } = await pool.query('insert into master_clients(name, contact_name, email, phone, country, brand_color, logo_url, notes) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id', f);
+      await audit(s.aid, 'CLIENT_CREE', f[0], req); return send(res, 200, { id: rows[0].id });
+    }
+    let m;
+    if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)$/.exec(p))) {
+      const f = clientFields(body); if (!f[0]) return send(res, 400, { error: 'Le nom du client est obligatoire.' });
+      const r = await pool.query('update master_clients set name=$2, contact_name=$3, email=$4, phone=$5, country=$6, brand_color=$7, logo_url=$8, notes=$9 where id=$1 returning id', [Number(m[1]), ...f]);
+      if (!r.rows.length) return send(res, 404, { error: 'Client introuvable.' });
+      await audit(s.aid, 'CLIENT_MODIFIE', f[0], req); return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/licenses$/.exec(p))) {
+      const cl = (await pool.query('select * from master_clients where id=$1', [Number(m[1])])).rows[0]; if (!cl) return send(res, 404, { error: 'Client introuvable.' });
+      const permanent = body.permanent === true; let exp = null;
+      if (!permanent) { exp = body.expiresAt ? new Date(body.expiresAt) : null; if (!exp || isNaN(exp) || exp < new Date()) return send(res, 400, { error: 'Choisissez une date d\'expiration future, ou une licence permanente.' }); }
+      const maxDevices = Math.min(Math.max(parseInt(body.maxDevices, 10) || 50, 1), 5000);
+      const code = lic.newActivationCode();
+      const r = await pool.query('insert into master_licenses(client_id, code_hash, code_hint, plan, max_devices, permanent, expires_at) values ($1,$2,$3,$4,$5,$6,$7) returning id',
+        [cl.id, lic.hashActivation(code), lic.codeHint(code), str(body.plan, 40) || 'standard', maxDevices, permanent, exp ? exp.toISOString() : null]);
+      await audit(s.aid, 'LICENCE_CREEE', `${cl.name} · licence ${r.rows[0].id}`, req);
+      return send(res, 200, { id: r.rows[0].id, code });
+    }
+    if (req.method === 'POST' && (m = /^\/api\/licenses\/(\d+)\/action$/.exec(p))) {
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [Number(m[1])])).rows[0];
+      if (!l) return send(res, 404, { error: 'Licence introuvable.' });
+      const reason = str(body.reason, 300); const a = body.action;
+      if (a === 'suspend' || a === 'revoke') {
+        if (!reason) return send(res, 400, { error: 'Indiquez le motif.' });
+        if (l.status === 'REVOKED') return send(res, 400, { error: 'Licence déjà révoquée.' });
+        await pool.query('update master_licenses set status=$2, status_reason=$3 where id=$1 returning id', [l.id, a === 'suspend' ? 'SUSPENDED' : 'REVOKED', reason]);
+        await audit(s.aid, a === 'suspend' ? 'LICENCE_SUSPENDUE' : 'LICENCE_REVOQUEE', `${l.cname} · licence ${l.id} · ${reason}`, req); return send(res, 200, { ok: true });
+      }
+      if (a === 'reactivate') {
+        if (l.status !== 'SUSPENDED') return send(res, 400, { error: 'Seule une licence suspendue peut être rétablie.' });
+        await pool.query("update master_licenses set status=$2, status_reason=null where id=$1 returning id", [l.id, l.instance_id ? 'ACTIVE' : 'PENDING']);
+        await audit(s.aid, 'LICENCE_RETABLIE', `${l.cname} · licence ${l.id}`, req); return send(res, 200, { ok: true });
+      }
+      if (a === 'newcode') { // nouveau code : l'ancien est annulé et l'installation devra être réactivée
+        if (l.status === 'REVOKED') return send(res, 400, { error: 'Licence révoquée : créez une nouvelle licence.' });
+        const code = lic.newActivationCode();
+        await pool.query("update master_licenses set code_hash=$2, code_hint=$3, status='PENDING', instance_id=null, instance_url=null, instance_key_hash=null, activated_at=null, status_reason=null where id=$1 returning id", [l.id, lic.hashActivation(code), lic.codeHint(code)]);
+        await audit(s.aid, 'LICENCE_NOUVEAU_CODE', `${l.cname} · licence ${l.id}`, req); return send(res, 200, { code });
+      }
+      return send(res, 400, { error: 'Action inconnue.' });
     }
     return send(res, 404, { error: 'Introuvable' });
   }

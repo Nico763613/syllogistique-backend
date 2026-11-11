@@ -71,17 +71,56 @@ async function doConfirm() {
       <div class="codes">${r.codes.map((c) => `<code>${esc(c)}</code>`).join('')}</div><button onclick="showHome()">J'ai noté mes codes</button></div>`;
   } catch (e) { fail(e); }
 }
+const STL = { PENDING: ['En attente d\'activation', '#B7791F'], ACTIVE: ['Active', 'var(--ok)'], SUSPENDED: ['Suspendue', '#B7791F'], REVOKED: ['Révoquée', 'var(--danger)'], EXPIRED: ['Expirée', 'var(--danger)'] };
+const fd = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
+let CL = [];
 async function showHome() {
   try {
-    const me = await api('/api/me'); const log = await api('/api/audit');
+    const me = await api('/api/me'); const log = await api('/api/audit'); CL = await api('/api/clients');
     document.getElementById('out').style.display = 'inline-block';
+    const lics = CL.flatMap((c) => c.licenses); const act = lics.filter((l) => l.effective === 'ACTIVE').length;
     v.innerHTML = `<div class="card"><h2>Bienvenue, Monsieur SYLLA</h2><p class="muted">${esc(me.email)}</p></div>
-      <div class="grid"><div class="kpi"><b>0</b><span>Clients</span></div><div class="kpi"><b>0</b><span>Licences</span></div><div class="kpi"><b>0</b><span>Appareils</span></div></div>
-      <div class="card" style="margin-top:14px"><h2>Prochaines étapes</h2><p class="muted">Étape 2 : création des clients et des licences. Étape 3 : activation dans les installations clientes.</p></div>
+      <div class="grid"><div class="kpi"><b>${CL.length}</b><span>Clients</span></div><div class="kpi"><b>${lics.length}</b><span>Licences</span></div><div class="kpi"><b>${act}</b><span>Actives</span></div></div>
+      <div class="card" style="margin-top:14px"><h2>Clients</h2><div id="cl">${CL.map(clientCard).join('') || '<p class="muted">Aucun client pour le moment.</p>'}</div>
+        <button class="gold" onclick="newClient()">+ Nouveau client</button><div id="nc"></div></div>
       <div class="card"><h2>Changer mon mot de passe</h2><label>Mot de passe actuel</label><input id="c1" type="password"><label>Nouveau (12 caractères minimum)</label><input id="c2" type="password">
         <div class="err" id="err"></div><button onclick="doPw()">Modifier</button></div>
-      <div class="card"><h2>Journal d'audit</h2><table>${log.map((l) => `<tr><td>${esc(new Date(l.at).toLocaleString('fr-FR'))}</td><td>${esc(l.action)}</td><td>${esc(l.ip || '')}</td></tr>`).join('')}</table></div>`;
+      <div class="card"><h2>Journal d'audit</h2><table>${log.map((l) => `<tr><td>${esc(new Date(l.at).toLocaleString('fr-FR'))}</td><td>${esc(l.action)}</td><td>${esc(l.detail || '')}</td></tr>`).join('')}</table></div>`;
   } catch (e) { showLogin(); }
+}
+function clientCard(c) {
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px"><b>${esc(c.name)}</b> <span class="muted">${esc(c.country || '')}</span>
+    <div class="muted">${esc([c.contact_name, c.phone, c.email].filter(Boolean).join(' · '))}</div>
+    ${c.licenses.map((l) => { const st = STL[l.effective] || [l.effective, '#666']; return `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
+      <span style="color:${st[1]};font-weight:600">${st[0]}</span> <span class="muted">· licence n°${l.id} · code …${esc(l.hint)} · ${l.permanent ? 'permanente' : 'jusqu\'au ' + fd(l.expiresAt)} · ${l.maxDevices} appareils max</span>
+      ${l.reason ? `<div class="muted">Motif : ${esc(l.reason)}</div>` : ''}${l.lastCheckAt ? `<div class="muted">Dernier contact : ${new Date(l.lastCheckAt).toLocaleString('fr-FR')}${l.appVersion ? ' · v' + esc(l.appVersion) : ''}</div>` : ''}
+      <div>${l.status === 'REVOKED' ? '' : `${l.status === 'SUSPENDED' ? `<button class="ghost" onclick="licAct(${l.id},'reactivate')">Rétablir</button>` : `<button class="ghost" onclick="licAct(${l.id},'suspend')">Suspendre</button>`}
+        <button class="ghost" onclick="licAct(${l.id},'newcode')">Nouveau code</button> <button class="ghost" style="color:var(--danger)" onclick="licAct(${l.id},'revoke')">Révoquer</button>`}</div></div>`; }).join('')}
+    <button class="ghost" onclick="newLic(${c.id})">+ Licence</button><div id="nl${c.id}"></div></div>`;
+}
+function newClient() {
+  document.getElementById('nc').innerHTML = `<label>Nom du client *</label><input id="n1"><label>Contact</label><input id="n2"><label>Téléphone</label><input id="n3"><label>E-mail</label><input id="n4"><label>Pays</label><input id="n5">
+    <label>Couleur (ex. #1E7B4B)</label><input id="n6" placeholder="#163A5F"><div class="err" id="err"></div><button onclick="saveClient()">Enregistrer</button>`;
+}
+async function saveClient() { try { await api('/api/clients', { name: n1.value, contactName: n2.value, phone: n3.value, email: n4.value, country: n5.value, brandColor: n6.value }); showHome(); } catch (e) { fail(e); } }
+function newLic(id) {
+  const d = new Date(Date.now() + 365 * 864e5).toISOString().slice(0, 10);
+  document.getElementById('nl' + id).innerHTML = `<label>Expire le</label><input id="ld${id}" type="date" value="${d}"><label><input type="checkbox" id="lp${id}" style="width:auto"> Licence permanente</label>
+    <label>Appareils maximum</label><input id="lm${id}" type="number" value="50"><div class="err" id="err"></div><button onclick="saveLic(${id})">Créer la licence</button>`;
+}
+async function saveLic(id) {
+  try { const r = await api(`/api/clients/${id}/licenses`, { permanent: document.getElementById('lp' + id).checked, expiresAt: document.getElementById('ld' + id).value, maxDevices: document.getElementById('lm' + id).value }); showCode2(r.code); } catch (e) { fail(e); }
+}
+function showCode2(code) {
+  const msg = `Bonjour, voici votre code d'activation SYLLOGISTIQUE : ${code}\nIl est valable pour une seule installation. Ne le partagez pas.`;
+  v.innerHTML = `<div class="card"><h2>Code d'activation</h2><p class="muted">Ce code ne sera plus jamais affiché. Copiez-le maintenant et envoyez-le au client.</p>
+    <p style="text-align:center;font-size:18px"><code>${esc(code)}</code></p><textarea id="mg" rows="3" style="width:100%" readonly>${esc(msg)}</textarea>
+    <button class="gold" onclick="navigator.clipboard.writeText(mg.value).then(()=>this.textContent='Copié ✓')">Copier le message</button> <button class="ghost" onclick="showHome()">Terminé</button></div>`;
+}
+async function licAct(id, action) {
+  let reason; if (action === 'suspend' || action === 'revoke') { reason = prompt(action === 'revoke' ? 'Révocation DÉFINITIVE. Motif :' : 'Motif de la suspension :'); if (!reason) return; }
+  else if (action === 'newcode' && !confirm('Un nouveau code annule l\'ancien et l\'installation devra être réactivée. Continuer ?')) return;
+  try { const r = await api(`/api/licenses/${id}/action`, { action, reason }); if (r.code) showCode2(r.code); else showHome(); } catch (e) { alert(e.message); }
 }
 async function doPw() { try { await api('/api/password', { current: c1.value, next: c2.value }); document.getElementById('err').style.color = 'var(--ok)'; document.getElementById('err').textContent = 'Mot de passe modifié.'; c1.value = c2.value = ''; } catch (e) { fail(e); } }
 async function logout() { try { await api('/api/logout', {}); } catch (e) {} showLogin(); }

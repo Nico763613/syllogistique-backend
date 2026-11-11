@@ -95,3 +95,69 @@ test('verrouillage après 5 mots de passe faux', async () => {
   assert.equal(r.status, 423, 'même le bon mot de passe est refusé pendant le verrouillage');
   const a = await pool.query("select count(*)::int as n from master_audit_log where action='LOGIN_BLOQUE'"); assert.ok(a.rows[0].n >= 1);
 });
+
+// ---------- étape 2 : clients, licences, activation ----------
+async function pub(method, path, body) {
+  const r = await fetch(base + path, { method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  return { status: r.status, json: await r.json().catch(() => null) };
+}
+test('clients et licences : création, activation unique, jeton signé, suspension, révocation', async () => {
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  cookie = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  assert.equal((await call('POST', '/api/clients', { name: '  ' })).status, 400);
+  const cl = await call('POST', '/api/clients', { name: 'Transports Diallo', country: 'Guinée', brandColor: '#1a7f37', email: 'a@b.c' });
+  assert.equal(cl.status, 200);
+  assert.equal((await call('POST', `/api/clients/${cl.json.id}/licenses`, { permanent: false })).status, 400, 'date requise');
+  assert.equal((await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: '2001-01-01' })).status, 400, 'date passée refusée');
+  const lic = await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(), maxDevices: 20 });
+  assert.equal(lic.status, 200); assert.match(lic.json.code, /^SYLL-[A-Z2-9]{5}-[A-Z2-9]{5}-[A-Z2-9]{5}-[A-Z2-9]{5}$/);
+  const stored = (await pool.query('select code_hash, code_hint from master_licenses where id=$1', [lic.json.id])).rows[0];
+  assert.ok(!JSON.stringify(stored).includes(lic.json.code), 'le code n\'est jamais stocké en clair');
+  // la liste n'expose jamais le code
+  const list = await call('GET', '/api/clients'); assert.ok(!JSON.stringify(list.json).includes(lic.json.code));
+  // activation : mauvais code, puis bon code
+  assert.equal((await pub('POST', '/v1/activate', { code: 'SYLL-AAAAA-AAAAA-AAAAA-AAAAA', instanceId: 'instance-0001' })).status, 404);
+  assert.equal((await pub('POST', '/v1/activate', { code: lic.json.code })).status, 400);
+  const lower = lic.json.code.toLowerCase().replace(/-/g, ' ');
+  const act = await pub('POST', '/v1/activate', { code: lower, instanceId: 'instance-0001', appVersion: '39' });
+  assert.equal(act.status, 200); assert.ok(act.json.instanceKey && act.json.licenseId);
+  const pk = (await pub('GET', '/v1/public-key')).json.publicKey;
+  const lt = require('../src/license');
+  const tok = lt.verifyToken(act.json.token, pk); assert.ok(tok); assert.equal(tok.status, 'ACTIVE'); assert.equal(tok.brand.name, 'Transports Diallo'); assert.equal(tok.maxDevices, 20);
+  assert.equal(lt.verifyToken(act.json.token.replace(/^./, (c) => (c === 'a' ? 'b' : 'a')), pk), null, 'jeton falsifié refusé');
+  // réutilisation du code : refusée
+  assert.equal((await pub('POST', '/v1/activate', { code: lic.json.code, instanceId: 'instance-0002' })).status, 409);
+  assert.equal((await pub('POST', '/v1/activate', { code: lic.json.code, instanceId: 'instance-0001' })).status, 409);
+  // contrôle périodique
+  const chk = { licenseId: act.json.licenseId, instanceKey: act.json.instanceKey, instanceId: 'instance-0001' };
+  let r = await pub('POST', '/v1/check', chk); assert.equal(r.status, 200); assert.equal(r.json.status, 'ACTIVE');
+  assert.equal((await pub('POST', '/v1/check', { ...chk, instanceKey: 'faux' })).status, 401);
+  assert.equal((await pub('POST', '/v1/check', { ...chk, instanceId: 'instance-0002' })).status, 401);
+  // suspension (motif obligatoire) puis rétablissement
+  assert.equal((await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'suspend' })).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'suspend', reason: 'impayé' })).status, 200);
+  r = await pub('POST', '/v1/check', chk); assert.equal(r.json.status, 'SUSPENDED'); assert.equal(lt.verifyToken(r.json.token, pk).status, 'SUSPENDED');
+  assert.equal((await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'reactivate' })).status, 200);
+  assert.equal((await pub('POST', '/v1/check', chk)).json.status, 'ACTIVE');
+  // expiration calculée
+  await pool.query("update master_licenses set expires_at = now() - interval '1 day' where id=$1 returning id", [lic.json.id]);
+  assert.equal((await pub('POST', '/v1/check', chk)).json.status, 'EXPIRED');
+  await pool.query("update master_licenses set expires_at = now() + interval '5 day' where id=$1 returning id", [lic.json.id]);
+  // nouveau code : l'ancienne installation n'est plus reconnue
+  const nc = await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'newcode' }); assert.equal(nc.status, 200); assert.notEqual(nc.json.code, lic.json.code);
+  assert.equal((await pub('POST', '/v1/check', chk)).status, 401);
+  assert.equal((await pub('POST', '/v1/activate', { code: nc.json.code, instanceId: 'instance-0003' })).status, 200);
+  // révocation définitive
+  assert.equal((await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'revoke', reason: 'fin de contrat' })).status, 200);
+  assert.equal((await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'reactivate' })).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${lic.json.id}/action`, { action: 'newcode' })).status, 400);
+  // licence permanente : jamais expirée
+  const perm = await call('POST', `/api/clients/${cl.json.id}/licenses`, { permanent: true });
+  assert.equal(perm.status, 200);
+  const act2 = await pub('POST', '/v1/activate', { code: perm.json.code, instanceId: 'instance-0009' });
+  assert.equal(lt.verifyToken(act2.json.token, pk).permanent, true);
+  // tout est tracé, et l'API d'administration reste fermée sans session
+  const au = await call('GET', '/api/audit'); for (const k of ['CLIENT_CREE', 'LICENCE_CREEE', 'LICENCE_ACTIVEE', 'LICENCE_SUSPENDUE', 'LICENCE_REVOQUEE', 'ACTIVATION_REFUSEE']) assert.ok(au.json.some((l) => l.action === k), k);
+  assert.equal((await call('GET', '/api/clients', undefined, '')).status, 401);
+  assert.equal((await call('POST', '/api/licenses/1/action', { action: 'revoke', reason: 'x' }, '')).status, 401);
+});
