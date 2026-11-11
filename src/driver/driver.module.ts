@@ -5,9 +5,10 @@ import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
 import { DriverDeviceGuard } from './driver-device.guard';
 import { DriverSheetService } from './driver-sheet.service';
+import { DriverPointersService } from './driver-pointers.service';
 
 @Module({
   controllers: [DriverController, DriverAdminController],
-  providers: [DriverSheetService, DriverAppService, DriverDevicesService, DriverHistoryService, DriverDeviceGuard],
+  providers: [DriverPointersService, DriverSheetService, DriverAppService, DriverDevicesService, DriverHistoryService, DriverDeviceGuard],
 })
 export class DriverModule {}

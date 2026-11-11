@@ -12,6 +12,7 @@ const NUMERIC_KEYS = new Set([
   'DOCUMENT_ALERT_DAYS',
   'FUEL_ANOMALY_PERCENT',
   'MAX_SITES',
+  'TON_PRICE', // prix par tonne transportée (GNF), fixé par le responsable logistique
   'FLEET_TARGET', // nombre de véhicules prévus (10 au départ, à augmenter)
 ]);
 const KEY_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;

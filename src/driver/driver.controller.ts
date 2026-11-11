@@ -9,7 +9,8 @@ import { DriverAppService } from './driver-app.service';
 import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
 import { DriverSheetService } from './driver-sheet.service';
-import { ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { DriverPointersService } from './driver-pointers.service';
+import { VehicleSpecDto, PointerDto, ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -37,6 +38,13 @@ export class DriverController {
   @UseGuards(DriverDeviceGuard)
   profile(@Body() dto: UpdateProfileDto, @CurrentUser() user: any) {
     return this.app.updateProfile(user.userId, dto.phone);
+  }
+
+  @Post('vehicle-spec')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  vehicleSpec(@Body() dto: VehicleSpecDto, @CurrentUser() user: any) {
+    return this.app.updateVehicleSpec(user.userId, dto);
   }
 
   @Get('vehicles')
@@ -105,7 +113,17 @@ const MANAGERS = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GEST
 @Roles(...MANAGERS)
 @Controller('driver-admin')
 export class DriverAdminController {
-  constructor(private devices: DriverDevicesService, private history: DriverHistoryService, private sheets: DriverSheetService) {}
+  constructor(private devices: DriverDevicesService, private history: DriverHistoryService, private sheets: DriverSheetService, private pointers: DriverPointersService) {}
+
+  @Get('pointers')
+  pointersOfDay(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.pointers.day(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);
+  }
+
+  @Post('pointers')
+  savePointer(@Body() dto: PointerDto, @CurrentUser() actor: any, @Query('siteId') siteId?: string) {
+    return this.pointers.save(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, dto, actor.userId);
+  }
 
   @Get('overview')
   overview(@CurrentUser() actor: any, @Query('siteId') siteId?: string) {

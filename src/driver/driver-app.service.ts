@@ -71,13 +71,13 @@ export class DriverAppService {
       id: t.id, status: t.status, destination: t.destination, purpose: t.purpose, passengerName: t.passengerName, observations: t.observations,
       startTime: t.startTime, scheduledArrival: t.scheduledArrival, endTime: t.endTime, startMileage: t.startMileage, endMileage: t.endMileage, distance: t.distance,
       vehicle: `${t.vehicle.internalNumber} — ${t.vehicle.registrationNumber}`, vehicleId: t.vehicleId,
-      reference: t.reference, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, route: t.route,
+      reference: t.reference, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, tonnagePerTrip: t.tonnagePerTrip, route: t.route,
     });
     return {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
       device: { id: device.id, model: device.model, activatedAt: device.activatedAt },
       vehicle: vehicleRow
-        ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
+        ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, truckType: vehicleRow.truckType, wheels: vehicleRow.wheels, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
         : null,
       activeTrip: active ? fmtTrip(active) : null,
       trips: trips.map(fmtTrip),
@@ -206,7 +206,7 @@ export class DriverAppService {
     await this.prisma.$transaction([
       this.prisma.trip.update({
         where: { id: trip.id },
-        data: { status: 'COMPLETED', endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endFuelLiters: tankLiters(p.fuelLiters), endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
+        data: { status: 'COMPLETED', tonnagePerTrip: (() => { const t = num(p.tonnagePerTrip); return t !== undefined && t > 0 && t <= 200 ? t : undefined; })(), endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endFuelLiters: tankLiters(p.fuelLiters), endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
       }),
       this.prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { currentMileage: odometer, status: condition === 'PANNE' || condition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' } }),
       this.prisma.tripLog.create({ data: { tripId: trip.id, driverId: driver.id, eventType: 'ARRIVE', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } }),
@@ -334,6 +334,20 @@ export class DriverAppService {
     await this.prisma.user.update({ where: { id: userId }, data: { phone: clean } });
     await this.audit.log({ userId, action: 'UPDATE', entity: 'Driver', entityId: driver.id, newValue: { phone: clean } });
     return { phone: clean };
+  }
+
+  // Le chauffeur renseigne son camion : type, nombre de roues, capacité (comme le responsable logistique)
+  async updateVehicleSpec(userId: string, d: { truckType?: string; wheels?: number; capacity?: string }) {
+    const driver = await this.driverOf(userId);
+    const vehicle = await this.prisma.vehicle.findFirst({ where: { assignedDriverId: driver.id, deletedAt: null } });
+    if (!vehicle) throw new BadRequestException("Aucun véhicule n'est affecté à votre compte.");
+    const data: { truckType?: string; wheels?: number; capacity?: string } = {};
+    if (d.truckType) data.truckType = str(d.truckType, 40) as string;
+    if (d.wheels !== undefined && Number.isInteger(d.wheels) && d.wheels >= 2 && d.wheels <= 40) data.wheels = d.wheels;
+    if (d.capacity) data.capacity = str(d.capacity, 40) as string;
+    await this.prisma.vehicle.update({ where: { id: vehicle.id }, data });
+    await this.audit.log({ userId, action: 'UPDATE', entity: 'Vehicle', entityId: vehicle.id, newValue: data });
+    return data;
   }
 
   // Véhicules du site que le chauffeur peut prendre en charge (remplacement)

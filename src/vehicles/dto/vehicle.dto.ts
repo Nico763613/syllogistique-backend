@@ -10,6 +10,7 @@ export class CreateVehicleDto {
   @IsOptional() @IsInt() year?: number;
   @IsOptional() @IsString() capacity?: string;
   @IsOptional() @IsInt() @Min(0) wheels?: number;
+  @IsOptional() @IsString() truckType?: string;
   @IsOptional() @IsInt() @Min(0) currentMileage?: number;
   @IsOptional() @IsString() assignedDriverId?: string;
   @IsOptional() @IsString() photoUrl?: string;
@@ -27,6 +28,7 @@ export class UpdateVehicleDto {
   @IsOptional() @IsInt() year?: number;
   @IsOptional() @IsString() capacity?: string;
   @IsOptional() @IsInt() @Min(0) wheels?: number;
+  @IsOptional() @IsString() truckType?: string;
   @IsOptional() @IsEnum(VehicleStatus) status?: VehicleStatus;
   @IsOptional() @IsString() assignedDriverId?: string;
   @IsOptional() @IsString() photoUrl?: string;
