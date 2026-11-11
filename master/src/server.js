@@ -9,6 +9,10 @@ const { makePool, migrate } = require('./db');
 
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
+const IDLE_MIN = 15; // déconnexion automatique après 15 minutes d'inactivité
+const PUB = {};
+for (const f of ['manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png']) PUB['/' + f] = fs.readFileSync(path.join(__dirname, 'public', f));
+const PUB_TYPE = { '.json': 'application/manifest+json', '.js': 'application/javascript; charset=utf-8', '.png': 'image/png' };
 const MAX_FAILS = 5, LOCK_MIN = 15;
 
 function createApp(pool, cfg) {
@@ -16,6 +20,8 @@ function createApp(pool, cfg) {
   const secure = !cfg.insecureCookies;
   const tries = new Map(); // limitation par adresse IP
   const v1tries = new Map();
+  const rtries = new Map(); // tentatives de réinitialisation : 5 par 15 minutes
+  function resetLimited(req) { const k = ip(req), now = Date.now(); const e = rtries.get(k) || { n: 0, t: now }; if (now - e.t > 15 * 60000) { e.n = 0; e.t = now; } e.n++; rtries.set(k, e); return e.n > 5; }
   let keysP = null; const keys = () => (keysP = keysP || lic.loadKeys(pool, secret));
 
   const ip = (req) => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
@@ -29,15 +35,26 @@ function createApp(pool, cfg) {
     return e.n > 20;
   }
   function send(res, code, body, extra = {}) {
-    const isJson = typeof body === 'object';
+    const isJson = typeof body === 'object' && !Buffer.isBuffer(body);
     res.writeHead(code, {
       'content-type': isJson ? 'application/json; charset=utf-8' : 'text/html; charset=utf-8',
       'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'x-frame-options': 'DENY', 'referrer-policy': 'no-referrer',
-      'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'",
+      'content-security-policy': "default-src 'self'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; manifest-src 'self'; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'",
       ...(secure ? { 'strict-transport-security': 'max-age=31536000; includeSubDomains' } : {}),
       ...extra,
     });
     res.end(isJson ? JSON.stringify(body) : body);
+  }
+  function sendFile(res, name, buf) {
+    const ext = path.extname(name);
+    res.writeHead(200, { 'content-type': PUB_TYPE[ext], 'cache-control': ext === '.png' ? 'public, max-age=86400' : 'no-cache', 'x-content-type-options': 'nosniff', ...(name === '/sw.js' ? { 'service-worker-allowed': '/' } : {}) });
+    res.end(buf);
+  }
+  function sendCsv(res, name, rows) {
+    const cell = (v) => { let t = v === null || v === undefined ? '' : String(v); if (/^[=+\-@\t\r]/.test(t)) t = "'" + t; return '"' + t.replace(/"/g, '""') + '"'; };
+    const out = '\ufeff' + rows.map((r) => r.map(cell).join(';')).join('\r\n') + '\r\n';
+    res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${name}"`, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+    res.end(out);
   }
   const cookie = (val, maxAge) => `${COOKIE}=${val}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
   const readBody = (req) => new Promise((ok, ko) => { let d = ''; req.on('data', (c) => { d += c; if (d.length > 20000) { ko(new Error('trop gros')); req.destroy(); } }); req.on('end', () => { try { ok(d ? JSON.parse(d) : {}); } catch (e) { ko(e); } }); });
@@ -89,8 +106,20 @@ function createApp(pool, cfg) {
       const l = rows[0];
       if (!l || !l.instance_key_hash || !lic.safeEqual(lic.hashKey(b.instanceKey || ''), l.instance_key_hash) || l.instance_id !== String(b.instanceId || '')) return send(res, 401, { error: 'Licence non reconnue.' });
       await pool.query('update master_licenses set last_check_at=now(), last_check_ip=$2, app_version=coalesce($3, app_version) where id=$1 returning id', [l.id, ip(req), String(b.appVersion || '').slice(0, 30) || null]);
+      // appareils remontés par l'installation (facultatif) : liste enregistrée, ordres de blocage / déconnexion renvoyés
+      if (Array.isArray(b.devices)) {
+        for (const d of b.devices.slice(0, 500)) {
+          const did = String(d && d.id || '').slice(0, 100); if (!did) continue;
+          await pool.query(`insert into master_devices(license_id, device_id, name, last_seen_at) values ($1,$2,$3,$4)
+            on conflict (license_id, device_id) do update set name=excluded.name, last_seen_at=excluded.last_seen_at, disconnect_requested=false returning id`,
+          [l.id, did, String(d.name || '').slice(0, 120) || null, d.lastSeenAt && !isNaN(new Date(d.lastSeenAt)) ? new Date(d.lastSeenAt).toISOString() : new Date().toISOString()]);
+        }
+      }
+      const dv = (await pool.query('select device_id, blocked, disconnect_requested from master_devices where license_id=$1', [l.id])).rows;
       const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
-      return send(res, 200, { status: lic.effectiveStatus(l), token: await licenseToken(l, c) });
+      const out = { status: lic.effectiveStatus(l), token: await licenseToken(l, c), blockedDevices: dv.filter((d) => d.blocked).map((d) => d.device_id), disconnectDevices: dv.filter((d) => d.disconnect_requested).map((d) => d.device_id) };
+      await pool.query('update master_devices set disconnect_requested=false where license_id=$1 and disconnect_requested returning id', [l.id]);
+      return send(res, 200, out);
     }
     return send(res, 404, { error: 'Introuvable' });
   }
@@ -99,6 +128,7 @@ function createApp(pool, cfg) {
     const url = new URL(req.url, 'http://x'); const p = url.pathname;
     if (req.method === 'GET' && p === '/health') return send(res, 200, { ok: true });
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, UI);
+    if (req.method === 'GET' && PUB[p]) return sendFile(res, p, PUB[p]);
     if (p.startsWith('/v1/')) return handleV1(req, res, p);
     if (!p.startsWith('/api/')) return send(res, 404, { error: 'Introuvable' });
 
@@ -142,7 +172,7 @@ function createApp(pool, cfg) {
       if (!ok) { await audit(a && a.id, 'CODE2_ECHEC', null, req); return send(res, 401, { error: 'Code incorrect.' }); }
       await pool.query('update master_admins set last_login_at=now() where id=$1 returning id', [a.id]);
       await audit(a.id, 'LOGIN_OK', null, req);
-      return send(res, 200, { ok: true }, { 'set-cookie': startSession(res, { aid: a.id, stage: 'ok' }, 480) });
+      return send(res, 200, { ok: true }, { 'set-cookie': startSession(res, { aid: a.id, stage: 'ok' }, IDLE_MIN) });
     }
 
     if (req.method === 'GET' && p === '/api/2fa/setup') {
@@ -161,11 +191,12 @@ function createApp(pool, cfg) {
       await pool.query('delete from master_recovery_codes where admin_id=$1 returning id', [a.id]);
       for (const c of codes) await pool.query('insert into master_recovery_codes(admin_id, code_hash) values ($1,$2) returning id', [a.id, auth.hashCode(c)]);
       await audit(a.id, '2FA_ACTIVE', null, req);
-      return send(res, 200, { codes }, { 'set-cookie': startSession(res, { aid: a.id, stage: 'ok' }, 480) });
+      return send(res, 200, { codes }, { 'set-cookie': startSession(res, { aid: a.id, stage: 'ok' }, IDLE_MIN) });
     }
 
     // ---- espace connecté ----
     if (!s || s.stage !== 'ok') return send(res, 401, { error: 'Non connecté.' });
+    res.setHeader('set-cookie', startSession(res, { aid: s.aid, stage: 'ok' }, IDLE_MIN)); // session glissante : 15 min d'inactivité
     if (req.method === 'GET' && p === '/api/me') {
       const { rows } = await pool.query('select email, last_login_at from master_admins where id=$1', [s.aid]);
       return rows[0] ? send(res, 200, rows[0]) : send(res, 401, { error: 'Non connecté.' });
@@ -185,6 +216,7 @@ function createApp(pool, cfg) {
     }
 
     // ---------- clients et licences ----------
+    const endOfDay = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(String(v)) ? new Date(v + 'T23:59:59Z') : new Date(v));
     const str = (v, n = 200) => (v === undefined || v === null || String(v).trim() === '' ? null : String(v).trim().slice(0, n));
     const color = (v) => (/^#[0-9A-Fa-f]{6}$/.test(String(v || '')) ? v : null);
     const clientFields = (b) => [str(b.name, 120), str(b.contactName), str(b.email), str(b.phone, 40), str(b.country, 60), color(b.brandColor), str(b.logoUrl, 400), str(b.notes, 1000)];
@@ -209,7 +241,7 @@ function createApp(pool, cfg) {
     if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/licenses$/.exec(p))) {
       const cl = (await pool.query('select * from master_clients where id=$1', [Number(m[1])])).rows[0]; if (!cl) return send(res, 404, { error: 'Client introuvable.' });
       const permanent = body.permanent === true; let exp = null;
-      if (!permanent) { exp = body.expiresAt ? new Date(body.expiresAt) : null; if (!exp || isNaN(exp) || exp < new Date()) return send(res, 400, { error: 'Choisissez une date d\'expiration future, ou une licence permanente.' }); }
+      if (!permanent) { exp = body.expiresAt ? endOfDay(body.expiresAt) : null; if (!exp || isNaN(exp) || exp < new Date()) return send(res, 400, { error: 'Choisissez une date d\'expiration future, ou une licence permanente.' }); }
       const maxDevices = Math.min(Math.max(parseInt(body.maxDevices, 10) || 50, 1), 5000);
       const code = lic.newActivationCode();
       const r = await pool.query('insert into master_licenses(client_id, code_hash, code_hint, plan, max_devices, permanent, expires_at) values ($1,$2,$3,$4,$5,$6,$7) returning id',
@@ -239,6 +271,68 @@ function createApp(pool, cfg) {
         await audit(s.aid, 'LICENCE_NOUVEAU_CODE', `${l.cname} · licence ${l.id}`, req); return send(res, 200, { code });
       }
       return send(res, 400, { error: 'Action inconnue.' });
+    }
+    // ---------- suppression, prolongation, appareils, export, réinitialisation ----------
+    const effOf = (l) => lic.effectiveStatus(l);
+    if (req.method === 'POST' && (m = /^\/api\/licenses\/(\d+)\/delete$/.exec(p))) {
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [Number(m[1])])).rows[0];
+      if (!l) return send(res, 404, { error: 'Licence introuvable.' });
+      const e = effOf(l);
+      if (e !== 'REVOKED' && e !== 'EXPIRED') return send(res, 400, { error: 'Seule une licence révoquée ou expirée peut être supprimée. Révoquez-la d\'abord.' });
+      await pool.query('delete from master_licenses where id=$1 returning id', [l.id]);
+      await audit(s.aid, 'LICENCE_SUPPRIMEE', `${l.cname} · licence ${l.id} (${e})`, req); return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/delete$/.exec(p))) {
+      const cl = (await pool.query('select * from master_clients where id=$1', [Number(m[1])])).rows[0]; if (!cl) return send(res, 404, { error: 'Client introuvable.' });
+      const ls = (await pool.query('select * from master_licenses where client_id=$1', [cl.id])).rows;
+      if (ls.some((l) => effOf(l) === 'ACTIVE')) return send(res, 400, { error: 'Ce client a une licence active. Révoquez-la d\'abord.' });
+      await pool.query('delete from master_clients where id=$1 returning id', [cl.id]); // licences et appareils supprimés en cascade
+      await audit(s.aid, 'CLIENT_SUPPRIME', `${cl.name} · ${ls.length} licence(s) supprimée(s)`, req); return send(res, 200, { ok: true, licenses: ls.length });
+    }
+    if (req.method === 'POST' && (m = /^\/api\/licenses\/(\d+)\/extend$/.exec(p))) {
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [Number(m[1])])).rows[0];
+      if (!l) return send(res, 404, { error: 'Licence introuvable.' });
+      if (l.status === 'REVOKED') return send(res, 400, { error: 'Licence révoquée : créez une nouvelle licence.' });
+      const permanent = body.permanent === true; let exp = l.expires_at;
+      if (permanent) exp = null; else if (body.expiresAt) { const d = endOfDay(body.expiresAt); if (isNaN(d) || d < new Date()) return send(res, 400, { error: 'Choisissez une date future.' }); exp = d.toISOString(); }
+      else if (!l.permanent) { /* seulement le nombre d'appareils */ } else return send(res, 400, { error: 'Choisissez une date ou laissez la licence permanente.' });
+      const maxDevices = body.maxDevices ? Math.min(Math.max(parseInt(body.maxDevices, 10) || l.max_devices, 1), 5000) : l.max_devices;
+      await pool.query('update master_licenses set permanent=$2, expires_at=$3, max_devices=$4 where id=$1 returning id', [l.id, permanent, exp, maxDevices]);
+      await audit(s.aid, 'LICENCE_PROLONGEE', `${l.cname} · licence ${l.id} · ${permanent ? 'permanente' : (exp ? String(new Date(exp).toISOString()).slice(0, 10) : '—')} · ${maxDevices} appareils`, req);
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'GET' && (m = /^\/api\/licenses\/(\d+)\/devices$/.exec(p))) {
+      const { rows } = await pool.query('select device_id, name, last_seen_at, blocked, disconnect_requested from master_devices where license_id=$1 order by last_seen_at desc nulls last', [Number(m[1])]);
+      return send(res, 200, rows);
+    }
+    if (req.method === 'POST' && (m = /^\/api\/licenses\/(\d+)\/devices\/action$/.exec(p))) {
+      const a = body.action; const did = String(body.deviceId || '');
+      if (!['block', 'unblock', 'disconnect'].includes(a)) return send(res, 400, { error: 'Action inconnue.' });
+      const col = a === 'disconnect' ? 'disconnect_requested=true' : `blocked=${a === 'block'}`;
+      const r = await pool.query(`update master_devices set ${col} where license_id=$1 and device_id=$2 returning id`, [Number(m[1]), did]);
+      if (!r.rows.length) return send(res, 404, { error: 'Appareil introuvable.' });
+      await audit(s.aid, 'APPAREIL_' + a.toUpperCase(), `licence ${m[1]} · ${did.slice(0, 40)}`, req); return send(res, 200, { ok: true });
+    }
+    if (req.method === 'GET' && (p === '/api/export/clients.csv' || p === '/api/export/licenses.csv')) {
+      const rows = (await pool.query('select l.*, c.name as cname, c.country, c.contact_name, c.email, c.phone from master_licenses l right join master_clients c on c.id=l.client_id order by c.id, l.id')).rows;
+      const day = new Date().toISOString().slice(0, 10); const d = (v) => (v ? new Date(v).toISOString().slice(0, 10) : '');
+      await audit(s.aid, 'EXPORT_CSV', p.split('/').pop(), req);
+      if (p.endsWith('clients.csv')) {
+        const cs = (await pool.query('select * from master_clients order by id')).rows;
+        return sendCsv(res, `clients-${day}.csv`, [['N°', 'Client', 'Contact', 'Téléphone', 'E-mail', 'Pays', 'Créé le', 'Nombre de licences']].concat(cs.map((c) => [c.id, c.name, c.contact_name, c.phone, c.email, c.country, d(c.created_at), rows.filter((l) => String(l.client_id) === String(c.id)).length])));
+      }
+      const SL = { PENDING: 'En attente', ACTIVE: 'Active', SUSPENDED: 'Suspendue', REVOKED: 'Révoquée', EXPIRED: 'Expirée' };
+      return sendCsv(res, `licences-${day}.csv`, [['N° licence', 'Client', 'Statut', 'Formule', 'Appareils max', 'Permanente', 'Expire le', 'Activée le', 'Dernier contact', 'Version', 'Code (4 derniers)']].concat(
+        rows.filter((l) => l.id).map((l) => [l.id, l.cname, SL[effOf(l)] || effOf(l), l.plan, l.max_devices, l.permanent ? 'oui' : 'non', d(l.expires_at), d(l.activated_at), d(l.last_check_at), l.app_version, l.code_hint])));
+    }
+    if (req.method === 'POST' && p === '/api/reset') {
+      if (resetLimited(req)) return send(res, 429, { error: 'Trop de tentatives.' });
+      if (String(body.word || '').trim() !== 'SUPPRIMER') return send(res, 400, { error: 'Tapez exactement le mot SUPPRIMER.' });
+      const a = (await pool.query('select * from master_admins where id=$1', [s.aid])).rows[0];
+      if (!a || !a.totp_secret || !auth.verifyTotp(a.totp_secret, body.code)) { await audit(s.aid, 'REINIT_REFUSEE', 'code à 6 chiffres incorrect', req); return send(res, 401, { error: 'Code à 6 chiffres incorrect.' }); }
+      const n = (await pool.query('select (select count(*) from master_clients)::int as c, (select count(*) from master_licenses)::int as l')).rows[0];
+      await pool.query('delete from master_clients returning id'); // licences et appareils en cascade ; administrateurs, clés de signature et journal d'audit conservés
+      await audit(s.aid, 'REINIT_TEST', `${n.c} client(s) et ${n.l} licence(s) supprimés`, req); return send(res, 200, { ok: true, clients: n.c, licenses: n.l });
     }
     return send(res, 404, { error: 'Introuvable' });
   }

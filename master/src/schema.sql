@@ -65,3 +65,15 @@ create table if not exists master_licenses (
   created_at      timestamptz not null default now()
 );
 create index if not exists master_licenses_client on master_licenses (client_id);
+
+-- Étape 3 : appareils remontés par les installations
+create table if not exists master_devices (
+  id            bigserial primary key,
+  license_id    bigint not null references master_licenses(id) on delete cascade,
+  device_id     text not null,
+  name          text,
+  last_seen_at  timestamptz,
+  blocked       boolean not null default false,
+  disconnect_requested boolean not null default false,
+  unique (license_id, device_id)
+);
