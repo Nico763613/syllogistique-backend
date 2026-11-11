@@ -21,7 +21,7 @@ export class SettingsService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
   list(organizationId: string) {
-    return this.prisma.setting.findMany({ where: { organizationId }, orderBy: { key: 'asc' } });
+    return this.prisma.setting.findMany({ where: { organizationId, NOT: { key: { startsWith: 'LICENSE_' } } }, orderBy: { key: 'asc' } });
   }
 
   async fuelPrice(organizationId: string) {
@@ -37,6 +37,7 @@ export class SettingsService {
   }
 
   async set(organizationId: string, key: string, value: string, actorId: string, reason?: string) {
+    if (key.startsWith('LICENSE_')) throw new BadRequestException('Clé réservée.');
     if (!KEY_PATTERN.test(key)) {
       throw new BadRequestException('Clé invalide (majuscules, chiffres et _ uniquement).');
     }

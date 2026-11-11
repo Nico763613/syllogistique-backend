@@ -39,3 +39,13 @@ Les clients, les licences et les appareils arrivent aux étapes 2 à 6.
 
 ## Tests (développeurs)
 `npm test` — nécessite une base PostgreSQL locale (variables `PGHOST_TEST`, `PGPORT_TEST`, `PGDB_TEST`) : un simulateur du paquet `pg` (dossier `test/shim_modules`) est utilisé uniquement pour les tests.
+
+## Étape 3 — relier une installation cliente au Master
+
+Sur le service Render de l'installation du client, ajouter la variable :
+- `MASTER_URL` = l'adresse de votre Master (ex. https://syllogistique-master.onrender.com)
+- (facultatif, recommandé) `MASTER_PUBLIC_KEY` = la clé publique affichée par `MASTER_URL/v1/public-key`
+
+Sans `MASTER_URL`, l'installation fonctionne comme avant (c'est le cas de la vôtre : licence permanente, rien à faire).
+Avec `MASTER_URL` : écran d'activation « Syllogistique » → le client saisit le code reçu → l'application prend son nom, son logo et sa couleur.
+Vérification toutes les heures ; avertissement dès 3 jours sans contact, blocage à 7 jours ; suspension/révocation/expiration = blocage dès la prochaine vérification.
