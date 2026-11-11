@@ -21,7 +21,7 @@ export class ActivateDeviceDto {
   @IsOptional() @IsString() @MaxLength(120) os?: string;
 }
 
-export const OP_TYPES = ['start', 'arrive', 'fuel', 'breakdown', 'incident', 'maintenance', 'expense'] as const;
+export const OP_TYPES = ['start', 'arrive', 'fuel', 'breakdown', 'incident', 'maintenance', 'expense', 'pause'] as const;
 export type OpType = (typeof OP_TYPES)[number];
 
 export class SyncOpDto {

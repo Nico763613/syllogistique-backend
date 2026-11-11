@@ -22,6 +22,8 @@ const when = (v: unknown): Date => {
   return Number.isNaN(+d) || +d > now + 10 * 60_000 ? new Date(now) : d;
 };
 
+const list = (v: unknown, max = 12): string[] => (Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map((x) => x.trim().slice(0, 80)))].slice(0, max) : []);
+
 const tankLiters = (v: unknown): number | undefined => { const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN; return Number.isFinite(n) && n >= 0 && n <= 2000 ? Math.round(n * 10) / 10 : undefined; };
 
 @Injectable()
@@ -72,6 +74,7 @@ export class DriverAppService {
       startTime: t.startTime, scheduledArrival: t.scheduledArrival, endTime: t.endTime, startMileage: t.startMileage, endMileage: t.endMileage, distance: t.distance,
       vehicle: `${t.vehicle.internalNumber} — ${t.vehicle.registrationNumber}`, vehicleId: t.vehicleId,
       reference: t.reference, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, tripsCount: t.tripsCount, tonnagePerTrip: t.tonnagePerTrip, route: t.route,
+      operationSites: t.operationSites, products: t.products, loadPlaces: t.loadPlaces, unloadPlaces: t.unloadPlaces, pauseMileage: t.pauseMileage, pauseAt: t.pauseAt,
     });
     return {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
@@ -82,8 +85,18 @@ export class DriverAppService {
       activeTrip: active ? fmtTrip(active) : null,
       trips: trips.map(fmtTrip),
       fuelPrice,
+      operationSites: await this.operationSites(driver.siteId, orgUser?.organizationId),
       serverTime: new Date(),
     };
+  }
+
+  // Sites d'opération proposés au chauffeur : réglage OPERATION_SITES (liste séparée par des virgules), sinon les sites de l'entreprise
+  private async operationSites(siteId: string, organizationId?: string): Promise<string[]> {
+    const set = organizationId ? await this.prisma.setting.findUnique({ where: { organizationId_key: { organizationId, key: 'OPERATION_SITES' } } }) : null;
+    const fromSetting = set ? String(set.value).split(',').map((x) => x.trim()).filter(Boolean) : [];
+    if (fromSetting.length) return fromSetting.slice(0, 40);
+    const sites = await this.prisma.site.findMany({ where: organizationId ? { organizationId } : { id: siteId }, select: { name: true }, orderBy: { name: 'asc' }, take: 40 });
+    return sites.map((s) => s.name);
   }
 
   // Traitement idempotent d'un lot d'opérations (en ligne ou rejouées après une coupure réseau)
@@ -98,6 +111,7 @@ export class DriverAppService {
         let r: { duplicate?: boolean; [k: string]: unknown };
         if (op.type === 'start') r = await this.start(driver, userId, op, p);
         else if (op.type === 'arrive') r = await this.arrive(driver, userId, op, p);
+        else if (op.type === 'pause') r = await this.pause(driver, op, p);
         else if (op.type === 'fuel') r = await this.fuel(driver, userId, organizationId, op, p);
         else if (op.type === 'breakdown') r = await this.breakdown(driver, userId, op, p);
         else if (op.type === 'maintenance') r = await this.maintenance(driver, userId, op, p);
@@ -159,12 +173,15 @@ export class DriverAppService {
     const purposeType = ['MISSION', 'AUTRE', 'TRANSPORT'].includes(p.purposeType) ? (p.purposeType as string) : trip?.purposeType ?? (vehicle.vehicleType === 'TRUCK' ? 'TRANSPORT' : 'MISSION');
     const regions = Array.isArray(p.regions) ? p.regions.filter((r: unknown) => typeof r === 'string' && REGIONS.includes(r)) : [];
     const destination = str(p.destination, 200) ?? trip?.destination ?? undefined;
-    const cargo = str(p.cargo, 120);
+    const operationSites = list(p.operationSites), products = list(p.products);
+    const cargo = products.length ? products.join(', ').slice(0, 120) : str(p.cargo, 120);
+    if (vehicle.vehicleType === 'TRUCK' && !operationSites.length && !destination) throw new BadRequestException("Cochez au moins un site d'opération.");
+    if (vehicle.vehicleType === 'TRUCK' && !products.length && !cargo) throw new BadRequestException('Cochez le produit transporté.');
     const preCondition = p.preCondition === 'ANOMALIE' ? 'ANOMALIE' : 'RAS';
     const preAnomalies = str(p.preAnomalies, 1000);
     if (preCondition === 'ANOMALIE' && !preAnomalies) throw new BadRequestException("Décrivez l'anomalie constatée avant le départ.");
     if (purposeType === 'MISSION' && vehicle.vehicleType === 'SERVICE_VEHICLE' && !regions.length && !destination) throw new BadRequestException('Indiquez la région (ou la destination) de la mission.');
-    const fiche = { destination, route: str(p.route, 300), startFuelLiters: tankLiters(p.fuelLiters), purposeType, regions, cargo, purpose: str(p.purpose, 300) ?? trip?.purpose ?? undefined, preCondition, preAnomalies };
+    const fiche = { operationSites, products, destination, route: str(p.route, 300), startFuelLiters: tankLiters(p.fuelLiters), purposeType, regions, cargo, purpose: str(p.purpose, 300) ?? trip?.purpose ?? undefined, preCondition, preAnomalies };
     const tripId = trip ? trip.id : (op.tripId as string);
     const logs = this.prisma.tripLog.create({ data: { tripId, driverId: driver.id, eventType: 'START', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } });
     const vehUp = this.prisma.vehicle.update({ where: { id: vehicle.id }, data: { status: 'ON_MISSION', currentMileage: odometer } });
@@ -184,6 +201,21 @@ export class DriverAppService {
     }
     await this.audit.log({ userId, action: 'UPDATE', entity: 'Trip', entityId: tripId, newValue: { status: 'IN_PROGRESS', odometer, lat, lng, purposeType, destination } });
     return { tripId, status: 'IN_PROGRESS' };
+  }
+
+  // Pause en cours de journée : kilométrage et heure, pour la fiche de bord du camion
+  private async pause(driver: { id: string }, op: SyncOpDto, p: P) {
+    if (await this.prisma.tripLog.findUnique({ where: { clientOpId: op.clientOpId } })) return { duplicate: true };
+    const trip = await this.tripOf(driver.id, op.tripId);
+    if (trip.status !== 'IN_PROGRESS') throw new BadRequestException('Aucune journée en cours.');
+    const odometer = num(p.odometer);
+    if (odometer === undefined || !Number.isInteger(odometer) || odometer < trip.startMileage) throw new BadRequestException(`Kilométrage à la pause invalide (départ : ${trip.startMileage}).`);
+    const at = when(p.occurredAt);
+    await this.prisma.$transaction([
+      this.prisma.trip.update({ where: { id: trip.id }, data: { pauseMileage: odometer, pauseAt: at } }),
+      this.prisma.tripLog.create({ data: { tripId: trip.id, driverId: driver.id, eventType: 'PAUSE', mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } }),
+    ]);
+    return { tripId: trip.id, pauseMileage: odometer };
   }
 
   private async arrive(driver: { id: string }, userId: string, op: SyncOpDto, p: P) {
@@ -206,7 +238,7 @@ export class DriverAppService {
     await this.prisma.$transaction([
       this.prisma.trip.update({
         where: { id: trip.id },
-        data: { status: 'COMPLETED', tonnagePerTrip: (() => { const t = num(p.tonnagePerTrip); return t !== undefined && t > 0 && t <= 200 ? t : undefined; })(), endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endFuelLiters: tankLiters(p.fuelLiters), endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
+        data: { status: 'COMPLETED', loadPlaces: list(p.loadPlaces), unloadPlaces: list(p.unloadPlaces), tonnagePerTrip: (() => { const t = num(p.tonnagePerTrip); return t !== undefined && t > 0 && t <= 200 ? t : undefined; })(), endTime: at, endMileage: odometer, distance, endLat: lat, endLng: lng, endFuelLiters: tankLiters(p.fuelLiters), endCondition: condition, delayReason, arrivalMileage: num(p.arrivalMileage) !== undefined && Number.isInteger(num(p.arrivalMileage)) && (num(p.arrivalMileage) as number) >= trip.startMileage ? num(p.arrivalMileage) : undefined, recipientName: str(p.recipientName, 120), signatureData: signature, tripsCount: num(p.tripsCount) !== undefined && Number.isInteger(num(p.tripsCount)) && (num(p.tripsCount) as number) >= 0 && (num(p.tripsCount) as number) <= 99 ? num(p.tripsCount) : undefined, maintenanceNeeded, maintenanceReason, observations: [trip.observations, str(p.observations)].filter(Boolean).join(' | ') || undefined },
       }),
       this.prisma.vehicle.update({ where: { id: trip.vehicleId }, data: { currentMileage: odometer, status: condition === 'PANNE' || condition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' } }),
       this.prisma.tripLog.create({ data: { tripId: trip.id, driverId: driver.id, eventType: 'ARRIVE', latitude: lat, longitude: lng, mileage: odometer, syncedOffline: !!p.offline, clientOpId: op.clientOpId, occurredAt: at } }),
