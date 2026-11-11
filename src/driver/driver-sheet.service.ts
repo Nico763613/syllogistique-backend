@@ -42,7 +42,7 @@ export class DriverSheetService {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, activity: driver.activity },
       trips: trips.map((t) => ({
         id: t.id, status: t.status, plate: t.vehicle.registrationNumber, brand: [t.vehicle.brand, t.vehicle.model].filter(Boolean).join(' '),
-        reference: t.reference, destination: t.destination, route: t.route, startFuelLiters: t.startFuelLiters, endFuelLiters: t.endFuelLiters, purpose: t.purpose, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, voyages: t.tripsCount,
+        reference: t.reference, destination: t.destination, route: t.route, startFuelLiters: t.startFuelLiters, endFuelLiters: t.endFuelLiters, purpose: t.purpose, purposeType: t.purposeType, regions: t.regions, cargo: t.cargo, voyages: t.tripsCount, tonnagePerTrip: t.tonnagePerTrip,
         startTime: t.startTime, endTime: t.endTime, startMileage: t.startMileage, arrivalMileage: t.arrivalMileage, endMileage: t.endMileage, km: n(t.distance),
         preCondition: t.preCondition, preAnomalies: t.preAnomalies, delayReason: t.delayReason, maintenanceNeeded: t.maintenanceNeeded, maintenanceReason: t.maintenanceReason,
       })),

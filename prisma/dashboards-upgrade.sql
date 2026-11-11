@@ -240,3 +240,24 @@ ALTER TABLE driver_maintenance_entries ADD COLUMN IF NOT EXISTS longitude DOUBLE
 ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS insured BOOLEAN
 --#
 ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS wheels INTEGER
+--#
+ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS truck_type TEXT
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS tonnage_per_trip DOUBLE PRECISION
+--#
+CREATE TABLE IF NOT EXISTS pointer_counts (
+  id TEXT PRIMARY KEY,
+  site_id TEXT NOT NULL,
+  vehicle_id TEXT NOT NULL,
+  day DATE NOT NULL,
+  movements INTEGER NOT NULL DEFAULT 0,
+  tons DOUBLE PRECISION NOT NULL DEFAULT 0,
+  note TEXT,
+  created_by TEXT,
+  created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+)
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS pointer_counts_vehicle_id_day_key ON pointer_counts (vehicle_id, day)
+--#
+CREATE INDEX IF NOT EXISTS pointer_counts_site_id_day_idx ON pointer_counts (site_id, day)

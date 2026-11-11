@@ -276,6 +276,7 @@ model Vehicle {
   year               Int?
   capacity           String?
   wheels             Int?        // nombre de roues (camions)
+  truckType          String?     @map("truck_type") // BENNE | REMORQUE | SEMI_REMORQUE | PLATEAU | CITERNE | PORTE_CHAR | AUTRE
   currentMileage     Int         @default(0) @map("current_mileage")
   status             VehicleStatus @default(AVAILABLE)
   assignedDriverId   String?     @map("assigned_driver_id")
@@ -370,6 +371,7 @@ model Trip {
   regions       String[] @default([])
   cargo         String?
   tripsCount    Int?     @map("trips_count")
+  tonnagePerTrip Float?  @map("tonnage_per_trip") // tonnes par mouvement (camion), coché par le chauffeur
   preCondition  String?  @map("pre_condition") // RAS | ANOMALIE
   preAnomalies  String?  @map("pre_anomalies")
   arrivalMileage Int? @map("arrival_mileage") // compteur à l'arrivée à destination (arrêt = endMileage)
@@ -1604,4 +1606,22 @@ model DriverExpense {
   @@index([driverId, date])
   @@index([status])
   @@map("driver_expenses")
+}
+
+// Totaux des pointeurs (site minier) par camion et par jour, saisis au bureau pour contrôle des fiches de bord
+model PointerCount {
+  id        String   @id @default(uuid())
+  siteId    String   @map("site_id")
+  vehicleId String   @map("vehicle_id")
+  day       DateTime @db.Date
+  movements Int      @default(0)
+  tons      Float    @default(0)
+  note      String?
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([vehicleId, day])
+  @@index([siteId, day])
+  @@map("pointer_counts")
 }

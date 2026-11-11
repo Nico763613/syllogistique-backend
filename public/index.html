@@ -532,6 +532,22 @@ const titles = {
 };
 
 
+
+/* ---------- Camions : types, roues, capacités (listes + « Autre ») ---------- */
+const TRUCK_TYPES = [['BENNE', 'Camion benne'], ['REMORQUE', 'Camion remorque'], ['SEMI_REMORQUE', 'Semi-remorque'], ['PLATEAU', 'Camion plateau'], ['CITERNE', 'Camion-citerne'], ['PORTE_CHAR', 'Porte-char'], ['AUTRE', 'Autre']];
+const TRUCK_WHEELS = [6, 8, 10, 12, 14, 16, 18, 20];
+const TRUCK_CAPS = [10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 70];
+const TON_CHOICES = [40, 45, 50, 55, 60];
+const ttLabel = (c) => (TRUCK_TYPES.find(t => t[0] === c) || [0, c || '—'])[1];
+function otherSel(id, opts, fmtOpt, ph, cur) {
+  const has = cur !== undefined && cur !== null && cur !== '' && opts.map(String).includes(String(cur));
+  const other = cur !== undefined && cur !== null && cur !== '' && !has;
+  return `<select id="${id}" onchange="document.getElementById('${id}-o').style.display=this.value==='__o'?'block':'none'"><option value="">— Choisir —</option>${opts.map(o => `<option value="${o}"${has && String(cur) === String(o) ? ' selected' : ''}>${fmtOpt(o)}</option>`).join('')}<option value="__o"${other ? ' selected' : ''}>Autre…</option></select><input id="${id}-o" style="display:${other ? 'block' : 'none'};margin-top:6px" placeholder="${ph}" value="${other ? esc(cur) : ''}">`;
+}
+function otherVal(id) { const e = document.getElementById(id); if (!e) return ''; return e.value === '__o' ? (document.getElementById(id + '-o').value || '').trim() : e.value; }
+const capNum = (c) => { const m = /^\s*(\d+(?:[.,]\d+)?)\s*t/i.exec(c || ''); return m ? String(parseFloat(m[1].replace(',', '.'))) : (c || ''); };
+const capFmt = (v) => (/^\d+([.,]\d+)?$/.test(v) ? v + ' t' : v);
+
 /* ---------- Historique (journal des modifications de l'écran) et sauvegarde automatique des saisies ---------- */
 const HIST_ENT = {
   trucks: ['Vehicle', 'Document', 'VehicleDowntime'], 'service-vehicles': ['Vehicle', 'Document', 'VehicleDowntime'], vehicles: ['Vehicle', 'Document', 'VehicleDowntime'],
@@ -1181,6 +1197,7 @@ async function renderVehicles(kind) {
       <td><b>${esc(v.internalNumber)}</b></td>
       <td>${esc(v.registrationNumber)}${v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : ''}</td>
       <td>${esc([v.brand, v.model].filter(Boolean).join(' ') || '—')}</td>
+      <td>${esc(v.truckType ? ttLabel(v.truckType) : '—')}</td>
       <td>${v.wheels != null ? esc(v.wheels) : '—'}</td>
       <td>${esc(v.capacity || '—')}</td>
       <td>${v.assignedDriver ? `<b>${esc(v.assignedDriver.lastName)}</b> ${esc(v.assignedDriver.firstName)}<br><small>${esc(v.assignedDriver.phone || '—')} · permis ${esc(v.assignedDriver.licenseNumber || '—')}</small>` : '—'}</td>
@@ -1188,7 +1205,7 @@ async function renderVehicles(kind) {
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
       <td><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button></td>
-    </tr>`).join('') || `<tr><td colspan="10" class="empty">Aucun camion enregistré.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="11" class="empty">Aucun camion enregistré.</td></tr>`;
   const rows = list.map(v => `
     <tr>
       <td><b>${esc(v.internalNumber)}</b></td>
@@ -1211,8 +1228,9 @@ async function renderVehicles(kind) {
         <div><label>Immatriculation</label><select id="v-regtype"><option value="NORMALE">Normale</option><option value="IT">IT (Immatriculation Temporaire)</option></select></div>
         <div><label>Fin de validité plaque IT</label><input id="v-itexp" type="date" /></div>
         ${kind === 'TRUCK' ? `
-        <div><label>Nombre de roues</label><input id="v-wheels" type="number" min="0" inputmode="numeric" placeholder="6, 10, 12…" /></div>
-        <div><label>Capacité (tonnes ou m³)</label><input id="v-cap" placeholder="Ex. 30 t" /></div>
+        <div><label>Type de camion</label><select id="v-ttype"><option value="">— Choisir —</option>${TRUCK_TYPES.map(t => `<option value="${t[0]}">${t[1]}</option>`).join('')}</select></div>
+        <div><label>Nombre de roues</label>${otherSel('v-wheels', TRUCK_WHEELS, n => n + ' roues', 'Nombre de roues')}</div>
+        <div><label>Capacité</label>${otherSel('v-cap', TRUCK_CAPS, n => n + ' tonnes', 'Ex. 80 t')}</div>
         <div><label>Chauffeur affecté</label><select id="v-driver"><option value="">— Aucun —</option>${drvList.map(d => `<option value="${esc(d.id)}">${esc(d.lastName + ' ' + d.firstName)}${d.activity === 'SERVICE_VEHICLE' ? ' (véhicule de service)' : ''}</option>`).join('')}</select></div>
         <div><label>Assurance — N° de police</label><input id="v-insref" /></div>
         <div><label>Assurance — date d'expiration</label><input id="v-insexp" type="date" /></div>` : ''}
@@ -1225,7 +1243,7 @@ async function renderVehicles(kind) {
         ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})">✏️ Objectif</button>` : ''}</h3>
       ${!kind && list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
       ${insAlerts.length ? `<div class="msg err" style="margin-bottom:10px">🛡 Assurance à renouveler : ${insAlerts.map(v => esc(v.internalNumber) + (v.insurance.status === 'EXPIRED' ? ' (expirée)' : ' (dans ' + v.insurance.daysLeft + ' j)')).join(', ')}</div>` : ''}
-      ${kind === 'TRUCK' ? `<table><thead><tr><th>N° interne</th><th>Plaque</th><th>Marque / modèle</th><th>Roues</th><th>Capacité</th><th>Chauffeur</th><th>Assurance</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${truckRows}</tbody></table>`
+      ${kind === 'TRUCK' ? `<table><thead><tr><th>N° interne</th><th>Plaque</th><th>Marque / modèle</th><th>Type</th><th>Roues</th><th>Capacité</th><th>Chauffeur</th><th>Assurance</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${truckRows}</tbody></table>`
       : `<table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}
     </div>
     <div class="panel">
@@ -1380,8 +1398,9 @@ async function createVehicle() {
     const g = (id) => { const e = document.getElementById(id); return e ? e.value.trim() : ''; };
     const created = await api('/vehicles', { method: 'POST', body: {
       siteId: state.siteId,
-      ...(g('v-wheels') ? { wheels: Math.round(Number(g('v-wheels'))) } : {}),
-      ...(g('v-cap') ? { capacity: g('v-cap') } : {}),
+      ...(otherVal('v-wheels') && Number(otherVal('v-wheels')) > 0 ? { wheels: Math.round(Number(otherVal('v-wheels'))) } : {}),
+      ...(otherVal('v-cap') ? { capacity: capFmt(otherVal('v-cap')) } : {}),
+      ...(g('v-ttype') ? { truckType: g('v-ttype') } : {}),
       ...(g('v-driver') ? { assignedDriverId: g('v-driver') } : {}),
       vehicleType: document.getElementById('v-type').value,
       internalNumber: document.getElementById('v-internal').value,
@@ -1435,7 +1454,8 @@ async function editVehicle(id) {
     { key: 'registrationNumber', label: 'Plaque', value: v.registrationNumber },
     { key: 'brand', label: 'Marque', value: v.brand }, { key: 'model', label: 'Modèle', value: v.model },
     { key: 'year', label: 'Année', type: 'number', value: v.year },
-    { key: 'wheels', label: 'Nombre de roues', type: 'number', value: v.wheels }, { key: 'capacity', label: 'Capacité', value: v.capacity },
+    { key: 'truckType', label: 'Type de camion', value: v.truckType || '', options: [['', '—']].concat(TRUCK_TYPES) },
+    { key: 'wheels', label: 'Nombre de roues', type: 'number', value: v.wheels }, { key: 'capacity', label: 'Capacité (ex. 45 t)', value: v.capacity },
     { key: 'status', label: 'Statut', value: v.status, options: [['AVAILABLE', 'Disponible'], ['ON_MISSION', 'En mission'], ['MAINTENANCE', 'Maintenance'], ['IMMOBILIZED', 'Immobilisé'], ['OUT_OF_SERVICE', 'Hors service']] },
     { key: 'assignedDriverId', label: 'Chauffeur affecté', value: v.assignedDriverId || '', options: [['', '— inchangé / aucun —']].concat(drv.map(d => [d.id, d.firstName + ' ' + d.lastName])) },
     { key: 'observations', label: 'Observations', value: v.observations },
@@ -2630,7 +2650,7 @@ function drvMissionsHtml(me) {
       ${t.observations ? `<div class="drv-row"><span>Notes</span><b style="text-align:right">${esc(t.observations)}</b></div>` : ''}
       ${t.scheduledArrival ? `<div class="drv-row"><span>Arrivée prévue</span><b>${drvDt(t.scheduledArrival)}</b></div>` : ''}
       ${t.status !== 'PLANNED' ? `<div class="drv-row"><span>Compteur départ → arrêt</span><b>${esc(t.startMileage)} → ${t.endMileage ?? '…'}</b></div>` : ''}
-      ${t.tripsCount != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.tripsCount)}</b></div>` : ''}
+      ${t.tripsCount != null ? `<div class="drv-row"><span>Voyages</span><b>${esc(t.tripsCount)}${t.tonnagePerTrip ? ' × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.tripsCount * t.tonnagePerTrip * 10) / 10) + ' t' : ''}</b></div>` : ''}
       </details>
       ${t.status === 'PLANNED' ? `<button class="drv-btn gold" onclick="drvStartForm('${esc(t.id)}')">▶ Déclarer le départ</button>` : ''}
       ${t.status === 'IN_PROGRESS' ? `<button class="drv-btn gold" onclick="drvArriveForm('${esc(t.id)}')">🏁 Arrivée / retour</button>` : ''}
@@ -2681,6 +2701,11 @@ function drvProfileHtml(me) {
     <div class="drv-row"><span>Appareil Android</span><b>${esc((me.device && me.device.model) || 'activé')}</b></div>
     <label>Téléphone</label><input id="p-phone" inputmode="tel" value="${esc(me.driver.phone || '')}">
     <button class="drv-btn" onclick="drvSavePhone()">Enregistrer le téléphone</button><div id="p-msg1"></div></div>
+    ${v && v.type === 'TRUCK' ? `<div class="drv-card"><h4>🚛 Mon camion</h4>
+    <label>Type de camion</label><select id="sp-type"><option value="">— Choisir —</option>${TRUCK_TYPES.map(t => `<option value="${t[0]}"${v.truckType === t[0] ? ' selected' : ''}>${t[1]}</option>`).join('')}</select>
+    <label>Nombre de roues</label>${otherSel('sp-wheels', TRUCK_WHEELS, n => n + ' roues', 'Nombre de roues', v.wheels)}
+    <label>Capacité</label>${otherSel('sp-cap', TRUCK_CAPS, n => n + ' tonnes', 'Ex. 80 t', capNum(v.capacity))}
+    <button class="drv-btn" onclick="drvSaveSpec()">Enregistrer mon camion</button><div id="p-msg3"></div></div>` : ''}
     <div class="drv-card">${drvLicenseHtml(me)}</div>
     <div class="drv-card"><h4>🔁 Je remplace un collègue</h4>
     <div style="font-size:13px;color:var(--muted)">Si le chauffeur habituel est malade ou absent, prenez le véhicule : il passe sur votre compte et le gestionnaire est prévenu.</div>
@@ -2694,6 +2719,16 @@ async function drvSavePhone() {
   const m = drvEl('p-msg1');
   try { const r = await api('/driver/profile', { method: 'POST', body: { phone: drvEl('p-phone').value } }); DRV.me.driver.phone = r.phone; dset('me', DRV.me); m.innerHTML = '<div class="msg ok">Téléphone enregistré.</div>'; }
   catch (e) { m.innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; }
+}
+async function drvSaveSpec() {
+  const m = drvEl('p-msg3');
+  try {
+    const wheels = otherVal('sp-wheels'), cap = otherVal('sp-cap'), tt = drvEl('sp-type').value;
+    const body = { ...(tt ? { truckType: tt } : {}), ...(wheels && Number(wheels) > 0 ? { wheels: Math.round(Number(wheels)) } : {}), ...(cap ? { capacity: capFmt(cap) } : {}) };
+    const r = await api('/driver/vehicle-spec', { method: 'POST', body });
+    Object.assign(DRV.me.vehicle, r); dset('me', DRV.me);
+    m.innerHTML = '<div class="msg ok">Camion enregistré.</div>';
+  } catch (e) { m.innerHTML = `<div class="drv-warn">${esc(e.message)}</div>`; }
 }
 async function drvChangePw() {
   const m = drvEl('p-msg2');
@@ -2876,6 +2911,7 @@ function drvArriveForm(tripId) {
  ${drvFuelSel('f-fuel')}
     <div id="f-calc" class="drv-warn" style="background:#eef4fb;color:#163A5F;border-color:#c9daf0"></div>
     ${truck ? '<label>Nombre de voyages effectués</label><input id="f-voy" type="number" inputmode="numeric" value="1">' : ''}
+    ${truck ? `<label>Tonnage par voyage (cochez) *</label><div onchange="document.getElementById('f-ton-o').style.display=(document.querySelector('input[name=f-ton]:checked')||{}).value==='o'?'block':'none'" style="display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0">${TON_CHOICES.map(n => `<label style="display:flex;align-items:center;gap:5px;margin:0"><input type="radio" name="f-ton" value="${n}" style="width:auto"> ${n} t</label>`).join('')}<label style="display:flex;align-items:center;gap:5px;margin:0"><input type="radio" name="f-ton" value="o" style="width:auto"> Autre</label></div><input id="f-ton-o" inputmode="decimal" placeholder="Tonnage (ex. 38)" style="display:none">` : ''}
     <label>Nom de la personne qui réceptionne</label><input id="f-recipient">
     <label>État du véhicule</label><select id="f-cond"><option value="RAS">RAS</option><option value="DOMMAGE_MINEUR">Dommage mineur</option><option value="DOMMAGE_MAJEUR">Dommage majeur</option><option value="PANNE">Panne</option></select>
     ${late ? '<label>Motif du retard</label><input id="f-delay" placeholder="Embouteillage, contrôle, attente chargement…">' : ''}
@@ -2885,10 +2921,16 @@ function drvArriveForm(tripId) {
     if (odometer === undefined) throw new Error("Saisissez le kilométrage de retour / d'arrêt.");
     if (odometer < t.startMileage) throw new Error(`Le kilométrage doit être supérieur ou égal à ${t.startMileage}.`);
     if (drvNum('f-fuel') === undefined || drvNum('f-fuel') < 0) throw new Error("Indiquez les litres de carburant dans le réservoir à l'arrivée.");
+    let tonnage;
+    if (drvEl('f-voy')) {
+      const r = document.querySelector('input[name="f-ton"]:checked');
+      tonnage = r ? (r.value === 'o' ? Number(String(drvEl('f-ton-o').value).replace(',', '.')) : Number(r.value)) : undefined;
+      if (!tonnage || !(tonnage > 0)) throw new Error('Cochez le tonnage transporté (pour le contrôle avec les pointeurs).');
+    }
     const g = await drvGeo();
     const sig = drvEl('f-sig') ? drvSigData() : undefined;
     const arr = drvEl('f-arrdt') && drvEl('f-arrdt').value ? new Date(drvEl('f-arrdt').value).toISOString() : new Date().toISOString();
-    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
+    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, tonnagePerTrip: tonnage, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
   }, 'Enregistrer l\'arrivée');
   if (drvEl('f-sig')) drvSigInit();
 }
@@ -3516,13 +3558,47 @@ async function renderDriverSheets(date) {
   const blocks = list.map((sh) => `<div class="panel"><h3>${esc(sh.driver.name)} ${sh.status === 'SENT' ? '<span class="badge ok">Envoyée ' + drvDt(sh.sentAt) + '</span> ' + (sh.processedAt ? '<span class="badge ok">✔ Traitée ' + drvDt(sh.processedAt) + '</span>' : '<span class="badge warn">À traiter</span> <button class="btn small gold" onclick="processSheet(\'' + esc(sh.driver.id) + '\',\'' + esc(sh.date) + '\')">✔ Marquer comme traitée</button>') : '<span class="badge warn">Non envoyée</span>'}</h3>
     <div class="desc">${esc(sh.day)} ${esc(sh.date)} · ${esc(sh.driver.phone || '')} · ${sh.driver.activity === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service'} — <b>${fmt(sh.totals.km)} km</b> · ${sh.totals.liters} L (${fmt(sh.totals.fuelCost)} GNF)${sh.totals.consumption !== null ? ' · ' + sh.totals.consumption + ' L/100 km' : ''}${sh.totals.voyages ? ' · ' + sh.totals.voyages + ' voyage(s)' : ''}${sh.totals.maintenanceCost ? ' · maintenance ' + fmt(sh.totals.maintenanceCost) + ' GNF' : ''}</div>
     <div style="overflow:auto"><table><tr><th>Véhicule</th><th>Destination / motif</th><th>Horaires</th><th>Km départ</th><th>Km arrivée</th><th>Km arrêt</th><th>Distance</th><th>Observations</th></tr>
-    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:11px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:11px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:11px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:11px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
+    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:11px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:11px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:11px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:11px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
     ${sh.fuel.length ? `<h4 style="margin:10px 0 4px">⛽ Carburant</h4><table><tr><th>Heure</th><th>Station</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${f.liters}</td><td class="mono">${fmt(f.cost)}</td></tr>`).join('')}</table>` : ''}
     ${sh.maintenance.length ? `<h4 style="margin:10px 0 4px">🔧 Maintenance</h4><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${sh.maintenance.map((m) => `<tr><td>${esc(DRV_NAT[m.nature] || m.nature)}</td><td>${esc(m.detail || '')}</td><td class="mono">${m.mileage != null ? fmt(m.mileage) : '—'}</td><td class="mono">${m.nextServiceKm ? fmt(m.nextServiceKm) + ' km' : '—'}</td><td class="mono">${m.cost != null ? fmt(m.cost) : '—'}</td></tr>`).join('')}</table>` : ''}
   </div>`).join('');
   root().innerHTML = `<div class="panel"><h3>📋 Fiches journalières des chauffeurs</h3><div class="desc">Fiches saisies par les chauffeurs ; une fois envoyées, elles ne sont plus modifiables.</div>
-    <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div>${blocks || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
+    <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div><div id="ptr-panel"></div>${blocks || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
+  loadPointers(d);
 }
+
+/* ---------- Camions : contrôle avec les pointeurs ---------- */
+async function loadPointers(d) {
+  const box = document.getElementById('ptr-panel'); if (!box) return;
+  try {
+    const r = await api('/driver-admin/pointers?date=' + d + '&siteId=' + state.siteId);
+    const canPrice = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+    const gap = (g, u) => g === null ? '<span class="badge warn">À saisir</span>' : g === 0 ? '<span class="badge ok">Conforme</span>' : `<span class="badge bad">${g > 0 ? '+' : ''}${g}${u}</span>`;
+    box.innerHTML = `<div class="panel"><h3>⚖️ Contrôle avec les pointeurs — camions</h3>
+      <div class="desc">Mouvements et tonnes déclarés par les chauffeurs (tonnage coché sur la fiche de bord), comparés aux totaux relevés par les pointeurs. Prix par tonne : <b>${r.pricePerTon ? fmt(r.pricePerTon) + ' GNF' : 'non fixé'}</b>
+      ${canPrice ? `<button class="btn small" onclick="setTonPrice()">Fixer le prix par tonne</button>` : ''}</div>
+      <div style="overflow:auto"><table><thead><tr><th>Camion</th><th>Chauffeur</th><th>Mouvements déclarés</th><th>Tonnes déclarées</th><th>Montant (GNF)</th><th>Pointeur : mouvements</th><th>Pointeur : tonnes</th><th>Écart</th><th></th></tr></thead><tbody>
+      ${r.rows.map((x, i) => `<tr><td><b>${esc(x.vehicle)}</b></td><td>${esc(x.driver)}</td><td class="mono">${x.movements}</td><td class="mono">${x.tons}${x.missingTonnage ? ' <span class="badge warn">tonnage manquant</span>' : ''}</td><td class="mono">${r.pricePerTon ? fmt(x.amount) : '—'}</td>
+        <td><input id="pm-${i}" type="number" min="0" inputmode="numeric" style="width:80px" value="${x.pointer ? x.pointer.movements : ''}"></td>
+        <td><input id="pt-${i}" type="number" min="0" step="0.1" inputmode="decimal" style="width:90px" value="${x.pointer ? x.pointer.tons : ''}"></td>
+        <td>${gap(x.gapTons, ' t')}${x.gapMovements ? '<div style="font-size:11px">' + (x.gapMovements > 0 ? '+' : '') + x.gapMovements + ' mouv.</div>' : ''}</td>
+        <td><button class="btn small" onclick="savePointer('${esc(x.vehicleId)}', ${i}, '${esc(r.date)}')">Enregistrer</button></td></tr>`).join('') || '<tr><td colspan="9" class="empty">Aucun camion en mouvement ce jour.</td></tr>'}
+      </tbody></table></div><div id="ptr-msg"></div></div>`;
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function savePointer(vehicleId, i, day) {
+  const m = parseInt(document.getElementById('pm-' + i).value, 10), t = parseFloat(String(document.getElementById('pt-' + i).value).replace(',', '.'));
+  if (isNaN(m) || isNaN(t)) { document.getElementById('ptr-msg').innerHTML = '<div class="msg err">Saisissez les mouvements et les tonnes du pointeur.</div>'; return; }
+  try { await api('/driver-admin/pointers?siteId=' + state.siteId, { method: 'POST', body: { vehicleId, day, movements: m, tons: t } }); loadPointers(day); }
+  catch (e) { document.getElementById('ptr-msg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function setTonPrice() {
+  const v = prompt('Prix par tonne transportée (GNF) :'); if (v === null) return;
+  const n = Number(String(v).replace(/\s/g, '').replace(',', '.'));
+  if (!(n > 0)) { alert('Saisissez un montant supérieur à 0.'); return; }
+  try { await api('/settings/TON_PRICE', { method: 'PUT', body: { value: String(n), reason: 'Prix par tonne' } }); loadPointers(window._shDate); } catch (e) { alert(e.message); }
+}
+
 /* ============ LICENCE : activation et blocage (actif seulement si le serveur est relié au Master) ============ */
 function licScreen(stateName, message) {
   let ov = document.getElementById('lic-ov'); if (ov) ov.remove();

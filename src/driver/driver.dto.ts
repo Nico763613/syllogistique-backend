@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsEmail, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsEmail, IsIn, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 
 export class LinkDriverDto {
   @IsString() driverId: string;
@@ -37,6 +37,20 @@ export class SyncDto {
 
 export class UpdateProfileDto {
   @IsString() @MinLength(6) @MaxLength(30) phone: string;
+}
+
+export class VehicleSpecDto {
+  @IsOptional() @IsString() @MaxLength(40) truckType?: string;
+  @IsOptional() @IsInt() @Min(2) @Max(40) wheels?: number;
+  @IsOptional() @IsString() @MaxLength(40) capacity?: string;
+}
+
+export class PointerDto {
+  @IsString() vehicleId: string;
+  @IsString() day: string;
+  @IsInt() @Min(0) @Max(500) movements: number;
+  @IsNumber() @Min(0) @Max(100000) tons: number;
+  @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 
 export class InviteDto {
