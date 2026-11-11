@@ -418,6 +418,7 @@ async function apiHandle(res, path, options, retried) {
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
+    if (res.status === 402 && String(err.code || '').startsWith('LICENSE_')) { licScreen(err.code.slice(8), err.message); }
     const ex = new Error(Array.isArray(err.message) ? err.message.join(', ') : err.message || 'Erreur API'); ex.code = err.code; throw ex;
   }
   const ct = res.headers.get('content-type') || '';
@@ -3507,7 +3508,47 @@ async function renderDriverSheets(date) {
   root().innerHTML = `<div class="panel"><h3>📋 Fiches journalières des chauffeurs</h3><div class="desc">Fiches saisies par les chauffeurs ; une fois envoyées, elles ne sont plus modifiables.</div>
     <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div>${blocks || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
 }
+/* ============ LICENCE : activation et blocage (actif seulement si le serveur est relié au Master) ============ */
+function licScreen(stateName, message) {
+  let ov = document.getElementById('lic-ov'); if (ov) ov.remove();
+  ov = document.createElement('div'); ov.id = 'lic-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0E2740;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
+  const act = stateName === 'UNACTIVATED';
+  ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:26px;text-align:center;font-family:inherit">
+    <div style="font-size:42px">${act ? '🔑' : '🔒'}</div>
+    <h2 style="margin:8px 0;color:#163A5F;letter-spacing:.5px">Syllogistique</h2>
+    <p style="color:#4a5a70;font-size:14px">${esc(message || (act ? "Entrez le code d'activation reçu de votre fournisseur." : 'Accès suspendu. Contactez votre fournisseur.'))}</p>
+    ${act ? `<input id="lic-code" placeholder="SYLL-XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" autocomplete="off" style="width:100%;padding:12px;border:1px solid #cdd6e2;border-radius:8px;font-size:15px;text-align:center;margin-top:8px">
+    <button class="btn gold" style="width:100%;margin-top:12px" onclick="licActivate()">Activer</button><div id="lic-msg" style="margin-top:10px"></div>` : `<button class="btn" style="width:100%;margin-top:12px" onclick="location.reload()">Réessayer</button>`}
+    <div class="powered">Powered by Syllogistique</div></div>`;
+  document.body.appendChild(ov);
+}
+async function licActivate() {
+  const m = document.getElementById('lic-msg'); const code = document.getElementById('lic-code').value.trim();
+  const base = (document.getElementById('api-url').value || localStorage.getItem('syllo_api_url') || '').replace(/\/$/, '');
+  m.innerHTML = '<div class="msg">Activation en cours…</div>';
+  try {
+    const r = await fetch(base + '/license/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(Array.isArray(j.message) ? j.message.join(', ') : j.message || 'Activation refusée.');
+    m.innerHTML = '<div class="msg ok">Activation réussie.</div>'; setTimeout(() => location.reload(), 800);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function licLoad() {
+  try {
+    const base = (document.getElementById('api-url') ? document.getElementById('api-url').value : '') || localStorage.getItem('syllo_api_url') || '';
+    if (!base) return;
+    const r = await fetch(base.replace(/\/$/, '') + '/license/status'); if (!r.ok) return;
+    const j = await r.json(); if (!j.enforced) return;
+    if (j.state === 'UNACTIVATED' || j.state === 'BLOCKED') licScreen(j.state, j.message);
+    else if (j.state === 'WARNING') {
+      const b = document.createElement('div'); b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#E0A72E;color:#1b1b1b;padding:8px 12px;font-size:13px;text-align:center';
+      b.textContent = '⚠️ ' + j.message; document.body.appendChild(b);
+    }
+  } catch (e) {}
+}
 brandLoad();
+licLoad();
 </script>
 
 </body>

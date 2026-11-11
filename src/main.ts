@@ -8,6 +8,7 @@ import { join } from 'path';
 const helmetModule = require('helmet');
 const helmet = helmetModule.default ?? helmetModule;
 import { AppModule } from './app.module';
+import { LicenseService } from './license/license.service';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -28,6 +29,22 @@ async function bootstrap() {
     console.warn('⚠️  CORS_ORIGINS non défini : tous les sites sont autorisés. Définissez-le en production.');
     app.enableCors();
   }
+  // Licence : si MASTER_URL est défini, l'API reste fermée tant que l'installation n'est pas activée
+  // ou si la licence est suspendue, révoquée, expirée ou non vérifiée depuis plus de 7 jours.
+  const lic = app.get(LicenseService);
+  app.use(async (req: any, res: any, next: any) => {
+    if (!lic.enforced) return next();
+    const p: string = req.path || '';
+    if (['/app', '/site', '/uploads', '/license', '/docs', '/branding', '/health'].some((x) => p === x || p.startsWith(x + '/'))) return next();
+    try {
+      const s = await lic.state();
+      if (s.state === 'UNACTIVATED' || s.state === 'BLOCKED') {
+        return res.status(402).json({ statusCode: 402, code: 'LICENSE_' + s.state, reason: s.reason ?? null, message: s.message });
+      }
+    } catch { /* en cas de doute, ne pas bloquer à tort */ }
+    next();
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
