@@ -253,6 +253,9 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
+      <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
+      <div class="nav-item" data-view="espace-logi" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE" onclick="go('espace-logi')"><span class="nav-icon">🧭</span> Espace Responsable logistique</div>
+
       <div class="nav-section-label" id="nav-dept-label">🚚 Logistique &amp; Flotte</div>
       <div class="nav-sub-label">Flotte</div>
       <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
@@ -489,7 +492,7 @@ function enterApp() {
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'dash-hse', AGENT_HSE: 'dash-hse', MECANICIEN: 'my-report', POINTEUR: 'my-report' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'dash-hse', AGENT_HSE: 'dash-hse', MECANICIEN: 'my-report', POINTEUR: 'my-report', DIRECTEUR_GENERAL: 'pilotage', ADMIN_LOGISTIQUE: 'espace-logi' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -535,7 +538,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -1113,7 +1116,7 @@ function applyRoleNav() {
     if (ok) any = true;
   });
   // Les rôles départementaux (commercial, caisse, HSE) ne voient que leur espace
-  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR'].includes(role)) {
+  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR', 'DIRECTEUR_GENERAL'].includes(role)) {
     document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings') el.style.display = 'none'; });
     document.querySelectorAll('#sidebar .nav-section-label').forEach((el) => { if (el.id !== 'nav-dept-label') el.style.display = 'none'; });
   }
@@ -1125,6 +1128,8 @@ function applyRoleNav() {
 async function renderView(view) {
   if (!window._silent) root().innerHTML = '<div class="empty">Chargement…</div>';
   try {
+    if (view === 'pilotage') return renderExecutive('dg');
+    if (view === 'espace-logi') return renderExecutive('logi');
     if (view === 'dashboard') return renderDashboard();
     if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
     if (view === 'vehicles') return renderVehicles();
@@ -2593,6 +2598,95 @@ async function stInvite(userId) {
     box.scrollIntoView({ behavior: 'smooth' });
   } catch (e) { box.innerHTML = `<div class="msg err" style="margin-top:10px">${esc(e.message)}</div>`; }
 }
+
+/* ---------------- PILOTAGE : espace Directeur Général et espace Responsable logistique ---------------- */
+function execStyle() {
+  if (document.getElementById('exec-style')) return;
+  const st = document.createElement('style'); st.id = 'exec-style';
+  st.textContent = `.ex-hero{border-radius:16px;padding:20px 22px;color:#fff;background:linear-gradient(120deg,#0E2740 0%,#1F4A75 55%,#2E8B57 120%);margin-bottom:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+  .ex-hero h2{margin:0 0 4px;font-size:22px}.ex-hero p{margin:0;opacity:.9;font-size:14px}.ex-hero .ex-date{font-size:12px;opacity:.8}
+  .ex-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+  .ex-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;box-shadow:0 2px 8px rgba(14,39,64,.05)}
+  .ex-ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+  .ex-kpi b{display:block;font-size:24px;line-height:1.1;color:var(--navy)}.ex-kpi span{font-size:12px;color:var(--muted)}.ex-kpi small{display:block;font-size:11px;margin-top:2px}
+  .ex-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-bottom:14px}
+  .ex-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 2px 8px rgba(14,39,64,.05)}
+  .ex-card h3{margin:0 0 10px;font-size:15px;color:var(--navy);display:flex;justify-content:space-between;align-items:center}
+  .ex-bars{display:flex;align-items:flex-end;gap:10px;height:150px;padding-top:6px;border-bottom:1px solid var(--line)}
+  .ex-bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+  .ex-bar div.pair{display:flex;gap:3px;align-items:flex-end;height:calc(100% - 18px);width:100%;justify-content:center}
+  .ex-bar i{display:block;width:42%;max-width:22px;border-radius:5px 5px 0 0;min-height:2px}
+  .ex-bar em{font-style:normal;font-size:11px;color:var(--muted);margin-top:4px}
+  .ex-ring{width:120px;height:120px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:4px auto}
+  .ex-ring div{width:88px;height:88px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--navy)}
+  .ex-al{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}.ex-al:last-child{border:0}
+  .ex-dot{width:10px;height:10px;border-radius:50%;margin-top:5px;flex-shrink:0}
+  .ex-act{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+  .ex-act button{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px 6px;cursor:pointer;font-size:12px;color:var(--navy);display:flex;flex-direction:column;align-items:center;gap:6px}
+  .ex-act button span{font-size:22px}.ex-act button:hover{background:#F4F8FC}
+  .ex-row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}.ex-row:last-child{border:0}`;
+  document.head.appendChild(st);
+}
+function exKpi(ico, bg, val, label, sub) {
+  return `<div class="ex-kpi"><div class="ex-ico" style="background:${bg}">${ico}</div><div><b>${val}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+}
+function exBars(rows) {
+  const max = Math.max(1, ...rows.map((r) => r.total));
+  return `<div class="ex-bars">${rows.map((r) => `<div class="ex-bar"><div class="pair"><i title="Missions : ${r.total}" style="height:${(r.total / max) * 100}%;background:#2F6FB5"></i><i title="Terminées : ${r.completed}" style="height:${(r.completed / max) * 100}%;background:#2E8B57"></i></div><em>${esc(r.label)}</em></div>`).join('')}</div>
+    <div class="desc" style="margin-top:6px"><span style="color:#2F6FB5">■</span> Missions &nbsp; <span style="color:#2E8B57">■</span> Terminées</div>`;
+}
+function exAlerts(list) {
+  const col = { CRITICAL: '#C0392B', WARNING: '#E0A72E', INFO: '#2F6FB5' };
+  return list.length ? list.map((a) => `<div class="ex-al"><div class="ex-dot" style="background:${col[a.severity] || col.INFO}"></div><div><b>${esc(a.title)}</b><div style="color:var(--muted)">${esc(a.message)}</div><div style="color:var(--muted);font-size:11px">${drvDt(a.at)}</div></div></div>`).join('') : '<div class="empty" style="padding:10px">Aucune alerte non lue.</div>';
+}
+async function renderExecutive(mode) {
+  execStyle();
+  const d = await api('/dashboards/executive' + (state.siteId ? '?siteId=' + state.siteId : ''));
+  const u = state.user, f = d.fleet, m = d.missions, pe = d.people, ex = d.expenses, hs = d.hse, st = d.stock;
+  const heroTxt = mode === 'dg' ? 'Voici la situation globale de votre entreprise.' : 'Voici l’activité de votre logistique : missions, véhicules et chauffeurs.';
+  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
+  const rate = m.completionRate;
+  const ring = (v, col) => `<div class="ex-ring" style="background:conic-gradient(${col} ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
+  const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
+  const alertsCard = `<div class="ex-card"><h3>🔔 Alertes importantes</h3>${exAlerts(d.alerts)}</div>`;
+  const moveCard = `<div class="ex-card"><h3>📦 Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${st.recent.length ? st.recent.map((r) => `<div class="ex-row"><span>${esc(r.item)}</span><span style="color:${r.type === 'IN' || r.type === 'RETURN' ? '#2E8B57' : '#C0392B'}">${r.type === 'IN' || r.type === 'RETURN' ? '+' : '−'}${fmt(r.quantity)}</span><span style="color:var(--muted)">${drvDt(r.at)}</span></div>`).join('') : '<div class="empty" style="padding:10px">Aucun mouvement.</div>'}${st.belowMinimum ? `<div class="msg err" style="margin-top:8px">Stock faible : ${st.belowMinimum} article(s) sous le seuil minimum.</div>` : ''}</div>`;
+  const chartCard = `<div class="ex-card"><h3>📈 Performance des missions (6 mois) <span class="badge ${m.monthTotal >= m.previousMonthTotal ? 'ok' : 'warn'}">${m.monthTotal} ce mois</span></h3>${exBars(m.byMonth)}</div>`;
+  let body;
+  if (mode === 'dg') {
+    const kpis = `<div class="ex-kpis">
+      ${exKpi('🚚', '#E3EEFB', f.active, 'Véhicules actifs', `sur ${f.total} · ${f.maintenance} en maintenance`)}
+      ${exKpi('▶️', '#E1F4E8', m.inProgress, 'Missions en cours', `${m.today} aujourd’hui`)}
+      ${exKpi('👥', '#EFE6FA', pe.present + ' / ' + pe.drivers, 'Chauffeurs présents', `${pe.staffReportsToday}/${pe.staff} rapports du personnel`)}
+      ${exKpi('💰', '#FDF1D6', fmt(ex.today), 'Dépenses du jour (GNF)', `Mois : ${fmt(ex.month)}`)}</div>`;
+    const strat = `<div class="ex-card"><h3>🎯 Indicateurs stratégiques</h3>
+      <div class="ex-row"><span>Taux de missions terminées (mois)</span><b>${rate == null ? '—' : rate + ' %'}</b></div>
+      <div class="ex-row"><span>Kilomètres parcourus (mois)</span><b>${fmt(m.kmMonth)} km</b></div>
+      <div class="ex-row"><span>Dépenses du mois</span><b>${fmt(ex.month)} GNF</b></div>
+      <div class="ex-row"><span>Valeur du stock</span><b>${fmt(st.value)} GNF</b></div>
+      <div class="ex-row"><span>Dépenses chauffeurs à valider</span><b>${ex.pendingApproval}</b></div>
+      <div class="ex-row"><span>Véhicules immobilisés</span><b>${f.immobilized}</b></div></div>`;
+    const hse = `<div class="ex-card"><h3>🦺 Sécurité (HSE)</h3>${ring(hs.complianceRate, '#2E8B57')}<div class="desc" style="text-align:center">Conformité des inspections du mois</div>
+      <div class="ex-row"><span>Incidents ouverts</span><b>${hs.openIncidents}</b></div><div class="ex-row"><span>Accidents (mois)</span><b>${hs.accidentsMonth}</b></div><div class="ex-row"><span>Inspections (mois)</span><b>${hs.inspectionsMonth}</b></div></div>`;
+    const exp = `<div class="ex-card"><h3>💰 Dépenses globales du jour</h3>
+      <div class="ex-row"><span>Carburant</span><b>${fmt(ex.fuelToday)}</b></div><div class="ex-row"><span>Maintenance</span><b>${fmt(ex.maintenanceToday)}</b></div><div class="ex-row"><span>Frais chauffeurs</span><b>${fmt(ex.driversToday)}</b></div><div class="ex-row"><span><b>Total</b></span><b>${fmt(ex.today)} GNF</b></div></div>`;
+    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Accès rapides</h3><div class="ex-act">${act('📊', 'Rapports camions', 'reports-truck')}${act('🚙', 'Rapports véhicules', 'reports-service')}${act('📦', 'Stocks', 'stock')}${act('🦺', 'HSE', 'dash-hse')}${act('🛒', 'Achats', 'purchases')}${act('📝', 'États des besoins', 'needs')}</div></div>`;
+    body = hero + kpis + `<div class="ex-grid">${chartCard}${strat}${alertsCard}</div><div class="ex-grid">${exp}${hse}${moveCard}</div>` + actions;
+  } else {
+    const kpis = `<div class="ex-kpis">
+      ${exKpi('🚚', '#E3EEFB', f.active, 'Véhicules actifs', `${f.onMission} en mission · ${f.available} disponibles`)}
+      ${exKpi('▶️', '#E1F4E8', m.inProgress, 'Missions en cours', `${m.today} aujourd’hui`)}
+      ${exKpi('⏳', '#FDF1D6', m.planned, 'Missions en attente', 'planifiées, non démarrées')}
+      ${exKpi('💰', '#FDE8E4', fmt(ex.today), 'Dépenses du jour (GNF)', `${ex.pendingApproval} frais à valider`)}</div>`;
+    const track = `<div class="ex-card"><h3>🧭 Suivi des missions en cours <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('driver-board')">Voir tout →</a></h3>${m.running.length ? m.running.map((t) => `<div class="ex-row"><span><b>${esc(t.vehicle)}</b> · ${esc(t.driver)}<br><span style="color:var(--muted)">${esc(t.destination || 'Destination non renseignée')}</span></span><span style="text-align:right"><span class="badge ok">En cours</span><br><span style="color:var(--muted);font-size:11px">départ ${drvDt(t.startTime)}</span></span></div>`).join('') : '<div class="empty" style="padding:10px">Aucune mission en cours.</div>'}</div>`;
+    const crew = `<div class="ex-card"><h3>👥 Chauffeurs & équipe</h3>
+      <div class="ex-row"><span>Chauffeurs actifs</span><b>${pe.drivers}</b></div><div class="ex-row"><span>Présents aujourd’hui</span><b>${pe.present}</b></div><div class="ex-row"><span>Absents / non présents</span><b>${pe.absent}</b></div><div class="ex-row"><span>Rapports du personnel reçus</span><b>${pe.staffReportsToday}/${pe.staff}</b></div>
+      <div class="ex-row"><span>Véhicules en maintenance</span><b>${f.maintenance}</b></div><div class="ex-row"><span>Véhicules immobilisés</span><b>${f.immobilized}</b></div></div>`;
+    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${act('🚛', 'Camions', 'trucks')}${act('🚙', 'Véhicules de service', 'service-vehicles')}${act('🧑‍✈️', 'Chauffeurs', 'drivers')}${act('📜', 'Fiches de bord', 'driver-sheets')}${act('⛽', 'Carburant', 'fuel')}${act('🔧', 'Maintenance', 'maintenance')}${act('🕒', 'Pointeurs', 'staff-pointer')}${act('🔨', 'Mécaniciens', 'staff-mech')}</div></div>`;
+    body = hero + kpis + `<div class="ex-grid">${track}${alertsCard}${crew}</div><div class="ex-grid">${chartCard}${moveCard}</div>` + actions;
+  }
+  root().innerHTML = body;
+}
+
 /* ---------------- RESPONSABLES : le Master Admin enregistre le DG et le Responsable logistique et leur envoie le lien ---------------- */
 const MGR_ROLES = { DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique' };
 async function renderManagers() {
