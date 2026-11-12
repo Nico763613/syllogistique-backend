@@ -25,6 +25,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { QrcodesModule } from './qrcodes/qrcodes.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { StaffModule } from './staff/staff.module';
 import { SettingsModule } from './settings/settings.module';
 import { SitesModule } from './sites/sites.module';
 import { DocumentsModule } from './documents/documents.module';
@@ -68,6 +69,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     UploadsModule,
     QrcodesModule,
     MessagingModule,
+    StaffModule,
     SettingsModule,
     SitesModule,
     DocumentsModule,
