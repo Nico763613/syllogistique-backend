@@ -2088,9 +2088,22 @@ async function renderNeeds() {
       <button class="btn small" id="nd-cancel" style="display:none;margin-left:6px;" onclick="renderNeeds()">Annuler la modification</button></div>
       <div id="nd-msg"></div>
     </div>
+    ${['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) ? `<div class="panel"><h3>✉️ Circuit de transmission</h3>
+      <div class="desc">1) L'état des besoins est envoyé par e-mail aux Achats ; 2) après leur traitement, il est transmis à la comptabilité.</div>
+      <div class="grid-2"><div><label>E-mails des Achats</label><input id="nd-mail-ach" placeholder="achats@entreprise.com" /></div><div><label>E-mails de la comptabilité</label><input id="nd-mail-cpt" placeholder="compta@entreprise.com" /></div></div>
+      <button class="btn" onclick="saveNeedMails()">Enregistrer les destinataires</button><div id="nd-mmsg"></div></div>` : ''}
     <div class="panel"><h3>États des besoins</h3><div id="nd-list"><div class="empty">Chargement…</div></div></div>`;
   addNeedLine();
   loadNeeds();
+  if (document.getElementById('nd-mail-ach')) api('/settings').then((all) => { const g = (k) => (all.find((x) => x.key === k) || {}).value || ''; document.getElementById('nd-mail-ach').value = g('NEEDS_PURCHASING_EMAILS'); document.getElementById('nd-mail-cpt').value = g('NEEDS_ACCOUNTING_EMAILS') || g('REPORT_ACCOUNTING_EMAILS'); }).catch(() => {});
+}
+async function saveNeedMails() {
+  const m = document.getElementById('nd-mmsg');
+  try {
+    await api('/settings/NEEDS_PURCHASING_EMAILS', { method: 'PUT', body: { value: document.getElementById('nd-mail-ach').value } });
+    await api('/settings/NEEDS_ACCOUNTING_EMAILS', { method: 'PUT', body: { value: document.getElementById('nd-mail-cpt').value } });
+    m.innerHTML = '<div class="msg ok">Destinataires enregistrés.</div>';
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 function drawNeedLines() {
   const box = document.getElementById('nd-lines');
@@ -2133,7 +2146,7 @@ async function loadNeeds() {
   const box = document.getElementById('nd-list');
   try {
     const list = await api('/needs?siteId=' + state.siteId);
-    const st = { BROUILLON: '📝 Brouillon', ENVOYE: '📤 Envoyé', APPROUVE: '✅ Approuvé', REJETE: '❌ Rejeté', SATISFAIT: '📦 Satisfait' };
+    const st = { BROUILLON: '📝 Brouillon', ENVOYE: '📤 Envoyé aux Achats', APPROUVE: '✅ Approuvé', REJETE: '❌ Rejeté', SATISFAIT: '📦 Satisfait', TRANSMIS_COMPTA: '💼 Transmis à la comptabilité' };
     const admin = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
     const canEdit = (n) => n.status === 'BROUILLON' || state.user.role === 'SUPER_ADMIN';
     box.innerHTML = list.length ? `<table><thead><tr><th>N°</th><th>Objet</th><th>Priorité</th><th>Total est.</th><th>État</th><th>Actions</th></tr></thead><tbody>${list.map(n => `
@@ -2141,7 +2154,8 @@ async function loadNeeds() {
       <td>${n.priority === 'URGENTE' ? '<span class="badge bad">Urgente</span>' : 'Normale'}</td><td class="mono">${n.total ? fmt(n.total) : '—'}</td><td>${st[n.status] || esc(n.status)}</td>
       <td><button class="btn small" onclick="needPdf('${esc(n.id)}','${esc(n.reference)}')">PDF</button>
       <button class="btn small" onclick="needWhatsapp('${esc(n.id)}')">WhatsApp</button>
-      <button class="btn small" onclick="needEmail('${esc(n.id)}')">E-mail</button>
+      <button class="btn small" onclick="needEmail('${esc(n.id)}','PURCHASING')">✉️ Aux Achats</button>
+      <button class="btn small" onclick="needEmail('${esc(n.id)}','ACCOUNTING')" ${n.status === 'BROUILLON' || n.status === 'REJETE' ? 'disabled title="Envoyez d\'abord aux Achats"' : ''}>✉️ À la comptabilité</button>
       ${canEdit(n) ? `<button class="btn small" onclick="editNeed('${esc(n.id)}')">✏️ Modifier</button>` : ''}
       ${admin ? `<select onchange="needStatus('${esc(n.id)}', this.value)"><option value="">État…</option><option value="ENVOYE">Envoyé</option><option value="APPROUVE">Approuvé</option><option value="REJETE">Rejeté</option><option value="SATISFAIT">Satisfait</option></select>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun état des besoins.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
@@ -2180,11 +2194,12 @@ async function needPdf(id, ref) {
 async function needWhatsapp(id) {
   try { const w = await api('/needs/' + id + '/whatsapp'); w.links.forEach(l => window.open(l.url, '_blank')); } catch (e) { alert(e.message); }
 }
-async function needEmail(id) {
-  const to = prompt('Adresse(s) e-mail du destinataire (séparées par des virgules) :');
-  if (!to) return;
+async function needEmail(id, stage) {
+  const who = stage === 'ACCOUNTING' ? 'la comptabilité' : 'les Achats';
+  const to = prompt(`Adresse(s) e-mail de ${who} (séparées par des virgules).\nLaissez vide pour utiliser les adresses enregistrées :`, '');
+  if (to === null) return;
   try {
-    const r = await api('/needs/' + id + '/send-email', { method: 'POST', body: { to } });
+    const r = await api('/needs/' + id + '/send-email', { method: 'POST', body: { to: to || undefined, stage } });
     alert(r.sent ? 'E-mail envoyé avec le PDF.' : "Envoi e-mail non configuré sur le serveur (SMTP) : rien n'a été envoyé. Utilisez le PDF ou WhatsApp.");
     loadNeeds();
   } catch (e) { alert(e.message); }
