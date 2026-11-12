@@ -1208,7 +1208,7 @@ async function renderVehicles(kind) {
       <td>${insBadge(v.insurance)}</td>
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
-      <td><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button></td>
+      <td style="white-space:nowrap"><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button> <button class="btn small gold" onclick="vehDriverPanel('${esc(v.id)}')">👤 Chauffeur</button></td>
     </tr>`).join('') || `<tr><td colspan="11" class="empty">Aucun camion enregistré.</td></tr>`;
   const rows = list.map(v => `
     <tr>
@@ -1218,7 +1218,7 @@ async function renderVehicles(kind) {
       <td>${esc(v.assignedDriver ? v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName : '—')}</td>
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
-      <td><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button></td>
+      <td style="white-space:nowrap"><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button> <button class="btn small gold" onclick="vehDriverPanel('${esc(v.id)}')">👤 Chauffeur</button></td>
     </tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun ${kindLabel} enregistré.</td></tr>`;
 
   root().innerHTML = `
@@ -1235,7 +1235,7 @@ async function renderVehicles(kind) {
         <div><label>Type de camion</label><select id="v-ttype"><option value="">— Choisir —</option>${TRUCK_TYPES.map(t => `<option value="${t[0]}">${t[1]}</option>`).join('')}</select></div>
         <div><label>Nombre de roues</label>${otherSel('v-wheels', TRUCK_WHEELS, n => n + ' roues', 'Nombre de roues')}</div>
         <div><label>Capacité</label>${otherSel('v-cap', TRUCK_CAPS, n => n + ' tonnes', 'Ex. 80 t')}</div>
-        <div><label>Chauffeur affecté</label><select id="v-driver"><option value="">— Aucun —</option>${drvList.map(d => `<option value="${esc(d.id)}">${esc(d.lastName + ' ' + d.firstName)}${d.activity === 'SERVICE_VEHICLE' ? ' (véhicule de service)' : ''}</option>`).join('')}</select></div>
+        <div><label>Chauffeur affecté</label><select id="v-driver"><option value="">— Aucun —</option>${drvList.filter(d => d.activity !== 'SERVICE_VEHICLE').map(d => `<option value="${esc(d.id)}">${esc(d.lastName + ' ' + d.firstName)}${d.activity === 'SERVICE_VEHICLE' ? ' (véhicule de service)' : ''}</option>`).join('')}</select></div>
         <div><label>Assurance — N° de police</label><input id="v-insref" /></div>
         <div><label>Assurance — date d'expiration</label><input id="v-insexp" type="date" /></div>` : ''}
       </div>
@@ -1450,6 +1450,58 @@ function openEditor(title, fields, onSave) {
   };
 }
 const day10 = (d) => (d ? String(d).slice(0, 10) : '');
+function vehInfoCard(v) {
+  const kind = v.vehicleType === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service';
+  const row = (a, b) => `<div class="drv-row"><span>${a}</span><b>${b == null || b === '' ? '—' : esc(b)}</b></div>`;
+  return `<div><h4 style="margin:0 0 6px">${kind} — informations</h4>${row('N° interne', v.internalNumber)}${row('Plaque', v.registrationNumber)}${row('Marque / modèle', [v.brand, v.model].filter(Boolean).join(' '))}
+    ${v.vehicleType === 'TRUCK' ? row('Type', v.truckType ? ttLabel(v.truckType) : '') + row('Roues', v.wheels) + row('Capacité', v.capacity) : ''}${row('Kilométrage', fmt(v.currentMileage) + ' km')}</div>`;
+}
+function vehDriverPanel(vid) {
+  const v = (window._vehicles || []).find(x => x.id === vid); if (!v) return;
+  const kindLbl = v.vehicleType === 'TRUCK' ? 'chauffeur de camion' : 'chauffeur de véhicule de service';
+  const d = v.assignedDriver;
+  const ov = document.createElement('div');
+  ov.id = 'veh-drv-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
+  const left = d ? `<div><h4 style="margin:0 0 6px">👤 Chauffeur affecté</h4>
+      <div class="drv-row"><span>Nom</span><b>${esc(d.firstName + ' ' + d.lastName)}</b></div><div class="drv-row"><span>Téléphone</span><b>${esc(d.phone || '—')}</b></div><div class="drv-row"><span>Permis</span><b>${esc(d.licenseNumber || '—')}</b></div>
+      <button class="btn gold" style="margin-top:10px" onclick="vehSendInvite('${esc(d.id)}')">💬 Envoyer le lien par WhatsApp</button></div>`
+    : `<div><h4 style="margin:0 0 6px">➕ Nouveau ${kindLbl}</h4>
+      <label>Prénom</label><input id="nd-first" /><label>Nom</label><input id="nd-last" /><label>Téléphone (WhatsApp)</label><input id="nd-phone" type="tel" placeholder="6xx xx xx xx" />
+      <label>N° de permis</label><input id="nd-lic" /><label>Catégorie du permis</label><input id="nd-cat" placeholder="Ex : C, EC" /><label>Expiration du permis</label><input id="nd-exp" type="date" />
+      <button class="btn gold" style="margin-top:10px" onclick="vehSaveDriver('${esc(v.id)}')">Enregistrer le chauffeur</button></div>`;
+  ov.innerHTML = `<div class="panel" style="max-width:760px;width:100%;margin:20px auto;"><h3>👤 Chauffeur — ${esc(v.internalNumber)}</h3>
+    <div class="grid-2">${left}${vehInfoCard(v)}</div><div id="nd-msg" style="margin-top:10px"></div>
+    <button class="btn" style="margin-top:10px" onclick="document.getElementById('veh-drv-ov').remove();renderView(state.view)">Fermer</button></div>`;
+  document.body.appendChild(ov);
+}
+async function vehSaveDriver(vid) {
+  const m = document.getElementById('nd-msg');
+  const v = (window._vehicles || []).find(x => x.id === vid);
+  const g = (id) => document.getElementById(id).value.trim();
+  if (!g('nd-first') || !g('nd-last')) { m.innerHTML = '<div class="msg err">Prénom et nom obligatoires.</div>'; return; }
+  if (g('nd-phone').replace(/\D/g, '').length < 8) { m.innerHTML = '<div class="msg err">Numéro de téléphone obligatoire (le lien est envoyé par WhatsApp).</div>'; return; }
+  try {
+    const dr = await api('/drivers', { method: 'POST', body: { siteId: state.siteId, firstName: g('nd-first'), lastName: g('nd-last'), phone: g('nd-phone'), activity: v.vehicleType,
+      licenseNumber: g('nd-lic') || undefined, licenseCategory: g('nd-cat') || undefined, licenseExpiryDate: g('nd-exp') || undefined } });
+    await api('/vehicles/' + vid, { method: 'PATCH', body: { assignedDriverId: dr.id } });
+    m.innerHTML = '<div class="msg ok">Chauffeur enregistré et affecté au véhicule.</div>';
+    await vehSendInvite(dr.id, true);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function vehSendInvite(driverId, keep) {
+  const m = document.getElementById('nd-msg');
+  try {
+    const link = location.origin + location.pathname.replace(/index\.html$/, '');
+    const r = await api('/driver-admin/invite', { method: 'POST', body: { driverId, appUrl: link } });
+    const num = r.phone.length === 9 ? '224' + r.phone : r.phone;
+    window._invMsg = r.message;
+    m.innerHTML = (keep ? m.innerHTML : '') + `<div class="msg ok">Message prêt pour ${esc(r.driver)} (${esc(num)}).</div>
+      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Envoyer par WhatsApp</a>
+      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+      <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ». Le chauffeur n'aura qu'à choisir son mot de passe : son nom, son téléphone et son véhicule sont déjà enregistrés.</div>`;
+  } catch (e) { m.innerHTML = (keep ? m.innerHTML : '') + `<div class="msg err">${esc(e.message)}</div>`; }
+}
 async function editVehicle(id) {
   const v = (window._vehicles || []).find(x => x.id === id); if (!v) return;
   let drv = []; try { drv = await api('/drivers?siteId=' + state.siteId); } catch (e) {}
@@ -1461,7 +1513,7 @@ async function editVehicle(id) {
     { key: 'truckType', label: 'Type de camion', value: v.truckType || '', options: [['', '—']].concat(TRUCK_TYPES) },
     { key: 'wheels', label: 'Nombre de roues', type: 'number', value: v.wheels }, { key: 'capacity', label: 'Capacité (ex. 45 t)', value: v.capacity },
     { key: 'status', label: 'Statut', value: v.status, options: [['AVAILABLE', 'Disponible'], ['ON_MISSION', 'En mission'], ['MAINTENANCE', 'Maintenance'], ['IMMOBILIZED', 'Immobilisé'], ['OUT_OF_SERVICE', 'Hors service']] },
-    { key: 'assignedDriverId', label: 'Chauffeur affecté', value: v.assignedDriverId || '', options: [['', '— inchangé / aucun —']].concat(drv.map(d => [d.id, d.firstName + ' ' + d.lastName])) },
+    { key: 'assignedDriverId', label: 'Chauffeur affecté', value: v.assignedDriverId || '', options: [['', '— inchangé / aucun —']].concat(drv.filter(d => !d.activity || d.activity === v.vehicleType).map(d => [d.id, d.firstName + ' ' + d.lastName])) },
     { key: 'observations', label: 'Observations', value: v.observations },
   ], async (d) => { await api('/vehicles/' + id, { method: 'PATCH', body: d }); renderView(state.view); });
 }

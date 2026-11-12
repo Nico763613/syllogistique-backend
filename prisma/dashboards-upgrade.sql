@@ -267,3 +267,9 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS operation_sites TEXT[] NOT NULL DEFAU
 
 --#
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS loader_name TEXT
+--#
+CREATE TABLE IF NOT EXISTS staff_reports (id text PRIMARY KEY, user_id text NOT NULL REFERENCES users(id), site_id text, role_name text NOT NULL, date text NOT NULL, activities text NOT NULL, observations text, sent_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, received_at timestamp(3), received_by text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)
+--#
+CREATE UNIQUE INDEX IF NOT EXISTS staff_reports_user_id_date_key ON staff_reports(user_id, date)
+--#
+CREATE INDEX IF NOT EXISTS staff_reports_role_name_date_idx ON staff_reports(role_name, date)

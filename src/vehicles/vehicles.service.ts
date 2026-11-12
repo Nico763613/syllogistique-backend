@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -8,7 +8,18 @@ import { CreateVehicleDto, UpdateVehicleDto } from './dto/vehicle.dto';
 export class VehiclesService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
+  // Séparation stricte : un chauffeur de camion ne peut être affecté qu'à un camion, un chauffeur de véhicule de service qu'à un véhicule de service
+  private async checkDriverKind(driverId: string | undefined | null, vehicleType: string | undefined | null) {
+    if (!driverId || !vehicleType) return;
+    const d = await this.prisma.driver.findUnique({ where: { id: driverId }, select: { firstName: true, lastName: true, activity: true } });
+    if (!d) throw new NotFoundException('Chauffeur introuvable.');
+    if (d.activity && d.activity !== vehicleType) {
+      throw new BadRequestException(`${d.firstName} ${d.lastName} est un chauffeur de ${d.activity === 'TRUCK' ? 'camion' : 'véhicule de service'} : il ne peut pas être affecté à un ${vehicleType === 'TRUCK' ? 'camion' : 'véhicule de service'}.`);
+    }
+  }
+
   async create(dto: CreateVehicleDto, actorId: string) {
+    await this.checkDriverKind(dto.assignedDriverId, (dto as any).vehicleType);
     const existing = await this.prisma.vehicle.findFirst({
       where: { siteId: dto.siteId, registrationNumber: dto.registrationNumber },
     });
@@ -69,6 +80,7 @@ export class VehiclesService {
   async update(id: string, dto: UpdateVehicleDto, actorId: string) {
     const before = await this.prisma.vehicle.findUnique({ where: { id } });
     if (!before) throw new NotFoundException('Véhicule introuvable.');
+    await this.checkDriverKind(dto.assignedDriverId, before.vehicleType);
 
     const vehicle = await this.prisma.vehicle.update({ where: { id }, data: dto });
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Vehicle', entityId: id, oldValue: before, newValue: dto });

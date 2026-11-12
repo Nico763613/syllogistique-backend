@@ -168,6 +168,7 @@ model User {
   notifications    Notification[]
   hseCorrectiveActions HseCorrectiveAction[] @relation("ActionResponsible")
   hseToolboxTalks  HseToolboxTalk[] @relation("TalkFacilitator")
+  staffReports     StaffReport[]
   hseToolboxAttendees HseToolboxAttendee[]
   hseInspections   HseInspection[] @relation("InspectionInspector")
   hseIncidentPersons HseIncidentPerson[]
@@ -1632,4 +1633,27 @@ model PointerCount {
   @@unique([vehicleId, day])
   @@index([siteId, day])
   @@map("pointer_counts")
+}
+
+
+// Rapport d'activité quotidien du personnel (agents HSE, magasiniers) : envoyé depuis leur téléphone, reçu par le responsable
+model StaffReport {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  siteId       String?  @map("site_id")
+  roleName     String   @map("role_name")
+  date         String   // AAAA-MM-JJ
+  activities   String
+  observations String?
+  sentAt       DateTime @default(now()) @map("sent_at")
+  receivedAt   DateTime? @map("received_at")
+  receivedBy   String?  @map("received_by")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([roleName, date])
+  @@map("staff_reports")
 }
