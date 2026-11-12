@@ -1,12 +1,16 @@
 import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-export const STAFF_ROLES = ['AGENT_HSE', 'GESTIONNAIRE_HSE', 'MAGASINIER'] as const;
+// Personnel de terrain : envoie un rapport d'activité chaque jour
+export const STAFF_ROLES = ['AGENT_HSE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'MECANICIEN', 'POINTEUR'] as const;
+// Responsables : enregistrés uniquement par le Master Admin (SUPER_ADMIN)
+export const MANAGER_ROLES = ['DIRECTEUR_GENERAL', 'ADMIN_LOGISTIQUE'] as const;
+export const ALL_STAFF_ROLES = [...STAFF_ROLES, ...MANAGER_ROLES] as const;
 
 export class CreateStaffDto {
   @IsString() @MinLength(1) firstName: string;
   @IsString() @MinLength(1) lastName: string;
   @IsString() @MinLength(8) phone: string;
-  @IsIn(STAFF_ROLES as unknown as string[]) role: string;
+  @IsIn(ALL_STAFF_ROLES as unknown as string[]) role: string;
   @IsString() siteId: string;
 }
 

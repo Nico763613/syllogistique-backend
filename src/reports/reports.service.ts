@@ -272,6 +272,9 @@ export class ReportsService {
       MAGASINIER: 'Magasinier',
       CHAUFFEUR: 'Chauffeur',
       LECTEUR: 'Lecteur / Superviseur',
+      DIRECTEUR_GENERAL: 'Directeur Général',
+      MECANICIEN: 'Mécanicien',
+      POINTEUR: 'Pointeur',
     };
     return {
       name: user ? `${user.firstName} ${user.lastName}` : '—',

@@ -9,7 +9,7 @@ import { CreateStaffDto, InviteStaffDto, StaffReportDto } from './staff.dto';
 
 const OFFICE = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE];
 const READERS = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_HSE, RoleName.LECTEUR];
-const STAFF = [RoleName.AGENT_HSE, RoleName.GESTIONNAIRE_HSE, RoleName.MAGASINIER];
+const STAFF = [RoleName.AGENT_HSE, RoleName.GESTIONNAIRE_HSE, RoleName.MAGASINIER, RoleName.MECANICIEN, RoleName.POINTEUR];
 const toList = (r?: string) => (r ? r.split(',').map((x) => x.trim()).filter(Boolean) : undefined);
 
 @ApiTags('staff')
@@ -22,19 +22,19 @@ export class StaffController {
   @Post()
   @Roles(...OFFICE)
   create(@Body() dto: CreateStaffDto, @CurrentUser() actor: any) {
-    return this.service.create(dto, actor, actor.organizationId);
+    return this.service.create(dto, actor, actor.organizationId, actor.role);
   }
 
   @Get()
   @Roles(...READERS)
-  list(@Query('role') role?: string, @Query('siteId') siteId?: string) {
-    return this.service.list(toList(role), siteId);
+  list(@Query('role') role?: string, @Query('siteId') siteId?: string, @CurrentUser() actor?: any) {
+    return this.service.list(toList(role), siteId, actor.role);
   }
 
   @Post('invite')
   @Roles(...OFFICE)
   invite(@Body() dto: InviteStaffDto, @CurrentUser() actor: any) {
-    return this.service.invite(dto.userId, dto.appUrl, actor);
+    return this.service.invite(dto.userId, dto.appUrl, actor, actor.role);
   }
 
   @Get('reports/mine')

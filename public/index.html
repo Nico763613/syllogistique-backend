@@ -255,7 +255,7 @@
 
       <div class="nav-section-label" id="nav-dept-label">🚚 Logistique &amp; Flotte</div>
       <div class="nav-sub-label">Flotte</div>
-      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
+      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
       <div class="nav-item" data-view="trucks" onclick="go('trucks')"><span class="nav-icon">🚛</span> Camions</div>
       <div class="nav-item" data-view="service-vehicles" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
       <div class="nav-item" data-view="drivers" onclick="go('drivers')"><span class="nav-icon">👨‍✈️</span> Chauffeurs</div>
@@ -271,20 +271,25 @@
       <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
 
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
-      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
+      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
       <div class="nav-item" data-view="stock" onclick="go('stock')"><span class="nav-icon">📦</span> Stocks</div>
-      <div class="nav-item" data-view="staff-store" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-store')"><span class="nav-icon">🧑‍🏭</span> Magasiniers &amp; rapports</div>
+      <div class="nav-item" data-view="staff-store" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-store')"><span class="nav-icon">🧑‍🏭</span> Magasiniers &amp; rapports</div>
 
       <div class="nav-section-label">🛒 Achats &amp; Approvisionnement</div>
-      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
+      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
       <div class="nav-item" data-view="purchases" onclick="go('purchases')"><span class="nav-icon">🛒</span> Achats</div>
       <div class="nav-item" data-view="needs" onclick="go('needs')"><span class="nav-icon">📝</span> États des besoins</div>
       <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL,CAISSIER" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
 
       <div class="nav-section-label">🦺 HSE</div>
-      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
-      <div class="nav-item" data-view="staff-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,LECTEUR" onclick="go('staff-hse')"><span class="nav-icon">👷</span> Agents HSE &amp; rapports</div>
-      <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER" onclick="go('my-report')"><span class="nav-icon">📝</span> Mon rapport du jour</div>
+      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
+      <div class="nav-item" data-view="staff-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-hse')"><span class="nav-icon">👷</span> Agents HSE &amp; rapports</div>
+      <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER,MECANICIEN,POINTEUR" onclick="go('my-report')"><span class="nav-icon">📝</span> Mon rapport du jour</div>
+
+      <div class="nav-section-label">🛠️ Équipes</div>
+      <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon">🏢</span> Responsables (DG &amp; Logistique)</div>
+      <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-mech')"><span class="nav-icon">🔧</span> Mécaniciens &amp; rapports</div>
+      <div class="nav-item" data-view="staff-pointer" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-pointer')"><span class="nav-icon">🕒</span> Pointeurs &amp; rapports</div>
 
       <div class="nav-section-label">Système</div>
       <div class="nav-item" data-view="sync" onclick="go('sync')">
@@ -484,7 +489,7 @@ function enterApp() {
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'dash-hse', AGENT_HSE: 'dash-hse' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'dash-hse', AGENT_HSE: 'dash-hse', MECANICIEN: 'my-report', POINTEUR: 'my-report' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -517,6 +522,7 @@ function roleLabel(r) {
     CHAUFFEUR: 'Chauffeur', LECTEUR: 'Lecteur / Superviseur',
     RESPONSABLE_COMMERCIAL: 'Responsable commercial', CAISSIER: 'Caissier',
     GESTIONNAIRE_HSE: 'Gestionnaire HSE', AGENT_HSE: 'Agent HSE',
+    DIRECTEUR_GENERAL: 'Directeur Général', MECANICIEN: 'Mécanicien', POINTEUR: 'Pointeur',
   }[r] || esc(r);
 }
 
@@ -529,7 +535,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -1107,7 +1113,7 @@ function applyRoleNav() {
     if (ok) any = true;
   });
   // Les rôles départementaux (commercial, caisse, HSE) ne voient que leur espace
-  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE'].includes(role)) {
+  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR'].includes(role)) {
     document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings') el.style.display = 'none'; });
     document.querySelectorAll('#sidebar .nav-section-label').forEach((el) => { if (el.id !== 'nav-dept-label') el.style.display = 'none'; });
   }
@@ -1136,7 +1142,8 @@ async function renderView(view) {
     if (view === 'purchases') return renderPurchases();
     if (view === 'needs') return renderNeeds();
     if (view === 'daily') return renderDaily();
-    if (view === 'staff-hse' || view === 'staff-store') return renderStaff(view);
+    if (STAFF_CFG[view]) return renderStaff(view);
+    if (view === 'staff-managers') return renderManagers();
     if (view === 'my-report') return renderMyReport();
     if (view === 'reports-truck') return renderKindReports('TRUCK');
     if (view === 'reports-service') return renderKindReports('SERVICE_VEHICLE');
@@ -2517,7 +2524,9 @@ async function krProcess(id) {
 /* ---------------- PERSONNEL : agents HSE et magasiniers (enregistrement, lien WhatsApp, rapports) ---------------- */
 const STAFF_CFG = {
   'staff-hse': { role: 'AGENT_HSE', one: 'agent HSE', title: '👷 Agents HSE', rep: 'Rapports HSE' },
-  'staff-store': { role: 'MAGASINIER', one: 'magasinier', title: '🧑‍🏭 Magasiniers', rep: 'Rapports Entrepôt' },
+  'staff-store': { role: 'MAGASINIER', one: 'gestionnaire de stock', title: '🧑‍🏭 Gestionnaires de stock', rep: 'Rapports Entrepôt' },
+  'staff-mech': { role: 'MECANICIEN', one: 'mécanicien', title: '🔧 Mécaniciens', rep: 'Rapports Atelier' },
+  'staff-pointer': { role: 'POINTEUR', one: 'pointeur', title: '🕒 Pointeurs', rep: 'Rapports de pointage' },
 };
 async function renderStaff(view) {
   const c = STAFF_CFG[view]; window._stView = view;
@@ -2539,7 +2548,7 @@ async function stLoad() {
   const c = STAFF_CFG[window._stView]; if (!c) return;
   const d = document.getElementById('st-date').value;
   const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
-  const canReceive = state.user.role !== 'LECTEUR';
+  const canReceive = !['LECTEUR', 'DIRECTEUR_GENERAL'].includes(state.user.role);
   try {
     const [team, reps] = await Promise.all([api('/staff?role=' + c.role + '&siteId=' + state.siteId), api('/staff/reports?role=' + c.role + '&date=' + d + '&siteId=' + state.siteId)]);
     const active = team.filter((u) => u.status === 'ACTIVE');
@@ -2583,6 +2592,39 @@ async function stInvite(userId) {
       <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ».</div>`;
     box.scrollIntoView({ behavior: 'smooth' });
   } catch (e) { box.innerHTML = `<div class="msg err" style="margin-top:10px">${esc(e.message)}</div>`; }
+}
+/* ---------------- RESPONSABLES : le Master Admin enregistre le DG et le Responsable logistique et leur envoie le lien ---------------- */
+const MGR_ROLES = { DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique' };
+async function renderManagers() {
+  root().innerHTML = `
+    <div class="panel"><h3>🏢 Responsables de l'entreprise</h3>
+      <div class="desc">Vous enregistrez ici le Directeur Général et le Responsable logistique, puis vous leur envoyez le lien de l'application par WhatsApp. Chacun arrive directement dans son propre espace.</div></div>
+    <div class="panel"><h3>➕ Nouveau responsable</h3>
+      <div class="grid-2"><div><label>Fonction</label><select id="st-role">${Object.entries(MGR_ROLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+      <div><label>Prénom</label><input id="st-first"></div><div><label>Nom</label><input id="st-last"></div><div><label>Téléphone (WhatsApp)</label><input id="st-phone" type="tel" placeholder="6xx xx xx xx"></div></div>
+      <button class="btn gold" onclick="mgSave()">Enregistrer et préparer le message</button><div id="st-msg"></div></div>
+    <div class="panel"><h3>Responsables enregistrés</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`;
+  mgLoad();
+}
+async function mgLoad() {
+  const box = document.getElementById('st-team'); if (!box) return;
+  try {
+    const team = await api('/staff?role=DIRECTEUR_GENERAL,ADMIN_LOGISTIQUE');
+    box.innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Fonction</th><th>Nom</th><th>Téléphone</th><th>Application</th><th></th></tr>${team.map((u) => `<tr><td>${esc(MGR_ROLES[u.role] || u.role)}</td><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
+      <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td>
+      <td><button class="btn small gold" onclick="stInvite('${esc(u.id)}')">💬 Envoyer le lien par WhatsApp</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucun responsable enregistré.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function mgSave() {
+  const m = document.getElementById('st-msg'), g = (id) => document.getElementById(id).value.trim();
+  if (!g('st-first') || !g('st-last')) { m.innerHTML = '<div class="msg err">Prénom et nom obligatoires.</div>'; return; }
+  if (g('st-phone').replace(/\D/g, '').length < 8) { m.innerHTML = '<div class="msg err">Numéro de téléphone obligatoire (le lien est envoyé par WhatsApp).</div>'; return; }
+  try {
+    const r = await api('/staff', { method: 'POST', body: { firstName: g('st-first'), lastName: g('st-last'), phone: g('st-phone'), role: g('st-role'), siteId: state.siteId } });
+    m.innerHTML = '<div class="msg ok">Enregistré.</div>';
+    await stInvite(r.id); mgLoad();
+    ['st-first', 'st-last', 'st-phone'].forEach((id) => { document.getElementById(id).value = ''; });
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function stReceive(id) { try { await api('/staff/reports/' + id + '/receive', { method: 'POST', body: {} }); stLoad(); } catch (e) { alert(e.message); } }
 // Côté agent HSE / magasinier : « Mon rapport du jour »

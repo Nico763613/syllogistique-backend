@@ -17,7 +17,9 @@ export class RolesGuard implements CanActivate {
     const { user } = request;
 
     if (requiredRoles && requiredRoles.length > 0) {
-      if (!user || !requiredRoles.includes(user.role)) {
+      // Le Directeur Général a au moins les droits de consultation du Lecteur / Superviseur
+      const effective = user && (requiredRoles.includes(user.role) || (user.role === 'DIRECTEUR_GENERAL' && requiredRoles.includes(RoleName.LECTEUR)));
+      if (!effective) {
         throw new ForbiddenException(
           "Vous n'avez pas la permission d'effectuer cette action.",
         );

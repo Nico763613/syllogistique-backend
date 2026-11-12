@@ -8,6 +8,9 @@ const ROLE_LABELS: Record<string, string> = {
   MAGASINIER: 'Magasinier',
   CHAUFFEUR: 'Chauffeur',
   LECTEUR: 'Lecteur / Superviseur',
+  DIRECTEUR_GENERAL: 'Directeur Général',
+  MECANICIEN: 'Mécanicien',
+  POINTEUR: 'Pointeur',
 };
 
 export async function getIssuer(prisma: PrismaService, userId: string) {
