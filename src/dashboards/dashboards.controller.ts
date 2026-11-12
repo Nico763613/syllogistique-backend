@@ -9,6 +9,7 @@ import { LogisticsDashboardService } from './logistics-dashboard.service';
 import { StockDashboardService } from './stock-dashboard.service';
 import { FleetDashboardService } from './fleet-dashboard.service';
 import { HseDashboardService } from './hse-dashboard.service';
+import { ExecutiveDashboardService } from './executive-dashboard.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
 @ApiTags('dashboards')
@@ -16,7 +17,7 @@ import { DashboardQueryDto } from './dto/dashboard-query.dto';
 @UseGuards(RolesGuard)
 @Controller('dashboards')
 export class DashboardsController {
-  constructor(private commercial: CommercialDashboardService, private logistics: LogisticsDashboardService, private stock: StockDashboardService, private fleet: FleetDashboardService, private hse: HseDashboardService) {}
+  constructor(private commercial: CommercialDashboardService, private logistics: LogisticsDashboardService, private stock: StockDashboardService, private fleet: FleetDashboardService, private hse: HseDashboardService, private executive: ExecutiveDashboardService) {}
 
   // Tableau de bord Commercial & Caisse. Le caissier ne reçoit que les données de sa propre session.
   @Get('commercial')
@@ -50,6 +51,13 @@ export class DashboardsController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.LECTEUR)
   fleetDashboard(@Query() query: DashboardQueryDto, @CurrentUser() actor: any) {
     return this.fleet.get(actor, query);
+  }
+
+  // Tableau de bord de pilotage (Directeur Général, Responsable logistique)
+  @Get('executive')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+  executiveDashboard(@Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.executive.get(actor, siteId);
   }
 
   // Tableau de bord HSE
