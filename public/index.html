@@ -2200,7 +2200,7 @@ async function needEmail(id, stage) {
   if (to === null) return;
   try {
     const r = await api('/needs/' + id + '/send-email', { method: 'POST', body: { to: to || undefined, stage } });
-    alert(r.sent ? 'E-mail envoyé avec le PDF.' : "Envoi e-mail non configuré sur le serveur (SMTP) : rien n'a été envoyé. Utilisez le PDF ou WhatsApp.");
+    alert(r.sent ? 'E-mail envoyé avec le PDF.' : ((r.message || 'Envoi e-mail non configuré sur le serveur (SMTP)') + " Rien n'a été envoyé : utilisez le PDF ou WhatsApp."));
     loadNeeds();
   } catch (e) { alert(e.message); }
 }
@@ -2412,7 +2412,7 @@ async function sendDailyEmail(audience) {
     }});
     msg.innerHTML = r.sent
       ? '<div class="msg ok">E-mail envoyé avec le PDF en pièce jointe.</div>'
-      : '<div class="msg err">Envoi e-mail non configuré sur le serveur (SMTP) : le message n\'a pas été envoyé. Utilisez le PDF (télécharger ou imprimer) en attendant.</div>';
+      : '<div class="msg err">' + esc(r.message || 'Envoi e-mail non configuré sur le serveur (SMTP).') + ' Le message n\'a pas été envoyé : utilisez le PDF (télécharger ou imprimer) en attendant.</div>';
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function saveDailyNumbers() {
@@ -3623,7 +3623,7 @@ async function msPdf(action, audience) {
     const q = msReportQs(); msCheckSigner(q);
     if (action === 'mail') {
       const r = await api('/reports/missions/send-email', { method: 'POST', body: { ...q, audience, to: document.getElementById(audience === 'ACCOUNTING' ? 'ms-acc' : 'ms-hier').value } });
-      m.innerHTML = r.sent ? '<div class="msg ok">Rapport envoyé par e-mail (PDF joint).</div>' : '<div class="msg err">Envoi e-mail non configuré sur le serveur (SMTP) : utilisez l\'enregistrement ou l\'impression du PDF.</div>';
+      m.innerHTML = r.sent ? '<div class="msg ok">Rapport envoyé par e-mail (PDF joint).</div>' : '<div class="msg err">' + esc(r.message || 'Envoi e-mail non configuré sur le serveur (SMTP).') + ' Utilisez l\'enregistrement ou l\'impression du PDF.</div>';
       return;
     }
     const blob = await api('/reports/missions/pdf?' + new URLSearchParams(q));
