@@ -17,7 +17,7 @@ export class MaintenanceController {
   constructor(private maintenanceService: MaintenanceService) {}
 
   @Post()
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MECANICIEN)
   create(@Body() dto: CreateMaintenanceDto, @CurrentUser() actor: any) {
     return this.maintenanceService.create(dto, actor.userId);
   }

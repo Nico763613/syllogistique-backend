@@ -253,6 +253,8 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
+      <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon">🏠</span> Mon espace de travail</div>
+      <div class="nav-item" data-view="pointage" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
       <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
       <div class="nav-item" data-view="espace-logi" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE" onclick="go('espace-logi')"><span class="nav-icon">🧭</span> Espace Responsable logistique</div>
 
@@ -492,7 +494,7 @@ function enterApp() {
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'dash-hse', AGENT_HSE: 'dash-hse', MECANICIEN: 'my-report', POINTEUR: 'my-report', DIRECTEUR_GENERAL: 'pilotage', ADMIN_LOGISTIQUE: 'espace-logi' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'espace', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', DIRECTEUR_GENERAL: 'pilotage', ADMIN_LOGISTIQUE: 'espace-logi', MAGASINIER: 'espace' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -538,7 +540,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -1120,6 +1122,8 @@ function applyRoleNav() {
     document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings') el.style.display = 'none'; });
     document.querySelectorAll('#sidebar .nav-section-label').forEach((el) => { if (el.id !== 'nav-dept-label') el.style.display = 'none'; });
   }
+  const extra = { MECANICIEN: ['maintenance', 'trucks', 'service-vehicles', 'stock'], POINTEUR: ['drivers'] }[role] || [];
+  extra.forEach((v) => { const el = document.querySelector('#sidebar .nav-item[data-view="' + v + '"]'); if (el) el.style.display = ''; });
   const lbl = document.getElementById('nav-dept-label');
   if (lbl) lbl.style.display = any ? '' : 'none';
 }
@@ -1128,6 +1132,8 @@ function applyRoleNav() {
 async function renderView(view) {
   if (!window._silent) root().innerHTML = '<div class="empty">Chargement…</div>';
   try {
+    if (view === 'espace') return renderWorkspace();
+    if (view === 'pointage') return renderPointage();
     if (view === 'pilotage') return renderExecutive('dg');
     if (view === 'espace-logi') return renderExecutive('logi');
     if (view === 'dashboard') return renderDashboard();
@@ -2685,6 +2691,74 @@ async function renderExecutive(mode) {
     body = hero + kpis + `<div class="ex-grid">${track}${alertsCard}${crew}</div><div class="ex-grid">${chartCard}${moveCard}</div>` + actions;
   }
   root().innerHTML = body;
+}
+
+
+/* ---------------- MON ESPACE : gestionnaire de stock, agent HSE, mécanicien, pointeur ---------------- */
+async function renderWorkspace() {
+  execStyle();
+  const d = await api('/dashboards/workspace' + (state.siteId ? '?siteId=' + state.siteId : ''));
+  const u = state.user, k = d.kpis;
+  const names = { STORE: 'Gestionnaire de stock', HSE: 'Agent HSE', MECHANIC: 'Mécanicien', POINTER: 'Pointeur' };
+  const hello = { STORE: 'Gérez vos articles, entrées et sorties du jour.', HSE: 'Prévention, inspections et incidents de votre site.', MECHANIC: 'Interventions, diagnostics et véhicules à réparer.', POINTER: 'Pointage du jour et présence des chauffeurs.' }[d.kind];
+  const rep = d.myReport ? `<span class="badge ok">✔ Rapport du jour ${d.myReport.receivedAt ? 'reçu' : 'envoyé'}</span>` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
+  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
+  const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
+  const actions = (items) => `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${items}${act('📝', 'Mon rapport du jour', 'my-report')}</div></div>`;
+  const empty = (t) => `<div class="empty" style="padding:10px">${t}</div>`;
+  let body = '';
+  if (d.kind === 'STORE') {
+    const sign = (t) => (t === 'IN' || t === 'RETURN' ? ['+', '#2E8B57'] : ['−', '#C0392B']);
+    body = `<div class="ex-kpis">${exKpi('📦', '#E3EEFB', fmt(k.items), 'Articles en stock')}${exKpi('⬆️', '#E1F4E8', k.entriesToday, 'Entrées aujourd’hui')}${exKpi('⬇️', '#FDF1D6', k.exitsToday, 'Sorties aujourd’hui')}${exKpi('⚠️', '#FDE8E4', k.belowMinimum, 'Articles sous le seuil')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3>📋 Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Article</th><th>Type</th><th>Qté</th><th>Destination</th></tr>${d.recent.map((r) => { const [sg, c] = sign(r.type); return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.item)}</td><td style="color:${c}">${r.type === 'IN' ? 'Entrée' : r.type === 'OUT' ? 'Sortie' : esc(r.type)}</td><td style="color:${c}">${sg}${fmt(r.quantity)}</td><td>${esc(r.vehicle || r.reason || '—')}</td></tr>`; }).join('')}</table></div>` : empty('Aucun mouvement.')}</div>
+      <div class="ex-card"><h3>🔔 Alertes de stock</h3>${d.alerts.length ? d.alerts.map((a) => `<div class="ex-al"><div class="ex-dot" style="background:${a.quantity <= 0 ? '#C0392B' : '#E0A72E'}"></div><div><b>${esc(a.name)}</b><div style="color:var(--muted)">${fmt(a.quantity)} ${esc(a.unit)} en stock (minimum ${fmt(a.minimum)})</div></div></div>`).join('') : empty('Aucune alerte : tous les articles sont au-dessus du seuil.')}</div></div>`
+      + actions(act('📦', 'Stocks', 'stock') + act('🛒', 'Achats', 'purchases') + act('📝', 'États des besoins', 'needs'));
+  } else if (d.kind === 'HSE') {
+    const sev = { LOW: '#2F6FB5', MEDIUM: '#E0A72E', HIGH: '#E67E22', CRITICAL: '#C0392B' };
+    const ring = (v) => `<div class="ex-ring" style="background:conic-gradient(#2E8B57 ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
+    body = `<div class="ex-kpis">${exKpi('🛡️', '#E3EEFB', k.inspections, 'Inspections (mois)')}${exKpi('⚠️', '#FDF1D6', k.openIncidents, 'Incidents ouverts')}${exKpi('🚑', '#FDE8E4', k.accidents, 'Accidents (mois)')}${exKpi('✅', '#E1F4E8', k.compliance == null ? '—' : k.compliance + ' %', 'Conformité')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3>🦺 État sécurité</h3>${ring(k.compliance)}<div class="desc" style="text-align:center">${k.compliance == null ? 'Aucune inspection ce mois-ci' : k.compliance >= 90 ? 'Très bon niveau' : k.compliance >= 70 ? 'Niveau acceptable' : 'À améliorer'}</div></div>
+      <div class="ex-card"><h3>🔔 Alertes sécurité</h3>${d.incidents.length ? d.incidents.map((i) => `<div class="ex-al"><div class="ex-dot" style="background:${sev[i.severity] || '#2F6FB5'}"></div><div><b>${esc(i.type)} — ${esc(i.severity)}</b><div style="color:var(--muted)">${esc(i.description)}</div><div style="color:var(--muted);font-size:11px">${drvDt(i.at)}</div></div></div>`).join('') : empty('Aucun incident ouvert.')}</div>
+      <div class="ex-card"><h3>🔍 Dernières inspections</h3>${d.inspections.length ? d.inspections.map((i) => `<div class="ex-row"><span>${esc(i.type)}</span><span>${drvDt(i.at)}</span><span class="badge ${i.compliant ? 'ok' : 'warn'}">${i.compliant == null ? '—' : i.compliant ? 'Conforme' : 'Non conforme'}</span></div>`).join('') : empty('Aucune inspection.')}</div></div>`
+      + actions(act('🦺', 'Inspections, incidents, actions', 'dash-hse'));
+  } else if (d.kind === 'MECHANIC') {
+    const st = { COMPLETED: ['Terminé', 'ok'], IN_PROGRESS: ['En cours', 'warn'], PLANNED: ['Planifié', 'warn'], OVERDUE: ['En retard', 'bad'] };
+    body = `<div class="ex-kpis">${exKpi('🚛', '#FDE8E4', k.down, 'Véhicules en panne')}${exKpi('🔧', '#FDF1D6', k.inProgress, 'Réparations en cours')}${exKpi('✅', '#E1F4E8', k.doneMonth, 'Terminées (mois)')}${exKpi('📅', '#E3EEFB', k.todo, 'Interventions à faire')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3>🛠️ Interventions récentes <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('maintenance')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Véhicule</th><th>Nature</th><th>Statut</th></tr>${d.recent.map((r) => { const [t, c] = st[r.status] || [r.status, 'warn']; return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.nature)}</td><td><span class="badge ${c}">${t}</span></td></tr>`; }).join('')}</table></div>` : empty('Aucune intervention enregistrée.')}</div>
+      <div class="ex-card"><h3>🚧 Véhicules à l’arrêt</h3>${d.stopped.length ? d.stopped.map((v) => `<div class="ex-row"><span><b>${esc(v.vehicle)}</b> <span style="color:var(--muted)">${esc(v.plate)}</span></span><span class="badge bad">${v.status === 'MAINTENANCE' ? 'En maintenance' : 'Immobilisé'}</span></div>`).join('') : empty('Aucun véhicule à l’arrêt.')}</div></div>`
+      + actions(act('➕', 'Nouvelle intervention', 'maintenance') + act('🚛', 'Camions', 'trucks') + act('🚙', 'Véhicules de service', 'service-vehicles') + act('📦', 'Pièces en stock', 'stock'));
+  } else {
+    body = `<div class="ex-kpis">${exKpi('👥', '#E3EEFB', k.total, 'Effectif total')}${exKpi('✅', '#E1F4E8', k.present, 'Présents')}${exKpi('❌', '#FDE8E4', k.absent, 'Absents')}${exKpi('🕒', '#FDF1D6', k.remaining, 'Pointage restant')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3>🕒 Pointage du jour</h3>${k.remaining === 0 && k.total > 0 ? '<div class="msg ok">Pointage terminé : tous les chauffeurs sont pointés.</div>' : `<div class="msg err">${k.remaining} chauffeur(s) restent à pointer.</div>`}<button class="btn gold" style="margin-top:8px" onclick="go('pointage')">Faire le pointage</button>${k.others ? `<div class="desc" style="margin-top:8px">${k.others} en repos, permission ou maladie.</div>` : ''}</div>
+      <div class="ex-card"><h3>❌ Absences du jour</h3>${d.absentees.length ? d.absentees.map((a) => `<div class="ex-row"><span>${esc(a.name)}</span><span style="color:var(--muted)">${esc(a.reason || '')}</span></div>`).join('') : empty('Aucune absence enregistrée.')}</div></div>`
+      + actions(act('🕒', 'Pointage', 'pointage') + act('🧑‍✈️', 'Chauffeurs', 'drivers'));
+  }
+  root().innerHTML = hero + body;
+}
+/* ---------------- POINTAGE des chauffeurs (pointeur, responsable logistique) ---------------- */
+const ATT_ST = [['PRESENT', '✅ Présent', 'ok'], ['ABSENT', '❌ Absent', 'bad'], ['REST', '😴 Repos', 'warn'], ['PERMISSION', '📝 Permission', 'warn'], ['SICK', '🤒 Maladie', 'warn'], ['LEAVE', '🌴 Congé', 'warn']];
+async function renderPointage() {
+  const date = window._ptDate || new Date().toISOString().slice(0, 10);
+  const [drivers, att] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/drivers/attendance/day?siteId=' + state.siteId + '&date=' + date)]);
+  const by = {}; att.forEach((a) => { by[a.driverId] = a; });
+  const list = drivers.filter((d) => d.status === 'ACTIVE' || !d.status);
+  const done = list.filter((d) => by[d.id]).length;
+  window._ptDrivers = list; window._ptAtt = by;
+  root().innerHTML = `<div class="panel"><h3>🕒 Pointage des chauffeurs</h3>
+    <div class="desc">Touchez le statut de chaque chauffeur. Une correction demande un motif.</div>
+    <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._ptDate=this.value;renderPointage()">
+    <div class="msg ${done === list.length && list.length ? 'ok' : 'err'}" style="margin-top:10px">${done} / ${list.length} chauffeurs pointés</div></div>
+    <div class="panel">${list.map((d) => { const a = by[d.id]; const cur = a && ATT_ST.find((s) => s[0] === a.status);
+      return `<div class="drv-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:150px"><b>${esc(d.lastName)}</b> ${esc(d.firstName)} ${cur ? `<span class="badge ${cur[2]}">${cur[1]}</span>` : '<span class="badge warn">Non pointé</span>'}</span>
+      <span>${ATT_ST.map((s) => `<button class="btn small ${a && a.status === s[0] ? 'gold' : ''}" style="margin:2px" onclick="ptMark('${esc(d.id)}','${s[0]}')">${s[1]}</button>`).join('')}</span></div>`; }).join('') || '<div class="empty">Aucun chauffeur enregistré.</div>'}</div>`;
+}
+async function ptMark(driverId, status) {
+  const date = window._ptDate || new Date().toISOString().slice(0, 10), prev = (window._ptAtt || {})[driverId];
+  const body = { driverId, siteId: state.siteId, date, status };
+  if (status === 'ABSENT') { const r = prompt("Motif de l'absence (obligatoire) :", prev && prev.absenceReason || ''); if (!r || r.trim().length < 2) return; body.absenceReason = r.trim(); }
+  if (prev) { if (prev.status === status && status !== 'ABSENT') return; const c = prompt('Pointage déjà saisi. Motif de la correction :', ''); if (!c || c.trim().length < 3) return; body.correctionReason = c.trim(); }
+  if (status === 'PRESENT') body.checkIn = new Date().toISOString();
+  try { await api('/drivers/attendance', { method: 'POST', body }); renderPointage(); } catch (e) { alert(e.message); }
 }
 
 /* ---------------- RESPONSABLES : le Master Admin enregistre le DG et le Responsable logistique et leur envoie le lien ---------------- */
