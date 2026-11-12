@@ -312,6 +312,41 @@ export class ReportsService {
     return lines.join('\n');
   }
 
+  // Rapport global des missions : par camion ou véhicule, sur une période (à relire et signer par le responsable logistique)
+  async missionsReport(siteId: string, from: string, to: string, kind?: string, vehicleId?: string) {
+    if (!siteId) throw new BadRequestException('Le site (siteId) est obligatoire.');
+    const start = this.dayBounds(from || new Date().toISOString().slice(0, 10)).start;
+    const end = this.dayBounds(to || from || new Date().toISOString().slice(0, 10)).end;
+    const k = kind === 'TRUCK' || kind === 'SERVICE_VEHICLE' ? kind : undefined;
+    const [site, trips] = await Promise.all([
+      this.prisma.site.findUnique({ where: { id: siteId }, include: { organization: true } }),
+      this.prisma.trip.findMany({
+        where: { siteId, status: { not: 'CANCELLED' }, startTime: { gte: start, lt: end }, ...(vehicleId ? { vehicleId } : {}), ...(k ? { vehicle: { vehicleType: k } } : {}) },
+        include: { driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { internalNumber: true, registrationNumber: true, vehicleType: true } } },
+        orderBy: { startTime: 'asc' },
+      }),
+    ]);
+    if (!site) throw new NotFoundException('Site introuvable.');
+    const fuel = trips.length ? await this.prisma.fuelTransaction.findMany({ where: { vehicleId: { in: [...new Set(trips.map((t) => t.vehicleId))] }, transactionDate: { gte: start, lt: end } } }) : [];
+    const byV = new Map<string, any>();
+    for (const t of trips) {
+      const key = t.vehicleId;
+      const row = byV.get(key) ?? { vehicle: t.vehicle.internalNumber, plate: t.vehicle.registrationNumber, kind: t.vehicle.vehicleType === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE', missions: 0, km: 0, movements: 0, tons: 0, liters: 0, cost: 0 };
+      row.missions++; row.km += t.distance ?? 0; row.movements += t.tripsCount ?? 0; row.tons += t.tripsCount && t.tonnagePerTrip ? t.tripsCount * t.tonnagePerTrip : 0;
+      byV.set(key, row);
+    }
+    for (const f of fuel) { const row = byV.get(f.vehicleId); if (row) { row.liters += Number(f.quantityLiters); row.cost += Number(f.totalCost); } }
+    const vehicles = [...byV.values()].map((r) => ({ ...r, tons: Math.round(r.tons * 10) / 10, liters: Math.round(r.liters * 10) / 10 }));
+    const sum = (f: (x: any) => number) => vehicles.reduce((s, x) => s + f(x), 0);
+    return {
+      organization: site.organization?.name ?? 'SYLLOGISTIQUE', site: site.name, from: start.toISOString().slice(0, 10), to: new Date(+end - 1).toISOString().slice(0, 10),
+      kind: k ?? 'ALL', kindLabel: k === 'TRUCK' ? 'Camions' : k === 'SERVICE_VEHICLE' ? 'Véhicules de service' : 'Camions et véhicules de service',
+      totals: { missions: trips.length, km: sum((x) => x.km), movements: sum((x) => x.movements), tons: Math.round(sum((x) => x.tons) * 10) / 10, liters: Math.round(sum((x) => x.liters) * 10) / 10, cost: sum((x) => x.cost) },
+      vehicles,
+      trips: trips.map((t) => ({ reference: t.reference ?? '', date: t.startTime, vehicle: t.vehicle.registrationNumber, driver: `${t.driver.firstName} ${t.driver.lastName}`, destination: t.destination ?? (t.operationSites || []).join(', '), cargo: t.cargo ?? '', km: t.distance ?? 0, movements: t.tripsCount ?? 0, tons: t.tripsCount && t.tonnagePerTrip ? Math.round(t.tripsCount * t.tonnagePerTrip * 10) / 10 : 0 })),
+    };
+  }
+
   // E-mails de la comptabilité (paramètre REPORT_ACCOUNTING_EMAILS)
   async accountingEmails(organizationId: string) {
     const st = await this.prisma.setting.findUnique({ where: { organizationId_key: { organizationId, key: 'REPORT_ACCOUNTING_EMAILS' } } });

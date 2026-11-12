@@ -130,25 +130,26 @@ export class DriverSheetService {
   }
 
   // Historique des missions (bureau : tous les chauffeurs du site ; chauffeur : ses propres missions), filtres + pagination
-  async missions(f: { siteId?: string; driverId?: string; vehicleId?: string; status?: string; from?: string; to?: string; q?: string; page?: number }, onlyDriverId?: string) {
+  async missions(f: { kind?: string; siteId?: string; driverId?: string; vehicleId?: string; status?: string; from?: string; to?: string; q?: string; page?: number }, onlyDriverId?: string) {
     const take = 30, page = Math.max(1, Number(f.page) || 1);
     const where: any = {};
     if (onlyDriverId) where.driverId = onlyDriverId; else { if (f.siteId) where.siteId = f.siteId; if (f.driverId) where.driverId = f.driverId; }
     if (f.vehicleId) where.vehicleId = f.vehicleId;
+    if (f.kind === 'TRUCK' || f.kind === 'SERVICE_VEHICLE') where.vehicle = { vehicleType: f.kind };
     if (f.status && ['PLANNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'].includes(f.status)) where.status = f.status;
     if (f.from || f.to) where.startTime = { ...(f.from ? { gte: dayStart(f.from) } : {}), ...(f.to ? { lt: new Date(+dayStart(f.to) + 86400000) } : {}) };
     const q = (f.q || '').trim();
     if (q) where.OR = [{ reference: { contains: q, mode: 'insensitive' } }, { destination: { contains: q, mode: 'insensitive' } }, { purpose: { contains: q, mode: 'insensitive' } }];
     const [total, rows] = await Promise.all([
       this.prisma.trip.count({ where }),
-      this.prisma.trip.findMany({ where, orderBy: { startTime: 'desc' }, skip: (page - 1) * take, take, include: { driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { registrationNumber: true } } } }),
+      this.prisma.trip.findMany({ where, orderBy: { startTime: 'desc' }, skip: (page - 1) * take, take, include: { driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { registrationNumber: true, vehicleType: true } } } }),
     ]);
     const fuel = rows.length ? await this.prisma.fuelTransaction.groupBy({ by: ['tripId'], where: { tripId: { in: rows.map((r) => r.id) } }, _sum: { quantityLiters: true, totalCost: true } }) : [];
     return {
       total, page, pages: Math.max(1, Math.ceil(total / take)),
       missions: rows.map((t) => {
         const fu = fuel.find((x) => x.tripId === t.id);
-        return { id: t.id, reference: t.reference, status: t.status, startTime: t.startTime, endTime: t.endTime, driver: `${t.driver.firstName} ${t.driver.lastName}`, vehicle: t.vehicle.registrationNumber, destination: t.destination, purpose: t.purpose, km: t.distance ?? null, liters: fu ? n(fu._sum.quantityLiters) : 0, fuelCost: fu ? n(fu._sum.totalCost) : 0 };
+        return { id: t.id, reference: t.reference, status: t.status, startTime: t.startTime, endTime: t.endTime, driver: `${t.driver.firstName} ${t.driver.lastName}`, vehicle: t.vehicle.registrationNumber, vehicleId: t.vehicleId, kind: t.vehicle.vehicleType === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE', tons: t.tripsCount && t.tonnagePerTrip ? Math.round(t.tripsCount * t.tonnagePerTrip * 10) / 10 : null, destination: t.destination, purpose: t.purpose, km: t.distance ?? null, liters: fu ? n(fu._sum.quantityLiters) : 0, fuelCost: fu ? n(fu._sum.totalCost) : 0 };
       }),
     };
   }
@@ -209,12 +210,13 @@ export class DriverSheetService {
     const next = new Date(+day + 86400000);
     const drivers = await this.prisma.driver.findMany({ where: { deletedAt: null, status: 'ACTIVE', ...(siteId ? { siteId } : {}) }, orderBy: { lastName: 'asc' } });
     const ids = drivers.map((d) => d.id);
-    const [vehicles, trips, fuel, maint, reports] = await Promise.all([
+    const [vehicles, trips, fuel, maint, reports, attend] = await Promise.all([
       this.prisma.vehicle.findMany({ where: { assignedDriverId: { in: ids }, deletedAt: null } }),
       this.prisma.trip.findMany({ where: { driverId: { in: ids }, OR: [{ startTime: { gte: day, lt: next } }, { status: 'IN_PROGRESS' }] }, include: { vehicle: true }, orderBy: { startTime: 'asc' } }),
       this.prisma.fuelTransaction.findMany({ where: { driverId: { in: ids }, transactionDate: { gte: day, lt: next } } }),
       this.prisma.driverMaintenance.findMany({ where: { driverId: { in: ids }, date: { gte: day, lt: next } } }),
       this.prisma.driverDailyReport.findMany({ where: { driverId: { in: ids }, reportDate: day } }),
+      this.prisma.driverAttendance.findMany({ where: { driverId: { in: ids }, date: day } }),
     ]);
     const now = Date.now();
     const rows = drivers.map((d) => {
@@ -235,8 +237,13 @@ export class DriverSheetService {
       if (!veh) alerts.push('Aucun véhicule affecté');
       else if (['IMMOBILIZED', 'MAINTENANCE', 'OUT_OF_SERVICE'].includes(veh.status)) alerts.push('Véhicule immobilisé');
       if (dm.some((m) => m.nature === 'ANOMALIE')) alerts.push('Anomalie signalée');
+      const att = attend.find((a) => a.driverId === d.id);
+      const absent = att && att.status !== 'PRESENT' ? `${att.status}${att.absenceReason ? ' : ' + att.absenceReason : ''}` : null;
+      if (absent) alerts.push('Absent — ' + absent);
+      const loader = [...dt].reverse().find((t) => t.loaderName)?.loaderName ?? null;
       return {
         id: d.id, name: `${d.firstName} ${d.lastName}`, phone: d.phone,
+        kind: veh ? (veh.vehicleType === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE') : 'NONE', loader, absent,
         vehicle: veh ? veh.registrationNumber : null, status,
         destination: active ? (active.destination ?? (active.regions || []).join(', ')) : null,
         tripsCount: dt.length, km, liters: Math.round(liters * 100) / 100, fuelCost: df.reduce((a, f) => a + n(f.totalCost), 0),
@@ -244,7 +251,7 @@ export class DriverSheetService {
       };
     });
     const count = (st: string) => rows.filter((r) => r.status === st).length;
-    return { date: day.toISOString().slice(0, 10), summary: { total: rows.length, enMission: count('EN_MISSION'), aEnvoyer: count('A_ENVOYER'), envoyees: count('ENVOYEE'), rien: count('RIEN') }, drivers: rows };
+    return { date: day.toISOString().slice(0, 10), summary: { byKind: { TRUCK: rows.filter((r) => r.kind === 'TRUCK').length, SERVICE_VEHICLE: rows.filter((r) => r.kind === 'SERVICE_VEHICLE').length, NONE: rows.filter((r) => r.kind === 'NONE').length }, absents: rows.filter((r) => r.absent).length, total: rows.length, enMission: count('EN_MISSION'), aEnvoyer: count('A_ENVOYER'), envoyees: count('ENVOYEE'), rien: count('RIEN') }, drivers: rows };
   }
 
   async listForDay(siteId: string | undefined, date?: string, actorId?: string) {
