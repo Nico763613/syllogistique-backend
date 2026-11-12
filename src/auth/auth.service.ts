@@ -50,10 +50,10 @@ export class AuthService {
     if (dto.email.includes('@')) {
       user = await this.prisma.user.findUnique({ where: { email: dto.email }, include: { role: true } });
     } else {
-      // Chauffeur ou personnel (HSE, magasinier) sans e-mail : connexion par numéro de téléphone (comparaison sur les 9 derniers chiffres)
+      // Chauffeur, personnel ou responsable (DG, responsable logistique) sans e-mail : connexion par numéro de téléphone (comparaison sur les 9 derniers chiffres)
       const digits = dto.email.replace(/\D/g, '').slice(-9);
       if (digits.length < 8) throw new UnauthorizedException('Identifiants invalides.');
-      const cands = await this.prisma.user.findMany({ where: { phone: { not: null }, status: 'ACTIVE', role: { name: { in: ['CHAUFFEUR', 'AGENT_HSE', 'GESTIONNAIRE_HSE', 'MAGASINIER'] } } }, include: { role: true } });
+      const cands = await this.prisma.user.findMany({ where: { phone: { not: null }, status: 'ACTIVE', role: { name: { in: ['CHAUFFEUR', 'AGENT_HSE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'MECANICIEN', 'POINTEUR', 'DIRECTEUR_GENERAL', 'ADMIN_LOGISTIQUE'] } } }, include: { role: true } });
       const hits = cands.filter((c) => (c.phone ?? '').replace(/\D/g, '').slice(-9) === digits);
       user = hits.length === 1 ? hits[0] : null;
     }

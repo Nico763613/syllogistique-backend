@@ -112,6 +112,9 @@ enum RoleName {
   CAISSIER
   GESTIONNAIRE_HSE
   AGENT_HSE
+  DIRECTEUR_GENERAL
+  MECANICIEN
+  POINTEUR
 }
 
 model Permission {

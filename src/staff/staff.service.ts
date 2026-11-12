@@ -1,12 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
-import { CreateStaffDto, StaffReportDto, STAFF_ROLES } from './staff.dto';
+import { CreateStaffDto, StaffReportDto, STAFF_ROLES, MANAGER_ROLES, ALL_STAFF_ROLES } from './staff.dto';
 
-const LABEL: Record<string, string> = { AGENT_HSE: 'agent HSE', GESTIONNAIRE_HSE: 'responsable HSE', MAGASINIER: 'magasinier' };
+const LABEL: Record<string, string> = { AGENT_HSE: 'agent HSE', GESTIONNAIRE_HSE: 'responsable HSE', MAGASINIER: 'gestionnaire de stock', MECANICIEN: 'mécanicien', POINTEUR: 'pointeur', DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique' };
+const isManager = (r: string) => (MANAGER_ROLES as readonly string[]).includes(r);
 
 // Personnel de terrain (agents HSE, magasiniers) : comptes créés par le bureau, invitation WhatsApp,
 // connexion par numéro de téléphone, rapport d'activité quotidien reçu par le responsable.
@@ -16,7 +17,8 @@ export class StaffService {
 
   private last9(phone: string) { return phone.replace(/\D/g, '').slice(-9); }
 
-  async create(dto: CreateStaffDto, actor: Actor, organizationId: string) {
+  async create(dto: CreateStaffDto, actor: Actor, organizationId: string, actorRole?: string) {
+    if (isManager(dto.role) && actorRole !== 'SUPER_ADMIN') throw new ForbiddenException("Seul l'administrateur principal peut enregistrer le Directeur Général ou le Responsable logistique.");
     const digits = this.last9(dto.phone);
     if (digits.length < 8) throw new BadRequestException('Numéro de téléphone invalide.');
     const all = await this.prisma.user.findMany({ where: { phone: { not: null }, deletedAt: null }, select: { phone: true } });
@@ -32,8 +34,9 @@ export class StaffService {
     return { id: u.id };
   }
 
-  async list(roles: string[] | undefined, siteId?: string) {
-    const names = (roles && roles.length ? roles : [...STAFF_ROLES]).filter((r) => (STAFF_ROLES as readonly string[]).includes(r));
+  async list(roles: string[] | undefined, siteId?: string, actorRole?: string) {
+    const allowed: readonly string[] = actorRole === 'SUPER_ADMIN' ? ALL_STAFF_ROLES : STAFF_ROLES;
+    const names = (roles && roles.length ? roles : [...STAFF_ROLES]).filter((r) => allowed.includes(r));
     const users = await this.prisma.user.findMany({
       where: { deletedAt: null, role: { name: { in: names as any } }, ...(siteId ? { siteId } : {}) },
       include: { role: true }, orderBy: { lastName: 'asc' },
@@ -48,10 +51,11 @@ export class StaffService {
   }
 
   // Message WhatsApp : lien, identifiant (téléphone), mot de passe provisoire (tant qu'il n'a pas créé le sien)
-  async invite(userId: string, appUrl: string, actor: Actor) {
+  async invite(userId: string, appUrl: string, actor: Actor, actorRole?: string) {
     if (!/^https:\/\//.test(appUrl)) throw new BadRequestException("Lien de l'application invalide.");
     const u = await this.prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
-    if (!u || !(STAFF_ROLES as readonly string[]).includes(u.role.name)) throw new NotFoundException('Personnel introuvable.');
+    if (!u || !(ALL_STAFF_ROLES as readonly string[]).includes(u.role.name)) throw new NotFoundException('Personnel introuvable.');
+    if (isManager(u.role.name) && actorRole !== 'SUPER_ADMIN') throw new ForbiddenException("Seul l'administrateur principal peut envoyer ce lien.");
     const digits = (u.phone ?? '').replace(/\D/g, '');
     if (digits.length < 8) throw new BadRequestException('Renseignez le numéro de téléphone.');
     let temp: string | null = null;
@@ -65,7 +69,7 @@ export class StaffService {
       `Voici votre application de travail SYLLOGISTIQUE (${LABEL[u.role.name]}) : ${appUrl}`,
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
       `2) Connexion : votre numéro de téléphone${temp ? ` et le mot de passe provisoire ${temp} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe'}.`,
-      `3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`,
+      ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre espace de pilotage.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),
     ];
     return { name: `${u.firstName} ${u.lastName}`, phone: digits, message: lines.join('\n') };
   }
