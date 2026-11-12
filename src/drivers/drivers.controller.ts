@@ -27,6 +27,12 @@ export class DriversController {
     return this.driversService.findAll(siteId);
   }
 
+  // Pointage d'un jour : un enregistrement par chauffeur (statut, motif)
+  @Get('attendance/day')
+  attendanceDay(@Query('siteId') siteId?: string, @Query('date') date?: string) {
+    return this.driversService.attendanceDay(siteId, date);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.driversService.findOne(id);
@@ -44,7 +50,7 @@ export class DriversController {
   }
 
   @Post('attendance')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.POINTEUR)
   markAttendance(@Body() dto: MarkAttendanceDto, @CurrentUser() actor: any) {
     return this.driversService.markAttendance(dto, actor.userId);
   }
