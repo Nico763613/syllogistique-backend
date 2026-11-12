@@ -147,12 +147,15 @@ export class ExportService {
 
       title('Missions');
       line(`${report.trips.count} mission(s) — ${n(report.trips.totalKm)} km`);
-      if (report.trips.totalVoyages) line(`Voyages : ${report.trips.totalVoyages}`);
+      if (report.trips.totalVoyages) line(`Mouvements : ${report.trips.totalVoyages}${report.trips.totalTons ? ' — ' + report.trips.totalTons + ' t' : ''}`);
       const hh = (d: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
       for (const x of report.trips.list) {
         doc.moveDown(0.3);
         doc.fillColor(navy).text(`${x.plate}${x.plateIT ? ' (plaque IT)' : ''} — ${x.brand || x.vehicle} — ${x.driver}${x.phone ? ' — ' + x.phone : ''}`).fillColor('#000000');
         line(`   Destination : ${x.destination || x.regions.join(', ') || '—'}${x.cargo ? ' — ' + x.cargo : ''}${x.purposeType ? ' — ' + x.purposeType.toLowerCase() : ''}`);
+        if (x.operationSites.length) line(`   Sites d'opération : ${x.operationSites.join(', ')}`);
+        if (x.loadPlaces.length) line(`   Chargement : ${x.loadPlaces.join(', ')} → déchargement : ${x.unloadPlaces.join(', ')}${x.tons ? ' — ' + x.tons + ' t (' + x.voyages + ' × ' + x.tonnagePerTrip + ' t)' : ''}`);
+        if (x.pauseMileage !== null) line(`   Pause : ${n(x.pauseMileage)} km${x.pauseAt ? ' à ' + hh(x.pauseAt) : ''}`);
         line(`   Horaires : ${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? ' — ' + x.voyages + ' voyage(s)' : ''}`);
         line(`   Compteur : ${n(x.startMileage)} → ${x.endMileage !== null ? n(x.endMileage) : 'en cours'}${x.fuelMileages.length ? ' (plein à ' + x.fuelMileages.map(n).join(', ') + ')' : ''} — ${n(x.km)} km`);
         line(`   Réservoir : ${x.tankStart ?? '?'} L au départ → ${x.tankEnd ?? '?'} L à l'arrivée${x.tankUsed !== null ? ' — ' + x.tankUsed + ' L utilisés' : ''}`);

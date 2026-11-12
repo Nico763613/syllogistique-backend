@@ -187,6 +187,7 @@ export class ReportsService {
         count: trips.length,
         totalKm: sum(trips, (t) => t.distance ?? 0),
         totalVoyages: sum(trips, (t) => t.tripsCount ?? 0),
+        totalTons: Math.round(sum(trips, (t) => (t.tripsCount && t.tonnagePerTrip ? t.tripsCount * t.tonnagePerTrip : 0)) * 10) / 10,
         list: trips.map((t) => {
           // Carburant rattaché à la mission (sinon, ravitaillements du même véhicule le même jour)
           const tf = fuel.filter((f) => (f.tripId ? f.tripId === t.id : f.vehicleId === t.vehicleId));
@@ -212,6 +213,9 @@ export class ReportsService {
             regions: t.regions,
             cargo: t.cargo ?? '',
             voyages: t.tripsCount,
+            operationSites: t.operationSites, products: t.products, loadPlaces: t.loadPlaces, unloadPlaces: t.unloadPlaces,
+            pauseMileage: t.pauseMileage, pauseAt: t.pauseAt, tonnagePerTrip: t.tonnagePerTrip,
+            tons: t.tripsCount && t.tonnagePerTrip ? Math.round(t.tripsCount * t.tonnagePerTrip * 10) / 10 : null,
             startTime: t.startTime,
             endTime: t.endTime,
             startMileage: t.startMileage,
@@ -287,7 +291,7 @@ export class ReportsService {
       `${r.site} — ${d}/${m}/${y}`,
       '',
       `${r.kindLabel} : ${f.available}/${f.total} disponibles, ${f.onMission} en mission, ${f.maintenance + f.immobilized} indisponibles`,
-      `Missions : ${r.trips.count} — ${n(r.trips.totalKm)} km${r.trips.totalVoyages ? ` — ${r.trips.totalVoyages} voyage(s)` : ''}`,
+      `Missions : ${r.trips.count} — ${n(r.trips.totalKm)} km${r.trips.totalVoyages ? ` — ${r.trips.totalVoyages} mouvement(s)` : ''}${r.trips.totalTons ? ` — ${r.trips.totalTons} t` : ''}`,
       `Carburant (pleins) : ${n(r.fuel.liters)} L — ${n(r.fuel.cost)} GNF`,
       `Cumul semaine (lun→ven) : ${n(r.fuel.week.liters)} L — ${n(r.fuel.week.cost)} GNF`,
       `Chauffeurs en service : ${r.drivers.onDuty}`,
@@ -306,6 +310,12 @@ export class ReportsService {
     }
     lines.push('', `Établi par : ${issuer.name}${issuer.service ? ' — ' + issuer.service : ''}${issuer.phone ? ' — ' + issuer.phone : ''}`);
     return lines.join('\n');
+  }
+
+  // E-mails de la comptabilité (paramètre REPORT_ACCOUNTING_EMAILS)
+  async accountingEmails(organizationId: string) {
+    const st = await this.prisma.setting.findUnique({ where: { organizationId_key: { organizationId, key: 'REPORT_ACCOUNTING_EMAILS' } } });
+    return st?.value ?? '';
   }
 
   // E-mails habituels de la hiérarchie (paramètre REPORT_EMAIL_RECIPIENTS)

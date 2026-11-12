@@ -59,11 +59,13 @@ export class ReportsController {
     @Body('to') to: string,
     @Body('siteId') siteId: string,
     @Body('date') date: string,
+    @Body('kind') kind: string,
+    @Body('audience') audience: string,
     @CurrentUser() actor: any,
   ) {
     if (!String(to ?? '').trim()) {
-      // Sans adresse saisie : e-mails habituels de la hiérarchie (paramètre REPORT_EMAIL_RECIPIENTS)
-      to = await this.reportsService.hierarchyEmails(actor.organizationId);
+      // Sans adresse saisie : e-mails habituels de la hiérarchie (REPORT_EMAIL_RECIPIENTS) ou de la comptabilité (REPORT_ACCOUNTING_EMAILS)
+      to = audience === 'ACCOUNTING' ? await this.reportsService.accountingEmails(actor.organizationId) : await this.reportsService.hierarchyEmails(actor.organizationId);
     }
     const recipients = String(to ?? '')
       .split(/[,;\s]+/)
@@ -72,7 +74,7 @@ export class ReportsController {
     if (recipients.length === 0 || recipients.length > 10 || !recipients.every((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))) {
       throw new BadRequestException('Adresse(s) e-mail invalide(s) (10 maximum, séparées par des virgules).');
     }
-    const report = await this.reportsService.dailyReport(siteId, date, 'SERVICE_VEHICLE');
+    const report = await this.reportsService.dailyReport(siteId, date, kind === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE');
     const issuer = await this.reportsService.issuer(actor.userId);
     const buffer = await this.exportService.dailyReportPdf(report, issuer);
     const result = await this.messaging.sendEmailWithAttachment({
