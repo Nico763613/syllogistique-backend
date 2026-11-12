@@ -266,7 +266,8 @@
       <div class="nav-item" data-view="fuel" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant</div>
       <div class="nav-item" data-view="maintenance" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
       <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses chauffeurs</div>
-      <div class="nav-item" data-view="daily" onclick="go('daily')"><span class="nav-icon">📋</span> Rapports journaliers</div>
+      <div class="nav-item" data-view="reports-truck" onclick="go('reports-truck')"><span class="nav-icon">🚛</span> Rapports camions</div>
+      <div class="nav-item" data-view="reports-service" onclick="go('reports-service')"><span class="nav-icon">🚙</span> Rapports véhicules de service</div>
       <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
 
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
@@ -525,7 +526,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -553,7 +554,7 @@ const capFmt = (v) => (/^\d+([.,]\d+)?$/.test(v) ? v + ' t' : v);
 const HIST_ENT = {
   trucks: ['Vehicle', 'Document', 'VehicleDowntime'], 'service-vehicles': ['Vehicle', 'Document', 'VehicleDowntime'], vehicles: ['Vehicle', 'Document', 'VehicleDowntime'],
   drivers: ['Driver', 'DriverDevice'], 'driver-devices': ['DriverDevice'], fuel: ['FuelTransaction'], maintenance: ['Maintenance', 'DriverMaintenance'],
-  'driver-expenses': ['DriverExpense'], 'driver-sheets': ['DriverDailyReport'], 'driver-board': ['DriverDailyReport', 'Trip'], 'driver-missions': ['Trip'], daily: ['DriverDailyReport', 'Trip'],
+  'driver-expenses': ['DriverExpense'], 'driver-sheets': ['DriverDailyReport'], 'driver-board': ['DriverDailyReport', 'Trip'], 'driver-missions': ['Trip'], daily: ['DriverDailyReport', 'Trip'], 'reports-truck': ['DriverDailyReport', 'Trip'], 'reports-service': ['DriverDailyReport', 'Trip'],
   stock: ['InventoryItem', 'StockMovement'], purchases: ['PurchaseOrder', 'GoodsReceipt'], needs: ['Need'], 'dash-hse': ['HseIncident', 'HseInspection'],
 };
 const HIST_LAB = { CREATE: 'Création', UPDATE: 'Modification', DELETE: 'Suppression' };
@@ -634,7 +635,7 @@ function go(view, noPush) {
 { const _rv = renderView; renderView = async function (view) { const r = await _rv(view); draftRestore(); return r; }; }
 
 /* ---------- Actualisation automatique du bureau (toutes les 30 s, écran ouvert et visible uniquement) ---------- */
-const LIVE_VIEWS = ['dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance'];
+const LIVE_VIEWS = ['dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance', 'reports-truck', 'reports-service'];
 const LIVE = { since: null, timer: null, busy: false };
 function liveCanRun() {
   return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR';
@@ -1132,6 +1133,8 @@ async function renderView(view) {
     if (view === 'purchases') return renderPurchases();
     if (view === 'needs') return renderNeeds();
     if (view === 'daily') return renderDaily();
+    if (view === 'reports-truck') return renderKindReports('TRUCK');
+    if (view === 'reports-service') return renderKindReports('SERVICE_VEHICLE');
     if (view === 'sync') return renderSync();
     if (view === 'settings') return renderSettings();
   } catch (e) {
@@ -2445,6 +2448,66 @@ async function renderDaily() {
       <div id="d-nmsg"></div>
     </div>` : ''}`;
   loadDaily();
+}
+/* ---------------- RAPPORTS PAR CATÉGORIE (camions / véhicules de service) ---------------- */
+async function renderKindReports(kind) {
+  dailyKind = kind; window._krKind = kind;
+  const today = window._krDate || new Date().toISOString().slice(0, 10);
+  const canEdit = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  try { const all = await api('/settings'); dailyEmails = (all.find(s => s.key === 'REPORT_EMAIL_RECIPIENTS') || {}).value || ''; dailyAccEmails = (all.find(s => s.key === 'REPORT_ACCOUNTING_EMAILS') || {}).value || ''; } catch (e) {}
+  root().innerHTML = `
+    <div class="panel"><h3>${kind === 'TRUCK' ? '🚛 Rapports camions' : '🚙 Rapports véhicules de service'}</h3>
+      <div class="desc">Les chauffeurs ${kind === 'TRUCK' ? 'de camions' : 'de véhicules de service'} uniquement. Touchez un bouton pour ouvrir le détail d'un chauffeur.</div>
+      <label>Jour</label><input id="d-date" type="date" value="${esc(today)}" onchange="window._krDate=this.value;loadDaily();krLoad()" style="max-width:220px">
+      <div id="kr-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
+    <div id="kr-list"><div class="empty">Chargement…</div></div>
+    <div class="panel"><h3>📋 Rapport global du jour</h3><div id="d-body"><div class="empty">Chargement…</div></div></div>`;
+  loadDaily(); krLoad();
+}
+const KR_TABS = [['trips', '🧭 Trajets'], ['fuel', '⛽ Carburant'], ['maint', '🔧 Maintenance'], ['pannes', '⚠ Pannes']];
+async function krLoad() {
+  const box = document.getElementById('kr-list'); if (!box) return;
+  const kind = window._krKind, d = document.getElementById('d-date').value;
+  try {
+    const [bd, sheets] = await Promise.all([api('/driver-admin/board?date=' + d + '&siteId=' + state.siteId), api('/driver-admin/sheets?date=' + d + '&siteId=' + state.siteId)]);
+    window._krSheets = {}; sheets.forEach((sh) => { window._krSheets[sh.driver.id] = sh; });
+    const list = bd.drivers.filter((x) => x.kind === kind);
+    const cnt = (st) => list.filter((x) => x.status === st).length;
+    const tile = (n, l, c) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center"><div style="font-size:24px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+    document.getElementById('kr-sum').innerHTML = tile(list.length, 'Chauffeurs', 'var(--navy)') + tile(cnt('ENVOYEE'), 'Rapports envoyés', '#2E8B57') + tile(cnt('A_ENVOYER'), 'À envoyer', '#C77D0A') + tile(cnt('RIEN'), 'Rien de saisi', '#B4372F');
+    box.innerHTML = list.map((x) => {
+      const st = BOARD_ST[x.status], sh = window._krSheets[x.id];
+      const num = String(x.phone || '').replace(/\D/g, ''), full = num.length === 9 ? '224' + num : num;
+      const relance = x.phone && (x.status === 'A_ENVOYER' || x.status === 'RIEN') ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent('Bonjour ' + x.name + ', merci de compléter et d\'envoyer votre fiche de bord du jour dans l\'application.')}">💬 Relancer</a>` : '';
+      return `<div class="panel" id="kr-${esc(x.id)}"><h3 style="margin-bottom:4px">${esc(x.name)} <span class="badge ${st[2]}">${st[0]} ${st[1]}</span>${sh && sh.processedAt ? ' <span class="badge ok">✔ Traitée</span>' : ''}</h3>
+        <div class="desc">${esc(x.vehicle || 'Aucun véhicule')} · ${esc(x.phone || '—')} · <b>${fmt(x.km)} km</b> · ${x.liters} L · ${x.tripsCount} trajet(s)</div>
+        ${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C">⚠ ${esc(a)}</div>`).join('')}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${sh ? KR_TABS.map(([k, t]) => `<button class="btn small" style="margin:0" onclick="krToggle('${esc(x.id)}','${k}')">${t}</button>`).join('') + (sh.status === 'SENT' && !sh.processedAt ? `<button class="btn small gold" style="margin:0" onclick="krProcess('${esc(x.id)}')">✔ Marquer traitée</button>` : '') : '<span class="desc" style="margin:0">Aucune saisie ce jour.</span>'}${relance}</div>
+        <div id="kr-d-${esc(x.id)}" style="margin-top:8px"></div></div>`;
+    }).join('') || '<div class="panel"><div class="empty">Aucun chauffeur dans cette catégorie.</div></div>';
+  } catch (e) { box.innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
+}
+function krToggle(id, tab) {
+  const box = document.getElementById('kr-d-' + id), sh = (window._krSheets || {})[id]; if (!box || !sh) return;
+  if (box.dataset.tab === tab) { box.innerHTML = ''; box.dataset.tab = ''; return; }
+  box.dataset.tab = tab;
+  const hh = (x) => (x ? new Date(x).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
+  const empty = '<div class="desc">Rien à signaler.</div>';
+  let html = '';
+  if (tab === 'trips') html = sh.trips.length ? `<div style="overflow:auto"><table><tr><th>Véhicule</th><th>Destination / motif</th><th>Horaires</th><th>Km</th><th>Distance</th></tr>${sh.trips.map((t) => `<tr><td>${esc(t.plate)}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}</td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)} → ${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)} km</b></td></tr>`).join('')}</table></div>` : empty;
+  else if (tab === 'fuel') html = sh.fuel.length ? `<div style="overflow:auto"><table><tr><th>Heure</th><th>Source</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${fmt(f.liters)}</td><td class="mono">${fmt(f.cost)}</td></tr>`).join('')}</table></div>` : empty;
+  else if (tab === 'maint') { const m = sh.maintenance.filter((x) => x.nature !== 'ANOMALIE'); html = m.length ? `<div style="overflow:auto"><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${m.map((x) => `<tr><td>${esc(DRV_NAT[x.nature] || x.nature)}</td><td>${esc(x.detail || '')}</td><td class="mono">${fmt(x.mileage)}</td><td class="mono">${x.nextServiceKm ? fmt(x.nextServiceKm) : '—'}</td><td class="mono">${fmt(x.cost)}</td></tr>`).join('')}</table></div>` : empty; }
+  else if (tab === 'pannes') {
+    const a = sh.maintenance.filter((x) => x.nature === 'ANOMALIE');
+    const t = sh.trips.filter((x) => x.preCondition === 'ANOMALIE' || x.maintenanceNeeded);
+    html = a.length || t.length ? `${a.map((x) => `<div class="drv-row"><span>${esc(x.detail || 'Anomalie')}</span><b>${x.severity ? esc(x.severity) : ''}</b></div>`).join('')}${t.map((x) => `<div class="drv-row"><span>${esc(x.plate)} — ${esc(x.preAnomalies || x.maintenanceReason || '')}</span><b>${x.maintenanceNeeded ? 'Maintenance à prévoir' : 'Anomalie'}</b></div>`).join('')}` : empty;
+  }
+  box.innerHTML = html;
+}
+async function krProcess(id) {
+  const d = document.getElementById('d-date').value;
+  const note = prompt('Note pour le chauffeur (facultatif) :', ''); if (note === null) return;
+  try { await api('/driver-admin/sheets/process', { method: 'POST', body: { driverId: id, date: d, note: note || undefined } }); krLoad(); } catch (e) { alert(e.message); }
 }
 function dailyTripsTable(r) {
   if (!r.trips.list.length) return '';
