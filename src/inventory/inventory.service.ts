@@ -270,7 +270,7 @@ export class InventoryService {
       },
       include: {
         item: { select: { sku: true, name: true, unit: true, location: true } },
-        vehicle: { select: { internalNumber: true } },
+        vehicle: { select: { internalNumber: true, registrationNumber: true } },
         createdBy: { select: { firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'desc' },
