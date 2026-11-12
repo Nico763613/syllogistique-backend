@@ -205,8 +205,27 @@ export class NeedsService {
     };
   }
 
+  // Adresses habituelles du circuit : Achats (NEEDS_PURCHASING_EMAILS) puis comptabilité (NEEDS_ACCOUNTING_EMAILS, à défaut REPORT_ACCOUNTING_EMAILS)
+  private async stageEmails(siteId: string, stage: 'PURCHASING' | 'ACCOUNTING') {
+    const site = await this.prisma.site.findUnique({ where: { id: siteId }, select: { organizationId: true } });
+    if (!site) return '';
+    const keys = stage === 'PURCHASING' ? ['NEEDS_PURCHASING_EMAILS'] : ['NEEDS_ACCOUNTING_EMAILS', 'REPORT_ACCOUNTING_EMAILS'];
+    for (const key of keys) {
+      const st = await this.prisma.setting.findUnique({ where: { organizationId_key: { organizationId: site.organizationId, key } } });
+      if (st?.value?.trim()) return st.value;
+    }
+    return '';
+  }
+
   async email(id: string, dto: SendNeedEmailDto, userId: string) {
-    const recipients = dto.to.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+    const stage = dto.stage ?? 'PURCHASING';
+    const current = await this.findOne(id);
+    if (stage === 'ACCOUNTING' && ['BROUILLON', 'REJETE'].includes(current.status)) {
+      throw new BadRequestException("Envoyez d'abord l'état des besoins aux Achats : la comptabilité le reçoit ensuite.");
+    }
+    const to = dto.to && dto.to.trim() ? dto.to : await this.stageEmails(current.siteId, stage);
+    if (!to.trim()) throw new BadRequestException(`Aucune adresse e-mail pour ${stage === 'PURCHASING' ? 'les Achats' : 'la comptabilité'} : saisissez-la ou enregistrez-la dans les destinataires.`);
+    const recipients = to.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
     if (recipients.length === 0 || recipients.length > 10 || !recipients.every((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))) {
       throw new BadRequestException('Adresse(s) e-mail invalide(s) (10 maximum, séparées par des virgules).');
     }
@@ -215,14 +234,15 @@ export class NeedsService {
     const text = await this.text(id, userId);
     const result = await this.messaging.sendEmailWithAttachment({
       to: recipients.join(', '),
-      subject: `État des besoins ${need.reference} — ${need.title}`,
-      text: `Bonjour,\n\nVeuillez trouver ci-joint l'état des besoins ${need.reference}.\n\n${text}\n\nCordialement.`,
+      subject: `État des besoins ${need.reference} — ${need.title}${stage === 'ACCOUNTING' ? ' (pour la comptabilité)' : ''}`,
+      text: `Bonjour,\n\nVeuillez trouver ci-joint l'état des besoins ${need.reference}${stage === 'ACCOUNTING' ? ', transmis pour la comptabilité après traitement par les Achats' : ''}.\n\n${text}\n\nCordialement.`,
       filename: `etat_des_besoins_${need.reference}.pdf`,
       buffer,
       contentType: 'application/pdf',
     });
     // Un envoi réel passe l'état en « Envoyé » (un brouillon n'est jamais marqué envoyé sans envoi)
-    if (result.sent && need.status === 'BROUILLON') await this.prisma.needRequest.update({ where: { id }, data: { status: 'ENVOYE' } });
+    if (result.sent && stage === 'PURCHASING' && need.status === 'BROUILLON') await this.prisma.needRequest.update({ where: { id }, data: { status: 'ENVOYE' } });
+    if (result.sent && stage === 'ACCOUNTING') await this.prisma.needRequest.update({ where: { id }, data: { status: 'TRANSMIS_COMPTA' } });
     return { ...result, recipients };
   }
 }

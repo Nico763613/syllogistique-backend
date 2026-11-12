@@ -31,10 +31,12 @@ export class UpdateNeedDto {
 }
 
 export class SetNeedStatusDto {
-  @IsIn(['BROUILLON', 'ENVOYE', 'APPROUVE', 'REJETE', 'SATISFAIT']) status: string;
+  @IsIn(['BROUILLON', 'ENVOYE', 'APPROUVE', 'REJETE', 'SATISFAIT', 'TRANSMIS_COMPTA']) status: string;
   @IsOptional() @IsString() note?: string;
 }
 
 export class SendNeedEmailDto {
-  @IsString() to: string;
+  @IsOptional() @IsString() to?: string;
+  // Circuit : Achats d'abord, puis comptabilité
+  @IsOptional() @IsIn(['PURCHASING', 'ACCOUNTING']) stage?: 'PURCHASING' | 'ACCOUNTING';
 }
