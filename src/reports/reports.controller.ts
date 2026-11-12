@@ -33,6 +33,35 @@ export class ReportsController {
     return { report, issuer, text: this.reportsService.dailyReportText(report, issuer) };
   }
 
+  @Get('missions/pdf')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  async missionsPdf(@Query() q: Record<string, string>, @Res() res: Response) {
+    const report = await this.reportsService.missionsReport(q.siteId, q.from, q.to, q.kind, q.vehicleId);
+    const buffer = await this.exportService.missionsReportPdf(report, { name: (q.name || '').slice(0, 60), firstNames: (q.firstNames || '').slice(0, 80), phone: (q.phone || '').slice(0, 30), title: (q.title || '').slice(0, 60) });
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="rapport_missions_${report.from}_${report.to}.pdf"` });
+    res.send(buffer);
+  }
+
+  @Post('missions/send-email')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  async missionsEmail(@Body() b: Record<string, string>, @CurrentUser() actor: any) {
+    let to = String(b.to ?? '').trim() || (b.audience === 'ACCOUNTING' ? await this.reportsService.accountingEmails(actor.organizationId) : await this.reportsService.hierarchyEmails(actor.organizationId));
+    const recipients = to.split(/[,;\s]+/).map((x) => x.trim()).filter(Boolean);
+    if (recipients.length === 0 || recipients.length > 10 || !recipients.every((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))) throw new BadRequestException('Adresse(s) e-mail invalide(s) (10 maximum, séparées par des virgules).');
+    const report = await this.reportsService.missionsReport(b.siteId, b.from, b.to, b.kind, b.vehicleId);
+    const signer = { name: (b.name || '').slice(0, 60), firstNames: (b.firstNames || '').slice(0, 80), phone: (b.phone || '').slice(0, 30), title: (b.title || '').slice(0, 60) };
+    const buffer = await this.exportService.missionsReportPdf(report, signer);
+    const result = await this.messaging.sendEmailWithAttachment({
+      to: recipients.join(', '),
+      subject: `${report.organization} — Rapport des missions (${report.kindLabel.toLowerCase()}) du ${report.from} au ${report.to}`,
+      text: `Bonjour,\n\nVeuillez trouver ci-joint le rapport global des missions (${report.kindLabel.toLowerCase()}) du ${report.from} au ${report.to} : ${report.totals.missions} mission(s), ${report.totals.km} km.\n\nCordialement,\n${signer.name} ${signer.firstNames}${signer.phone ? '\nTél. : ' + signer.phone : ''}`,
+      filename: `rapport_missions_${report.from}_${report.to}.pdf`,
+      buffer,
+      contentType: 'application/pdf',
+    });
+    return { ...result, recipients };
+  }
+
   @Get('daily/export/pdf')
   async dailyPdf(
     @Query('siteId') siteId: string,

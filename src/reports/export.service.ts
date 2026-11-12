@@ -184,4 +184,44 @@ export class ExportService {
       doc.end();
     });
   }
+
+  // Rapport global des missions (PDF) signé par le responsable logistique
+  async missionsReportPdf(
+    report: Awaited<ReturnType<ReportsService['missionsReport']>>,
+    signer: { name: string; firstNames: string; phone: string; title: string },
+  ): Promise<Buffer> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+      const fr = (d: string) => d.split('-').reverse().join('/');
+      const n = (v: number) => Math.round(v).toLocaleString('fr-FR');
+      const navy = '#163A5F', gold = '#E0A72E';
+      doc.rect(0, 0, doc.page.width, 70).fill(navy);
+      doc.fillColor('#FFFFFF').fontSize(18).text(report.organization, 50, 20);
+      doc.fillColor(gold).fontSize(12).text(`Rapport global des missions — ${report.kindLabel}`, 50, 44);
+      doc.fillColor('#000000').fontSize(10).text(`${report.site} — du ${fr(report.from)} au ${fr(report.to)}`, 50, 85);
+      doc.moveDown();
+      const title = (t: string) => { doc.moveDown(0.6); doc.fillColor(navy).fontSize(13).text(t, { underline: true }); doc.fillColor('#000000').fontSize(10).moveDown(0.2); };
+      const T = report.totals;
+      title('Synthèse');
+      doc.text(`${T.missions} mission(s) — ${n(T.km)} km — ${n(T.movements)} mouvement(s)${T.tons ? ' — ' + T.tons + ' t' : ''}`);
+      doc.text(`Carburant : ${n(T.liters)} L — ${n(T.cost)} GNF`);
+      title('Par véhicule');
+      for (const v of report.vehicles) doc.text(`• ${v.plate} (${v.vehicle}) — ${v.missions} mission(s) — ${n(v.km)} km${v.movements ? ' — ' + v.movements + ' mouv.' : ''}${v.tons ? ' — ' + v.tons + ' t' : ''} — ${v.liters} L — ${n(v.cost)} GNF`);
+      title('Détail des missions');
+      for (const t of report.trips) doc.text(`${fr(new Date(t.date).toISOString().slice(0, 10))} — ${t.reference || '—'} — ${t.vehicle} — ${t.driver} — ${t.destination || '—'}${t.cargo ? ' (' + t.cargo + ')' : ''} — ${n(t.km)} km${t.tons ? ' — ' + t.tons + ' t' : ''}`);
+      doc.moveDown(2);
+      doc.fillColor(navy).fontSize(10).text('Établi et validé par', { underline: true });
+      doc.fillColor('#000000');
+      doc.text(`${signer.name} ${signer.firstNames}`.trim());
+      if (signer.title) doc.text(signer.title);
+      if (signer.phone) doc.text(`Tél. de service : ${signer.phone}`);
+      doc.moveDown(1.5).text('Signature : ______________________');
+      doc.fillColor('#555555').text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYLLOGISTIQUE`);
+      doc.end();
+    });
+  }
 }

@@ -13,4 +13,6 @@ export class DashboardQueryDto {
   @IsOptional() @IsDateString() to?: string;
   // Pas des graphiques (par défaut selon la période)
   @IsOptional() @IsIn(GRANULARITIES as unknown as string[]) granularity?: (typeof GRANULARITIES)[number];
+  // Charroi : camions ou véhicules de service (vide = tous)
+  @IsOptional() @IsIn(['TRUCK', 'SERVICE_VEHICLE']) kind?: 'TRUCK' | 'SERVICE_VEHICLE';
 }

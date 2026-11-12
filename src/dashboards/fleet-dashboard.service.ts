@@ -30,23 +30,27 @@ export class FleetDashboardService {
     const now = new Date();
     const today = startOfDay(now);
     const siteWhere: any = siteId ? { siteId } : {};
-    const vehicleSite: any = siteId ? { vehicle: { siteId } } : {};
+    // Camions et véhicules de service ne sont jamais mélangés quand un type est demandé
+    const vk: any = q.kind === 'TRUCK' || q.kind === 'SERVICE_VEHICLE' ? { vehicleType: q.kind } : {};
+    const hasKind = !!vk.vehicleType;
+    const vehicleSite: any = siteId || hasKind ? { vehicle: { ...(siteId ? { siteId } : {}), ...vk } } : {};
+    const tripWhere: any = { ...siteWhere, ...(hasKind ? { vehicle: vk } : {}) };
 
     const [vehicles, trips, prevTrips, fuel, prevFuel, maints, prevMaint, docs, drivers, downtimes] = await Promise.all([
       this.prisma.vehicle.findMany({
-        where: { ...siteWhere, deletedAt: null },
+        where: { ...siteWhere, ...vk, deletedAt: null },
         select: { id: true, internalNumber: true, registrationNumber: true, status: true, currentMileage: true, referenceConsumption: true, itExpiryDate: true, registrationType: true },
       }),
       this.prisma.trip.findMany({
-        where: { ...siteWhere, tripDate: { gte: p.from, lt: p.to } },
+        where: { ...tripWhere, tripDate: { gte: p.from, lt: p.to } },
         select: { id: true, vehicleId: true, tripDate: true, startTime: true, status: true, distance: true, destination: true, scheduledArrival: true, driver: { select: { firstName: true, lastName: true } }, vehicle: { select: { internalNumber: true } } },
       }),
-      this.prisma.trip.aggregate({ where: { ...siteWhere, tripDate: { gte: p.previousFrom, lt: p.previousTo } }, _sum: { distance: true }, _count: { _all: true } }),
+      this.prisma.trip.aggregate({ where: { ...tripWhere, tripDate: { gte: p.previousFrom, lt: p.previousTo } }, _sum: { distance: true }, _count: { _all: true } }),
       this.prisma.fuelTransaction.findMany({
-        where: { ...siteWhere, transactionDate: { gte: p.from, lt: p.to } },
+        where: { ...tripWhere, transactionDate: { gte: p.from, lt: p.to } },
         select: { vehicleId: true, transactionDate: true, quantityLiters: true, totalCost: true },
       }),
-      this.prisma.fuelTransaction.aggregate({ where: { ...siteWhere, transactionDate: { gte: p.previousFrom, lt: p.previousTo } }, _sum: { totalCost: true, quantityLiters: true } }),
+      this.prisma.fuelTransaction.aggregate({ where: { ...tripWhere, transactionDate: { gte: p.previousFrom, lt: p.previousTo } }, _sum: { totalCost: true, quantityLiters: true } }),
       this.prisma.maintenance.findMany({
         where: { ...vehicleSite, maintenanceDate: { gte: p.from, lt: p.to } },
         select: { kind: true, cost: true, partsCost: true, laborCost: true, maintenanceDate: true },
@@ -65,7 +69,7 @@ export class FleetDashboardService {
         select: { id: true, firstName: true, lastName: true, licenseExpiryDate: true },
       }),
       this.prisma.vehicleDowntime.findMany({
-        where: { ...siteWhere, OR: [{ endedAt: null }, { endedAt: { gte: p.from } }], startedAt: { lt: p.to } },
+        where: { ...tripWhere, OR: [{ endedAt: null }, { endedAt: { gte: p.from } }], startedAt: { lt: p.to } },
         select: { id: true, vehicleId: true, category: true, reason: true, startedAt: true, endedAt: true, vehicle: { select: { internalNumber: true } } },
       }),
     ]);

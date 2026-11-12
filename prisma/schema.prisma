@@ -382,6 +382,7 @@ model Trip {
   products      String[] @default([])
   loadPlaces    String[] @default([]) @map("load_places")
   unloadPlaces  String[] @default([]) @map("unload_places")
+  loaderName    String?  @map("loader_name")
   pauseMileage  Int?     @map("pause_mileage")
   pauseAt       DateTime? @map("pause_at")
   @@index([siteId, tripDate])

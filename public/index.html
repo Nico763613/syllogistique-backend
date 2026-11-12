@@ -804,12 +804,15 @@ function deptWorklist(title, rows) {
     <tbody>${rows.map((r) => `<tr>${cols.map((c) => `<td>${fmtCell(c, r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 }
 
+const DEPT_KIND = { value: 'ALL' };
 async function renderDeptDashboard(key) {
   const q = new URLSearchParams({ period: DEPT_PERIOD.value });
+  if (key === 'fleet' && DEPT_KIND.value !== 'ALL') q.set('kind', DEPT_KIND.value);
   if (state.siteId) q.set('siteId', state.siteId);
   const d = await api('/dashboards/' + key + '?' + q.toString());
   const periods = [['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois'], ['year', 'Année']];
-  const bar = `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
+  const kindBar = key === 'fleet' ? `<div style="margin-bottom:10px">${[['ALL', 'Tous'], ['TRUCK', '🚛 Camions'], ['SERVICE_VEHICLE', '🚙 Véhicules de service']].map(([k, t]) => `<button class="btn ${DEPT_KIND.value === k ? 'gold' : ''}" style="margin-right:6px" onclick="DEPT_KIND.value='${k}'; renderView(state.view)">${t}</button>`).join('')}</div>` : '';
+  const bar = kindBar + `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
     ${periods.map(([v, l]) => `<button class="btn small ${DEPT_PERIOD.value === v ? 'gold' : ''}" onclick="DEPT_PERIOD.value='${v}'; renderView(state.view)">${l}</button>`).join('')}
     <span class="desc" style="margin-left:auto;">${d.access.scope === 'session' ? 'Vue « ma session de caisse » · ' : ''}Période : ${new Date(d.period.from).toLocaleDateString('fr-FR')} → ${new Date(d.period.to).toLocaleDateString('fr-FR')}</span></div>`;
   const kpis = `<div class="kpi-grid">${(d.kpis || []).map(deptKpiCard).join('')}</div>`;
@@ -2995,6 +2998,7 @@ function drvArriveForm(tripId) {
  ${drvFuelSel('f-fuel')}
     <div id="f-calc" class="drv-warn" style="background:#eef4fb;color:#163A5F;border-color:#c9daf0"></div>
     ${truck ? `<label>Nombre de mouvements (chargement → déchargement) *</label><input id="f-voy" type="number" inputmode="numeric" value="1">
+      <label>Nom du chargeur (facultatif)</label><input id="f-loader" placeholder="Chargeur / pointeur sur le site">
       <label>Lieu de chargement — cochez *</label>${drvMulti('g-load', '⬆ Lieu de chargement', places)}<label>Lieu de déchargement — cochez *</label>${drvMulti('g-unload', '⬇ Lieu de déchargement', places)}
       ${t.pauseMileage != null ? `<div class="drv-warn" style="background:#eef4fb;color:#163A5F;border-color:#c9daf0">Pause enregistrée : ${fmt(t.pauseMileage)} km${t.pauseAt ? ' à ' + new Date(t.pauseAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</div>` : ''}` : ''}
     ${truck ? `<label>Tonnage par voyage (cochez) *</label><div onchange="document.getElementById('f-ton-o').style.display=(document.querySelector('input[name=f-ton]:checked')||{}).value==='o'?'block':'none'" style="display:flex;flex-wrap:wrap;gap:8px 14px;margin:4px 0">${TON_CHOICES.map(n => `<label style="display:flex;align-items:center;gap:5px;margin:0"><input type="radio" name="f-ton" value="${n}" style="width:auto"> ${n} t</label>`).join('')}<label style="display:flex;align-items:center;gap:5px;margin:0"><input type="radio" name="f-ton" value="o" style="width:auto"> Autre</label></div><input id="f-ton-o" inputmode="decimal" placeholder="Tonnage (ex. 38)" style="display:none">` : ''}
@@ -3018,7 +3022,7 @@ function drvArriveForm(tripId) {
     const g = await drvGeo();
     const sig = drvEl('f-sig') ? drvSigData() : undefined;
     const arr = drvEl('f-arrdt') && drvEl('f-arrdt').value ? new Date(drvEl('f-arrdt').value).toISOString() : new Date().toISOString();
-    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, tonnagePerTrip: tonnage, loadPlaces, unloadPlaces, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
+    drvEnqueue({ type: 'arrive', tripId, payload: { odometer, fuelLiters: drvNum('f-fuel'), tripsCount: drvEl('f-voy') ? drvNum('f-voy') : undefined, tonnagePerTrip: tonnage, loadPlaces, unloadPlaces, loaderName: drvEl('f-loader') ? drvEl('f-loader').value.trim() || undefined : undefined, occurredAt: arr, offline: !navigator.onLine, recipientName: drvEl('f-recipient').value, endCondition: drvEl('f-cond').value, delayReason: drvEl('f-delay') ? drvEl('f-delay').value : undefined, observations: drvEl('f-obs').value, signatureData: sig, ...g } });
   }, 'Enregistrer l\'arrivée');
   if (drvEl('f-sig')) drvSigInit();
 }
@@ -3163,8 +3167,8 @@ function drvInvitePanel() {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
   ov.innerHTML = `<div class="panel" style="max-width:640px;width:100%;margin:20px auto;"><h3>📲 Envoyer l'application aux chauffeurs</h3>
     <div class="desc">Même lien pour tous : <b>${esc(link)}</b>. Pour chaque chauffeur, le message WhatsApp contient le lien, la marche à suivre, son mot de passe provisoire (premier envoi) et son code d'activation personnel.</div>
-    <table>${list.map((d) => `<tr><td><b>${esc(d.name)}</b><div style="font-size:11px">${esc(d.phone || 'pas de numéro')}</div></td><td>${act(d.activity)}</td>
-      <td><button class="btn small gold" ${d.phone ? '' : 'disabled'} onclick="drvInviteSend('${esc(d.id)}')">💬 WhatsApp</button></td></tr>`).join('') || '<tr><td class="empty">Aucun chauffeur.</td></tr>'}</table>
+    ${[['TRUCK', '🚛 Chauffeurs de camions'], ['SERVICE_VEHICLE', '🚙 Chauffeurs de véhicules de service'], ['', 'Activité à préciser']].map(([k, t]) => { const g = list.filter((d) => (d.activity || '') === k); return g.length ? `<h4 style="margin:14px 0 4px">${t} (${g.length})</h4><table>${g.map((d) => `<tr><td><b>${esc(d.name)}</b><div style="font-size:11px">${esc(d.phone || 'pas de numéro')}</div></td><td>${act(d.activity)}</td>
+      <td><button class="btn small gold" ${d.phone ? '' : 'disabled'} onclick="drvInviteSend('${esc(d.id)}')">💬 WhatsApp</button></td></tr>`).join('')}</table>` : ''; }).join('') || '<div class="empty">Aucun chauffeur.</div>'}
     <div id="inv-msg"></div><button class="btn" style="margin-top:10px" onclick="this.closest('div[style*=fixed]').remove();renderDriverDevices()">Fermer</button></div>`;
   document.body.appendChild(ov);
 }
@@ -3560,6 +3564,7 @@ async function decideExpense(id, decision) {
   try { await api('/driver-admin/expenses/' + id + '/decision', { method: 'POST', body: { decision, note } }); renderDriverExpenses(); }
   catch (e) { alert(e.message); }
 }
+window._bdKind = window._bdKind || 'ALL';
 async function renderDriverBoard(date) {
   const d = date || window._bdDate || new Date().toISOString().slice(0, 10);
   window._bdDate = d;
@@ -3572,29 +3577,65 @@ async function renderDriverBoard(date) {
     const msg = x.status === 'A_ENVOYER' ? `Bonjour ${x.name}, merci de compléter et d'envoyer votre fiche de bord du jour dans l'application.` : `Bonjour ${x.name}, merci de renseigner votre fiche de bord du jour (départ, carburant, arrivée) dans l'application.`;
     return `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">💬 Relancer</a>`;
   };
-  const rows = r.drivers.map((x) => { const st = BOARD_ST[x.status]; return `<tr>
+  const shown = r.drivers.filter((x) => window._bdKind === 'ALL' || x.kind === window._bdKind);
+  const BK = r.summary.byKind || {};
+  const kindTabs = [['ALL', 'Tous (' + r.drivers.length + ')'], ['TRUCK', '🚛 Camions (' + (BK.TRUCK || 0) + ')'], ['SERVICE_VEHICLE', '🚙 Véhicules de service (' + (BK.SERVICE_VEHICLE || 0) + ')'], ['NONE', 'Sans véhicule (' + (BK.NONE || 0) + ')']].map(([k, t]) => `<button class="btn ${window._bdKind === k ? 'gold' : ''}" style="margin-right:6px" onclick="window._bdKind='${k}';renderDriverBoard()">${t}</button>`).join('');
+  const rows = shown.map((x) => { const st = BOARD_ST[x.status]; return `<tr>
     <td><b>${esc(x.name)}</b><div style="font-size:11px;color:var(--muted)">${esc(x.phone || '')}</div></td>
-    <td>${esc(x.vehicle || '—')}</td>
+    <td>${esc(x.vehicle || '—')}${x.loader ? `<div style="font-size:11px;color:var(--muted)">Chargeur : ${esc(x.loader)}</div>` : ''}</td>
     <td><span class="badge ${st[2]}">${st[0]} ${st[1]}</span>${x.destination ? `<div style="font-size:11px">${esc(x.destination)}</div>` : ''}</td>
     <td class="mono">${fmt(x.km)} km</td><td class="mono">${x.liters} L</td>
     <td>${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C">⚠ ${esc(a)}</div>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
     <td>${x.status === 'RIEN' || x.status === 'A_ENVOYER' ? wa(x) : ''}</td></tr>`; }).join('');
   root().innerHTML = `<div class="panel"><h3>🧭 Suivi des chauffeurs</h3><div class="desc">Situation de chaque chauffeur pour la journée choisie.</div>
-    <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverBoard(this.value)" style="max-width:220px">
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(S.total, 'Chauffeurs', 'var(--navy)')}${tile(S.enMission, 'En mission', '#2E8B57')}${tile(S.aEnvoyer, 'Fiche à envoyer', '#C98A0B')}${tile(S.envoyees, 'Fiches envoyées', '#2E8B57')}${tile(S.rien, 'Rien de saisi', '#C0392B')}</div></div>
+    <div style="margin:8px 0">${kindTabs}</div><label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverBoard(this.value)" style="max-width:220px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(S.total, 'Chauffeurs actifs', 'var(--navy)')}${tile(S.absents || 0, 'Absents', '#B4372F')}${tile(S.enMission, 'En mission', '#2E8B57')}${tile(S.aEnvoyer, 'Fiche à envoyer', '#C98A0B')}${tile(S.envoyees, 'Fiches envoyées', '#2E8B57')}${tile(S.rien, 'Rien de saisi', '#C0392B')}</div></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Véhicule</th><th>Situation</th><th>Distance</th><th>Carburant</th><th>Alertes</th><th></th></tr>${rows || '<tr><td colspan="7" class="empty">Aucun chauffeur actif.</td></tr>'}</table></div></div>`;
 }
 const MS_ST = { PLANNED: ['warn', 'Planifiée'], IN_PROGRESS: ['ok', 'En cours'], COMPLETED: ['ok', 'Terminée'], CANCELLED: ['bad', 'Annulée'] };
-window._ms = { page: 1, from: '', to: '', status: '', q: '' };
+window._ms = { page: 1, from: '', to: '', status: '', q: '', kind: 'TRUCK', vehicleId: '' };
+function msSigner() { try { return JSON.parse(localStorage.getItem('ms-signer') || '{}'); } catch (e) { return {}; } }
+function msReportQs() {
+  const f = window._ms; const g = (id) => (document.getElementById(id) || {}).value || '';
+  const sg = { name: g('ms-name'), firstNames: g('ms-first'), phone: g('ms-phone'), title: g('ms-title') };
+  try { localStorage.setItem('ms-signer', JSON.stringify(sg)); } catch (e) {}
+  return { siteId: state.siteId, kind: f.kind, vehicleId: f.vehicleId, from: f.from || new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10), to: f.to || new Date().toISOString().slice(0, 10), ...sg };
+}
+function msCheckSigner(q) { if (!q.name.trim() || !q.firstNames.trim() || !q.phone.trim()) throw new Error('Renseignez votre nom, vos prénoms et votre téléphone de service avant d\'enregistrer ou d\'envoyer le rapport.'); }
+async function msPdf(action, audience) {
+  const m = document.getElementById('ms-msg');
+  try {
+    const q = msReportQs(); msCheckSigner(q);
+    if (action === 'mail') {
+      const r = await api('/reports/missions/send-email', { method: 'POST', body: { ...q, audience, to: document.getElementById(audience === 'ACCOUNTING' ? 'ms-acc' : 'ms-hier').value } });
+      m.innerHTML = r.sent ? '<div class="msg ok">Rapport envoyé par e-mail (PDF joint).</div>' : '<div class="msg err">Envoi e-mail non configuré sur le serveur (SMTP) : utilisez l\'enregistrement ou l\'impression du PDF.</div>';
+      return;
+    }
+    const blob = await api('/reports/missions/pdf?' + new URLSearchParams(q));
+    const name = `rapport_missions_${q.from}_${q.to}.pdf`;
+    if (action === 'folder' && window.showSaveFilePicker) {
+      const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }] });
+      const w = await h.createWritable(); await w.write(blob); await w.close(); m.innerHTML = '<div class="msg ok">Rapport enregistré dans le dossier choisi.</div>'; return;
+    }
+    const url = URL.createObjectURL(blob);
+    if (action === 'print') { const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; fr.src = url; fr.onload = () => { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { window.open(url, '_blank'); } setTimeout(() => { fr.remove(); URL.revokeObjectURL(url); }, 60000); }; document.body.appendChild(fr); return; }
+    const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+    m.innerHTML = '<div class="msg ok">Rapport téléchargé (dossier « Téléchargements »).</div>';
+  } catch (e) { if (e.name !== 'AbortError') m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
 async function renderMissionHistory(reset) {
   const f = window._ms; if (reset) f.page = 1;
-  const qs = new URLSearchParams({ siteId: state.siteId, page: f.page, ...(f.from ? { from: f.from } : {}), ...(f.to ? { to: f.to } : {}), ...(f.status ? { status: f.status } : {}), ...(f.q ? { q: f.q } : {}) });
+  const vehs = (await api('/vehicles?siteId=' + state.siteId).catch(() => [])).filter((v) => v.vehicleType === f.kind);
+  const sg = msSigner();
+  const qs = new URLSearchParams({ siteId: state.siteId, kind: f.kind, ...(f.vehicleId ? { vehicleId: f.vehicleId } : {}), page: f.page, ...(f.from ? { from: f.from } : {}), ...(f.to ? { to: f.to } : {}), ...(f.status ? { status: f.status } : {}), ...(f.q ? { q: f.q } : {}) });
   const r = await api('/driver-admin/missions?' + qs);
   const tr = r.missions.map((m) => `<tr><td><b>${esc(m.reference || '—')}</b><div style="font-size:11px;color:var(--muted)">${esc(drvDt(m.startTime))}</div></td>
     <td>${esc(m.driver)}<div style="font-size:11px;color:var(--muted)">${esc(m.vehicle)}</div></td><td>${esc(m.destination || m.purpose || '—')}</td>
     <td class="mono">${m.km != null ? fmt(m.km) + ' km' : '—'}</td><td class="mono">${m.liters ? m.liters + ' L' : '—'}</td>
     <td><span class="badge ${MS_ST[m.status][0]}">${MS_ST[m.status][1]}</span></td><td><a href="#" onclick="tripTimeline('${esc(m.id)}');return false;">🕒</a></td></tr>`).join('');
-  root().innerHTML = `<div class="panel"><h3>📜 Historique des missions</h3><div class="desc">${r.total} mission(s) trouvée(s).</div>
+  const kt = [['TRUCK', '🚛 Camions'], ['SERVICE_VEHICLE', '🚙 Véhicules de service']].map(([k, t]) => `<button class="btn ${f.kind === k ? 'gold' : ''}" style="margin-right:6px" onclick="window._ms.kind='${k}';window._ms.vehicleId='';renderMissionHistory(1)">${t}</button>`).join('');
+  root().innerHTML = `<div class="panel"><h3>📜 Historique des missions</h3><div style="margin-bottom:8px">${kt}</div><div class="desc">${r.total} mission(s) trouvée(s).</div>
+    <div style="margin-bottom:8px"><label>${f.kind === 'TRUCK' ? 'Camion' : 'Véhicule'}</label><select onchange="window._ms.vehicleId=this.value;renderMissionHistory(1)"><option value="">Tous</option>${vehs.map((v) => `<option value="${esc(v.id)}" ${f.vehicleId === v.id ? 'selected' : ''}>${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div><label>Du</label><input type="date" value="${esc(f.from)}" onchange="window._ms.from=this.value;renderMissionHistory(1)"></div>
       <div><label>Au</label><input type="date" value="${esc(f.to)}" onchange="window._ms.to=this.value;renderMissionHistory(1)"></div>
@@ -3602,6 +3643,14 @@ async function renderMissionHistory(reset) {
       <div><label>Recherche (n° ou destination)</label><input value="${esc(f.q)}" placeholder="TRP-2026-0001, Kindia…" onkeydown="if(event.key==='Enter'){window._ms.q=this.value;renderMissionHistory(1)}" onchange="window._ms.q=this.value;renderMissionHistory(1)"></div>
     </div></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>N° / départ</th><th>Chauffeur / véhicule</th><th>Destination</th><th>Distance</th><th>Carburant</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="7" class="empty">Aucune mission.</td></tr>'}</table></div>
+    <div class="panel"><h3>🧾 Rapport global — à relire, signer et transmettre</h3>
+      <div class="desc">Généré automatiquement pour la période choisie (30 derniers jours par défaut), ${f.kind === 'TRUCK' ? 'camions' : 'véhicules de service'}${f.vehicleId ? ', véhicule sélectionné' : ''}. Complétez vos informations : elles figurent sur le rapport.</div>
+      <div class="grid-2"><div><label>Nom *</label><input id="ms-name" value="${esc(sg.name || '')}"></div><div><label>Prénoms *</label><input id="ms-first" value="${esc(sg.firstNames || '')}"></div>
+      <div><label>Téléphone de service *</label><input id="ms-phone" value="${esc(sg.phone || '')}"></div><div><label>Fonction</label><input id="ms-title" value="${esc(sg.title || 'Responsable logistique')}"></div></div>
+      <button class="btn gold" onclick="msPdf('folder')">📂 Enregistrer dans un dossier</button> <button class="btn" onclick="msPdf('print')">🖨️ Imprimer</button>
+      <div class="grid-2" style="margin-top:12px"><div><label>Hiérarchie — e-mail(s)</label><input id="ms-hier" placeholder="(vide = adresses habituelles)"></div><div><label>Comptabilité — e-mail(s)</label><input id="ms-acc" placeholder="(vide = adresses habituelles)"></div></div>
+      <button class="btn" onclick="msPdf('mail','HIERARCHY')">✉️ Envoyer à la hiérarchie</button> <button class="btn" onclick="msPdf('mail','ACCOUNTING')">✉️ Envoyer à la comptabilité</button>
+      <div id="ms-msg"></div></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><button class="btn small" ${r.page <= 1 ? 'disabled' : ''} onclick="window._ms.page--;renderMissionHistory()">← Précédent</button><span style="font-size:13px">Page ${r.page} / ${r.pages}</span><button class="btn small" ${r.page >= r.pages ? 'disabled' : ''} onclick="window._ms.page++;renderMissionHistory()">Suivant →</button></div></div>`;
 }
 // Application chauffeur : mes missions passées
