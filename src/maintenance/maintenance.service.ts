@@ -45,7 +45,7 @@ export class MaintenanceService {
   findAll(params: { vehicleId?: string }) {
     return this.prisma.maintenance.findMany({
       where: { ...(params.vehicleId ? { vehicleId: params.vehicleId } : {}) },
-      include: { maintenanceType: true, vehicle: { select: { internalNumber: true } }, supplier: true },
+      include: { maintenanceType: true, vehicle: { select: { internalNumber: true, registrationNumber: true, vehicleType: true } }, supplier: true },
       orderBy: { maintenanceDate: 'desc' },
     });
   }

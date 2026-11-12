@@ -1551,6 +1551,37 @@ async function createDriver() {
 }
 
 /* ---------------- FUEL ---------------- */
+let fuelKind = 'ALL', fuelPeriod = 'month', fuelDate = new Date().toISOString().slice(0, 10);
+const KIND_TABS = (cur, fn) => [['ALL', 'Tous'], ['TRUCK', '🚛 Camions'], ['SERVICE_VEHICLE', '🚙 Véhicules de service']].map(([k, t]) => `<button class="btn ${cur === k ? 'gold' : ''}" style="margin-right:6px" onclick="${fn}('${k}')">${t}</button>`).join('');
+function setFuelKind(k) { fuelKind = k; renderFuel(); }
+function setFuelPeriod(p, d) { if (p) fuelPeriod = p; if (d) fuelDate = d; renderFuel(); }
+function fuelBounds() {
+  const d = fuelDate;
+  if (fuelPeriod === 'day') return [d, d];
+  if (fuelPeriod === 'year') return [d.slice(0, 4) + '-01-01', d.slice(0, 4) + '-12-31'];
+  const last = new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7), 0)).getUTCDate();
+  return [d.slice(0, 7) + '-01', d.slice(0, 7) + '-' + String(last).padStart(2, '0')];
+}
+// Synthèse carburant par véhicule : alimentée automatiquement par les pleins déclarés sur les fiches de bord
+function fuelSummaryHtml(all) {
+  const [from, to] = fuelBounds();
+  const list = all.filter((f) => { const d = String(f.transactionDate).slice(0, 10); return d >= from && d <= to && (fuelKind === 'ALL' || f.vehicle.vehicleType === fuelKind); });
+  const by = {};
+  for (const f of list) {
+    const k = f.vehicle.internalNumber; const r = by[k] || (by[k] = { v: f.vehicle, n: 0, l: 0, c: 0, min: Infinity, max: -Infinity });
+    r.n++; r.l += Number(f.quantityLiters); r.c += Number(f.totalCost); if (f.mileage) { r.min = Math.min(r.min, f.mileage); r.max = Math.max(r.max, f.mileage); }
+  }
+  const rows = Object.values(by).sort((a, b) => b.l - a.l);
+  const tot = rows.reduce((a, r) => ({ n: a.n + r.n, l: a.l + r.l, c: a.c + r.c }), { n: 0, l: 0, c: 0 });
+  const label = fuelPeriod === 'day' ? new Date(fuelDate + 'T12:00:00').toLocaleDateString('fr-FR', { dateStyle: 'full' }) : fuelPeriod === 'year' ? 'Année ' + fuelDate.slice(0, 4) : new Date(fuelDate + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return { list, html: `<div class="panel"><h3>📊 Carburant par véhicule</h3>
+    <div style="margin:6px 0">${KIND_TABS(fuelKind, 'setFuelKind')}</div>
+    <div class="grid-2"><div><label>Période</label><select onchange="setFuelPeriod(this.value)"><option value="day" ${fuelPeriod === 'day' ? 'selected' : ''}>Jour</option><option value="month" ${fuelPeriod === 'month' ? 'selected' : ''}>Mois</option><option value="year" ${fuelPeriod === 'year' ? 'selected' : ''}>Année</option></select></div>
+    <div><label>Date de référence</label><input type="date" value="${esc(fuelDate)}" onchange="if(this.value)setFuelPeriod(null,this.value)" /></div></div>
+    <div class="desc">${esc(label)} — alimenté automatiquement par les pleins des fiches de bord et des chauffeurs.</div>
+    <table><thead><tr><th>Véhicule</th><th>Pleins</th><th>Litres</th><th>Coût (GNF)</th><th>Km (entre pleins)</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.v.internalNumber)} <span style="font-size:11px;color:var(--muted)">${esc(r.v.registrationNumber)}</span></td><td class="mono">${r.n}</td><td class="mono">${fmt(Math.round(r.l * 10) / 10)} L</td><td class="mono">${fmt(r.c)}</td><td class="mono">${r.max > r.min ? fmt(r.max - r.min) : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Aucun plein sur cette période.</td></tr>'}
+    ${rows.length ? `<tr><td><b>Total</b></td><td class="mono"><b>${tot.n}</b></td><td class="mono"><b>${fmt(Math.round(tot.l * 10) / 10)} L</b></td><td class="mono"><b>${fmt(tot.c)}</b></td><td></td></tr>` : ''}</tbody></table></div>` };
+}
 async function renderFuel() {
   const [list, vehicles, tariff] = await Promise.all([
     api('/fuel?siteId=' + state.siteId),
@@ -1558,7 +1589,8 @@ async function renderFuel() {
     api('/settings/fuel-price'),
   ]);
   const canEditPrice = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
-  const rows = list.map(f => `
+  const sum = fuelSummaryHtml(list);
+  const rows = sum.list.map(f => `
     <tr><td>${new Date(f.transactionDate).toLocaleDateString('fr-FR')}</td>
     <td>${esc(f.vehicle.internalNumber)}</td><td class="mono">${fmt(f.quantityLiters)} L</td>
     <td class="mono">${fmt(f.pricePerLiter)} GNF/L</td><td class="mono">${fmt(f.totalCost)} GNF</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun ravitaillement enregistré.</td></tr>`;
@@ -1575,6 +1607,7 @@ async function renderFuel() {
       <button class="btn gold" onclick="saveFuelPrice()">Modifier le tarif</button>` : ''}
       <div id="fp-msg"></div>
     </div>
+    ${sum.html}
     <div class="panel">
       <h3>⛽ Nouveau ravitaillement</h3>
       <div class="grid-2">
@@ -1620,6 +1653,9 @@ async function saveFuelPrice() {
 }
 
 /* ---------------- MAINTENANCE ---------------- */
+let maintKind = 'ALL', maintVeh = '';
+function setMaintKind(k) { maintKind = k; maintVeh = ''; renderMaintenance(); }
+function setMaintVeh(id) { maintVeh = id; renderMaintenance(); }
 async function renderMaintenance() {
   const [list, alerts, vehicles] = await Promise.all([
     api('/maintenance'),
@@ -1627,13 +1663,25 @@ async function renderMaintenance() {
     api('/vehicles?siteId=' + state.siteId),
   ]);
   const alertRows = alerts.map(a => `<div class="msg ${a.level === 'OVERDUE' ? 'err' : 'ok'}" style="margin-bottom:6px;">${a.level === 'OVERDUE' ? '🔴' : '🟠'} ${esc(a.internalNumber)} — entretien ${a.level === 'OVERDUE' ? 'en retard' : 'bientôt dû'}</div>`).join('') || '<div class="desc">Aucune alerte de maintenance.</div>';
-  const rows = list.map(m => `<tr><td>${new Date(m.maintenanceDate).toLocaleDateString('fr-FR')}</td><td>${esc(m.vehicle.internalNumber)}</td><td>${esc(m.maintenanceType.label)}</td><td class="mono">${fmt(m.cost)} GNF</td></tr>`).join('') || `<tr><td colspan="4" class="empty">Aucun entretien enregistré.</td></tr>`;
+  const inKind = (t) => maintKind === 'ALL' || t === maintKind;
+  const vehs = vehicles.filter((v) => inKind(v.vehicleType));
+  const alertOf = {}; alerts.forEach((a) => { alertOf[a.internalNumber] = a.level; });
+  const perVeh = vehs.map((v) => {
+    const mine = list.filter((m) => m.vehicle.internalNumber === v.internalNumber);
+    const last = mine[0];
+    return `<tr><td><a href="#" onclick="setMaintVeh('${esc(v.id)}');return false;"><b>${esc(v.internalNumber)}</b></a> <span style="font-size:11px;color:var(--muted)">${esc(v.registrationNumber)}</span></td><td class="mono">${mine.length}</td><td class="mono">${fmt(mine.reduce((s, m) => s + Number(m.cost || 0), 0))}</td><td>${last ? new Date(last.maintenanceDate).toLocaleDateString('fr-FR') + ' · ' + esc(last.maintenanceType.label) : '—'}</td><td>${alertOf[v.internalNumber] === 'OVERDUE' ? '<span class="badge bad">En retard</span>' : alertOf[v.internalNumber] ? '<span class="badge warn">Bientôt dû</span>' : '<span class="badge ok">À jour</span>'}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">Aucun véhicule.</td></tr>';
+  const shown = list.filter((m) => inKind(m.vehicle.vehicleType) && (!maintVeh || (vehicles.find((v) => v.id === maintVeh) || {}).internalNumber === m.vehicle.internalNumber));
+  const rows = shown.map(m => `<tr><td>${new Date(m.maintenanceDate).toLocaleDateString('fr-FR')}</td><td>${esc(m.vehicle.internalNumber)}</td><td>${esc(m.maintenanceType.label)}</td><td class="mono">${fmt(m.cost)} GNF</td></tr>`).join('') || `<tr><td colspan="4" class="empty">Aucun entretien enregistré.</td></tr>`;
   const options = vehicles.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)}</option>`).join('');
   const types = ['VIDANGE','REVISION','PNEUS','FREINS','BATTERIE','HUILE','FILTRE','SUSPENSION','REPARATION','AUTRE'];
   const typeOptions = types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
 
   root().innerHTML = `
     <div class="panel"><h3>⚠ Alertes d'échéance</h3>${alertRows}</div>
+    <div class="panel"><h3>🔧 Maintenance par véhicule</h3>
+      <div style="margin:6px 0">${KIND_TABS(maintKind, 'setMaintKind')}</div>
+      <table><thead><tr><th>Véhicule</th><th>Interventions</th><th>Coût (GNF)</th><th>Dernier entretien</th><th>État</th></tr></thead><tbody>${perVeh}</tbody></table></div>
     <div class="panel">
       <h3>🔧 Nouvel entretien</h3>
       <div class="grid-2">
@@ -1646,7 +1694,7 @@ async function renderMaintenance() {
       <div id="m-msg"></div>
     </div>
     <div class="panel">
-      <h3>Historique</h3>
+      <h3>Historique${maintVeh ? ' — ' + esc((vehicles.find((v) => v.id === maintVeh) || {}).internalNumber || '') + ' <a href="#" onclick="setMaintVeh(\'\');return false;" style="font-size:13px">(voir tous)</a>' : ''}</h3>
       <table><thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Coût</th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
@@ -2210,6 +2258,9 @@ async function cancelCount(id) {
 /* ---------------- RAPPORT JOURNALIER ---------------- */
 let dailyText = '';
 let dailyEmails = '';
+let dailyAccEmails = '';
+let dailyKind = 'TRUCK';
+function setDailyKind(k) { dailyKind = k; renderDaily(); }
 async function renderDaily() {
   const today = new Date().toISOString().slice(0, 10);
   const canEdit = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
@@ -2218,10 +2269,15 @@ async function renderDaily() {
     const all = await api('/settings');
     numbers = (all.find(s => s.key === 'REPORT_WHATSAPP_NUMBERS') || {}).value || '';
     dailyEmails = (all.find(s => s.key === 'REPORT_EMAIL_RECIPIENTS') || {}).value || '';
+    dailyAccEmails = (all.find(s => s.key === 'REPORT_ACCOUNTING_EMAILS') || {}).value || '';
   } catch (e) {}
   root().innerHTML = `
     <div class="panel">
-      <h3>📋 Rapport du jour — Véhicules de service</h3>
+      <h3>📋 Rapports journaliers</h3>
+      <div class="tabs" style="display:flex;gap:8px;margin:6px 0 12px">
+        <button class="btn ${dailyKind === 'TRUCK' ? 'gold' : ''}" onclick="setDailyKind('TRUCK')">🚛 Camions</button>
+        <button class="btn ${dailyKind === 'SERVICE_VEHICLE' ? 'gold' : ''}" onclick="setDailyKind('SERVICE_VEHICLE')">🚙 Véhicules de service</button>
+      </div>
       <div class="grid-2">
         <div><label>Date</label><input id="d-date" type="date" value="${today}" onchange="loadDaily()" /></div>
       </div>
@@ -2231,6 +2287,8 @@ async function renderDaily() {
       <h3>✉️ Hiérarchie — destinataires du rapport</h3>
       <label>E-mails de la hiérarchie (séparés par des virgules)</label>
       <input id="d-emails" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" />
+      <label>E-mails de la comptabilité (séparés par des virgules)</label>
+      <input id="d-acc-emails" value="${esc(dailyAccEmails)}" placeholder="compta@entreprise.com" />
       <label>Numéros WhatsApp (utilisés uniquement pour les États des besoins)</label>
       <input id="d-numbers" value="${esc(numbers)}" placeholder="+224620000000, +224621000000" />
       <button class="btn gold" onclick="saveDailyNumbers()">Enregistrer</button>
@@ -2244,8 +2302,8 @@ function dailyTripsTable(r) {
   const rows = r.trips.list.map((x) => `<tr>
     <td><b>${esc(x.plate)}</b><div style="font-size:11px;color:var(--muted)">${esc(x.brand)}</div></td>
     <td>${esc(x.driver.split(' (')[0])}<div style="font-size:11px;color:var(--muted)">${esc(x.phone)}</div></td>
-    <td>${esc(x.destination || x.regions.join(', ') || '—')}${x.cargo ? '<div style="font-size:11px">' + esc(x.cargo) + '</div>' : ''}</td>
-    <td>${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? '<div style="font-size:11px">' + x.voyages + ' voyage(s)</div>' : ''}</td>
+    <td>${esc(x.destination || x.regions.join(', ') || '—')}${x.cargo ? '<div style="font-size:11px">' + esc(x.cargo) + '</div>' : ''}${x.loadPlaces && x.loadPlaces.length ? '<div style="font-size:11px">⬆ ' + esc(x.loadPlaces.join(', ')) + ' → ⬇ ' + esc((x.unloadPlaces || []).join(', ')) + '</div>' : ''}</td>
+    <td>${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? '<div style="font-size:11px">' + x.voyages + ' mouvement(s)' + (x.tons ? ' = ' + x.tons + ' t' : '') + '</div>' : ''}${x.pauseMileage != null ? '<div style="font-size:11px">⏸ pause ' + fmt(x.pauseMileage) + ' km</div>' : ''}</td>
     <td class="mono">${fmt(x.startMileage)} → ${x.endMileage !== null ? fmt(x.endMileage) : '…'}${x.fuelMileages.length ? '<div style="font-size:11px">plein : ' + x.fuelMileages.map(fmt).join(', ') + '</div>' : ''}</td>
     <td class="mono"><b>${fmt(x.km)} km</b></td>
     <td class="mono">${x.tankStart !== null || x.tankEnd !== null ? 'Réservoir ' + (x.tankStart ?? '?') + ' → ' + (x.tankEnd ?? '?') + ' L' + (x.tankUsed !== null ? '<div style="font-size:11px">' + x.tankUsed + ' L utilisés</div>' : '') : ''}<div style="font-size:11px">${x.liters ? 'Pleins : ' + x.liters + ' L · ' + fmt(x.fuelCost) + ' GNF' : 'Aucun plein'}${x.consumption !== null ? ' · ' + x.consumption + ' L/100' : ''}</div></td>
@@ -2256,12 +2314,12 @@ async function loadDaily() {
   const body = document.getElementById('d-body');
   try {
     const date = document.getElementById('d-date').value;
-    const { report: r, text: reportText } = await api('/reports/daily?siteId=' + state.siteId + '&date=' + date);
+    const { report: r, text: reportText } = await api('/reports/daily?siteId=' + state.siteId + '&kind=' + dailyKind + '&date=' + date);
     dailyText = reportText;
     const f = r.fleet;
     body.innerHTML = `
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">Véhicules de service disponibles</div><div class="kpi-value mono">${f.available}/${f.total}</div><div class="kpi-sub">${f.onMission} en mission • ${f.maintenance + f.immobilized} indisponibles</div></div>
+        <div class="kpi-card"><div class="kpi-label">${dailyKind === 'TRUCK' ? 'Camions' : 'Véhicules de service'} disponibles</div><div class="kpi-value mono">${f.available}/${f.total}</div><div class="kpi-sub">${f.onMission} en mission • ${f.maintenance + f.immobilized} indisponibles</div></div>
         <div class="kpi-card"><div class="kpi-label">Missions</div><div class="kpi-value mono">${r.trips.count}</div><div class="kpi-sub">${fmt(r.trips.totalKm)} km • ${r.drivers.onDuty} chauffeur(s) en service</div></div>
         <div class="kpi-card"><div class="kpi-label">Carburant du jour (pleins)</div><div class="kpi-value mono">${fmt(r.fuel.liters)} L</div><div class="kpi-sub">${fmt(r.fuel.cost)} GNF • semaine : ${fmt(r.fuel.week.liters)} L</div></div>
       </div>
@@ -2272,14 +2330,16 @@ async function loadDaily() {
       <button class="btn" style="margin-left:8px;" onclick="printDaily()">🖨️ Imprimer</button>
       <button class="btn" style="margin-left:8px;" onclick="saveDailyToFolder()">💾 Enregistrer dans un dossier</button>
       <div class="grid-2" style="margin-top:14px;">
-        <div><label>Envoyer à la hiérarchie — e-mail(s) du/des destinataire(s)</label><input id="d-email" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" /></div>
+        <div><label>Hiérarchie — e-mail(s) du/des destinataire(s)</label><input id="d-email" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" /></div>
+        <div><label>Comptabilité — e-mail(s)</label><input id="d-acc" value="${esc(dailyAccEmails)}" placeholder="compta@entreprise.com" /></div>
       </div>
-      <button class="btn" onclick="sendDailyEmail()">✉️ Envoyer à la hiérarchie par e-mail (PDF joint)</button>
+      <button class="btn" onclick="sendDailyEmail('HIERARCHY')">✉️ Envoyer à la hiérarchie (PDF joint)</button>
+      <button class="btn" style="margin-left:8px;" onclick="sendDailyEmail('ACCOUNTING')">✉️ Envoyer à la comptabilité (PDF joint)</button>
       <div id="d-msg"></div>`;
   } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 function dailyPdfPath() {
-  return '/reports/daily/export/pdf?siteId=' + state.siteId + '&date=' + document.getElementById('d-date').value;
+  return '/reports/daily/export/pdf?siteId=' + state.siteId + '&kind=' + dailyKind + '&date=' + document.getElementById('d-date').value;
 }
 async function downloadDailyPdf() {
   const msg = document.getElementById('d-msg');
@@ -2287,7 +2347,7 @@ async function downloadDailyPdf() {
     const blob = await api(dailyPdfPath());
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'rapport_du_jour_' + document.getElementById('d-date').value + '.pdf';
+    a.download = 'rapport_du_jour_' + (dailyKind === 'TRUCK' ? 'camions_' : 'vehicules_service_') + document.getElementById('d-date').value + '.pdf';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
@@ -2309,7 +2369,7 @@ async function printDaily() {
 async function saveDailyToFolder() {
   const msg = document.getElementById('d-msg');
   try {
-    const name = 'rapport_du_jour_' + document.getElementById('d-date').value + '.pdf';
+    const name = 'rapport_du_jour_' + (dailyKind === 'TRUCK' ? 'camions_' : 'vehicules_service_') + document.getElementById('d-date').value + '.pdf';
     const blob = await api(dailyPdfPath());
     if (window.showSaveFilePicker) {
       const handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Document PDF', accept: { 'application/pdf': ['.pdf'] } }] });
@@ -2323,11 +2383,12 @@ async function saveDailyToFolder() {
     }
   } catch (e) { if (e.name !== 'AbortError') msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
-async function sendDailyEmail() {
+async function sendDailyEmail(audience) {
   const msg = document.getElementById('d-msg');
   try {
     const r = await api('/reports/daily/send-email', { method: 'POST', body: {
-      to: document.getElementById('d-email').value,
+      to: document.getElementById(audience === 'ACCOUNTING' ? 'd-acc' : 'd-email').value,
+      kind: dailyKind, audience,
       siteId: state.siteId,
       date: document.getElementById('d-date').value,
     }});
@@ -2341,6 +2402,7 @@ async function saveDailyNumbers() {
   try {
     await api('/settings/REPORT_WHATSAPP_NUMBERS', { method: 'PUT', body: { value: document.getElementById('d-numbers').value } });
     await api('/settings/REPORT_EMAIL_RECIPIENTS', { method: 'PUT', body: { value: document.getElementById('d-emails').value } });
+    await api('/settings/REPORT_ACCOUNTING_EMAILS', { method: 'PUT', body: { value: document.getElementById('d-acc-emails').value } });
     msg.innerHTML = '<div class="msg ok">Destinataires enregistrés.</div>';
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }

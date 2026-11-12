@@ -97,7 +97,7 @@ export class FuelService {
             }
           : {}),
       },
-      include: { vehicle: { select: { internalNumber: true, registrationNumber: true } } },
+      include: { vehicle: { select: { internalNumber: true, registrationNumber: true, vehicleType: true } } },
       orderBy: { transactionDate: 'desc' },
     });
   }
