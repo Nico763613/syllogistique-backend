@@ -273,6 +273,7 @@
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
       <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
       <div class="nav-item" data-view="stock" onclick="go('stock')"><span class="nav-icon">📦</span> Stocks</div>
+      <div class="nav-item" data-view="staff-store" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-store')"><span class="nav-icon">🧑‍🏭</span> Magasiniers &amp; rapports</div>
 
       <div class="nav-section-label">🛒 Achats &amp; Approvisionnement</div>
       <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
@@ -282,6 +283,8 @@
 
       <div class="nav-section-label">🦺 HSE</div>
       <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
+      <div class="nav-item" data-view="staff-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,LECTEUR" onclick="go('staff-hse')"><span class="nav-icon">👷</span> Agents HSE &amp; rapports</div>
+      <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER" onclick="go('my-report')"><span class="nav-icon">📝</span> Mon rapport du jour</div>
 
       <div class="nav-section-label">Système</div>
       <div class="nav-item" data-view="sync" onclick="go('sync')">
@@ -526,7 +529,7 @@ function updateSyncPill() {
 
 const titles = {
   dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -1133,6 +1136,8 @@ async function renderView(view) {
     if (view === 'purchases') return renderPurchases();
     if (view === 'needs') return renderNeeds();
     if (view === 'daily') return renderDaily();
+    if (view === 'staff-hse' || view === 'staff-store') return renderStaff(view);
+    if (view === 'my-report') return renderMyReport();
     if (view === 'reports-truck') return renderKindReports('TRUCK');
     if (view === 'reports-service') return renderKindReports('SERVICE_VEHICLE');
     if (view === 'sync') return renderSync();
@@ -2508,6 +2513,97 @@ async function krProcess(id) {
   const d = document.getElementById('d-date').value;
   const note = prompt('Note pour le chauffeur (facultatif) :', ''); if (note === null) return;
   try { await api('/driver-admin/sheets/process', { method: 'POST', body: { driverId: id, date: d, note: note || undefined } }); krLoad(); } catch (e) { alert(e.message); }
+}
+/* ---------------- PERSONNEL : agents HSE et magasiniers (enregistrement, lien WhatsApp, rapports) ---------------- */
+const STAFF_CFG = {
+  'staff-hse': { role: 'AGENT_HSE', one: 'agent HSE', title: '👷 Agents HSE', rep: 'Rapports HSE' },
+  'staff-store': { role: 'MAGASINIER', one: 'magasinier', title: '🧑‍🏭 Magasiniers', rep: 'Rapports Entrepôt' },
+};
+async function renderStaff(view) {
+  const c = STAFF_CFG[view]; window._stView = view;
+  const today = window._stDate || new Date().toISOString().slice(0, 10);
+  const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  root().innerHTML = `
+    <div class="panel"><h3>${c.title} — ${c.rep}</h3>
+      <div class="desc">Chaque ${c.one} est enregistré, reçoit son lien par WhatsApp, puis envoie chaque jour son rapport d'activité : vous le recevez ici.</div>
+      <label>Jour</label><input id="st-date" type="date" value="${esc(today)}" onchange="window._stDate=this.value;stLoad()" style="max-width:220px">
+      <div id="st-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
+    <div id="st-reports"><div class="empty">Chargement…</div></div>
+    ${office ? `<div class="panel"><h3>➕ Nouveau ${c.one}</h3>
+      <div class="grid-2"><div><label>Prénom</label><input id="st-first"></div><div><label>Nom</label><input id="st-last"></div><div><label>Téléphone (WhatsApp)</label><input id="st-phone" type="tel" placeholder="6xx xx xx xx"></div></div>
+      <button class="btn gold" onclick="stSave()">Enregistrer</button><div id="st-msg"></div></div>` : ''}
+    <div class="panel"><h3>Équipe</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`;
+  stLoad();
+}
+async function stLoad() {
+  const c = STAFF_CFG[window._stView]; if (!c) return;
+  const d = document.getElementById('st-date').value;
+  const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  const canReceive = state.user.role !== 'LECTEUR';
+  try {
+    const [team, reps] = await Promise.all([api('/staff?role=' + c.role + '&siteId=' + state.siteId), api('/staff/reports?role=' + c.role + '&date=' + d + '&siteId=' + state.siteId)]);
+    const active = team.filter((u) => u.status === 'ACTIVE');
+    const byName = {}; reps.forEach((r) => { byName[r.name] = r; });
+    const missing = active.filter((u) => !byName[u.firstName + ' ' + u.lastName]);
+    const tile = (n, l, col) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center"><div style="font-size:24px;font-weight:700;color:${col}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+    document.getElementById('st-sum').innerHTML = tile(active.length, 'Personnes', 'var(--navy)') + tile(reps.length, 'Rapports envoyés', '#2E8B57') + tile(reps.filter((r) => r.receivedAt).length, 'Reçus', '#2E8B57') + tile(missing.length, 'Non envoyés', '#B4372F');
+    const wa = (u) => { const n = String(u.phone || '').replace(/\D/g, ''), f = n.length === 9 ? '224' + n : n; return u.phone ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(f)}?text=${encodeURIComponent('Bonjour ' + u.firstName + ', merci d\'envoyer votre rapport du jour dans l\'application.')}">💬 Relancer</a>` : ''; };
+    document.getElementById('st-reports').innerHTML = reps.map((r) => `<div class="panel"><h3 style="margin-bottom:4px">${esc(r.name)} <span class="badge ${r.receivedAt ? 'ok' : 'warn'}">${r.receivedAt ? '✔ Reçu' : '📤 Envoyé ' + drvDt(r.sentAt)}</span></h3>
+        <div class="desc">${esc(r.phone || '')}</div>
+        <h4 style="margin:8px 0 2px">Activités</h4><div style="white-space:pre-wrap">${esc(r.activities)}</div>
+        ${r.observations ? `<h4 style="margin:8px 0 2px">Observations</h4><div style="white-space:pre-wrap">${esc(r.observations)}</div>` : ''}
+        ${!r.receivedAt && canReceive ? `<button class="btn small gold" style="margin-top:8px" onclick="stReceive('${esc(r.id)}')">✔ Marquer comme reçu</button>` : ''}</div>`).join('')
+      + (missing.length ? `<div class="panel"><h3>⏳ Rapport non envoyé</h3>${missing.map((u) => `<div class="drv-row"><span>${esc(u.firstName + ' ' + u.lastName)}</span><span>${wa(u)}</span></div>`).join('')}</div>` : '')
+      || '<div class="panel"><div class="empty">Aucune personne enregistrée.</div></div>';
+    document.getElementById('st-team').innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Téléphone</th><th>Application</th><th>Dernier rapport</th><th></th></tr>${team.map((u) => `<tr><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
+      <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td><td>${esc(u.lastReport || '—')}</td>
+      <td>${office ? `<button class="btn small gold" onclick="stInvite('${esc(u.id)}')">💬 Envoyer le lien</button>` : ''}</td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune personne enregistrée.</div>';
+  } catch (e) { document.getElementById('st-reports').innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
+}
+async function stSave() {
+  const c = STAFF_CFG[window._stView], m = document.getElementById('st-msg'), g = (id) => document.getElementById(id).value.trim();
+  if (!g('st-first') || !g('st-last')) { m.innerHTML = '<div class="msg err">Prénom et nom obligatoires.</div>'; return; }
+  if (g('st-phone').replace(/\D/g, '').length < 8) { m.innerHTML = '<div class="msg err">Numéro de téléphone obligatoire (le lien est envoyé par WhatsApp).</div>'; return; }
+  try {
+    const r = await api('/staff', { method: 'POST', body: { firstName: g('st-first'), lastName: g('st-last'), phone: g('st-phone'), role: c.role, siteId: state.siteId } });
+    m.innerHTML = '<div class="msg ok">Enregistré.</div>';
+    await stInvite(r.id); stLoad();
+    ['st-first', 'st-last', 'st-phone'].forEach((id) => { document.getElementById(id).value = ''; });
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function stInvite(userId) {
+  const box = document.getElementById('st-inv');
+  try {
+    const link = location.origin + location.pathname.replace(/index\.html$/, '');
+    const r = await api('/staff/invite', { method: 'POST', body: { userId, appUrl: link } });
+    const num = r.phone.length === 9 ? '224' + r.phone : r.phone; window._invMsg = r.message;
+    box.innerHTML = `<div class="msg ok" style="margin-top:10px">Message prêt pour ${esc(r.name)} (${esc(num)}).</div>
+      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Envoyer par WhatsApp</a>
+      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+      <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ».</div>`;
+    box.scrollIntoView({ behavior: 'smooth' });
+  } catch (e) { box.innerHTML = `<div class="msg err" style="margin-top:10px">${esc(e.message)}</div>`; }
+}
+async function stReceive(id) { try { await api('/staff/reports/' + id + '/receive', { method: 'POST', body: {} }); stLoad(); } catch (e) { alert(e.message); } }
+// Côté agent HSE / magasinier : « Mon rapport du jour »
+async function renderMyReport() {
+  const today = new Date().toISOString().slice(0, 10);
+  const list = await api('/staff/reports/mine');
+  const cur = list.find((r) => r.date === today);
+  root().innerHTML = `<div class="panel"><h3>📝 Mon rapport du jour</h3>
+    <div class="desc">Décrivez vos activités de la journée : votre responsable le reçoit directement.</div>
+    <label>Date</label><input id="mr-date" type="date" value="${today}" max="${today}" style="max-width:220px">
+    <label>Activités de la journée</label><textarea id="mr-act" rows="6" placeholder="Ex : réception de 20 cartons, 3 sorties pour le camion RC-1, inventaire de l'allée B…">${esc(cur ? cur.activities : '')}</textarea>
+    <label>Observations (facultatif)</label><textarea id="mr-obs" rows="3">${esc(cur && cur.observations ? cur.observations : '')}</textarea>
+    <button class="btn gold" onclick="sendMyReport()">📤 Envoyer mon rapport</button><div id="mr-msg"></div></div>
+    <div class="panel"><h3>Mes derniers rapports</h3>${list.length ? list.map((r) => `<div class="drv-row"><span>${esc(r.date)}</span><span class="badge ${r.receivedAt ? 'ok' : 'warn'}">${r.receivedAt ? '✔ Reçu par le responsable' : 'Envoyé'}</span></div>`).join('') : '<div class="empty">Aucun rapport envoyé.</div>'}</div>`;
+}
+async function sendMyReport() {
+  const m = document.getElementById('mr-msg');
+  try {
+    await api('/staff/reports', { method: 'POST', body: { date: document.getElementById('mr-date').value, activities: document.getElementById('mr-act').value, observations: document.getElementById('mr-obs').value || undefined } });
+    m.innerHTML = '<div class="msg ok">Rapport envoyé à votre responsable.</div>'; setTimeout(renderMyReport, 900);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 function dailyTripsTable(r) {
   if (!r.trips.list.length) return '';
