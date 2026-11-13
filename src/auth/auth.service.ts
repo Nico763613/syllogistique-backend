@@ -97,8 +97,19 @@ export class AuthService {
         siteId: user.siteId,
         department: user.department,
         mustChangePassword: user.mustChangePassword,
+        photoUrl: user.photoUrl,
       },
     };
+  }
+
+  async getPhoto(userId: string) {
+    const u = await this.prisma.user.findUnique({ where: { id: userId }, select: { photoUrl: true } });
+    return { photoUrl: u?.photoUrl ?? null };
+  }
+
+  async setPhoto(userId: string, photo?: string | null) {
+    await this.prisma.user.update({ where: { id: userId }, data: { photoUrl: photo || null } });
+    return { photoUrl: photo || null };
   }
 
   async refresh(refreshToken: string) {
