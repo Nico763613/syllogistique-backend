@@ -324,7 +324,7 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
-      <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
+      <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE,LECTEUR" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
       <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon">🏠</span> Mon espace de travail</div>
       <div class="nav-item" data-view="pointage" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
       <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
@@ -571,7 +571,7 @@ function enterApp() {
   refreshAvatars(); loadMyPhoto(); buildBottomNav();
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', LECTEUR: 'home' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -601,7 +601,7 @@ function roleLabel(r) {
   return {
     SUPER_ADMIN: 'Super Administrateur', ADMIN_LOGISTIQUE: 'Administrateur Logistique',
     GESTIONNAIRE_FLOTTE: 'Gestionnaire de flotte', MAGASINIER: 'Magasinier',
-    CHAUFFEUR: 'Chauffeur', LECTEUR: 'Lecteur / Superviseur',
+    CHAUFFEUR: 'Chauffeur', LECTEUR: 'Superviseur',
     RESPONSABLE_COMMERCIAL: 'Responsable commercial', CAISSIER: 'Caissier',
     GESTIONNAIRE_HSE: 'Responsable HSE', AGENT_HSE: 'Agent HSE', COMPTABLE: 'Comptabilité',
     DIRECTEUR_GENERAL: 'Directeur Général', MECANICIEN: 'Mécanicien', POINTEUR: 'Pointeur',
@@ -2689,11 +2689,11 @@ async function stInvite(userId) {
 /* ---------------- ACCUEIL : uniquement les cartes des départements ---------------- */
 const HOME_CARDS = [
   { ico: '🎯', t: 'Direction', d: 'Tableau de bord, alertes et synthèse', v: 'pilotage', roles: ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'] },
-  { ico: '🚚', t: 'Logistique & Flotte', d: 'Camions, véhicules, chauffeurs, fiches de bord', v: 'espace-logi', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'] },
-  { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE'], over: { GESTIONNAIRE_HSE: 'espace' } },
-  { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER'], over: { MAGASINIER: 'espace' } },
+  { ico: '🚚', t: 'Logistique & Flotte', d: 'Camions, véhicules, chauffeurs, fiches de bord', v: 'espace-logi', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'], over: { LECTEUR: 'dash-fleet' } },
+  { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'espace' } },
+  { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER', 'LECTEUR'], over: { MAGASINIER: 'espace' } },
   { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'driver-expenses', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
-  { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE'] },
+  { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE', 'LECTEUR'] },
   { ico: '🏢', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
 ];
 function homeCardsFor(role) { return HOME_CARDS.filter((c) => c.roles.includes(role)).map((c) => ({ ...c, view: (c.over && c.over[role]) || c.v })); }
@@ -2708,8 +2708,8 @@ function bottomEntries(role) {
   const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
   if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
-  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'] }[role];
-  const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE'].includes(role);
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
+  const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE', 'LECTEUR'].includes(role);
   return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', 'reports-truck']] : []), ['👤', 'Profil', '#profil']];
 }
 function buildBottomNav() {
