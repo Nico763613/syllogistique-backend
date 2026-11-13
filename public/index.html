@@ -251,10 +251,23 @@
   .ph-card{background:#fff; border-radius:18px; padding:20px; width:min(360px,100%); text-align:center; max-height:94vh; overflow:auto;}
   .ph-card h3{margin:0 0 4px; color:var(--navy);} .ph-card canvas{width:260px; max-width:100%; height:auto; border-radius:14px; touch-action:none; background:#E6ECF5; margin:10px 0 4px; cursor:grab;}
   .ph-card .row{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;} .ph-card .btn{margin-top:0;}
+  .btn{min-height:44px;} @media (pointer:coarse),(max-width:860px){ .btn{min-height:48px;} .btn.small{min-height:48px;} .nav-item{min-height:48px;} }
+  #offline-bar{display:none; position:sticky; top:0; z-index:99; background:#C2570C; color:#fff; font-size:13px; font-weight:600; text-align:center; padding:8px 12px;}
+  #bottom-nav{display:none;}
+  @media (max-width:860px){ .sidebar{left:-290px !important;} .sidebar.open{left:0 !important;} #hist-btn,#install-btn,#draft-note,.user-chip .meta,.user-chip > span{display:none !important;} .topbar{padding:10px 14px;} .topbar h2{font-size:18px;} }
+  @media (max-width:860px){ #bottom-nav.on{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fff; border-top:1px solid var(--line); box-shadow:0 -4px 16px rgba(15,42,92,.08); padding-bottom:env(safe-area-inset-bottom);}
+    #bottom-nav button{flex:1; min-height:58px; border:none; background:none; font-size:11px; color:var(--muted); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;}
+    #bottom-nav button span{font-size:21px; line-height:1;} #bottom-nav button.on{color:var(--blue); font-weight:700;} .content{padding-bottom:90px;} .main .powered{padding-bottom:70px;} }
+  .hm-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;}
+  .hm-card{background:#fff; border:1px solid #E9EEF7; border-radius:16px; padding:22px; cursor:pointer; box-shadow:0 2px 10px rgba(15,42,92,.06); display:flex; gap:16px; align-items:center; min-height:104px; transition:.15s; text-align:left; font:inherit; color:inherit;}
+  .hm-card:hover{transform:translateY(-2px); box-shadow:0 8px 22px rgba(15,42,92,.12); border-color:#C9D8F6;}
+  .hm-ico{width:56px; height:56px; border-radius:14px; background:#E8EFFD; display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0;}
+  .hm-card b{display:block; font-size:17px; color:var(--navy);} .hm-card span.d{display:block; font-size:13px; color:var(--muted); margin-top:3px; line-height:1.35;}
   .btn.ghost{background:#fff; color:var(--navy); border:1px solid var(--line);} .btn.ghost:hover{background:#F1F5FC;} .btn.danger{background:#fff; color:var(--danger); border:1px solid #F0C9C4;}
 </style>
 </head>
 <body>
+<div id="offline-bar" role="status">⚠️ Pas de réseau — vos saisies sont gardées sur le téléphone et seront envoyées dès le retour du réseau.</div>
 
 <!-- ============ LOGIN ============ -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="syl-logo" viewBox="0 0 64 64"><polygon points="32,3 57,17.5 57,46.5 32,61 7,46.5 7,17.5" fill="#1E5BD8"/><polygon points="32,3 57,17.5 32,32 7,17.5" fill="#34B36B"/><polygon points="32,32 57,17.5 57,46.5 32,61" fill="#F5B301"/><polygon points="32,32 7,17.5 7,46.5 32,61" fill="#1747A8"/><path d="M19 40l9-7 6 4 11-9" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
@@ -311,6 +324,7 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
+      <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
       <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon">🏠</span> Mon espace de travail</div>
       <div class="nav-item" data-view="pointage" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
       <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
@@ -318,7 +332,7 @@
 
       <div class="nav-section-label" id="nav-dept-label">🚚 Logistique &amp; Flotte</div>
       <div class="nav-sub-label">Flotte</div>
-      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
+      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
       <div class="nav-item" data-view="trucks" onclick="go('trucks')"><span class="nav-icon">🚛</span> Camions</div>
       <div class="nav-item" data-view="service-vehicles" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
       <div class="nav-item" data-view="drivers" onclick="go('drivers')"><span class="nav-icon">👨‍✈️</span> Chauffeurs</div>
@@ -334,25 +348,25 @@
       <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
 
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
-      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
+      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
       <div class="nav-item" data-view="stock" onclick="go('stock')"><span class="nav-icon">📦</span> Stocks</div>
-      <div class="nav-item" data-view="staff-store" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-store')"><span class="nav-icon">🧑‍🏭</span> Magasiniers &amp; rapports</div>
+      <div class="nav-item" data-view="staff-store" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-store')"><span class="nav-icon">🧑‍🏭</span> Magasiniers &amp; rapports</div>
 
       <div class="nav-section-label">🛒 Achats &amp; Approvisionnement</div>
-      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
+      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
       <div class="nav-item" data-view="purchases" onclick="go('purchases')"><span class="nav-icon">🛒</span> Achats</div>
       <div class="nav-item" data-view="needs" onclick="go('needs')"><span class="nav-icon">📝</span> États des besoins</div>
       <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL,CAISSIER" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
 
       <div class="nav-section-label">🦺 HSE</div>
-      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
-      <div class="nav-item" data-view="staff-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-hse')"><span class="nav-icon">👷</span> Agents HSE &amp; rapports</div>
+      <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
+      <div class="nav-item" data-view="staff-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,LECTEUR" onclick="go('staff-hse')"><span class="nav-icon">👷</span> Agents HSE &amp; rapports</div>
       <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER,MECANICIEN,POINTEUR" onclick="go('my-report')"><span class="nav-icon">📝</span> Mon rapport du jour</div>
 
       <div class="nav-section-label">🛠️ Équipes</div>
       <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon">🏢</span> Responsables (DG &amp; Logistique)</div>
-      <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-mech')"><span class="nav-icon">🔧</span> Mécaniciens &amp; rapports</div>
-      <div class="nav-item" data-view="staff-pointer" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR,DIRECTEUR_GENERAL" onclick="go('staff-pointer')"><span class="nav-icon">🕒</span> Pointeurs &amp; rapports</div>
+      <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-mech')"><span class="nav-icon">🔧</span> Mécaniciens &amp; rapports</div>
+      <div class="nav-item" data-view="staff-pointer" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-pointer')"><span class="nav-icon">🕒</span> Pointeurs &amp; rapports</div>
 
       <div class="nav-section-label">Système</div>
       <div class="nav-item" data-view="sync" onclick="go('sync')">
@@ -392,6 +406,7 @@
           <span onclick="toggleUserMenu(event)" style="cursor:pointer;color:var(--muted)">⌄</span>
         </div>
       </div>
+      <nav id="bottom-nav" aria-label="Navigation"></nav>
       <div id="user-menu"><button onclick="openPhotoEditor()">📷 Ma photo de profil</button><button onclick="go('settings')">⚙️ Paramètres</button><button onclick="logout()">🚪 Déconnexion</button></div>
       <div class="content" id="view-root"></div>
       <div class="powered">Powered by Syllogistique</div>
@@ -553,10 +568,10 @@ function enterApp() {
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
   document.getElementById('side-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
   document.getElementById('side-role').textContent = roleLabel(state.user.role);
-  refreshAvatars(); loadMyPhoto();
+  refreshAvatars(); loadMyPhoto(); buildBottomNav();
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'espace', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', DIRECTEUR_GENERAL: 'pilotage', ADMIN_LOGISTIQUE: 'espace-logi', MAGASINIER: 'espace' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -588,7 +603,7 @@ function roleLabel(r) {
     GESTIONNAIRE_FLOTTE: 'Gestionnaire de flotte', MAGASINIER: 'Magasinier',
     CHAUFFEUR: 'Chauffeur', LECTEUR: 'Lecteur / Superviseur',
     RESPONSABLE_COMMERCIAL: 'Responsable commercial', CAISSIER: 'Caissier',
-    GESTIONNAIRE_HSE: 'Gestionnaire HSE', AGENT_HSE: 'Agent HSE',
+    GESTIONNAIRE_HSE: 'Responsable HSE', AGENT_HSE: 'Agent HSE', COMPTABLE: 'Comptabilité',
     DIRECTEUR_GENERAL: 'Directeur Général', MECANICIEN: 'Mécanicien', POINTEUR: 'Pointeur',
   }[r] || esc(r);
 }
@@ -601,7 +616,7 @@ function updateSyncPill() {
 }
 
 const titles = {
-  dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
+  home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
@@ -1180,9 +1195,10 @@ function applyRoleNav() {
     if (ok) any = true;
   });
   // Les rôles départementaux (commercial, caisse, HSE) ne voient que leur espace
-  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR', 'DIRECTEUR_GENERAL'].includes(role)) {
-    document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings') el.style.display = 'none'; });
-    document.querySelectorAll('#sidebar .nav-section-label').forEach((el) => { if (el.id !== 'nav-dept-label') el.style.display = 'none'; });
+  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR', 'DIRECTEUR_GENERAL', 'COMPTABLE'].includes(role)) {
+    document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings' || role === 'DIRECTEUR_GENERAL') el.style.display = 'none'; });
+    document.querySelectorAll('#sidebar .nav-section-label, #sidebar .nav-sub-label').forEach((el) => { el.style.display = 'none'; });
+    any = false;
   }
   const extra = { MECANICIEN: ['maintenance', 'trucks', 'service-vehicles', 'stock'], POINTEUR: ['drivers'] }[role] || [];
   extra.forEach((v) => { const el = document.querySelector('#sidebar .nav-item[data-view="' + v + '"]'); if (el) el.style.display = ''; });
@@ -1194,6 +1210,7 @@ function applyRoleNav() {
 async function renderView(view) {
   if (!window._silent) root().innerHTML = '<div class="empty">Chargement…</div>';
   try {
+    if (view === 'home') return renderHome();
     if (view === 'espace') return renderWorkspace();
     if (view === 'pointage') return renderPointage();
     if (view === 'pilotage') return renderExecutive('dg');
@@ -2668,6 +2685,48 @@ async function stInvite(userId) {
 }
 
 
+
+/* ---------------- ACCUEIL : uniquement les cartes des départements ---------------- */
+const HOME_CARDS = [
+  { ico: '🎯', t: 'Direction', d: 'Tableau de bord, alertes et synthèse', v: 'pilotage', roles: ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'] },
+  { ico: '🚚', t: 'Logistique & Flotte', d: 'Camions, véhicules, chauffeurs, fiches de bord', v: 'espace-logi', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'] },
+  { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE'], over: { GESTIONNAIRE_HSE: 'espace' } },
+  { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER'], over: { MAGASINIER: 'espace' } },
+  { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'driver-expenses', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
+  { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE'] },
+  { ico: '🏢', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
+];
+function homeCardsFor(role) { return HOME_CARDS.filter((c) => c.roles.includes(role)).map((c) => ({ ...c, view: (c.over && c.over[role]) || c.v })); }
+function renderHome() {
+  const u = state.user, cards = homeCardsFor(u.role);
+  root().innerHTML = `<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">Bonjour ${esc(u.firstName)} 👋</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
+    <div class="hm-grid">${cards.map((c) => `<button class="hm-card" onclick="go('${c.view}')"><div class="hm-ico">${c.ico}</div><div><b>${esc(c.t)}</b><span class="d">${esc(c.d)}</span></div></button>`).join('')}</div>`;
+}
+
+/* ---------------- BARRE DU BAS (mobile) et indicateur hors-ligne ---------------- */
+function bottomEntries(role) {
+  const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
+  if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
+  if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'] }[role];
+  const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE'].includes(role);
+  return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', 'reports-truck']] : []), ['👤', 'Profil', '#profil']];
+}
+function buildBottomNav() {
+  const nav = document.getElementById('bottom-nav'); if (!nav || !state.user || state.user.role === 'CHAUFFEUR') return;
+  nav.innerHTML = bottomEntries(state.user.role).map(([i, l, v]) => `<button data-v="${v}" onclick="bottomGo('${v}')"><span>${i}</span>${l}</button>`).join('');
+  nav.classList.add('on');
+}
+function bottomGo(v) {
+  if (v === '#profil') return toggleUserMenu({ stopPropagation() {} });
+  if (v === '#alertes') { go('pilotage'); setTimeout(() => { const a = document.getElementById('ex-alertes'); if (a) a.scrollIntoView({ behavior: 'smooth' }); }, 700); return; }
+  go(v);
+}
+function updateBottomNav(view) { document.querySelectorAll('#bottom-nav button').forEach((b) => b.classList.toggle('on', b.dataset.v === view)); }
+{ const _g = go; go = function (v) { const r = _g.apply(this, arguments); try { updateBottomNav(v); } catch (e) {} return r; }; }
+function offlineBar() { const b = document.getElementById('offline-bar'); if (b) b.style.display = navigator.onLine ? 'none' : 'block'; }
+window.addEventListener('online', offlineBar); window.addEventListener('offline', offlineBar); offlineBar();
+
 /* ---------------- PHOTO DE PROFIL (recadrage rond + compression automatique) ---------------- */
 function avatarHtml(size) {
   const u = state.user || {};
@@ -2754,7 +2813,7 @@ async function phRemove() {
 function execStyle() {
   if (document.getElementById('exec-style')) return;
   const st = document.createElement('style'); st.id = 'exec-style';
-  st.textContent = `.ex-hero{border-radius:16px;padding:20px 22px;color:#fff;background:linear-gradient(120deg,#0E2740 0%,#1F4A75 55%,#2E8B57 120%);margin-bottom:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
+  st.textContent = `.ex-hero{border-radius:16px;padding:20px 22px;color:#fff;background:linear-gradient(120deg,#0B2557 0%,#1747A8 100%);margin-bottom:14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}
   .ex-hero h2{margin:0 0 4px;font-size:22px}.ex-hero p{margin:0;opacity:.9;font-size:14px}.ex-hero .ex-date{font-size:12px;opacity:.8}
   .ex-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
   .ex-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;gap:12px;align-items:center;box-shadow:0 2px 8px rgba(14,39,64,.05)}
@@ -2779,7 +2838,7 @@ function execStyle() {
   document.head.appendChild(st);
 }
 function exKpi(ico, bg, val, label, sub) {
-  return `<div class="ex-kpi"><div class="ex-ico" style="background:${bg}">${ico}</div><div><b>${val}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+  return `<div class="ex-kpi"><div class="ex-ico" style="background:#E8EFFD">${ico}</div><div><b>${val}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
 }
 function exBars(rows) {
   const max = Math.max(1, ...rows.map((r) => r.total));
@@ -2804,24 +2863,23 @@ async function renderExecutive(mode) {
   const chartCard = `<div class="ex-card"><h3>📈 Performance des missions (6 mois) <span class="badge ${m.monthTotal >= m.previousMonthTotal ? 'ok' : 'warn'}">${m.monthTotal} ce mois</span></h3>${exBars(m.byMonth)}</div>`;
   let body;
   if (mode === 'dg') {
+    // Directeur Général : lecture seule absolue — aucun bouton d'action, aucun formulaire
+    const sy = d.synthesis, ev = sy.expensesPreviousMonth ? Math.round((sy.expensesValidated / sy.expensesPreviousMonth - 1) * 100) : null;
     const kpis = `<div class="ex-kpis">
-      ${exKpi('🚚', '#E3EEFB', f.active, 'Véhicules actifs', `sur ${f.total} · ${f.maintenance} en maintenance`)}
-      ${exKpi('▶️', '#E1F4E8', m.inProgress, 'Missions en cours', `${m.today} aujourd’hui`)}
-      ${exKpi('👥', '#EFE6FA', pe.present + ' / ' + pe.drivers, 'Chauffeurs présents', `${pe.staffReportsToday}/${pe.staff} rapports du personnel`)}
-      ${exKpi('💰', '#FDF1D6', fmt(ex.today), 'Dépenses du jour (GNF)', `Mois : ${fmt(ex.month)}`)}</div>`;
-    const strat = `<div class="ex-card"><h3>🎯 Indicateurs stratégiques</h3>
-      <div class="ex-row"><span>Taux de missions terminées (mois)</span><b>${rate == null ? '—' : rate + ' %'}</b></div>
-      <div class="ex-row"><span>Kilomètres parcourus (mois)</span><b>${fmt(m.kmMonth)} km</b></div>
-      <div class="ex-row"><span>Dépenses du mois</span><b>${fmt(ex.month)} GNF</b></div>
-      <div class="ex-row"><span>Valeur du stock</span><b>${fmt(st.value)} GNF</b></div>
-      <div class="ex-row"><span>Dépenses chauffeurs à valider</span><b>${ex.pendingApproval}</b></div>
-      <div class="ex-row"><span>Véhicules immobilisés</span><b>${f.immobilized}</b></div></div>`;
-    const hse = `<div class="ex-card"><h3>🦺 Sécurité (HSE)</h3>${ring(hs.complianceRate, '#2E8B57')}<div class="desc" style="text-align:center">Conformité des inspections du mois</div>
-      <div class="ex-row"><span>Incidents ouverts</span><b>${hs.openIncidents}</b></div><div class="ex-row"><span>Accidents (mois)</span><b>${hs.accidentsMonth}</b></div><div class="ex-row"><span>Inspections (mois)</span><b>${hs.inspectionsMonth}</b></div></div>`;
-    const exp = `<div class="ex-card"><h3>💰 Dépenses globales du jour</h3>
-      <div class="ex-row"><span>Carburant</span><b>${fmt(ex.fuelToday)}</b></div><div class="ex-row"><span>Maintenance</span><b>${fmt(ex.maintenanceToday)}</b></div><div class="ex-row"><span>Frais chauffeurs</span><b>${fmt(ex.driversToday)}</b></div><div class="ex-row"><span><b>Total</b></span><b>${fmt(ex.today)} GNF</b></div></div>`;
-    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Accès rapides</h3><div class="ex-act">${act('📊', 'Rapports camions', 'reports-truck')}${act('🚙', 'Rapports véhicules', 'reports-service')}${act('📦', 'Stocks', 'stock')}${act('🦺', 'HSE', 'dash-hse')}${act('🛒', 'Achats', 'purchases')}${act('📝', 'États des besoins', 'needs')}</div></div>`;
-    body = hero + kpis + `<div class="ex-grid">${chartCard}${strat}${alertsCard}</div><div class="ex-grid">${exp}${hse}${moveCard}</div>` + actions;
+      ${exKpi('🚚', '', f.active, 'Véhicules actifs', `sur ${f.total} · ${f.maintenance} en maintenance`)}
+      ${exKpi('▶️', '', m.inProgress, 'Missions en cours', `${m.today} aujourd’hui`)}
+      ${exKpi('👥', '', pe.present + ' / ' + pe.drivers, 'Chauffeurs présents', 'aujourd’hui')}
+      ${exKpi('💰', '', fmt(ex.today), 'Dépenses du jour (GNF)', `Mois : ${fmt(ex.month)}`)}</div>`;
+    const safety = `<div class="ex-card"><h3>🦺 Alertes sécurité</h3>${exAlerts(d.safetyAlerts)}</div>`;
+    const budget = `<div class="ex-card"><h3>💰 Alertes budget</h3>${exAlerts(d.budgetAlerts.map((a) => ({ ...a, at: d.asOf })))}</div>`;
+    const synth = `<div class="ex-card"><h3>📋 Synthèse du mois <span class="badge info">données validées</span></h3>
+      <div class="ex-row"><span>Missions terminées</span><b>${sy.missionsCompleted} / ${sy.missionsTotal}</b></div>
+      <div class="ex-row"><span>Kilomètres parcourus</span><b>${fmt(sy.km)} km</b></div>
+      <div class="ex-row"><span>Dépenses validées</span><b>${fmt(sy.expensesValidated)} GNF</b></div>
+      <div class="ex-row"><span>Évolution des dépenses vs mois dernier</span><b>${ev == null ? '—' : (ev > 0 ? '+' : '') + ev + ' %'}</b></div>
+      <div class="ex-row"><span>Incidents ouverts</span><b>${sy.incidents}</b></div>
+      <div class="ex-row"><span>Conformité HSE</span><b>${sy.compliance == null ? '—' : sy.compliance + ' %'}</b></div></div>`;
+    body = hero + kpis + `<div class="ex-grid" id="ex-alertes">${safety}${budget}</div><div class="ex-grid">${synth}${chartCard}</div>`;
   } else {
     const kpis = `<div class="ex-kpis">
       ${exKpi('🚚', '#E3EEFB', f.active, 'Véhicules actifs', `${f.onMission} en mission · ${f.available} disponibles`)}

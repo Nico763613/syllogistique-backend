@@ -115,6 +115,7 @@ enum RoleName {
   DIRECTEUR_GENERAL
   MECANICIEN
   POINTEUR
+  COMPTABLE
 }
 
 model Permission {
