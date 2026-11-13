@@ -150,6 +150,8 @@ model User {
   mustChangePassword Boolean @default(false) @map("must_change_password")
   // Photo de profil : petite image JPEG compressée côté appareil (data URL)
   photoUrl       String?   @map("photo_url")
+  // Dernier envoi du lien WhatsApp (suivi de l'enrôlement : envoyé / ouvert / activé / expiré)
+  invitedAt      DateTime? @map("invited_at")
   phone          String?
   // Département : LOGISTIQUE, CARBURANT, STOCK ou RH (vide = pas de restriction de département)
   department     String?

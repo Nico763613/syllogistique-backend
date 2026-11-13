@@ -191,6 +191,12 @@
   .drv-card h4{margin:0 0 6px; font-size:15px; color:var(--navy);}
   .drv-row{display:flex; justify-content:space-between; gap:10px; font-size:13px; padding:4px 0; border-bottom:1px dashed var(--line);} .drv-row:last-child{border-bottom:none;}
   .drv-row span:first-child{color:var(--muted);}
+  .dp-tabs{display:flex; gap:4px; overflow-x:auto; border-bottom:2px solid var(--line); margin:0 0 12px; -webkit-overflow-scrolling:touch;}
+  .dp-tabs button{flex:none; min-height:48px; padding:0 16px; border:0; background:none; font:inherit; font-weight:600; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-2px; cursor:pointer; white-space:nowrap;}
+  .dp-tabs button.on{color:var(--blue); border-bottom-color:var(--blue);}
+  .dp-sub{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px;}
+  .dp-sub button{min-height:44px; padding:0 14px; border-radius:22px; border:1px solid var(--line); background:#fff; font:inherit; font-weight:600; color:var(--navy); cursor:pointer;}
+  .dp-sub button.on{background:var(--blue); border-color:var(--blue); color:#fff;}
   .drv-btn{display:block; width:100%; padding:14px; border:none; border-radius:12px; font-size:15px; font-weight:700; background:var(--navy); color:#fff; margin-top:8px; cursor:pointer;}
   .drv-btn.gold{background:var(--gold); color:#1a1a1a;} .drv-btn.red{background:#C0392B;} .drv-btn.ghost{background:#fff; color:var(--navy); border:1px solid var(--line);}
   .drv-actions{display:grid; grid-template-columns:1fr 1fr; gap:8px;} .drv-actions .drv-btn{margin-top:0; font-size:13px; padding:12px 6px;}
@@ -326,26 +332,20 @@
 
       <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE,LECTEUR" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
       <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon">🏠</span> Mon espace de travail</div>
-      <div class="nav-item" data-view="pointage" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
+      <div class="nav-item" data-view="pointage" data-roles="POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
       <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
-      <div class="nav-item" data-view="espace-logi" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE" onclick="go('espace-logi')"><span class="nav-icon">🧭</span> Espace Responsable logistique</div>
+      <div class="nav-item" data-view="espace-logi" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE" onclick="go('espace-logi')"><span class="nav-icon">🧭</span> Tableau de bord Logistique</div>
 
       <div class="nav-section-label" id="nav-dept-label">🚚 Logistique &amp; Flotte</div>
-      <div class="nav-sub-label">Flotte</div>
-      <div class="nav-item" data-view="dash-fleet" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
-      <div class="nav-item" data-view="trucks" onclick="go('trucks')"><span class="nav-icon">🚛</span> Camions</div>
-      <div class="nav-item" data-view="service-vehicles" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
-      <div class="nav-item" data-view="drivers" onclick="go('drivers')"><span class="nav-icon">👨‍✈️</span> Chauffeurs</div>
-      <div class="nav-item" data-view="driver-board" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-board')"><span class="nav-icon">🧭</span> Suivi des chauffeurs</div>
-      <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches de bord</div>
-      <div class="nav-item" data-view="driver-devices" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-devices')"><span class="nav-icon">📲</span> Appareils chauffeurs</div>
-      <div class="nav-sub-label">Opérations</div>
-      <div class="nav-item" data-view="fuel" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant</div>
-      <div class="nav-item" data-view="maintenance" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
-      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses chauffeurs</div>
-      <div class="nav-item" data-view="reports-truck" onclick="go('reports-truck')"><span class="nav-icon">🚛</span> Rapports camions</div>
-      <div class="nav-item" data-view="reports-service" onclick="go('reports-service')"><span class="nav-icon">🚙</span> Rapports véhicules de service</div>
-      <div class="nav-item" data-view="driver-missions" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE" onclick="go('driver-missions')"><span class="nav-icon">📜</span> Historique des missions</div>
+      <div class="nav-item" data-view="dash-fleet" data-roles="GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon">📊</span> Charroi &amp; Flotte</div>
+      <div class="nav-item" data-view="trucks" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('trucks')"><span class="nav-icon">🚛</span> Flotte</div>
+      <div class="nav-item" data-view="drivers" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('drivers')"><span class="nav-icon">👥</span> Équipes terrain</div>
+      <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches de bord</div>
+      <div class="nav-item" data-view="fuel" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant &amp; Maintenance</div>
+      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses</div>
+      <div class="nav-item" data-view="service-vehicles" data-roles="MECANICIEN" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
+      <div class="nav-item" data-view="maintenance" data-roles="MECANICIEN" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
+      <div class="nav-item" data-view="reports-truck" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,GESTIONNAIRE_HSE,MAGASINIER" onclick="go(reportsHome(state.user.role))"><span class="nav-icon">📊</span> Rapports</div>
 
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
       <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
@@ -360,13 +360,12 @@
 
       <div class="nav-section-label">🦺 HSE</div>
       <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
-      <div class="nav-item" data-view="staff-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,LECTEUR" onclick="go('staff-hse')"><span class="nav-icon">👷</span> Agents HSE &amp; rapports</div>
+      <div class="nav-item" data-view="enrol" data-roles="GESTIONNAIRE_HSE" onclick="go('enrol')"><span class="nav-icon">💬</span> Enrôlement WhatsApp</div>
       <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER,MECANICIEN,POINTEUR" onclick="go('my-report')"><span class="nav-icon">📝</span> Mon rapport du jour</div>
 
       <div class="nav-section-label">🛠️ Équipes</div>
       <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon">🏢</span> Responsables (DG &amp; Logistique)</div>
       <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-mech')"><span class="nav-icon">🔧</span> Mécaniciens &amp; rapports</div>
-      <div class="nav-item" data-view="staff-pointer" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-pointer')"><span class="nav-icon">🕒</span> Pointeurs &amp; rapports</div>
 
       <div class="nav-section-label">Système</div>
       <div class="nav-item" data-view="sync" onclick="go('sync')">
@@ -617,7 +616,7 @@ function updateSyncPill() {
 
 const titles = {
   home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -716,7 +715,7 @@ function go(view, noPush) {
   if (!noPush && state.view && state.view !== view) { state.hist.push(state.view); if (state.hist.length > 30) state.hist.shift(); try { history.pushState({ off: 1 }, ''); } catch (e) {} }
   state.view = view;
   goBackBtn();
-  document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === view));
+  document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === navKey(view)));
   document.getElementById('view-title').textContent = titles[view];
   document.getElementById('sidebar').classList.remove('open');
   renderView(view);
@@ -1235,6 +1234,11 @@ async function renderView(view) {
     if (STAFF_CFG[view]) return renderStaff(view);
     if (view === 'staff-managers') return renderManagers();
     if (view === 'my-report') return renderMyReport();
+    if (view === 'enrol') return renderEnrol();
+    if (view === 'reports-drivers') return renderReportDrivers();
+    if (view === 'reports-stock') return state.user.role === 'MAGASINIER' ? renderDeptDashboard('stock') : renderStaff('staff-store', true);
+    if (view === 'reports-hse') return renderStaff('staff-hse', true);
+    if (view === 'reports-dg') return renderExecutive('dg');
     if (view === 'reports-truck') return renderKindReports('TRUCK');
     if (view === 'reports-service') return renderKindReports('SERVICE_VEHICLE');
     if (view === 'sync') return renderSync();
@@ -2618,26 +2622,26 @@ const STAFF_CFG = {
   'staff-mech': { role: 'MECANICIEN', one: 'mécanicien', title: '🔧 Mécaniciens', rep: 'Rapports Atelier' },
   'staff-pointer': { role: 'POINTEUR', one: 'pointeur', title: '🕒 Pointeurs', rep: 'Rapports de pointage' },
 };
-async function renderStaff(view) {
-  const c = STAFF_CFG[view]; window._stView = view;
+async function renderStaff(view, reportsOnly) {
+  const c = STAFF_CFG[view]; window._stView = view; window._stRo = !!reportsOnly;
   const today = window._stDate || new Date().toISOString().slice(0, 10);
-  const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) && !reportsOnly;
   root().innerHTML = `
-    <div class="panel"><h3>${c.title} — ${c.rep}</h3>
-      <div class="desc">Chaque ${c.one} est enregistré, reçoit son lien par WhatsApp, puis envoie chaque jour son rapport d'activité : vous le recevez ici.</div>
+    <div class="panel"><h3>${c.rep}</h3>
+      <div class="desc">${reportsOnly ? `Rapport d'activité envoyé chaque jour par les ${c.one}s. L'enregistrement et l'envoi du lien se font dans Logistique › Équipes terrain › Enrôlement.` : `Chaque ${c.one} est enregistré, reçoit son lien par WhatsApp, puis envoie chaque jour son rapport d'activité : vous le recevez ici.`}</div>
       <label>Jour</label><input id="st-date" type="date" value="${esc(today)}" onchange="window._stDate=this.value;stLoad()" style="max-width:220px">
       <div id="st-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
     <div id="st-reports"><div class="empty">Chargement…</div></div>
     ${office ? `<div class="panel"><h3>➕ Nouveau ${c.one}</h3>
       <div class="grid-2"><div><label>Prénom</label><input id="st-first"></div><div><label>Nom</label><input id="st-last"></div><div><label>Téléphone (WhatsApp)</label><input id="st-phone" type="tel" placeholder="6xx xx xx xx"></div></div>
       <button class="btn gold" onclick="stSave()">Enregistrer</button><div id="st-msg"></div></div>` : ''}
-    <div class="panel"><h3>Équipe</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`;
+    ${reportsOnly ? '' : '<div class="panel"><h3>Équipe</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>'}`;
   stLoad();
 }
 async function stLoad() {
   const c = STAFF_CFG[window._stView]; if (!c) return;
   const d = document.getElementById('st-date').value;
-  const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) && !window._stRo;
   const canReceive = !['LECTEUR', 'DIRECTEUR_GENERAL'].includes(state.user.role);
   try {
     const [team, reps] = await Promise.all([api('/staff?role=' + c.role + '&siteId=' + state.siteId), api('/staff/reports?role=' + c.role + '&date=' + d + '&siteId=' + state.siteId)]);
@@ -2654,7 +2658,7 @@ async function stLoad() {
         ${!r.receivedAt && canReceive ? `<button class="btn small gold" style="margin-top:8px" onclick="stReceive('${esc(r.id)}')">✔ Marquer comme reçu</button>` : ''}</div>`).join('')
       + (missing.length ? `<div class="panel"><h3>⏳ Rapport non envoyé</h3>${missing.map((u) => `<div class="drv-row"><span>${esc(u.firstName + ' ' + u.lastName)}</span><span>${wa(u)}</span></div>`).join('')}</div>` : '')
       || '<div class="panel"><div class="empty">Aucune personne enregistrée.</div></div>';
-    document.getElementById('st-team').innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Téléphone</th><th>Application</th><th>Dernier rapport</th><th></th></tr>${team.map((u) => `<tr><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
+    const tmEl = document.getElementById('st-team'); if (tmEl) tmEl.innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Téléphone</th><th>Application</th><th>Dernier rapport</th><th></th></tr>${team.map((u) => `<tr><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
       <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td><td>${esc(u.lastReport || '—')}</td>
       <td>${office ? `<button class="btn small gold" onclick="stInvite('${esc(u.id)}')">💬 Envoyer le lien</button>` : ''}</td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune personne enregistrée.</div>';
   } catch (e) { document.getElementById('st-reports').innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
@@ -2686,6 +2690,134 @@ async function stInvite(userId) {
 
 
 
+
+/* ---------------- ÉTAPE 3 : onglets de département, Rapports (menu unique), Enrôlement WhatsApp ---------------- */
+const LOGI_ROLES = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'];
+const OFFICE_ROLES = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'];
+const LOGI_TABS = [
+  { t: '🚛 Flotte', go: 'trucks', views: ['trucks', 'service-vehicles', 'vehicles'], subs: [['trucks', 'Camions'], ['service-vehicles', 'Véhicules de service']] },
+  { t: '👥 Équipes terrain', go: 'drivers', views: ['drivers', 'pointage', 'enrol', 'driver-board', 'driver-devices'], subs: [['drivers', 'Chauffeurs'], ['pointage', 'Pointage'], ['enrol', 'Enrôlement WhatsApp', 1], ['driver-board', 'Suivi du jour'], ['driver-devices', 'Appareils']] },
+  { t: '📋 Fiches de bord', go: 'driver-sheets', views: ['driver-sheets', 'driver-missions'], subs: [['driver-sheets', 'Du jour'], ['driver-missions', 'Historique']] },
+  { t: '⛽ Carburant & Maintenance', go: 'fuel', views: ['fuel', 'maintenance'], subs: [['fuel', 'Carburant'], ['maintenance', 'Maintenance']] },
+  { t: '💵 Dépenses', go: 'driver-expenses', views: ['driver-expenses'], subs: null },
+];
+const REPORT_TABS = [
+  { t: '🚛 Camions', go: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
+  { t: '🚙 Véhicules de service', go: 'reports-service', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
+  { t: '👥 Chauffeurs & pointages', go: 'reports-drivers', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
+  { t: '📦 Stock', go: 'reports-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR', 'MAGASINIER'] },
+  { t: '🦺 HSE', go: 'reports-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR', 'GESTIONNAIRE_HSE'] },
+  { t: '🎯 Synthèse DG', go: 'reports-dg', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'] },
+];
+function reportsHome(role) { return role === 'GESTIONNAIRE_HSE' ? 'reports-hse' : role === 'MAGASINIER' ? 'reports-stock' : 'reports-truck'; }
+function navKey(view) {
+  const r = state.user && state.user.role;
+  if (String(view).startsWith('reports-')) return 'reports-truck';
+  if (r && LOGI_ROLES.includes(r)) { const t = LOGI_TABS.find((x) => x.views.includes(view)); if (t) return t.go; }
+  return view;
+}
+function deptBarHtml(view) {
+  const r = state.user && state.user.role; if (!r) return '';
+  const btn = (label, v, on) => `<button class="${on ? 'on' : ''}" onclick="go('${v}')">${label}</button>`;
+  if (String(view).startsWith('reports-')) {
+    const tabs = REPORT_TABS.filter((x) => x.roles.includes(r)); if (tabs.length < 2) return '';
+    return `<div class="dp-tabs" id="dp-bar">${tabs.map((x) => btn(x.t, x.go, x.go === view)).join('')}</div>`;
+  }
+  if (LOGI_ROLES.includes(r)) {
+    const cur = LOGI_TABS.find((x) => x.views.includes(view)); if (!cur) return '';
+    const subs = (cur.subs || []).filter((x) => !x[2] || OFFICE_ROLES.includes(r));
+    return `<div class="dp-tabs" id="dp-bar">${LOGI_TABS.map((x) => btn(x.t, x.go, x === cur)).join('')}</div>` + (subs.length > 1 ? `<div class="dp-sub">${subs.map((x) => btn(x[1], x[0], x[0] === view)).join('')}</div>` : '');
+  }
+  return '';
+}
+{ const _rv3 = renderView; renderView = async function (view) { const r = await _rv3(view); try { const h = deptBarHtml(view); if (h && state.view === view) root().insertAdjacentHTML('afterbegin', h); } catch (e) {} return r; }; }
+
+/* Rapports › Chauffeurs & pointages (lecture seule : le pointage se saisit dans Équipes terrain) */
+async function renderReportDrivers() {
+  const date = window._rdDate || new Date().toISOString().slice(0, 10);
+  const q = 'siteId=' + encodeURIComponent(state.siteId || '');
+  const [drivers, att, bd] = await Promise.all([api('/drivers?' + q), api('/drivers/attendance/day?' + q + '&date=' + date), api('/driver-admin/board?date=' + date + '&' + q)]);
+  const by = {}; att.forEach((a) => { by[a.driverId] = a; });
+  const bo = {}; bd.drivers.forEach((x) => { bo[x.id] = x; });
+  const list = drivers.filter((d) => d.status === 'ACTIVE' || !d.status);
+  const pres = list.filter((d) => by[d.id] && by[d.id].status === 'PRESENT').length, abs = list.filter((d) => by[d.id] && by[d.id].status === 'ABSENT').length, none = list.filter((d) => !by[d.id]).length;
+  const tile = (n, l, c) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center"><div style="font-size:24px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+  const rows = list.map((d) => {
+    const a = by[d.id], cur = a && ATT_ST.find((x) => x[0] === a.status), x = bo[d.id], st = x && BOARD_ST[x.status];
+    return `<tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${d.activity === 'TRUCK' ? '🚛 Camion' : d.activity === 'SERVICE_VEHICLE' ? '🚙 Véhicule de service' : '—'}</td>
+      <td>${cur ? `<span class="badge ${cur[2]}">${cur[1]}</span>${a.absenceReason ? `<div style="font-size:11px;color:var(--muted)">${esc(a.absenceReason)}</div>` : ''}` : '<span class="badge warn">Non pointé</span>'}</td>
+      <td class="mono">${x ? fmt(x.km) + ' km' : '—'}</td><td>${st ? `<span class="badge ${st[2]}">${st[0]} ${st[1]}</span>` : '—'}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">Aucun chauffeur.</td></tr>';
+  root().innerHTML = `<div class="panel"><h3>👥 Chauffeurs & pointages</h3><div class="desc">Présence et fiches de bord du jour. Lecture seule.</div>
+    <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._rdDate=this.value;renderReportDrivers().then(()=>{const h=deptBarHtml('reports-drivers');if(h)root().insertAdjacentHTML('afterbegin',h)})">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(list.length, 'Chauffeurs actifs', 'var(--navy)')}${tile(pres, 'Présents', '#2E8B57')}${tile(abs, 'Absents', '#B4372F')}${tile(none, 'Non pointés', '#C77D0A')}</div></div>
+    <div class="panel"><div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Activité</th><th>Pointage</th><th>Km du jour</th><th>Fiche de bord</th></tr>${rows}</table></div></div>`;
+}
+
+/* Enrôlement WhatsApp : 4 catégories, un seul endroit pour enregistrer et envoyer le lien */
+const ENROL_TABS = [['TRUCK', '🚛 Chauffeurs camions'], ['SERVICE_VEHICLE', '🚙 Chauffeurs véhicules de service'], ['HSE', '🦺 Agents HSE'], ['POINTER', '🕒 Pointeurs']];
+const ENROL_ONE = { TRUCK: 'chauffeur de camion', SERVICE_VEHICLE: 'chauffeur de véhicule de service', HSE: 'agent HSE', POINTER: 'pointeur' };
+const ENROL_ST = { NON_ENVOYE: ['Non envoyé', 'info'], ENVOYE: ['📤 Envoyé', 'warn'], OUVERT: ['👀 Ouvert', 'warn'], ACTIVE: ['✅ Activé', 'ok'], EXPIRE: ['⏰ Expiré', 'bad'] };
+function enrolLink() { return location.origin + location.pathname.replace(/index\.html$/, ''); }
+async function renderEnrol(kind) {
+  const role = state.user.role, tabs = role === 'GESTIONNAIRE_HSE' ? ENROL_TABS.filter((t) => t[0] === 'HSE') : ENROL_TABS;
+  const can = [...OFFICE_ROLES, 'GESTIONNAIRE_HSE'].includes(role);
+  if (!can) { root().innerHTML = '<div class="panel"><div class="msg err">Accès réservé.</div></div>'; return; }
+  kind = kind || window._enKind; if (!tabs.some((t) => t[0] === kind)) kind = tabs[0][0]; window._enKind = kind;
+  const drv = kind === 'TRUCK' || kind === 'SERVICE_VEHICLE';
+  root().innerHTML = `${tabs.length > 1 ? `<div class="dp-sub">${tabs.map((t) => `<button class="${t[0] === kind ? 'on' : ''}" onclick="renderEnrol('${t[0]}').then(()=>{const h=deptBarHtml('enrol');if(h)root().insertAdjacentHTML('afterbegin',h)})">${t[1]}</button>`).join('')}</div>` : ''}
+    <div class="panel"><h3>➕ Nouveau ${ENROL_ONE[kind]}</h3>
+      <div class="desc">Enregistrez la personne : le lien de l'application s'ouvre dans WhatsApp, avec son identifiant (son numéro) et son mot de passe provisoire.</div>
+      <div class="grid-2"><div><label>Nom</label><input id="en-last" autocomplete="off"></div><div><label>Prénom</label><input id="en-first" autocomplete="off"></div>
+        <div><label>N° WhatsApp</label><input id="en-phone" type="tel" inputmode="tel" placeholder="6xx xx xx xx"></div>
+        <div>${drv ? '<label>N° de permis</label><input id="en-lic" autocomplete="off">' : `<label>Activité</label><input value="${kind === 'HSE' ? 'Agent HSE' : 'Pointeur'}" disabled>`}</div></div>
+      <button class="btn gold" style="margin-top:10px" onclick="enrolSave()">💬 Envoyer le lien par WhatsApp</button><div id="en-msg"></div><div id="en-send"></div></div>
+    <div class="panel"><h3>${tabs.find((t) => t[0] === kind)[1]}</h3><div id="en-sum" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div><div id="en-list"><div class="empty">Chargement…</div></div>
+      <div class="desc" style="margin-top:10px"><b>Envoyé</b> : lien envoyé, pas encore utilisé · <b>Ouvert</b> : la personne s'est connectée, installation à terminer · <b>Activé</b> : application prête · <b>Expiré</b> : sans suite après 24 h, à renvoyer.</div></div>`;
+  enrolLoad();
+}
+async function enrolLoad() {
+  const kind = window._enKind, box = document.getElementById('en-list'); if (!box) return;
+  try {
+    const rows = await api('/staff/enrolment?kind=' + kind + '&siteId=' + encodeURIComponent(state.siteId || ''));
+    const n = (st) => rows.filter((r) => r.state === st).length;
+    const tile = (v, l, c) => `<div style="flex:1;min-width:90px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px;text-align:center"><div style="font-size:22px;font-weight:700;color:${c}">${v}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+    document.getElementById('en-sum').innerHTML = tile(n('NON_ENVOYE'), 'Non envoyé', 'var(--navy)') + tile(n('ENVOYE') + n('OUVERT'), 'En cours', '#C77D0A') + tile(n('ACTIVE'), 'Activés', '#2E8B57') + tile(n('EXPIRE'), 'Expirés', '#B4372F');
+    box.innerHTML = rows.length ? rows.map((r) => {
+      const st = ENROL_ST[r.state] || ENROL_ST.NON_ENVOYE;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)">
+        <div style="min-width:170px;flex:1"><b>${esc(r.lastName)}</b> ${esc(r.firstName)}<div style="font-size:12px;color:var(--muted)">${esc(r.phone || 'pas de numéro')}${r.detail ? ' · ' + esc(r.detail) : ''}</div></div>
+        <div style="text-align:right"><span class="badge ${st[1]}">${st[0]}</span>${r.invitedAt ? `<div style="font-size:11px;color:var(--muted)">envoi ${drvDt(r.invitedAt)}</div>` : ''}</div>
+        ${r.state === 'ACTIVE' || !r.phone ? '' : `<button class="btn small gold" onclick="enrolResend('${r.kind}','${esc(r.id)}')">💬 ${r.state === 'NON_ENVOYE' ? 'Envoyer le lien' : 'Renvoyer le lien'}</button>`}</div>`;
+    }).join('') : '<div class="empty">Aucune personne enregistrée dans cette catégorie.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function enrolSend(type, id) {
+  const box = document.getElementById('en-send');
+  const r = type === 'DRIVER' ? await api('/driver-admin/invite', { method: 'POST', body: { driverId: id, appUrl: enrolLink() } }) : await api('/staff/invite', { method: 'POST', body: { userId: id, appUrl: enrolLink() } });
+  const num = r.phone.length === 9 ? '224' + r.phone : r.phone; window._invMsg = r.message;
+  box.innerHTML = `<div class="msg ok" style="margin-top:10px">Message prêt pour ${esc(r.driver || r.name)} (${esc(num)}).</div>
+    <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Ouvrir WhatsApp</a>
+    <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+    <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ».</div>`;
+  box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  enrolLoad();
+}
+async function enrolResend(type, id) { try { await enrolSend(type, id); } catch (e) { alert(e.message); } }
+async function enrolSave() {
+  const kind = window._enKind, drv = kind === 'TRUCK' || kind === 'SERVICE_VEHICLE', m = document.getElementById('en-msg'), g = (id) => (document.getElementById(id) ? document.getElementById(id).value.trim() : '');
+  if (!g('en-first') || !g('en-last')) { m.innerHTML = '<div class="msg err">Nom et prénom obligatoires.</div>'; return; }
+  if (g('en-phone').replace(/\D/g, '').length < 8) { m.innerHTML = '<div class="msg err">Numéro WhatsApp obligatoire.</div>'; return; }
+  m.innerHTML = '';
+  try {
+    let id;
+    if (drv) id = (await api('/drivers', { method: 'POST', body: { firstName: g('en-first'), lastName: g('en-last'), phone: g('en-phone'), licenseNumber: g('en-lic') || undefined, activity: kind, siteId: state.siteId } })).id;
+    else id = (await api('/staff', { method: 'POST', body: { firstName: g('en-first'), lastName: g('en-last'), phone: g('en-phone'), role: kind === 'HSE' ? 'AGENT_HSE' : 'POINTEUR', siteId: state.siteId } })).id;
+    ['en-first', 'en-last', 'en-phone', 'en-lic'].forEach((x) => { const el = document.getElementById(x); if (el) el.value = ''; });
+    await enrolSend(drv ? 'DRIVER' : 'STAFF', id);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
 /* ---------------- ACCUEIL : uniquement les cartes des départements ---------------- */
 const HOME_CARDS = [
   { ico: '🎯', t: 'Direction', d: 'Tableau de bord, alertes et synthèse', v: 'pilotage', roles: ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'] },
@@ -2693,7 +2825,7 @@ const HOME_CARDS = [
   { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'espace' } },
   { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER', 'LECTEUR'], over: { MAGASINIER: 'espace' } },
   { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'driver-expenses', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
-  { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE', 'LECTEUR'] },
+  { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'reports-hse', MAGASINIER: 'reports-stock' } },
   { ico: '🏢', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
 ];
 function homeCardsFor(role) { return HOME_CARDS.filter((c) => c.roles.includes(role)).map((c) => ({ ...c, view: (c.over && c.over[role]) || c.v })); }
@@ -2709,8 +2841,8 @@ function bottomEntries(role) {
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
   if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
   const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
-  const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'COMPTABLE', 'LECTEUR'].includes(role);
-  return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', 'reports-truck']] : []), ['👤', 'Profil', '#profil']];
+  const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'].includes(role);
+  return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', reportsHome(role)]] : []), ['👤', 'Profil', '#profil']];
 }
 function buildBottomNav() {
   const nav = document.getElementById('bottom-nav'); if (!nav || !state.user || state.user.role === 'CHAUFFEUR') return;
@@ -2723,7 +2855,7 @@ function bottomGo(v) {
   go(v);
 }
 function updateBottomNav(view) { document.querySelectorAll('#bottom-nav button').forEach((b) => b.classList.toggle('on', b.dataset.v === view)); }
-{ const _g = go; go = function (v) { const r = _g.apply(this, arguments); try { updateBottomNav(v); } catch (e) {} return r; }; }
+{ const _g = go; go = function (v) { const r = _g.apply(this, arguments); try { updateBottomNav(navKey(v)); } catch (e) {} return r; }; }
 function offlineBar() { const b = document.getElementById('offline-bar'); if (b) b.style.display = navigator.onLine ? 'none' : 'block'; }
 window.addEventListener('online', offlineBar); window.addEventListener('offline', offlineBar); offlineBar();
 
@@ -2890,8 +3022,13 @@ async function renderExecutive(mode) {
     const crew = `<div class="ex-card"><h3>👥 Chauffeurs & équipe</h3>
       <div class="ex-row"><span>Chauffeurs actifs</span><b>${pe.drivers}</b></div><div class="ex-row"><span>Présents aujourd’hui</span><b>${pe.present}</b></div><div class="ex-row"><span>Absents / non présents</span><b>${pe.absent}</b></div><div class="ex-row"><span>Rapports du personnel reçus</span><b>${pe.staffReportsToday}/${pe.staff}</b></div>
       <div class="ex-row"><span>Véhicules en maintenance</span><b>${f.maintenance}</b></div><div class="ex-row"><span>Véhicules immobilisés</span><b>${f.immobilized}</b></div></div>`;
-    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${act('🚛', 'Camions', 'trucks')}${act('🚙', 'Véhicules de service', 'service-vehicles')}${act('🧑‍✈️', 'Chauffeurs', 'drivers')}${act('📜', 'Fiches de bord', 'driver-sheets')}${act('⛽', 'Carburant', 'fuel')}${act('🔧', 'Maintenance', 'maintenance')}${act('🕒', 'Pointeurs', 'staff-pointer')}${act('🔨', 'Mécaniciens', 'staff-mech')}</div></div>`;
-    body = hero + kpis + `<div class="ex-grid">${track}${alertsCard}${crew}</div><div class="ex-grid">${chartCard}${moveCard}</div>` + actions;
+    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${act('💬', 'Enrôler par WhatsApp', 'enrol')}${act('🕒', 'Pointage du jour', 'pointage')}${act('📋', 'Fiches de bord', 'driver-sheets')}${act('💵', 'Dépenses à valider', 'driver-expenses')}${act('🚛', 'Flotte', 'trucks')}${act('⛽', 'Carburant & maintenance', 'fuel')}${act('📊', 'Rapports', 'reports-truck')}</div></div>`;
+    const todo = `<div class="ex-card"><h3>✅ À traiter</h3>
+      <div class="ex-row"><span>Dépenses à valider</span><b>${ex.pendingApproval}</b></div>
+      <div class="ex-row"><span>Missions en attente</span><b>${m.planned}</b></div>
+      <div class="ex-row"><span>Rapports du personnel non reçus</span><b>${Math.max(0, pe.staff - pe.staffReportsToday)}</b></div>
+      <div class="ex-row"><span>Articles sous le seuil de stock</span><b>${st.belowMinimum}</b></div></div>`;
+    body = hero + kpis + actions + `<div class="ex-grid">${track}${alertsCard}${crew}</div><div class="ex-grid">${chartCard}${todo}</div>`;
   }
   root().innerHTML = body;
 }

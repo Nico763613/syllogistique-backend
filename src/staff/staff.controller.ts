@@ -20,7 +20,7 @@ export class StaffController {
   constructor(private service: StaffService) {}
 
   @Post()
-  @Roles(...OFFICE)
+  @Roles(...OFFICE, RoleName.GESTIONNAIRE_HSE)
   create(@Body() dto: CreateStaffDto, @CurrentUser() actor: any) {
     return this.service.create(dto, actor, actor.organizationId, actor.role);
   }
@@ -32,9 +32,15 @@ export class StaffController {
   }
 
   @Post('invite')
-  @Roles(...OFFICE)
+  @Roles(...OFFICE, RoleName.GESTIONNAIRE_HSE)
   invite(@Body() dto: InviteStaffDto, @CurrentUser() actor: any) {
     return this.service.invite(dto.userId, dto.appUrl, actor, actor.role);
+  }
+
+  @Get('enrolment')
+  @Roles(...READERS)
+  enrolment(@Query('kind') kind: string, @Query('siteId') siteId?: string, @CurrentUser() actor?: any) {
+    return this.service.enrolment(kind, siteId, actor.role);
   }
 
   @Get('reports/mine')

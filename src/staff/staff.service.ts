@@ -19,6 +19,7 @@ export class StaffService {
 
   async create(dto: CreateStaffDto, actor: Actor, organizationId: string, actorRole?: string) {
     if (isManager(dto.role) && actorRole !== 'SUPER_ADMIN') throw new ForbiddenException("Seul l'administrateur principal peut enregistrer le Directeur Général ou le Responsable logistique.");
+    if (actorRole === 'GESTIONNAIRE_HSE' && dto.role !== 'AGENT_HSE') throw new ForbiddenException('Le responsable HSE enregistre uniquement des agents HSE.');
     const digits = this.last9(dto.phone);
     if (digits.length < 8) throw new BadRequestException('Numéro de téléphone invalide.');
     const all = await this.prisma.user.findMany({ where: { phone: { not: null }, deletedAt: null }, select: { phone: true } });
@@ -56,12 +57,15 @@ export class StaffService {
     const u = await this.prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
     if (!u || !(ALL_STAFF_ROLES as readonly string[]).includes(u.role.name)) throw new NotFoundException('Personnel introuvable.');
     if (isManager(u.role.name) && actorRole !== 'SUPER_ADMIN') throw new ForbiddenException("Seul l'administrateur principal peut envoyer ce lien.");
+    if (actorRole === 'GESTIONNAIRE_HSE' && u.role.name !== 'AGENT_HSE') throw new ForbiddenException('Le responsable HSE envoie le lien uniquement aux agents HSE.');
     const digits = (u.phone ?? '').replace(/\D/g, '');
     if (digits.length < 8) throw new BadRequestException('Renseignez le numéro de téléphone.');
     let temp: string | null = null;
     if (u.mustChangePassword) {
       temp = String(randomInt(100000, 1_000_000));
-      await this.prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(temp, 10) } });
+      await this.prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(temp, 10), invitedAt: new Date() } });
+    } else {
+      await this.prisma.user.update({ where: { id: u.id }, data: { invitedAt: new Date() } });
     }
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: u.id, newValue: { invitation: true } });
     const lines = [
@@ -72,6 +76,32 @@ export class StaffService {
       ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre espace de pilotage.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),
     ];
     return { name: `${u.firstName} ${u.lastName}`, phone: digits, message: lines.join('\n') };
+  }
+
+  // Suivi de l'enrôlement par WhatsApp : NON_ENVOYE → ENVOYE → OUVERT (s'est connecté) → ACTIVE, ou EXPIRE (lien resté sans suite plus de 24 h).
+  async enrolment(kind: string, siteId?: string, actorRole?: string) {
+    if (!['TRUCK', 'SERVICE_VEHICLE', 'HSE', 'POINTER'].includes(kind)) throw new BadRequestException('Catégorie invalide.');
+    if (actorRole === 'GESTIONNAIRE_HSE' && kind !== 'HSE') throw new ForbiddenException('Accès réservé aux agents HSE.');
+    const now = Date.now();
+    const stateOf = (u: { invitedAt: Date | null; lastLoginAt: Date | null } | null, activated: boolean) => {
+      if (!u || !u.invitedAt) return 'NON_ENVOYE';
+      if (activated) return 'ACTIVE';
+      if (u.lastLoginAt && u.lastLoginAt >= u.invitedAt) return 'OUVERT';
+      return now - u.invitedAt.getTime() > 24 * 3600 * 1000 ? 'EXPIRE' : 'ENVOYE';
+    };
+    if (kind === 'TRUCK' || kind === 'SERVICE_VEHICLE') {
+      const drivers = await this.prisma.driver.findMany({ where: { deletedAt: null, activity: kind, ...(siteId ? { siteId } : {}) }, orderBy: { lastName: 'asc' } });
+      const uids = drivers.map((d) => d.userId).filter((x): x is string => !!x);
+      const users = await this.prisma.user.findMany({ where: { id: { in: uids } }, select: { id: true, invitedAt: true, lastLoginAt: true } });
+      const devs = await this.prisma.driverDevice.findMany({ where: { driverId: { in: drivers.map((d) => d.id) }, status: 'ACTIVE' }, select: { driverId: true } });
+      return drivers.map((d) => {
+        const u = users.find((x) => x.id === d.userId) ?? null;
+        return { id: d.id, kind: 'DRIVER', firstName: d.firstName, lastName: d.lastName, phone: d.phone, detail: d.licenseNumber ? `Permis ${d.licenseNumber}${d.licenseCategory ? ' (' + d.licenseCategory + ')' : ''}` : null, invitedAt: u?.invitedAt ?? null, state: stateOf(u, devs.some((x) => x.driverId === d.id)) };
+      });
+    }
+    const role = kind === 'HSE' ? 'AGENT_HSE' : 'POINTEUR';
+    const users = await this.prisma.user.findMany({ where: { deletedAt: null, role: { name: role as any }, ...(siteId ? { siteId } : {}) }, orderBy: { lastName: 'asc' } });
+    return users.map((u) => ({ id: u.id, kind: 'STAFF', firstName: u.firstName, lastName: u.lastName, phone: u.phone, detail: null, invitedAt: u.invitedAt, state: stateOf(u, !u.mustChangePassword && !!u.lastLoginAt) }));
   }
 
   // --- Rapport d'activité du jour (par le personnel lui-même) ---
