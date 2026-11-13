@@ -271,7 +271,7 @@ export class ReportsService {
       GESTIONNAIRE_FLOTTE: 'Gestionnaire de flotte',
       MAGASINIER: 'Magasinier',
       CHAUFFEUR: 'Chauffeur',
-      LECTEUR: 'Lecteur / Superviseur',
+      LECTEUR: 'Superviseur',
       DIRECTEUR_GENERAL: 'Directeur Général',
       MECANICIEN: 'Mécanicien',
       POINTEUR: 'Pointeur',
