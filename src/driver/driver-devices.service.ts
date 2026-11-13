@@ -135,6 +135,7 @@ export class DriverDevicesService {
       }
     }
     const prov = await this.provision(driver.id, actor);
+    if (userId) await this.prisma.user.update({ where: { id: userId }, data: { invitedAt: new Date() } });
     const veh = await this.prisma.vehicle.findFirst({ where: { assignedDriverId: driver.id, deletedAt: null } });
     const kind = driver.activity === 'SERVICE_VEHICLE' ? 'chauffeur de véhicule de service' : driver.activity === 'TRUCK' ? 'chauffeur de camion' : 'chauffeur';
     const lines = [
