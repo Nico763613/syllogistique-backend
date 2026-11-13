@@ -206,19 +206,75 @@
   .drv-warn{background:#FBE9E7; color:var(--danger); padding:10px 12px; border-radius:10px; font-size:13px; margin-bottom:10px;}
   .drv-center{text-align:center; padding:26px 8px;}
   .drv-otp{font-size:34px; letter-spacing:6px; font-weight:800; color:var(--navy); font-family:monospace;}
+
+  /* ====== Identité SYL LOGISTIQUE (étape 1 : habillage commun) ====== */
+  :root{ --navy:#0F2A5C; --navy-dark:#0A1F47; --navy-soft:#2563EB; --blue:#2563EB; --bg:#EEF3FA; --line:#E1E8F3; --radius:14px; --text:#14223F; }
+  body{background:var(--bg);}
+  .sidebar{width:252px; background:linear-gradient(180deg,#0B2557 0%,#0A1F47 100%); padding:18px 0;}
+  .brand-block{display:flex; align-items:center; gap:10px; padding:0 18px 14px; border-bottom:none; margin-bottom:0;}
+  .brand-block .brand{font-size:17px; line-height:1.1; letter-spacing:.3px;}
+  .brand-block .tagline{font-size:10px; color:#B7C7E6; text-transform:none; letter-spacing:0; margin-top:2px;}
+  .side-user{display:flex; align-items:center; gap:12px; margin:6px 14px 12px; padding:12px; border-radius:14px; background:rgba(255,255,255,.07);}
+  .side-user b{display:block; font-size:14px; color:#fff; line-height:1.2;} .side-user small{display:block; font-size:11px; color:#B7C7E6; margin-top:2px;}
+  .av{border-radius:50%; overflow:hidden; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; background:#2563EB; box-shadow:0 0 0 2px rgba(255,255,255,.55);}
+  .av-img{display:block; object-fit:cover; border-radius:50%;} .av-ini{display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; border-radius:50%;}
+  .nav-item{margin:2px 12px; padding:10px 14px; border-left:none; border-radius:10px; color:#D5E0F4; font-size:14px;}
+  .nav-item:hover{background:rgba(255,255,255,.09);}
+  .nav-item.active{background:#2563EB; border-left-color:transparent; color:#fff; box-shadow:0 6px 16px rgba(37,99,235,.35);}
+  .nav-sub-label{color:#8FB0EA; padding-left:20px;} .nav-section-label{color:rgba(255,255,255,.45); padding:14px 18px 6px;}
+  .sidebar-footer{margin:auto 14px 0; padding:12px 4px 0;}
+  .topbar{padding:12px 28px; border-bottom:none; box-shadow:0 2px 12px rgba(15,42,92,.06);}
+  .topbar h2{font-size:21px; color:var(--navy);}
+  .user-chip{gap:10px;} .user-chip .meta{line-height:1.2;} #user-name{font-size:13px;}
+  #bell-btn{border:none; background:#F1F5FC; border-radius:50%; width:38px; height:38px; display:inline-flex; align-items:center; justify-content:center; font-size:17px; padding:0;}
+  #bell-count{top:-3px; right:-3px;}
+  #user-menu{display:none; position:absolute; right:28px; top:58px; z-index:30; width:230px; background:#fff; border:1px solid var(--line); border-radius:12px; box-shadow:0 12px 32px rgba(15,42,92,.18); padding:6px;}
+  #user-menu button{display:block; width:100%; text-align:left; background:none; border:none; padding:10px 12px; border-radius:8px; font-size:13px; cursor:pointer; color:var(--text);} #user-menu button:hover{background:#F1F5FC;}
+  .kpi-card{border-radius:var(--radius); box-shadow:0 2px 10px rgba(15,42,92,.06); border-color:#E9EEF7;} .kpi-card::before{display:none;}
+  .panel,.ex-card,.ex-kpi,.drv-card{border-radius:var(--radius); box-shadow:0 2px 10px rgba(15,42,92,.06); border-color:#E9EEF7;}
+  .btn{background:var(--blue); border-radius:10px;} .btn:hover{background:#1D4ED8;} .btn.gold{background:var(--blue); color:#fff;} .btn.gold:hover{background:#1D4ED8;}
+  .btn.small{border-radius:8px;}
+  .drv-head{background:linear-gradient(120deg,#0B2557,#1747A8);}
+  /* Écran de connexion */
+  #login-screen{background:linear-gradient(135deg,#0A1F47 0%,#0F2A5C 55%,#1747A8 100%); padding:20px;}
+  .lg-wrap{display:flex; width:min(980px,100%); background:#fff; border-radius:22px; overflow:hidden; box-shadow:0 30px 80px rgba(0,0,0,.4);}
+  .lg-side{flex:1.1; color:#fff; padding:40px 38px; background:linear-gradient(160deg,#0F2A5C 0%,#1747A8 100%); display:flex; flex-direction:column; gap:18px;}
+  .lg-logo{display:flex; align-items:center; gap:12px;} .lg-logo b{display:block; font-family:'Sora',sans-serif; font-size:21px; letter-spacing:.3px;} .lg-logo span{font-size:12px; color:#B7C7E6;}
+  .lg-side h1{font-size:25px; line-height:1.25; margin:14px 0 0;} .lg-side p{margin:0; color:#CBD8F1; font-size:14px; line-height:1.5;}
+  .lg-feats{list-style:none; padding:0; margin:8px 0 0; display:grid; gap:12px;} .lg-feats li{display:flex; gap:12px; align-items:center; font-size:14px; font-weight:600;} .lg-feats li i{font-style:normal; width:38px; height:38px; border-radius:10px; background:rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; font-size:19px;} .lg-feats small{display:block; font-weight:400; color:#B7C7E6; font-size:12px;}
+  .lg-wrap .login-card{flex:1; width:auto; border-radius:0; box-shadow:none; padding:40px 38px; align-self:center;}
+  .login-card h2{margin:0 0 4px; font-size:22px; color:var(--navy);} .login-card .sub{color:var(--muted); font-size:13px; margin-bottom:6px;}
+  @media (max-width:760px){ .lg-side{display:none;} .lg-wrap .login-card{padding:30px 24px;} .lg-mobile-logo{display:flex !important;} }
+  .lg-mobile-logo{display:none; align-items:center; gap:10px; margin-bottom:14px;} .lg-mobile-logo b{font-family:'Sora',sans-serif; color:var(--navy); font-size:18px;}
+  /* Éditeur de photo */
+  #ph-ov{position:fixed; inset:0; background:rgba(10,31,71,.6); z-index:95; display:flex; align-items:center; justify-content:center; padding:16px;}
+  .ph-card{background:#fff; border-radius:18px; padding:20px; width:min(360px,100%); text-align:center; max-height:94vh; overflow:auto;}
+  .ph-card h3{margin:0 0 4px; color:var(--navy);} .ph-card canvas{width:260px; max-width:100%; height:auto; border-radius:14px; touch-action:none; background:#E6ECF5; margin:10px 0 4px; cursor:grab;}
+  .ph-card .row{display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:10px;} .ph-card .btn{margin-top:0;}
+  .btn.ghost{background:#fff; color:var(--navy); border:1px solid var(--line);} .btn.ghost:hover{background:#F1F5FC;} .btn.danger{background:#fff; color:var(--danger); border:1px solid #F0C9C4;}
 </style>
 </head>
 <body>
 
 <!-- ============ LOGIN ============ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="syl-logo" viewBox="0 0 64 64"><polygon points="32,3 57,17.5 57,46.5 32,61 7,46.5 7,17.5" fill="#1E5BD8"/><polygon points="32,3 57,17.5 32,32 7,17.5" fill="#34B36B"/><polygon points="32,32 57,17.5 57,46.5 32,61" fill="#F5B301"/><polygon points="32,32 7,17.5 7,46.5 32,61" fill="#1747A8"/><path d="M19 40l9-7 6 4 11-9" stroke="#fff" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol></svg>
 <div id="login-screen">
+ <div class="lg-wrap">
+  <div class="lg-side">
+    <div class="lg-logo"><svg width="54" height="54"><use href="#syl-logo"/></svg><div><b>SYL LOGISTIQUE</b><span>Gestion Logistique &amp; Fret</span></div></div>
+    <h1>Pilotez votre logistique en toute simplicité</h1>
+    <p>Une plateforme complète pour gérer votre flotte, vos stocks, vos équipes et vos rapports, du bureau jusqu'au terrain.</p>
+    <ul class="lg-feats">
+      <li><i>🛡️</i><div>Sécurité renforcée<small>Accès à usage unique, par appareil autorisé</small></div></li>
+      <li><i>☁️</i><div>Synchronisation temps réel<small>Même hors connexion</small></div></li>
+      <li><i>📊</i><div>Tableaux de bord avancés<small>Un espace propre à chaque département</small></div></li>
+      <li><i>🤝</i><div>Accompagnement permanent</div></li>
+    </ul>
+  </div>
   <div class="login-card">
-    <div class="login-truck">🚚</div>
-    <div class="login-brand">
-      <div class="brand">SYLLOGISTIQUE</div>
-      <div class="tagline">GESTION LOGISTIQUE &amp; FLOTTE</div>
-    </div>
-    <div class="route-rule"></div>
+    <div class="lg-mobile-logo"><svg width="40" height="40"><use href="#syl-logo"/></svg><b>SYL LOGISTIQUE</b></div>
+    <h2>Connexion</h2>
+    <div class="sub">Accédez à votre espace de travail.</div>
 
     <label>URL de l'API</label>
     <input id="api-url" placeholder="https://votre-api.exemple.com" />
@@ -238,6 +294,7 @@
     <button id="install-btn-login" class="btn-ghost" style="display:none; width:100%; margin-top:12px; text-align:center;" onclick="installApp()">⬇ Installer sur cet appareil</button>
     <div class="powered">Powered by Syllogistique</div>
   </div>
+ </div>
 </div>
 
 <!-- ============ APP ============ -->
@@ -245,9 +302,10 @@
   <div class="shell">
     <aside class="sidebar" id="sidebar">
       <div class="brand-block">
-        <div class="brand">🚚 SYLLOGISTIQUE</div>
-        <div class="tagline">Gestion Logistique &amp; Flotte</div>
+        <svg width="40" height="40"><use href="#syl-logo"/></svg>
+        <div><div class="brand">SYL LOGISTIQUE</div><div class="tagline">Gestion Logistique &amp; Fret</div></div>
       </div>
+      <div class="side-user"><div class="av" data-avatar="46" onclick="openPhotoEditor()" title="Changer ma photo"></div><div><b id="side-name">—</b><small id="side-role">—</small></div></div>
 
       <div class="nav-item active" data-view="dashboard" onclick="go('dashboard')">
         <span class="nav-icon">🏠</span> Tableau de bord
@@ -326,13 +384,15 @@
         <div class="user-chip">
           <select id="site-switch" style="display:none; max-width:170px; margin-right:8px;" onchange="switchSite(this.value)" title="Entrepôt / site actif"></select>
           <button id="install-btn" class="btn-ghost" style="display:none;" onclick="installApp()">⬇ Installer l'application</button>
-          <div class="user-avatar" id="user-initials">SA</div>
-          <div>
+          <div class="av" id="user-initials" data-avatar="38" onclick="openPhotoEditor()" title="Changer ma photo"></div>
+          <div class="meta" onclick="toggleUserMenu(event)" style="cursor:pointer">
             <div id="user-name" style="color:var(--text); font-weight:600;">—</div>
             <div id="user-role">—</div>
           </div>
+          <span onclick="toggleUserMenu(event)" style="cursor:pointer;color:var(--muted)">⌄</span>
         </div>
       </div>
+      <div id="user-menu"><button onclick="openPhotoEditor()">📷 Ma photo de profil</button><button onclick="go('settings')">⚙️ Paramètres</button><button onclick="logout()">🚪 Déconnexion</button></div>
       <div class="content" id="view-root"></div>
       <div class="powered">Powered by Syllogistique</div>
     </div>
@@ -343,7 +403,7 @@
 <!-- ============ APPLICATION CHAUFFEUR ============ -->
 <div id="driver-app">
   <div class="drv-head">
-    <div style="display:flex;align-items:center;gap:10px"><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
+    <div style="display:flex;align-items:center;gap:10px"><div class="av" data-avatar="36" onclick="openPhotoEditor()" title="Ma photo"></div><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
     <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil">👤</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
@@ -488,10 +548,12 @@ function enterApp() {
   if (state.user && state.user.role === 'CHAUFFEUR') { setTimeout(() => drvEnter(), 0); return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  const initials = ((state.user.firstName || '?')[0] + (state.user.lastName || '?')[0]).toUpperCase();
-  document.getElementById('user-initials').textContent = initials;
-  document.getElementById('user-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  const realMail = state.user.email && !/@(staff|driver)\.local$/.test(state.user.email);
+  document.getElementById('user-name').textContent = realMail ? state.user.email : `${state.user.firstName} ${state.user.lastName}`;
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
+  document.getElementById('side-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  document.getElementById('side-role').textContent = roleLabel(state.user.role);
+  refreshAvatars(); loadMyPhoto();
   loadSiteSwitch();
   applyRoleNav();
   const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'espace', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', DIRECTEUR_GENERAL: 'pilotage', ADMIN_LOGISTIQUE: 'espace-logi', MAGASINIER: 'espace' }[state.user.role];
@@ -2605,6 +2667,89 @@ async function stInvite(userId) {
   } catch (e) { box.innerHTML = `<div class="msg err" style="margin-top:10px">${esc(e.message)}</div>`; }
 }
 
+
+/* ---------------- PHOTO DE PROFIL (recadrage rond + compression automatique) ---------------- */
+function avatarHtml(size) {
+  const u = state.user || {};
+  const ini = ((u.firstName || '?')[0] + (u.lastName || '?')[0]).toUpperCase();
+  return u.photoUrl ? `<img class="av-img" src="${esc(u.photoUrl)}" alt="" style="width:${size}px;height:${size}px">`
+    : `<span class="av-ini" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.38)}px">${esc(ini)}</span>`;
+}
+function refreshAvatars() { document.querySelectorAll('[data-avatar]').forEach((el) => { el.innerHTML = avatarHtml(+el.dataset.avatar); }); }
+async function loadMyPhoto() {
+  try { const r = await api('/auth/photo'); state.user.photoUrl = r.photoUrl || null; try { localStorage.setItem('syllo_user', JSON.stringify(state.user)); } catch (e) {} refreshAvatars(); } catch (e) {}
+}
+function toggleUserMenu(ev) { if (ev) ev.stopPropagation(); const m = document.getElementById('user-menu'); m.style.display = m.style.display === 'block' ? 'none' : 'block'; }
+document.addEventListener('click', () => { const m = document.getElementById('user-menu'); if (m) m.style.display = 'none'; });
+
+let PH = null;
+function openPhotoEditor() {
+  closePhotoEditor();
+  const ov = document.createElement('div'); ov.id = 'ph-ov';
+  ov.innerHTML = `<div class="ph-card"><h3>Ma photo de profil</h3><div class="desc" style="margin-bottom:0">Faites glisser pour cadrer, utilisez le curseur pour zoomer.</div>
+    <canvas id="ph-cv" width="260" height="260"></canvas>
+    <input type="range" id="ph-zoom" min="1" max="3" step="0.01" value="1" style="padding:0" oninput="phZoom(this.value)">
+    <div class="row"><label class="btn small">📷 Prendre une photo<input type="file" accept="image/*" capture="user" hidden onchange="phLoad(this.files[0])"></label>
+    <label class="btn small ghost" style="background:#fff;color:var(--navy);border:1px solid var(--line)">🖼️ Galerie<input type="file" accept="image/*" hidden onchange="phLoad(this.files[0])"></label></div>
+    <div class="row"><button class="btn small" id="ph-save" onclick="phSave()">Enregistrer</button><button class="btn small danger" onclick="phRemove()">Supprimer</button><button class="btn small ghost" onclick="closePhotoEditor()">Annuler</button></div>
+    <div id="ph-msg"></div></div>`;
+  document.body.appendChild(ov);
+  PH = { img: null, zoom: 1, ox: 0, oy: 0, changed: false };
+  const cv = document.getElementById('ph-cv');
+  let drag = null;
+  cv.onpointerdown = (e) => { if (!PH.img) return; drag = { x: e.clientX, y: e.clientY, ox: PH.ox, oy: PH.oy }; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; };
+  cv.onpointermove = (e) => { if (!drag) return; const k = 260 / cv.getBoundingClientRect().width; PH.ox = drag.ox + (e.clientX - drag.x) * k / 260; PH.oy = drag.oy + (e.clientY - drag.y) * k / 260; phDraw(); };
+  cv.onpointerup = cv.onpointercancel = () => { drag = null; cv.style.cursor = 'grab'; };
+  if (state.user && state.user.photoUrl) { const im = new Image(); im.onload = () => { PH.img = im; phDraw(); }; im.src = state.user.photoUrl; } else phDraw();
+}
+function closePhotoEditor() { const o = document.getElementById('ph-ov'); if (o) o.remove(); PH = null; }
+function phLoad(file) {
+  if (!file) return;
+  if (!/^image\//.test(file.type)) { document.getElementById('ph-msg').innerHTML = '<div class="msg err">Choisissez une image.</div>'; return; }
+  const rd = new FileReader();
+  rd.onload = () => { const im = new Image(); im.onload = () => { PH.img = im; PH.zoom = 1; PH.ox = 0; PH.oy = 0; PH.changed = true; document.getElementById('ph-zoom').value = 1; phDraw(); }; im.onerror = () => { document.getElementById('ph-msg').innerHTML = '<div class="msg err">Image illisible.</div>'; }; im.src = rd.result; };
+  rd.readAsDataURL(file);
+}
+function phZoom(v) { PH.zoom = +v; PH.changed = true; phDraw(); }
+function phRender(ctx, S) {
+  const im = PH.img; ctx.clearRect(0, 0, S, S); ctx.fillStyle = '#E6ECF5'; ctx.fillRect(0, 0, S, S);
+  if (!im) return;
+  const base = Math.max(S / im.width, S / im.height) * PH.zoom, w = im.width * base, h = im.height * base;
+  const mx = Math.max(0, (w - S) / 2) / S, my = Math.max(0, (h - S) / 2) / S;
+  PH.ox = Math.max(-mx, Math.min(mx, PH.ox)); PH.oy = Math.max(-my, Math.min(my, PH.oy));
+  ctx.drawImage(im, S / 2 - w / 2 + PH.ox * S, S / 2 - h / 2 + PH.oy * S, w, h);
+}
+function phDraw() {
+  const cv = document.getElementById('ph-cv'); if (!cv) return; const ctx = cv.getContext('2d'), S = 260;
+  phRender(ctx, S);
+  if (!PH.img) { ctx.fillStyle = '#6B7A8F'; ctx.font = '600 15px Inter,sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Prenez ou choisissez une photo', S / 2, S / 2); }
+  ctx.save(); ctx.fillStyle = 'rgba(10,31,71,.55)'; ctx.beginPath(); ctx.rect(0, 0, S, S); ctx.arc(S / 2, S / 2, S / 2 - 6, 0, Math.PI * 2, true); ctx.fill('evenodd'); ctx.restore();
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2 - 6, 0, Math.PI * 2); ctx.stroke();
+}
+async function phSave() {
+  const msg = document.getElementById('ph-msg');
+  if (!PH || !PH.img || !PH.changed) { msg.innerHTML = '<div class="msg err">Choisissez d’abord une nouvelle photo.</div>'; return; }
+  // Image finale ronde 192 px, JPEG léger (adapté aux connexions lentes) ; on réduit jusqu'à tenir sous ~60 Ko
+  let out = null;
+  for (const [size, q] of [[192, 0.72], [192, 0.55], [144, 0.6], [112, 0.55]]) {
+    const c = document.createElement('canvas'); c.width = c.height = size; const x = c.getContext('2d');
+    const keep = { ox: PH.ox, oy: PH.oy }; phRender(x, size); PH.ox = keep.ox; PH.oy = keep.oy;
+    out = c.toDataURL('image/jpeg', q); if (out.length < 60000) break;
+  }
+  try {
+    document.getElementById('ph-save').disabled = true;
+    await api('/auth/photo', { method: 'PUT', body: { photo: out } });
+    state.user.photoUrl = out; try { localStorage.setItem('syllo_user', JSON.stringify(state.user)); } catch (e) {}
+    refreshAvatars(); closePhotoEditor();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; document.getElementById('ph-save').disabled = false; }
+}
+async function phRemove() {
+  if (!state.user.photoUrl) { closePhotoEditor(); return; }
+  if (!confirm('Supprimer votre photo de profil ?')) return;
+  try { await api('/auth/photo', { method: 'DELETE' }); state.user.photoUrl = null; try { localStorage.setItem('syllo_user', JSON.stringify(state.user)); } catch (e) {} refreshAvatars(); closePhotoEditor(); }
+  catch (e) { document.getElementById('ph-msg').innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
 /* ---------------- PILOTAGE : espace Directeur Général et espace Responsable logistique ---------------- */
 function execStyle() {
   if (document.getElementById('exec-style')) return;
@@ -3108,6 +3253,7 @@ function drvEnter() {
   drvEl('app').style.display = 'none';
   drvEl('driver-app').style.display = 'block';
   drvEl('drv-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  refreshAvatars(); loadMyPhoto();
   { const m = dget('me', null); if (m) drvEl('drv-sub').textContent = drvKind(m); }
   window.addEventListener('online', () => { drvLoad(); });
   window.addEventListener('offline', drvPill);
@@ -3790,7 +3936,9 @@ function brandApply() {
   const logo = BRAND.logoUrl ? `<img src="${esc(brandSrc(BRAND.logoUrl))}" alt="" style="height:44px;max-width:120px;object-fit:contain;vertical-align:middle">` : '';
   const lb = document.querySelector('.login-brand .brand'); if (lb) lb.textContent = n;
   const lt = document.querySelector('.login-truck'); if (lt) lt.innerHTML = logo || '🚚';
-  const sb = document.querySelector('.brand-block .brand'); if (sb) sb.innerHTML = (logo ? logo.replace('height:44px', 'height:30px') + ' ' : '🚚 ') + esc(n);
+  const custom = !!(BRAND.logoUrl || (BRAND.name && BRAND.name !== 'SYLLOGISTIQUE'));
+  const sb = document.querySelector('.brand-block .brand'); if (sb) sb.textContent = custom ? n : 'SYL LOGISTIQUE';
+  if (custom) { const lg = document.querySelector('.brand-block svg'); if (lg && logo) lg.outerHTML = logo.replace('height:44px', 'height:38px'); const ll = document.querySelector('.lg-logo b'); if (ll) ll.textContent = n; }
   const ds = document.getElementById('drv-sub'); if (ds && !ds.dataset.k) ds.textContent = n;
 }
 async function brandLoad() {

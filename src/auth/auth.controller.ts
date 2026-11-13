@@ -1,9 +1,9 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, Put, Req, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Request } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
-import { LoginDto, RefreshTokenDto, ChangePasswordDto } from './dto/auth.dto';
+import { LoginDto, RefreshTokenDto, ChangePasswordDto, SetPhotoDto } from './dto/auth.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -28,6 +28,26 @@ export class AuthController {
   @Post('refresh')
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.refreshToken);
+  }
+
+  // Photo de profil de l'utilisateur connecté (lecture, ajout/changement, suppression)
+  @ApiBearerAuth()
+  @Get('photo')
+  getPhoto(@CurrentUser() user: any) {
+    return this.authService.getPhoto(user.userId);
+  }
+
+  @ApiBearerAuth()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Put('photo')
+  setPhoto(@CurrentUser() user: any, @Body() dto: SetPhotoDto) {
+    return this.authService.setPhoto(user.userId, dto.photo);
+  }
+
+  @ApiBearerAuth()
+  @Delete('photo')
+  removePhoto(@CurrentUser() user: any) {
+    return this.authService.setPhoto(user.userId, null);
   }
 
   @ApiBearerAuth()
