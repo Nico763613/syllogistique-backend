@@ -275,6 +275,7 @@ export class ReportsService {
       DIRECTEUR_GENERAL: 'Directeur Général',
       MECANICIEN: 'Mécanicien',
       POINTEUR: 'Pointeur',
+      COMPTABLE: 'Comptabilité',
     };
     return {
       name: user ? `${user.firstName} ${user.lastName}` : '—',

@@ -11,6 +11,7 @@ const ROLE_LABELS: Record<string, string> = {
   DIRECTEUR_GENERAL: 'Directeur Général',
   MECANICIEN: 'Mécanicien',
   POINTEUR: 'Pointeur',
+  COMPTABLE: 'Comptabilité',
 };
 
 export async function getIssuer(prisma: PrismaService, userId: string) {

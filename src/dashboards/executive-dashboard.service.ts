@@ -76,6 +76,22 @@ export class ExecutiveDashboardService {
     const expMonth = num(fuelMonth._sum.totalCost) + num(maintMonth._sum.cost) + num(drvExpMonth._sum.amount);
     const belowMin = items.filter((i) => num(i.currentQuantity) < num(i.minimumQuantity)).length;
 
+    // Données validées uniquement : frais chauffeurs approuvés + carburant + maintenance
+    const prev0 = new Date(month0.getFullYear(), month0.getMonth() - 1, 1);
+    const [fuelPrev, maintPrev, drvPrev, drvApprovedMonth, openIncidents] = await Promise.all([
+      this.prisma.fuelTransaction.aggregate({ where: { ...site, transactionDate: { gte: prev0, lt: month0 } }, _sum: { totalCost: true } }),
+      this.prisma.maintenance.aggregate({ where: { vehicle: vSite, maintenanceDate: { gte: prev0, lt: month0 } }, _sum: { cost: true } }),
+      this.prisma.driverExpense.aggregate({ where: { date: { gte: prev0, lt: month0 }, status: 'APPROVED' }, _sum: { amount: true } }),
+      this.prisma.driverExpense.aggregate({ where: { date: { gte: month0 }, status: 'APPROVED' }, _sum: { amount: true } }),
+      this.prisma.hseIncident.findMany({ where: { ...site, status: { not: 'CLOSED' } }, orderBy: { occurredAt: 'desc' }, take: 5, select: { type: true, severity: true, description: true, occurredAt: true } }),
+    ]);
+    const expPrev = num(fuelPrev._sum.totalCost) + num(maintPrev._sum.cost) + num(drvPrev._sum.amount);
+    const expValidated = num(fuelMonth._sum.totalCost) + num(maintMonth._sum.cost) + num(drvApprovedMonth._sum.amount);
+    const budgetAlerts: Array<{ title: string; message: string; severity: string }> = [];
+    if (expPrev > 0 && expMonth > expPrev * 1.2) budgetAlerts.push({ title: 'Dépenses en hausse', message: `Les dépenses du mois dépassent de ${Math.round((expMonth / expPrev - 1) * 100)} % celles du mois dernier.`, severity: 'WARNING' });
+    if (expensesPending > 0) budgetAlerts.push({ title: 'Dépenses en attente de validation', message: `${expensesPending} dépense(s) chauffeur ne sont pas encore validées.`, severity: 'INFO' });
+    if (belowMin > 0) budgetAlerts.push({ title: 'Stock sous le seuil', message: `${belowMin} article(s) à réapprovisionner.`, severity: 'WARNING' });
+
     return {
       asOf: now.toISOString(),
       fleet: { total: vTotal, active: vc('AVAILABLE') + vc('ON_MISSION'), available: vc('AVAILABLE'), onMission: vc('ON_MISSION'), maintenance: vc('MAINTENANCE'), immobilized: vc('IMMOBILIZED') },
@@ -93,6 +109,9 @@ export class ExecutiveDashboardService {
         recent: movements.map((m) => ({ at: m.createdAt, item: m.item.name, type: m.movementType, quantity: num(m.quantity), reason: m.reason })),
       },
       hse: { openIncidents: hseOpen, accidentsMonth: hseAccidents, inspectionsMonth: inspMonth, complianceRate: pct(inspCompliant, inspMonth) },
+      safetyAlerts: openIncidents.map((i) => ({ title: `${i.type} — gravité ${i.severity}`, message: i.description, severity: i.severity === 'CRITICAL' || i.severity === 'HIGH' ? 'CRITICAL' : 'WARNING', at: i.occurredAt })),
+      budgetAlerts,
+      synthesis: { missionsCompleted: cur.completed, missionsTotal: cur.total, km: Math.round(trips6.filter((t) => t.tripDate >= month0).reduce((s, t) => s + (t.distance ?? 0), 0)), expensesValidated: Math.round(expValidated), expensesPreviousMonth: Math.round(expPrev), incidents: hseOpen, compliance: pct(inspCompliant, inspMonth) },
       alerts: alerts.map((a) => ({ id: a.id, title: a.title, message: a.message, severity: a.severity, at: a.createdAt })),
     };
   }
