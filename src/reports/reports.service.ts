@@ -252,7 +252,7 @@ export class ReportsService {
       attendance: {
         counts: attendanceCount,
         absences: attendance
-          .filter((a) => a.status !== 'PRESENT')
+          .filter((a) => a.status !== 'PRESENT' && a.status !== 'LATE')
           .map((a) => ({
             driver: `${a.driver.firstName} ${a.driver.lastName}${a.driver.licenseNumber ? ' (permis ' + a.driver.licenseNumber + ')' : ''}`,
             status: a.status,

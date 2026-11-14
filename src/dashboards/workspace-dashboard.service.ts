@@ -82,11 +82,12 @@ export class WorkspaceDashboardService {
       this.prisma.driver.count({ where: { ...site, deletedAt: null, status: 'ACTIVE' } }),
       this.prisma.driverAttendance.findMany({ where: { ...site, date: day0 }, include: { driver: { select: { firstName: true, lastName: true } } } }),
     ]);
-    const present = att.filter((a) => a.status === 'PRESENT').length;
+    const present = att.filter((a) => a.status === 'PRESENT' || a.status === 'LATE').length; // un retard compte comme présent
+    const late = att.filter((a) => a.status === 'LATE').length;
     const absent = att.filter((a) => a.status === 'ABSENT');
     return {
       kind: 'POINTER',
-      kpis: { total: drivers, present, absent: absent.length, others: att.length - present - absent.length, remaining: Math.max(0, drivers - att.length) },
+      kpis: { total: drivers, present, late, absent: absent.length, others: att.length - present - absent.length, remaining: Math.max(0, drivers - att.length) },
       absentees: absent.map((a) => ({ name: `${a.driver.firstName} ${a.driver.lastName}`, reason: a.absenceReason })),
     };
   }

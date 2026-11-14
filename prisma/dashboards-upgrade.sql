@@ -297,3 +297,6 @@ ALTER TABLE staff_reports ADD COLUMN IF NOT EXISTS ops_at timestamp(3), ADD COLU
 
 --#
 ALTER TABLE vehicle_downtimes ADD COLUMN IF NOT EXISTS invoice_url text
+
+--#
+ALTER TYPE "AttendanceStatus" ADD VALUE IF NOT EXISTS 'LATE'

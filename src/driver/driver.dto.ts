@@ -53,6 +53,10 @@ export class PointerDto {
   @IsOptional() @IsString() @MaxLength(300) note?: string;
 }
 
+export class PointerCountDto extends PointerDto {
+  @IsOptional() @IsString() @MaxLength(300) correctionReason?: string;
+}
+
 export class InviteDto {
   @IsString() driverId: string;
   @IsString() @MaxLength(200) appUrl: string;
