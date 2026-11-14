@@ -113,7 +113,7 @@ export class DriverSheetService {
   async pendingValidation(siteId: string | undefined) {
     const ds = await this.prisma.driver.findMany({ where: { deletedAt: null, ...(siteId ? { siteId } : {}) }, select: { id: true } });
     const reps = await this.prisma.driverDailyReport.findMany({ where: { driverId: { in: ds.map((d) => d.id) }, processedAt: { not: null }, opsAt: null, rejectedAt: null }, orderBy: { reportDate: 'asc' }, take: 50 });
-    const out = [];
+    const out: Awaited<ReturnType<DriverSheetService['build']>>[] = [];
     for (const r of reps) out.push(await this.build(r.driverId, r.reportDate.toISOString().slice(0, 10)));
     return out;
   }
