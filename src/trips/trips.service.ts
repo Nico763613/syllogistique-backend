@@ -34,6 +34,7 @@ export class TripsService {
     }
 
     const distance = dto.endMileage !== undefined ? dto.endMileage - startMileage : undefined;
+    if (dto.customerId && !(await this.prisma.customer.findUnique({ where: { id: dto.customerId }, select: { id: true } }))) throw new BadRequestException('Client introuvable.');
 
     const trip = await this.prisma.trip.create({
       data: {
@@ -48,6 +49,7 @@ export class TripsService {
         endMileage: dto.endMileage,
         distance,
         destination: dto.destination,
+        customerId: dto.customerId || undefined,
         purpose: dto.purpose,
         passengerName: dto.passengerName,
         observations: dto.observations,
@@ -96,6 +98,18 @@ export class TripsService {
     });
 
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Trip', entityId: id, newValue: dto });
+    return updated;
+  }
+
+  // Client de la mission : choisi ou corrigé par le Responsable logistique (impossible une fois le trajet facturé)
+  async setCustomer(id: string, customerId: string, actorId: string) {
+    const trip = await this.prisma.trip.findUnique({ where: { id } });
+    if (!trip) throw new NotFoundException('Mission introuvable.');
+    if (trip.billedInvoiceId) throw new BadRequestException('Ce trajet est déjà facturé : le client ne peut plus être changé.');
+    const c = await this.prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, name: true } });
+    if (!c) throw new BadRequestException('Client introuvable.');
+    const updated = await this.prisma.trip.update({ where: { id }, data: { customerId } });
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Trip', entityId: id, newValue: { event: 'SET_CUSTOMER', customer: c.name } });
     return updated;
   }
 

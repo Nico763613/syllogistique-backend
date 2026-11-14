@@ -384,6 +384,7 @@ model Trip {
   tripsCount    Int?     @map("trips_count")
   tonnagePerTrip Float?  @map("tonnage_per_trip") // tonnes par mouvement (camion), coché par le chauffeur
   billedInvoiceId String? @map("billed_invoice_id") // facture de transport qui a facturé ce trajet
+  customerId    String?  @map("customer_id") // client de la mission (choisi par le Responsable logistique)
   preCondition  String?  @map("pre_condition") // RAS | ANOMALIE
   preAnomalies  String?  @map("pre_anomalies")
   arrivalMileage Int? @map("arrival_mileage") // compteur à l'arrivée à destination (arrêt = endMileage)

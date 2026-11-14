@@ -13,6 +13,7 @@ export class CreateTripDto {
   @IsOptional() @IsBoolean() planned?: boolean;
   @IsOptional() @IsDateString() scheduledArrival?: string;
   @IsOptional() @IsString() destination?: string;
+  @IsOptional() @IsString() customerId?: string; // client de la mission
   @IsOptional() @IsString() purpose?: string;
   @IsOptional() @IsString() passengerName?: string;
   @IsOptional() @IsString() observations?: string;
@@ -37,4 +38,8 @@ export class CorrectTripDto {
   @IsOptional() @IsString() purpose?: string;
   @IsOptional() @IsString() passengerName?: string;
   @IsOptional() @IsString() observations?: string;
+}
+
+export class SetTripCustomerDto {
+  @IsString() customerId: string;
 }

@@ -312,3 +312,6 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS billed_invoice_id text
 
 --#
 ALTER TABLE sales_invoices ADD COLUMN IF NOT EXISTS description text
+
+--#
+ALTER TABLE trips ADD COLUMN IF NOT EXISTS customer_id text
