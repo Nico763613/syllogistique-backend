@@ -4,11 +4,12 @@ const html = fs.readFileSync(__dirname + '/../public/index.html', 'utf8');
 const bad = [];
 const count = (arr) => arr.reduce((m, x) => ((m[x] = (m[x] || 0) + 1), m), {});
 // 1. une fonction = une seule entrée de menu
-const views = [...html.matchAll(/data-view="([\w-]+)"/g)].map((m) => m[1]);
+const markup = html.slice(0, html.indexOf('<script>')); // menus = balisage, hors code JS
+const views = [...markup.matchAll(/data-view="([\w-]+)"/g)].map((m) => m[1]);
 Object.entries(count(views)).filter(([, n]) => n > 1).forEach(([v, n]) => bad.push(`Menu en double : "${v}" ×${n}`));
 const COMMUNS = ['dashboard', 'stock', 'purchases', 'needs', 'sync', 'settings']; // menus communs : masqués pour les rôles départementaux par applyRoleNav()
 // 2. chaque entrée de menu a une liste de rôles (ce qui est interdit reste invisible)
-[...html.matchAll(/<(?:a|button|div)[^>]*data-view="([\w-]+)"[^>]*>/g)].forEach((m) => { if (!/data-roles=/.test(m[0]) && !COMMUNS.includes(m[1])) bad.push(`Menu sans data-roles : "${m[1]}"`); });
+[...markup.matchAll(/<(?:a|button|div)[^>]*data-view="([\w-]+)"[^>]*>/g)].forEach((m) => { if (!/data-roles=/.test(m[0]) && !COMMUNS.includes(m[1])) bad.push(`Menu sans data-roles : "${m[1]}"`); });
 // 3. un seul menu « Rapports »
 const rep = views.filter((v) => /^reports?(-|$)/.test(v));
 if (rep.length > 1) bad.push('Plusieurs menus Rapports : ' + rep.join(', '));

@@ -61,6 +61,24 @@ export class StaffController {
     return this.service.reports(toList(role), date, siteId);
   }
 
+  @Get('reports/pending')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.RESPONSABLE_OPERATIONS)
+  pending(@Query('siteId') siteId?: string) {
+    return this.service.pendingValidation(siteId);
+  }
+
+  @Post('reports/:id/validate')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.RESPONSABLE_OPERATIONS)
+  validate(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.service.validate(id, actor);
+  }
+
+  @Post('reports/:id/reject')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_HSE, RoleName.RESPONSABLE_OPERATIONS)
+  reject(@Param('id') id: string, @Body() body: { note?: string }, @CurrentUser() actor: any) {
+    return this.service.reject(id, body?.note ?? '', actor);
+  }
+
   @Post('reports/:id/receive')
   @Roles(...READERS.filter((r) => r !== RoleName.LECTEUR))
   receive(@Param('id') id: string, @CurrentUser() actor: any) {

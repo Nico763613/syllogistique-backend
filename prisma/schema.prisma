@@ -1666,6 +1666,11 @@ model StaffReport {
   sentAt       DateTime @default(now()) @map("sent_at")
   receivedAt   DateTime? @map("received_at")
   receivedBy   String?  @map("received_by")
+  opsAt        DateTime? @map("ops_at")
+  opsBy        String?  @map("ops_by")
+  rejectedAt   DateTime? @map("rejected_at")
+  rejectedBy   String?  @map("rejected_by")
+  rejectNote   String?  @map("reject_note")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

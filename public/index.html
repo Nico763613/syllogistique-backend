@@ -362,12 +362,12 @@
       <div class="nav-item" data-view="reports-truck" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,GESTIONNAIRE_HSE,MAGASINIER" onclick="go(reportsHome(state.user.role))"><span class="nav-icon">📊</span> Rapports</div>
 
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
-      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
+      <div class="nav-item" data-view="dash-stock" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('dash-stock')"><span class="nav-icon">📊</span> Tableau de bord Entrepôt</div>
       <div class="nav-item" data-view="stock" onclick="go('stock')"><span class="nav-icon">📦</span> Stocks</div>
       <div class="nav-item" data-view="staff-store" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-store')"><span class="nav-icon">🧑‍🏭</span> Magasiniers &amp; rapports</div>
 
       <div class="nav-section-label">🛒 Achats &amp; Approvisionnement</div>
-      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,MAGASINIER,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
+      <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
       <div class="nav-item" data-view="purchases" onclick="go('purchases')"><span class="nav-icon">🛒</span> Achats</div>
       <div class="nav-item" data-view="needs" onclick="go('needs')"><span class="nav-icon">📝</span> États des besoins</div>
       <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL,CAISSIER" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
@@ -1212,6 +1212,7 @@ function applyRoleNav() {
     document.querySelectorAll('#sidebar .nav-section-label, #sidebar .nav-sub-label').forEach((el) => { el.style.display = 'none'; });
     any = false;
   }
+  if (role === 'MAGASINIER') { const el = document.querySelector('#sidebar .nav-item[data-view="purchases"]'); if (el) el.style.display = 'none'; } // les achats restent au Responsable logistique
   const extra = { MECANICIEN: ['maintenance', 'trucks', 'service-vehicles', 'stock'], POINTEUR: ['drivers'] }[role] || [];
   extra.forEach((v) => { const el = document.querySelector('#sidebar .nav-item[data-view="' + v + '"]'); if (el) el.style.display = ''; });
   const lbl = document.getElementById('nav-dept-label');
@@ -2024,11 +2025,12 @@ async function renderStock() {
   loadStockAlerts();
   loadStockReceipts();
 }
-const STOCK_TABS = [['articles', '📦 Articles'], ['mouvements', '↕ Mouvements'], ['inventaire', '📋 Inventaire'], ['transferts', '↔ Transferts'], ['alertes', '🚨 Alertes'], ['receptions', '📥 Réceptions']];
+const STOCK_TABS = [['articles', '📦 Articles'], ['entrees', '📥 Entrées'], ['sorties', '↕ Sorties'], ['inventaire', '📋 Inventaire'], ['rapports', '📊 Rapports']];
+const STOCK_PANELS = { articles: ['articles', 'alertes'], entrees: ['receptions'], sorties: ['mouvements'], inventaire: ['inventaire', 'transferts'] };
 let stockTab = 'articles';
-function setStockTab(k) { stockTab = k; applyStockTab(); }
+function setStockTab(k) { if (k === 'rapports') return go(reportsHome(state.user.role)); stockTab = k; applyStockTab(); }
 function applyStockTab() {
-  document.querySelectorAll('[data-stab]').forEach((el) => { el.style.display = el.dataset.stab === stockTab ? '' : 'none'; });
+  document.querySelectorAll('[data-stab]').forEach((el) => { el.style.display = (STOCK_PANELS[stockTab] || []).includes(el.dataset.stab) ? '' : 'none'; });
   const bar = document.getElementById('st-tabs');
   if (bar) bar.innerHTML = STOCK_TABS.map(([k, t]) => `<button class="btn ${stockTab === k ? 'gold' : ''}" style="margin:0" onclick="setStockTab('${k}')">${t}</button>`).join('');
 }
@@ -2665,11 +2667,12 @@ async function stLoad() {
     const tile = (n, l, col) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center"><div style="font-size:24px;font-weight:700;color:${col}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
     document.getElementById('st-sum').innerHTML = tile(active.length, 'Personnes', 'var(--navy)') + tile(reps.length, 'Rapports envoyés', '#2E8B57') + tile(reps.filter((r) => r.receivedAt).length, 'Reçus', '#2E8B57') + tile(missing.length, 'Non envoyés', '#B4372F');
     const wa = (u) => { const n = String(u.phone || '').replace(/\D/g, ''), f = n.length === 9 ? '224' + n : n; return u.phone ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(f)}?text=${encodeURIComponent('Bonjour ' + u.firstName + ', merci d\'envoyer votre rapport du jour dans l\'application.')}">💬 Relancer</a>` : ''; };
-    document.getElementById('st-reports').innerHTML = reps.map((r) => `<div class="panel"><h3 style="margin-bottom:4px">${esc(r.name)} <span class="badge ${r.receivedAt ? 'ok' : 'warn'}">${r.receivedAt ? '✔ Reçu' : '📤 Envoyé ' + drvDt(r.sentAt)}</span></h3>
+    document.getElementById('st-reports').innerHTML = reps.map((r) => `<div class="panel"><h3 style="margin-bottom:4px">${esc(r.name)} ${stepBadge(staffStep(r))} <span style="font-size:12px;font-weight:400;color:var(--muted)">${drvDt(r.sentAt)}</span></h3>
         <div class="desc">${esc(r.phone || '')}</div>
         <h4 style="margin:8px 0 2px">Activités</h4><div style="white-space:pre-wrap">${esc(r.activities)}</div>
         ${r.observations ? `<h4 style="margin:8px 0 2px">Observations</h4><div style="white-space:pre-wrap">${esc(r.observations)}</div>` : ''}
-        ${!r.receivedAt && canReceive ? `<button class="btn small gold" style="margin-top:8px" onclick="stReceive('${esc(r.id)}')">✔ Marquer comme reçu</button>` : ''}</div>`).join('')
+        ${r.rejectNote ? `<div class="msg err">Rejeté : ${esc(r.rejectNote)}</div>` : ''}
+        ${!r.receivedAt && !r.rejectedAt && canReceive ? `<button class="btn small gold" style="margin-top:8px" onclick="stReceive('${esc(r.id)}')">✔ Vérifier et transmettre</button> <button class="btn small" style="margin-top:8px" onclick="stReject('${esc(r.id)}')">↩ Rejeter</button>` : ''}</div>`).join('')
       + (missing.length ? `<div class="panel"><h3>⏳ Rapport non envoyé</h3>${missing.map((u) => `<div class="drv-row"><span>${esc(u.firstName + ' ' + u.lastName)}</span><span>${wa(u)}</span></div>`).join('')}</div>` : '')
       || '<div class="panel"><div class="empty">Aucune personne enregistrée.</div></div>';
     const tmEl = document.getElementById('st-team'); if (tmEl) tmEl.innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Téléphone</th><th>Application</th><th>Dernier rapport</th><th></th></tr>${team.map((u) => `<tr><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
@@ -3059,9 +3062,10 @@ async function renderWorkspace() {
   const u = state.user, k = d.kpis;
   const names = { STORE: 'Gestionnaire de stock', HSE: 'Agent HSE', MECHANIC: 'Mécanicien', POINTER: 'Pointeur' };
   const hello = { STORE: 'Gérez vos articles, entrées et sorties du jour.', HSE: 'Prévention, inspections et incidents de votre site.', MECHANIC: 'Interventions, diagnostics et véhicules à réparer.', POINTER: 'Pointage du jour et présence des chauffeurs.' }[d.kind];
-  const rep = d.myReport ? `<span class="badge ok">✔ Rapport du jour ${d.myReport.receivedAt ? 'reçu' : 'envoyé'}</span>` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
+  const rep = d.myReport ? `Rapport du jour ${stepBadge(staffStep(d.myReport))}` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
   const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
+  const stAct = (ico, label, tab) => `<button onclick="stockTab='${tab}';go('stock')"><span>${ico}</span>${label}</button>`;
   const actions = (items) => `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${items}${act('📝', 'Mon rapport du jour', 'my-report')}</div></div>`;
   const empty = (t) => `<div class="empty" style="padding:10px">${t}</div>`;
   let body = '';
@@ -3070,7 +3074,7 @@ async function renderWorkspace() {
     body = `<div class="ex-kpis">${exKpi('📦', '#E3EEFB', fmt(k.items), 'Articles en stock')}${exKpi('⬆️', '#E1F4E8', k.entriesToday, 'Entrées aujourd’hui')}${exKpi('⬇️', '#FDF1D6', k.exitsToday, 'Sorties aujourd’hui')}${exKpi('⚠️', '#FDE8E4', k.belowMinimum, 'Articles sous le seuil')}</div>
       <div class="ex-grid"><div class="ex-card"><h3>📋 Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Article</th><th>Type</th><th>Qté</th><th>Destination</th></tr>${d.recent.map((r) => { const [sg, c] = sign(r.type); return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.item)}</td><td style="color:${c}">${r.type === 'IN' ? 'Entrée' : r.type === 'OUT' ? 'Sortie' : esc(r.type)}</td><td style="color:${c}">${sg}${fmt(r.quantity)}</td><td>${esc(r.vehicle || r.reason || '—')}</td></tr>`; }).join('')}</table></div>` : empty('Aucun mouvement.')}</div>
       <div class="ex-card"><h3>🔔 Alertes de stock</h3>${d.alerts.length ? d.alerts.map((a) => `<div class="ex-al"><div class="ex-dot" style="background:${a.quantity <= 0 ? '#C0392B' : '#E0A72E'}"></div><div><b>${esc(a.name)}</b><div style="color:var(--muted)">${fmt(a.quantity)} ${esc(a.unit)} en stock (minimum ${fmt(a.minimum)})</div></div></div>`).join('') : empty('Aucune alerte : tous les articles sont au-dessus du seuil.')}</div></div>`
-      + actions(act('📦', 'Stocks', 'stock') + act('🛒', 'Achats', 'purchases') + act('📝', 'États des besoins', 'needs'));
+      + actions(stAct('📥', 'Entrée', 'entrees') + stAct('📤', 'Sortie', 'sorties') + stAct('📋', 'Inventaire', 'inventaire') + stAct('🚨', 'Alertes stock', 'articles') + act('📝', 'États des besoins', 'needs'));
   } else if (d.kind === 'HSE') {
     const sev = { LOW: '#2F6FB5', MEDIUM: '#E0A72E', HIGH: '#E67E22', CRITICAL: '#C0392B' };
     const ring = (v) => `<div class="ex-ring" style="background:conic-gradient(#2E8B57 ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
@@ -3152,6 +3156,8 @@ async function mgSave() {
     ['st-first', 'st-last', 'st-phone'].forEach((id) => { document.getElementById(id).value = ''; });
   } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
+async function stReject(id) { const note = prompt('Motif du rejet (le personnel pourra corriger et renvoyer) :'); if (!note) return; try { await api('/staff/reports/' + id + '/reject', { method: 'POST', body: { note } }); (document.getElementById('st-reports') ? stLoad : renderOpsValidation)(); } catch (e) { alert(e.message); } }
+async function stValidate(id) { try { await api('/staff/reports/' + id + '/validate', { method: 'POST', body: {} }); renderOpsValidation(); } catch (e) { alert(e.message); } }
 async function stReceive(id) { try { await api('/staff/reports/' + id + '/receive', { method: 'POST', body: {} }); stLoad(); } catch (e) { alert(e.message); } }
 // Côté agent HSE / magasinier : « Mon rapport du jour »
 async function renderMyReport() {
@@ -3164,7 +3170,7 @@ async function renderMyReport() {
     <label>Activités de la journée</label><textarea id="mr-act" rows="6" placeholder="Ex : réception de 20 cartons, 3 sorties pour le camion RC-1, inventaire de l'allée B…">${esc(cur ? cur.activities : '')}</textarea>
     <label>Observations (facultatif)</label><textarea id="mr-obs" rows="3">${esc(cur && cur.observations ? cur.observations : '')}</textarea>
     <button class="btn gold" onclick="sendMyReport()">📤 Envoyer mon rapport</button><div id="mr-msg"></div></div>
-    <div class="panel"><h3>Mes derniers rapports</h3>${list.length ? list.map((r) => `<div class="drv-row"><span>${esc(r.date)}</span><span class="badge ${r.receivedAt ? 'ok' : 'warn'}">${r.receivedAt ? '✔ Reçu par le responsable' : 'Envoyé'}</span></div>`).join('') : '<div class="empty">Aucun rapport envoyé.</div>'}</div>`;
+    <div class="panel"><h3>Mes derniers rapports</h3>${list.length ? list.map((r) => `<div class="drv-row"><span>${esc(r.date)}${r.rejectNote ? '<br><small style="color:var(--bad-fg)">Rejeté : ' + esc(r.rejectNote) + ' — corrigez puis renvoyez.</small>' : ''}</span>${stepBadge(staffStep(r))}</div>`).join('') : '<div class="empty">Aucun rapport envoyé.</div>'}</div>`;
 }
 async function sendMyReport() {
   const m = document.getElementById('mr-msg');
@@ -4615,6 +4621,7 @@ function timelineOverlay(r) {
 async function tripTimeline(id) { try { timelineOverlay(await api('/driver-admin/trips/' + id + '/timeline')); } catch (e) { alert(e.message); } }
 async function drvTimeline(id) { try { timelineOverlay(await api('/driver/trips/' + id + '/timeline')); } catch (e) { alert(e.message); } }
 const STEP_ST = { DRAFT: ['info', 'Brouillon'], SUBMITTED: ['warn', 'Soumis'], VERIFIED: ['warn', 'Vérifié'], VALIDATED: ['ok', 'Validé'], REJECTED: ['bad', 'Rejeté'] };
+const staffStep = (r) => (r.rejectedAt ? 'REJECTED' : r.opsAt ? 'VALIDATED' : r.receivedAt ? 'VERIFIED' : 'SUBMITTED');
 const stepBadge = (st) => { const x = STEP_ST[st] || STEP_ST.DRAFT; return `<span class="badge ${x[0]}">${x[1]}</span>`; };
 async function sheetAct(kind, driverId, date) {
   let note;
@@ -4661,8 +4668,9 @@ async function renderDriverSheets(date) {
 
 /* Responsable des opérations : fiches vérifiées par la logistique, à valider puis transférer à la Comptabilité */
 async function renderOpsValidation() {
-  const list = await api('/driver-admin/sheets/pending?siteId=' + encodeURIComponent(state.siteId || ''));
-  root().innerHTML = `<div class="panel"><h3>✅ Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
+  const [list, staff] = await Promise.all([api('/driver-admin/sheets/pending?siteId=' + encodeURIComponent(state.siteId || '')), api('/staff/reports/pending?siteId=' + encodeURIComponent(state.siteId || '')).catch(() => [])]);
+  const staffHtml = staff.length ? `<div class="panel"><h3>🧑‍🏭 Rapports du personnel à valider <span class="badge warn">${staff.length}</span></h3>${staff.map((r) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(r.name)}</b> · ${esc(r.date)}<br><small>${esc(r.role)}</small><div style="white-space:pre-wrap;font-size:13px;margin-top:4px">${esc(r.activities)}</div>${r.observations ? '<div style="font-size:12px;color:var(--muted);white-space:pre-wrap">' + esc(r.observations) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="stValidate('${esc(r.id)}')">✔ Valider</button> <button class="btn small" onclick="stReject('${esc(r.id)}')">↩ Rejeter</button></span></div>`).join('')}</div>` : '';
+  root().innerHTML = staffHtml + `<div class="panel"><h3>✅ Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
     <div style="font-size:26px;font-weight:700;color:var(--navy)">${list.length} <span style="font-size:13px;font-weight:400;color:var(--muted)">fiche(s) en attente</span></div></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune fiche en attente de validation.</div></div>'}`;
 }
 

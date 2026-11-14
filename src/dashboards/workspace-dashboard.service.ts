@@ -16,8 +16,8 @@ export class WorkspaceDashboardService {
     const day1 = new Date(day0); day1.setDate(day1.getDate() + 1);
     const month0 = new Date(day0.getFullYear(), day0.getMonth(), 1);
     const todayStr = day0.toISOString().slice(0, 10);
-    const myReport = await this.prisma.staffReport.findUnique({ where: { userId_date: { userId: actor.userId, date: todayStr } }, select: { sentAt: true, receivedAt: true } });
-    const base = { role: actor.role, myReport: myReport ? { sentAt: myReport.sentAt, receivedAt: myReport.receivedAt } : null };
+    const myReport = await this.prisma.staffReport.findUnique({ where: { userId_date: { userId: actor.userId, date: todayStr } }, select: { sentAt: true, receivedAt: true, opsAt: true, rejectedAt: true } });
+    const base = { role: actor.role, myReport: myReport ? { sentAt: myReport.sentAt, receivedAt: myReport.receivedAt, opsAt: myReport.opsAt, rejectedAt: myReport.rejectedAt } : null };
 
     if (actor.role === 'MECANICIEN') return { ...base, ...(await this.mechanic(site, month0)) };
     if (actor.role === 'POINTEUR') return { ...base, ...(await this.pointer(site, day0)) };
