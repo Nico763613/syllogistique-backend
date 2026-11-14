@@ -17,8 +17,8 @@ export class DowntimesController {
   constructor(private service: DowntimesService) {}
 
   @Get()
-  list(@Query('siteId') siteId: string, @Query('vehicleId') vehicleId?: string, @Query('open') open?: string) {
-    return this.service.list(siteId, { vehicleId, open });
+  list(@Query('siteId') siteId: string, @Query('vehicleId') vehicleId?: string, @Query('open') open?: string, @CurrentUser() actor?: any) {
+    return this.service.list(siteId, { vehicleId, open }, actor);
   }
 
   @Post()
@@ -28,8 +28,8 @@ export class DowntimesController {
   }
 
   @Post(':id/resolve')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MECANICIEN)
   resolve(@Param('id') id: string, @Body() dto: ResolveDowntimeDto, @CurrentUser() actor: any) {
-    return this.service.resolve(id, dto, actor.userId);
+    return this.service.resolve(id, dto, actor.userId, actor.role);
   }
 }

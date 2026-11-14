@@ -13,4 +13,5 @@ export class ReportDowntimeDto {
 export class ResolveDowntimeDto {
   @IsOptional() @IsNumber() @Min(0) actualCost?: number;
   @IsOptional() @IsString() resolutionNote?: string;
+  @IsOptional() @IsString() invoiceUrl?: string;
 }
