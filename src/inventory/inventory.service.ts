@@ -282,7 +282,7 @@ export class InventoryService {
     const rows = await this.movements({ ...params, limit: 2000 });
     const labels: Record<string, string> = { IN: 'Entrée', OUT: 'Sortie', ADJUSTMENT: 'Ajustement', TRANSFER: 'Transfert' };
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'SYLLOGISTIQUE';
+    workbook.creator = 'SYL LOGISTIQUE';
     const sheet = workbook.addWorksheet('Mouvements de stock');
     sheet.addRow(['Date', 'Type', 'Code', 'Article', 'Quantité', 'Unité', 'Entrepôt', 'Véhicule', 'Référence', 'Motif', 'Saisi par']);
     sheet.getRow(1).font = { bold: true };
@@ -384,7 +384,7 @@ export class InventoryService {
     const issuer = await getIssuer(this.prisma, userId);
     const d = (v?: string) => (v ? new Date(v).toLocaleDateString('fr-FR') : '');
 
-    const { doc, done } = startDoc(site.organization?.name ?? 'SYLLOGISTIQUE', 'BON DE SORTIE / LIVRAISON');
+    const { doc, done } = startDoc(site.organization?.name ?? 'SYL LOGISTIQUE', 'BON DE SORTIE / LIVRAISON');
     keyValues(doc, [
       ['Site', site.name],
       ['Période', params.from || params.to ? `${d(params.from) || '…'} au ${d(params.to) || '…'}` : 'Toutes les sorties récentes'],

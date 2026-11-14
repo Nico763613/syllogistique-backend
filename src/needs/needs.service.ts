@@ -133,7 +133,7 @@ export class NeedsService {
       : [];
     const vname = new Map(vehicles.map((v) => [v.id, v.internalNumber]));
 
-    const { doc, done } = startDoc(site?.organization?.name ?? 'SYLLOGISTIQUE', 'ÉTAT DES BESOINS');
+    const { doc, done } = startDoc(site?.organization?.name ?? 'SYL LOGISTIQUE', 'ÉTAT DES BESOINS');
     keyValues(doc, [
       ['N°', need.reference],
       ['Date', new Date(need.createdAt).toLocaleDateString('fr-FR')],

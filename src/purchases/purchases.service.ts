@@ -318,7 +318,7 @@ export class PurchasesService {
       const d = new Date(order.orderDate).toLocaleDateString('fr-FR');
 
       doc.rect(0, 0, doc.page.width, 70).fill(navy);
-      doc.fillColor('#FFFFFF').fontSize(18).text(order.site.organization?.name ?? 'SYLLOGISTIQUE', 50, 20);
+      doc.fillColor('#FFFFFF').fontSize(18).text(order.site.organization?.name ?? 'SYL LOGISTIQUE', 50, 20);
       doc.fillColor(gold).fontSize(12).text('BON DE COMMANDE', 50, 44);
       doc.fillColor('#000000').fontSize(10);
       doc.text(`N° ${order.reference}   —   Date : ${d}   —   Statut : ${order.status}`, 50, 85);
@@ -365,7 +365,7 @@ export class PurchasesService {
       if (issuer.service) doc.text(issuer.service);
       if (issuer.phone) doc.text(`Tél. : ${issuer.phone}`);
       doc.fillColor(navy).text('Approuvé par (signature et cachet)', 330, sy, { underline: true });
-      doc.fillColor('#555555').fontSize(8).text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYLLOGISTIQUE`, 50, 780);
+      doc.fillColor('#555555').fontSize(8).text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYL LOGISTIQUE`, 50, 780);
       doc.end();
     });
   }

@@ -164,8 +164,8 @@ export class ReportsController {
     const buffer = await this.exportService.periodReportPdf(siteId, from, to_date);
     return this.messaging.sendEmailWithAttachment({
       to,
-      subject: `Rapport SYLLOGISTIQUE — ${from} au ${to_date}`,
-      text: `Bonjour,\n\nVeuillez trouver ci-joint le rapport logistique de la période du ${from} au ${to_date}.\n\nCordialement,\nSYLLOGISTIQUE`,
+      subject: `Rapport SYL LOGISTIQUE — ${from} au ${to_date}`,
+      text: `Bonjour,\n\nVeuillez trouver ci-joint le rapport logistique de la période du ${from} au ${to_date}.\n\nCordialement,\nSYL LOGISTIQUE`,
       filename: `rapport_${from}_${to_date}.pdf`,
       buffer,
       contentType: 'application/pdf',
@@ -175,7 +175,7 @@ export class ReportsController {
   // Lien WhatsApp pré-rempli pour partager le rapport (le PDF téléchargé est à joindre manuellement)
   @Get('period/whatsapp-link')
   whatsappLink(@Query('phone') phone: string, @Query('from') from: string, @Query('to') to: string) {
-    const message = `Rapport SYLLOGISTIQUE — période du ${from} au ${to}. Voir le PDF joint.`;
+    const message = `Rapport SYL LOGISTIQUE — période du ${from} au ${to}. Voir le PDF joint.`;
     return { link: this.messaging.buildWhatsAppLink(phone, message) };
   }
 }

@@ -1,6 +1,6 @@
 {
-  "name": "SYLLOGISTIQUE — Gestion Logistique & Flotte",
-  "short_name": "SYLLOGISTIQUE",
+  "name": "SYL LOGISTIQUE — Gestion Logistique & Flotte",
+  "short_name": "SYL LOGISTIQUE",
   "description": "Gestion logistique, transport, flotte, stocks et achats/ventes.",
   "start_url": "./index.html",
   "scope": "./",

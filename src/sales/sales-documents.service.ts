@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma.service';
 export class SalesDocumentsService {
   constructor(private prisma: PrismaService) {}
 
-  async invoicePdf(invoiceId: string, orgName = 'SYLLOGISTIQUE'): Promise<Buffer> {
+  async invoicePdf(invoiceId: string, orgName = 'SYL LOGISTIQUE'): Promise<Buffer> {
     const invoice = await this.prisma.salesInvoice.findUnique({
       where: { id: invoiceId },
       include: { customer: true, salesOrder: { include: { lines: { include: { item: true } } } } },
