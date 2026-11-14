@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { TripsService } from './trips.service';
 import { RoleName } from '@prisma/client';
-import { CreateTripDto, CloseTripDto, CorrectTripDto } from './dto/trip.dto';
+import { CreateTripDto, CloseTripDto, CorrectTripDto, SetTripCustomerDto } from './dto/trip.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Departments } from '../common/decorators/departments.decorator';
@@ -34,6 +34,13 @@ export class TripsController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   correct(@Param('id') id: string, @Body() dto: CorrectTripDto, @CurrentUser() actor: any) {
     return this.tripsService.correct(id, dto, actor.userId);
+  }
+
+  // Client de la mission (Responsable logistique)
+  @Patch(':id/customer')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  setCustomer(@Param('id') id: string, @Body() dto: SetTripCustomerDto, @CurrentUser() actor: any) {
+    return this.tripsService.setCustomer(id, dto.customerId, actor.userId);
   }
 
   @Get()

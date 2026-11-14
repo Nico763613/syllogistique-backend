@@ -1098,14 +1098,15 @@ const ACTION_FORMS = {
     ], async (d) => { await api('/fuel', { method: 'POST', body: { ...d, siteId: state.siteId, transactionDate: nowIso() } }); refreshDept(); });
   },
   async assign_mission() {
-    const [v, dr] = await Promise.all([api('/vehicles?siteId=' + state.siteId), api('/drivers?siteId=' + state.siteId)]);
+    const [v, dr, custs] = await Promise.all([api('/vehicles?siteId=' + state.siteId), api('/drivers?siteId=' + state.siteId), api('/customers')]);
     openEditor('Affecter une mission', [
+      { key: 'customerId', label: 'Client (pour la facturation)', options: [['', '— À préciser plus tard —'], ...custs.map((c) => [c.id, c.name])] },
       { key: 'vehicleId', label: 'Véhicule', options: needOpt(optList(v, (x) => x.id, (x) => `${x.internalNumber} (${x.currentMileage} km)`), 'véhicule') },
       { key: 'driverId', label: 'Chauffeur', options: needOpt(optList(dr, (x) => x.id, (x) => `${x.firstName} ${x.lastName}`), 'chauffeur') },
       { key: 'startMileage', label: 'Kilométrage de départ', type: 'number' },
       { key: 'destination', label: 'Destination' },
       { key: 'purpose', label: 'Objet' },
-    ], async (d) => { await api('/trips', { method: 'POST', body: { ...d, siteId: state.siteId, tripDate: nowIso(), startTime: nowIso() } }); refreshDept(); });
+    ], async (d) => { await api('/trips', { method: 'POST', body: { ...d, customerId: d.customerId || undefined, siteId: state.siteId, tripDate: nowIso(), startTime: nowIso() } }); refreshDept(); });
   },
   async close_mission() {
     const t = (await api('/trips?siteId=' + state.siteId)).filter((x) => x.status === 'IN_PROGRESS' || (!x.endTime && !x.endMileage));
@@ -1438,16 +1439,25 @@ async function loadTrips() {
   const box = document.getElementById('tr-list');
   if (!box) return;
   try {
-    const [drivers, trips] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/trips?siteId=' + state.siteId)]);
+    const [drivers, trips, custs] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/trips?siteId=' + state.siteId), api('/customers').catch(() => [])]);
+    window._trCust = custs;
     document.getElementById('tr-driver').innerHTML = drivers.map(d => `<option value="${esc(d.id)}">${esc(d.firstName)} ${esc(d.lastName)}</option>`).join('');
     const vs = document.getElementById('tr-vehicle');
     const fillKm = () => { const o = vs.options[vs.selectedIndex]; if (o) document.getElementById('tr-km').value = o.dataset.km || 0; };
     vs.onchange = fillKm; fillKm();
-    box.innerHTML = trips.length ? `<table><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Destination</th><th>Km</th><th></th></tr></thead><tbody>${trips.slice(0, 30).map(t => `
+    box.innerHTML = trips.length ? `<table><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Destination</th><th>Client</th><th>Km</th><th></th></tr></thead><tbody>${trips.slice(0, 30).map(t => `
       <tr><td>${new Date(t.tripDate).toLocaleDateString('fr-FR')}</td><td>${esc(t.vehicle?.internalNumber)}</td><td>${esc(t.driver?.firstName)} ${esc(t.driver?.lastName)}</td><td>${esc(t.destination || '—')}</td>
+      <td>${t.customerId ? esc((custs.find((c) => c.id === t.customerId) || {}).name || '—') : '<span class="badge warn">à préciser</span>'} ${t.billedInvoiceId ? '' : `<button class="btn small" onclick="tripClient('${esc(t.id)}')">✎</button>`}</td>
       <td class="mono">${t.distance ?? '…'}</td>
       <td>${t.endMileage === null ? `<button class="btn small gold" onclick="closeTrip('${esc(t.id)}')">Clôturer</button>` : ''} <button class="btn small" onclick="tripPdf('${esc(t.id)}')">Fiche de bord</button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune mission enregistrée.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function tripClient(id) {
+  const cs = window._trCust || [];
+  openEditor('Client de la mission', [{ key: 'customerId', label: 'Client à facturer', options: cs.map((c) => [c.id, c.name]) }], async (d) => {
+    if (!d.customerId) throw new Error('Choisissez un client.');
+    await api('/trips/' + id + '/customer', { method: 'PATCH', body: { customerId: d.customerId } }); renderView(state.view);
+  });
 }
 async function startTrip() {
   const msg = document.getElementById('tr-msg');
@@ -4214,17 +4224,18 @@ function drvBlock(id) {
 }
 async function drvUnblock(id) { try { await api('/driver-admin/devices/' + id + '/unblock', { method: 'POST' }); renderDriverDevices(); } catch (e) { alert(e.message); } }
 async function drvPlanTrip() {
-  const [drivers, vehicles] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/vehicles?siteId=' + state.siteId)]);
+  const [drivers, vehicles, custs] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/vehicles?siteId=' + state.siteId), api('/customers')]);
   const usable = vehicles.filter((v) => !['IMMOBILIZED', 'MAINTENANCE', 'OUT_OF_SERVICE'].includes(v.status));
   openEditor('Planifier une mission', [
     { key: 'driverId', label: 'Chauffeur', options: drivers.map((d) => [d.id, d.firstName + ' ' + d.lastName]) },
     { key: 'vehicleId', label: 'Véhicule disponible', options: usable.map((v) => [v.id, v.internalNumber + ' — ' + v.registrationNumber]) },
-    { key: 'destination', label: 'Destination' }, { key: 'purpose', label: 'Instructions' }, { key: 'passengerName', label: 'Contact / client' },
+    { key: 'customerId', label: 'Client (pour la facturation)', options: [['', '— À préciser plus tard —'], ...custs.map((c) => [c.id, c.name])] },
+    { key: 'destination', label: 'Destination' }, { key: 'purpose', label: 'Instructions' }, { key: 'passengerName', label: 'Contact sur place' },
     { key: 'startTime', label: 'Départ prévu', type: 'datetime-local' }, { key: 'scheduledArrival', label: 'Arrivée prévue', type: 'datetime-local' },
   ], async (d) => {
     if (!d.startTime) throw new Error('Indiquez le départ prévu.');
     const iso = (s) => new Date(s).toISOString();
-    await api('/trips', { method: 'POST', body: { planned: true, siteId: state.siteId, driverId: d.driverId, vehicleId: d.vehicleId, destination: d.destination, purpose: d.purpose, passengerName: d.passengerName, tripDate: iso(d.startTime), startTime: iso(d.startTime), scheduledArrival: d.scheduledArrival ? iso(d.scheduledArrival) : undefined } });
+    await api('/trips', { method: 'POST', body: { planned: true, siteId: state.siteId, driverId: d.driverId, vehicleId: d.vehicleId, destination: d.destination, customerId: d.customerId || undefined, purpose: d.purpose, passengerName: d.passengerName, tripDate: iso(d.startTime), startTime: iso(d.startTime), scheduledArrival: d.scheduledArrival ? iso(d.scheduledArrival) : undefined } });
     alert('Mission planifiée : elle apparaît sur le téléphone du chauffeur.');
   });
 }
@@ -4669,8 +4680,16 @@ async function csClose(id) {
     document.getElementById('dp-bar').insertAdjacentHTML('afterend', `<div class="msg ${gap === 0 ? 'ok' : 'err'}">Caisse clôturée. ${gap === 0 ? 'Aucun écart.' : 'Écart : ' + (gap > 0 ? '+' : '') + fmt(gap) + ' GNF.'} Elle sera vérifiée par le Responsable commercial.</div>`);
   } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
+function cpBillClient(id) {
+  document.querySelectorAll('.cp-bt').forEach((c) => { c.checked = c.dataset.c === id && !c.disabled; });
+  document.getElementById('cp-bc').value = id; cpBillSel();
+}
 function cpBillSel() {
-  const ck = [...document.querySelectorAll('.cp-bt:checked')], t = ck.reduce((a, c) => a + Number(c.dataset.t), 0), p = Number(document.getElementById('cp-bp').value) || 0;
+  const ck = [...document.querySelectorAll('.cp-bt:checked')];
+  const cs = [...new Set(ck.map((c) => c.dataset.c).filter(Boolean))];
+  if (cs.length === 1) document.getElementById('cp-bc').value = cs[0];
+  const msgBox = document.getElementById('cp-bmsg'); if (msgBox) msgBox.innerHTML = cs.length > 1 ? '<div class="msg err">Ces trajets appartiennent à plusieurs clients : facturez un client à la fois.</div>' : '';
+  const t = ck.reduce((a, c) => a + Number(c.dataset.t), 0), p = Number(document.getElementById('cp-bp').value) || 0;
   document.getElementById('cp-bsum').textContent = ck.length ? ck.length + ' trajet(s) · ' + (Math.round(t * 10) / 10) + ' t · ' + (p ? fmt(Math.round(t * p)) + ' GNF' : 'prix par tonne manquant') : 'Aucun trajet sélectionné.';
 }
 async function cpBill() {
@@ -4715,8 +4734,8 @@ async function renderCompta() {
     body = `<div class="panel"><h3>🚚 Trajets validés à facturer <span class="badge ${bu.rows.length ? 'warn' : 'ok'}">${bu.rows.length}</span></h3>
       <div class="desc">Trajets de camions validés par le Responsable des opérations. Cochez ceux du même client, puis créez la facture : le montant = tonnes × prix par tonne.${bu.waitingValidation ? ' <b>' + bu.waitingValidation + '</b> trajet(s) attendent encore la validation des opérations.' : ''}</div>
       ${bu.pricePerTon ? '' : '<div class="msg err">Le prix par tonne n\'est pas fixé : le Responsable logistique doit le fixer (écran Camions), ou saisissez-le ci-dessous.</div>'}
-      <div style="overflow:auto"><table><tr><th></th><th>Date</th><th>Camion</th><th>Chauffeur</th><th>Destination</th><th>Mouvements</th><th>Tonnes</th></tr>${bu.rows.map((r) => `<tr><td><input type="checkbox" class="cp-bt" value="${esc(r.id)}" data-t="${r.tons}" ${r.missingTonnage ? 'disabled' : ''} onchange="cpBillSel()" style="width:22px;height:22px"></td><td>${dd(r.date)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.driver)}</td><td>${esc(r.destination || '—')}</td><td class="mono">${r.movements}</td><td class="mono">${r.missingTonnage ? '<span class="badge warn">tonnage manquant</span>' : r.tons}</td></tr>`).join('') || '<tr><td colspan="7"><div class="empty">Aucun trajet validé à facturer.</div></td></tr>'}</table></div>
-      ${bu.rows.length ? `<label>Client à facturer</label><select id="cp-bc"><option value="">— Choisir le client —</option>${cust.map((c) => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('')}</select>
+      <div style="overflow:auto"><table><tr><th></th><th>Client</th><th>Date</th><th>Camion</th><th>Chauffeur</th><th>Destination</th><th>Mouvements</th><th>Tonnes</th></tr>${bu.rows.map((r) => `<tr><td><input type="checkbox" class="cp-bt" value="${esc(r.id)}" data-c="${esc(r.customerId || '')}" data-t="${r.tons}" ${r.missingTonnage ? 'disabled' : ''} onchange="cpBillSel()" style="width:22px;height:22px"></td><td>${r.customerName ? '<b>' + esc(r.customerName) + '</b>' : '<span class="badge warn">client non précisé</span>'}</td><td>${dd(r.date)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.driver)}</td><td>${esc(r.destination || '—')}</td><td class="mono">${r.movements}</td><td class="mono">${r.missingTonnage ? '<span class="badge warn">tonnage manquant</span>' : r.tons}</td></tr>`).join('') || '<tr><td colspan="8"><div class="empty">Aucun trajet validé à facturer.</div></td></tr>'}</table></div>
+      ${bu.rows.length ? `<div style="margin:10px 0">${[...new Map(bu.rows.filter((r) => r.customerId).map((r) => [r.customerId, r.customerName])).entries()].map(([id, n]) => `<button class="btn small" onclick="cpBillClient('${esc(id)}')">☑ Tous les trajets de ${esc(n)}</button> `).join('')}</div><label>Client à facturer</label><select id="cp-bc"><option value="">— Choisir le client —</option>${cust.map((c) => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('')}</select>
       <label>Prix par tonne (GNF)</label><input id="cp-bp" type="number" inputmode="numeric" min="1" value="${bu.pricePerTon || ''}" oninput="cpBillSel()">
       <div id="cp-bsum" style="margin:10px 0;font-weight:600;color:var(--navy)">Aucun trajet sélectionné.</div><div id="cp-bmsg"></div>
       <button class="btn gold" style="min-height:48px" onclick="cpBill()">🧾 Créer la facture</button>` : ''}</div>`;

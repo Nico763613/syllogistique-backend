@@ -41,6 +41,9 @@ export class TransportBillingService {
       orderBy: { tripDate: 'asc' },
       take: 500,
     });
+    const custIds = [...new Set(trips.map((t) => t.customerId).filter((x): x is string => !!x))];
+    const custs = custIds.length ? await this.prisma.customer.findMany({ where: { id: { in: custIds } }, select: { id: true, name: true } }) : [];
+    const custName = new Map(custs.map((c) => [c.id, c.name]));
     const ok = await this.validatedKeys(trips);
     const valid = trips.filter((t) => ok.has(t.driverId + '|' + this.day(t.tripDate)));
     return {
@@ -49,7 +52,7 @@ export class TransportBillingService {
       rows: valid.map((t) => {
         const movements = t.tripsCount ?? 0, per = t.tonnagePerTrip ?? 0;
         return {
-          id: t.id, date: this.day(t.tripDate), vehicle: `${t.vehicle.internalNumber} — ${t.vehicle.registrationNumber}`,
+          id: t.id, customerId: t.customerId, customerName: t.customerId ? custName.get(t.customerId) ?? null : null, date: this.day(t.tripDate), vehicle: `${t.vehicle.internalNumber} — ${t.vehicle.registrationNumber}`,
           driver: `${t.driver.lastName} ${t.driver.firstName}`, destination: t.destination, movements,
           tons: Math.round(movements * per * 10) / 10, missingTonnage: !(per > 0),
         };
@@ -67,6 +70,7 @@ export class TransportBillingService {
     const siteId = trips[0].siteId;
     if (trips.some((t) => t.siteId !== siteId)) throw new BadRequestException('Les trajets doivent appartenir au même site.');
     if (actor.role !== 'SUPER_ADMIN' && actor.siteId && siteId !== actor.siteId) throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
+    if (trips.some((t) => t.customerId && t.customerId !== customer.id)) throw new BadRequestException('Un trajet est destiné à un autre client : facturez chaque client séparément.');
     const ok = await this.validatedKeys(trips);
     if (trips.some((t) => !ok.has(t.driverId + '|' + this.day(t.tripDate)))) throw new BadRequestException("Un trajet n'est pas encore validé par le Responsable des opérations.");
     if (trips.some((t) => !((t.tonnagePerTrip ?? 0) > 0) || !((t.tripsCount ?? 0) > 0))) throw new BadRequestException('Un trajet n\'a pas de tonnage : corrigez la fiche avant de facturer.');
