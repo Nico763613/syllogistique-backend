@@ -76,6 +76,7 @@ export class DriverController {
   }
 
   @Get('trips/:id/timeline')
+  @Roles(...OPS)
   @Roles(RoleName.CHAUFFEUR)
   @UseGuards(DriverDeviceGuard)
   async timeline(@Param('id') id: string, @CurrentUser() user: any) {
@@ -106,6 +107,8 @@ export class DriverController {
 
 // --- Administration (gestionnaire de flotte) : liaison, QR/OTP, blocage, historique ---
 const MANAGERS = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE];
+const OPS = [...MANAGERS, RoleName.RESPONSABLE_OPERATIONS];
+const OPS_COMPTA = [...OPS, RoleName.COMPTABLE];
 
 @ApiTags('driver-admin')
 @ApiBearerAuth()
@@ -166,21 +169,53 @@ export class DriverAdminController {
   }
 
   @Get('expenses')
+  @Roles(...OPS_COMPTA)
   expenses(@Query('status') status: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
     return this.sheets.listExpenses(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, status);
   }
 
+  // Comptabilité seulement : la dépense n'est traitée qu'après validation de la fiche par le Responsable des opérations
   @Post('expenses/:id/decision')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.COMPTABLE)
   decideExpense(@Param('id') id: string, @Body() dto: ExpenseDecisionDto, @CurrentUser() actor: any) {
     return this.sheets.decideExpense(id, dto.decision, dto.note, actor.userId);
   }
 
+  // Resp. logistique : vérifie et transmet (ne valide pas)
   @Post('sheets/process')
   processSheet(@Body() dto: ProcessSheetDto, @CurrentUser() actor: any) {
     return this.sheets.processSheet(dto.driverId, dto.date, dto.note, actor.userId);
   }
 
+  // Resp. des opérations : valide et transfère à la Comptabilité
+  @Post('sheets/validate')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.RESPONSABLE_OPERATIONS)
+  validateSheet(@Body() dto: ProcessSheetDto, @CurrentUser() actor: any) {
+    return this.sheets.validateSheet(dto.driverId, dto.date, dto.note, actor.userId);
+  }
+
+  // Renvoi au chauffeur pour correction (motif obligatoire)
+  @Post('sheets/reject')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_OPERATIONS)
+  rejectSheet(@Body() dto: ProcessSheetDto, @CurrentUser() actor: any) {
+    return this.sheets.rejectSheet(dto.driverId, dto.date, dto.note, actor.userId);
+  }
+
+  @Get('sheets/pending')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.RESPONSABLE_OPERATIONS)
+  pendingSheets(@Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.sheets.pendingValidation(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId);
+  }
+
+  // Reçu papier reçu et conforme (déposé chez le responsable)
+  @Post('expenses/:id/receipt-check')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_OPERATIONS)
+  receiptCheck(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.sheets.checkReceipt(id, actor.userId);
+  }
+
   @Get('changes')
+  @Roles(...OPS_COMPTA)
   changes(@Query('since') since: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
     return this.sheets.changes(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, since);
   }
@@ -201,6 +236,7 @@ export class DriverAdminController {
   }
 
   @Get('sheets')
+  @Roles(...OPS)
   sheetsOfDay(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
     return this.sheets.listForDay(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date, actor.userId);
   }

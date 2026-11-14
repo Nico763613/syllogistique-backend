@@ -18,6 +18,8 @@ ALTER TYPE "RoleName" ADD VALUE IF NOT EXISTS 'POINTEUR';
 --#
 ALTER TYPE "RoleName" ADD VALUE IF NOT EXISTS 'COMPTABLE';
 --#
+ALTER TYPE "RoleName" ADD VALUE IF NOT EXISTS 'RESPONSABLE_OPERATIONS';
+--#
 ALTER TYPE "PaymentMethod" ADD VALUE IF NOT EXISTS 'ORANGE_MONEY';
 --#
 ALTER TYPE "StockMovementType" ADD VALUE IF NOT EXISTS 'RETURN';
@@ -285,3 +287,7 @@ CREATE TABLE IF NOT EXISTS staff_reports (id text PRIMARY KEY, user_id text NOT 
 CREATE UNIQUE INDEX IF NOT EXISTS staff_reports_user_id_date_key ON staff_reports(user_id, date)
 --#
 CREATE INDEX IF NOT EXISTS staff_reports_role_name_date_idx ON staff_reports(role_name, date)
+--#
+ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS ops_at timestamp(3), ADD COLUMN IF NOT EXISTS ops_by text, ADD COLUMN IF NOT EXISTS ops_note text, ADD COLUMN IF NOT EXISTS rejected_at timestamp(3), ADD COLUMN IF NOT EXISTS rejected_by text, ADD COLUMN IF NOT EXISTS reject_note text
+--#
+ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS receipt_checked_at timestamp(3), ADD COLUMN IF NOT EXISTS receipt_checked_by text

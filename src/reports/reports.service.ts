@@ -276,6 +276,7 @@ export class ReportsService {
       MECANICIEN: 'Mécanicien',
       POINTEUR: 'Pointeur',
       COMPTABLE: 'Comptabilité',
+      RESPONSABLE_OPERATIONS: 'Responsable des opérations',
     };
     return {
       name: user ? `${user.firstName} ${user.lastName}` : '—',

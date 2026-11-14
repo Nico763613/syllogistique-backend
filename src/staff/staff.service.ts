@@ -6,7 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
 import { CreateStaffDto, StaffReportDto, STAFF_ROLES, MANAGER_ROLES, ALL_STAFF_ROLES } from './staff.dto';
 
-const LABEL: Record<string, string> = { AGENT_HSE: 'agent HSE', GESTIONNAIRE_HSE: 'responsable HSE', MAGASINIER: 'gestionnaire de stock', MECANICIEN: 'mécanicien', POINTEUR: 'pointeur', DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique' };
+const LABEL: Record<string, string> = { AGENT_HSE: 'agent HSE', GESTIONNAIRE_HSE: 'responsable HSE', MAGASINIER: 'gestionnaire de stock', MECANICIEN: 'mécanicien', POINTEUR: 'pointeur', DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité' };
 const isManager = (r: string) => (MANAGER_ROLES as readonly string[]).includes(r);
 
 // Personnel de terrain (agents HSE, magasiniers) : comptes créés par le bureau, invitation WhatsApp,

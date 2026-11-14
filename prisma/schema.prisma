@@ -116,6 +116,7 @@ enum RoleName {
   MECANICIEN
   POINTEUR
   COMPTABLE
+  RESPONSABLE_OPERATIONS
 }
 
 model Permission {
@@ -1598,6 +1599,13 @@ model DriverDailyReport {
   processedAt DateTime? @map("processed_at") // marquée « traitée » par le bureau
   processedBy String?  @map("processed_by")
   processNote String?  @map("process_note")
+  // Chaîne de validation : vérifiée par le Resp. logistique (processedAt) → validée par le Resp. des opérations (opsAt) → Comptabilité
+  opsAt      DateTime? @map("ops_at")
+  opsBy      String?   @map("ops_by")
+  opsNote    String?   @map("ops_note")
+  rejectedAt DateTime? @map("rejected_at")
+  rejectedBy String?   @map("rejected_by")
+  rejectNote String?   @map("reject_note")
   @@unique([driverId, reportDate])
   @@map("driver_daily_reports")
 }
@@ -1618,6 +1626,8 @@ model DriverExpense {
   decidedBy    String?  @map("decided_by")
   decidedAt    DateTime? @map("decided_at")
   decisionNote String?  @map("decision_note")
+  receiptCheckedAt DateTime? @map("receipt_checked_at") // reçu papier déposé et conforme
+  receiptCheckedBy String?   @map("receipt_checked_by")
   clientOpId   String?  @unique @map("client_op_id")
   createdAt    DateTime @default(now()) @map("created_at")
   @@index([driverId, date])
