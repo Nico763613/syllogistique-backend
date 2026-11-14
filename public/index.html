@@ -3638,7 +3638,7 @@ async function drvHomeFill() {
   if (!sh || !me) { box.innerHTML = '<h4>📋 Ma fiche du jour</h4><div class="drv-center" style="font-size:13px">Indisponible hors connexion. Vos saisies sont conservées sur le téléphone.</div>'; return; }
   const sent = sh.status === 'SENT';
   const n = sh.trips.length + sh.fuel.length + sh.maintenance.length + (sh.expenses || []).length;
-  const missing = sh.fuel.filter((f) => f.source === 'STATION' && f.cost > 0 && !f.receiptUrl).length + (sh.expenses || []).filter((e) => !e.receiptUrl).length;
+  const missing = sh.fuel.filter((f) => f.source === 'STATION' && f.cost > 0 && !f.receiptUrl).length + (sh.expenses || []).filter((e) => !e.receiptUrl).length + sh.maintenance.filter((m) => m.nature !== 'ANOMALIE' && m.cost > 0 && !(m.photoUrls || []).length).length;
   let why = '';
   if (!sent) {
     if (me.activeTrip) why = "Terminez d'abord la mission en cours (Arrivée)."; else if (pend) why = pend + ' saisie(s) à synchroniser : il faut du réseau.';
@@ -4282,13 +4282,15 @@ function drvMaintForm(tripId) {
     <label>Précisions (facultatif ; obligatoire si « Autres » est coché)</label><input id="m-det">
     <label>Kilométrage lors de la maintenance (km)</label><input id="m-km" type="number" inputmode="numeric" value="${esc(me.vehicle ? me.vehicle.mileage : '')}">
     <label>Coût total (GNF)</label><input id="m-cost" type="number" inputmode="numeric">
-    <label>Rappel — prochaine vidange à (km)</label><input id="m-next" type="number" inputmode="numeric" placeholder="Ex. ${me.vehicle ? Number(me.vehicle.mileage || 0) + 10000 : '120000'}">`, async () => {
+    <label>Rappel — prochaine vidange à (km)</label><input id="m-next" type="number" inputmode="numeric" placeholder="Ex. ${me.vehicle ? Number(me.vehicle.mileage || 0) + 10000 : '120000'}">
+    ${drvPhotoField('📷 Photo de la facture ou du reçu — obligatoire si un coût est indiqué', false)}`, async () => {
     const picked = [...document.querySelectorAll('.m-part:checked')].map((x) => x.value), det = drvFix(drvEl('m-det').value);
     if (!picked.length) throw new Error('Cochez au moins une pièce ou un entretien.');
     if (picked.includes('Autres') && !det) throw new Error('Précisez ce que vous avez changé (champ « Précisions »).');
     const detail = picked.join(', ') + (det ? ' — ' + det : '');
+    if (drvNum('m-cost') > 0 && !DRV_PHOTOS.length) throw new Error('La photo de la facture ou du reçu est obligatoire quand un coût est indiqué.');
     const g = await drvGeo();
-    drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, payload: { nature: 'PIECES', detail, mileage: drvNum('m-km'), cost: drvNum('m-cost'), nextServiceKm: drvNum('m-next'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
+    drvEnqueue({ type: 'maintenance', tripId: tripId || undefined, photos: DRV_PHOTOS.slice(), payload: { nature: 'PIECES', detail, mileage: drvNum('m-km'), cost: drvNum('m-cost'), nextServiceKm: drvNum('m-next'), occurredAt: new Date().toISOString(), offline: !navigator.onLine, ...g } });
   }, 'Enregistrer la maintenance');
 }
 const DRV_FAULTS = ['Plaquettes de frein', 'Freins', 'Pare-chocs', 'Pneumatiques / crevaison', 'Moteur / mécanique', 'Boîte de vitesses / transmission', 'Suspension / amortisseurs', 'Batterie / électricité', 'Phares / feux', 'Pare-brise / vitres', 'Rétroviseur', 'Fuite d\'huile ou de liquide', 'Climatisation', 'Accident', 'Autres'];
