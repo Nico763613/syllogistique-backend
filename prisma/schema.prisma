@@ -383,6 +383,7 @@ model Trip {
   cargo         String?
   tripsCount    Int?     @map("trips_count")
   tonnagePerTrip Float?  @map("tonnage_per_trip") // tonnes par mouvement (camion), coché par le chauffeur
+  billedInvoiceId String? @map("billed_invoice_id") // facture de transport qui a facturé ce trajet
   preCondition  String?  @map("pre_condition") // RAS | ANOMALIE
   preAnomalies  String?  @map("pre_anomalies")
   arrivalMileage Int? @map("arrival_mileage") // compteur à l'arrivée à destination (arrêt = endMileage)
@@ -1004,6 +1005,7 @@ model SalesInvoice {
   cashSessionId String?  @map("cash_session_id")
   cogsAmount    Decimal? @map("cogs_amount") @db.Decimal(14, 0) // coût des marchandises vendues (marge)
   discountApprovedBy String? @map("discount_approved_by")
+  description   String?  // libellé libre (ex. facture de transport)
 
   cashSession   CashSession? @relation(fields: [cashSessionId], references: [id])
   installments  SalesInstallment[]

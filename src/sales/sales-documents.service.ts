@@ -53,6 +53,7 @@ export class SalesDocumentsService {
         doc.text(Number(l.unitPrice).toLocaleString('fr-FR'), 350, doc.y, { continued: true, width: 90 });
         doc.text(Number(l.lineTotal).toLocaleString('fr-FR'), 450, doc.y);
       }
+      if (!lines.length && invoice.description) doc.text(invoice.description, 50, doc.y, { width: 500 });
       doc.moveDown();
 
       doc.fontSize(10);

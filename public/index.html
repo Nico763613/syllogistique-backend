@@ -4669,9 +4669,25 @@ async function csClose(id) {
     document.getElementById('dp-bar').insertAdjacentHTML('afterend', `<div class="msg ${gap === 0 ? 'ok' : 'err'}">Caisse clôturée. ${gap === 0 ? 'Aucun écart.' : 'Écart : ' + (gap > 0 ? '+' : '') + fmt(gap) + ' GNF.'} Elle sera vérifiée par le Responsable commercial.</div>`);
   } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
+function cpBillSel() {
+  const ck = [...document.querySelectorAll('.cp-bt:checked')], t = ck.reduce((a, c) => a + Number(c.dataset.t), 0), p = Number(document.getElementById('cp-bp').value) || 0;
+  document.getElementById('cp-bsum').textContent = ck.length ? ck.length + ' trajet(s) · ' + (Math.round(t * 10) / 10) + ' t · ' + (p ? fmt(Math.round(t * p)) + ' GNF' : 'prix par tonne manquant') : 'Aucun trajet sélectionné.';
+}
+async function cpBill() {
+  const m = document.getElementById('cp-bmsg'), ids = [...document.querySelectorAll('.cp-bt:checked')].map((c) => c.value), cid = document.getElementById('cp-bc').value, p = Number(document.getElementById('cp-bp').value);
+  try {
+    if (!ids.length) throw new Error('Cochez au moins un trajet.');
+    if (!cid) throw new Error('Choisissez le client.');
+    if (!(p > 0)) throw new Error('Indiquez le prix par tonne.');
+    if (!confirm('Créer la facture pour ' + ids.length + ' trajet(s) ?')) return;
+    const inv = await api('/sales/transport/invoice', { method: 'POST', body: { customerId: cid, tripIds: ids, pricePerTon: p } });
+    await renderCompta();
+    document.getElementById('dp-bar').insertAdjacentHTML('afterend', '<div class="msg ok">✔ Facture ' + esc(inv.reference) + ' créée : ' + fmt(Math.round(Number(inv.totalAmount))) + ' GNF. Elle est visible dans Ventes › Factures et à encaisser à la Caisse.</div>');
+  } catch (e) { m.innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; }
+}
 /* ---------- Comptabilité : À traiter · Reçus · Synthèse · Historique ---------- */
 let cpTab = 'traiter', cpPeriod = 'month';
-const CP_TABS = [['traiter', '🧾 À traiter'], ['recus', '📄 Reçus'], ['synthese', '📊 Synthèse'], ['histo', '🗂 Historique']];
+const CP_TABS = [['traiter', '🧾 À traiter'], ['recus', '📄 Reçus'], ['synthese', '📊 Synthèse'], ['histo', '🗂 Historique'], ['facturer', '🚚 À facturer']];
 async function renderCompta() {
   const role = state.user.role, ro = role === 'DIRECTEUR_GENERAL'; // le Directeur général ne voit que la synthèse, sans aucune action
   if (ro) cpTab = 'synthese';
@@ -4693,6 +4709,17 @@ async function renderCompta() {
       ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', ''], unpaid.map((e) => `<tr><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono"><b>${fmt(e.amount)}</b> GNF</td><td><button class="btn small gold" onclick="cpPay('${esc(e.id)}')">💳 Marquer comme payée</button></td></tr>`).join(''))}</div>
       ${blocked.length ? `<div class="panel"><h3>⏳ En attente de validation de la fiche <span class="badge info">${blocked.length}</span></h3><div class="desc">Ces dépenses se débloqueront quand le Responsable des opérations aura validé la fiche du chauffeur.</div>
       ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', 'Fiche'], blocked.map((e) => `<tr style="opacity:.75"><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono">${fmt(e.amount)} GNF</td><td>${stepBadge(e.sheetStep)}<div style="font-size:11px;color:var(--muted)">Fiche pas encore validée</div></td></tr>`).join(''))}</div>` : ''}`;
+  } else if (cpTab === 'facturer') {
+    const [bu, cust] = await Promise.all([api('/sales/transport/unbilled?siteId=' + encodeURIComponent(state.siteId || '')), api('/customers')]);
+    window._cpBill = bu;
+    body = `<div class="panel"><h3>🚚 Trajets validés à facturer <span class="badge ${bu.rows.length ? 'warn' : 'ok'}">${bu.rows.length}</span></h3>
+      <div class="desc">Trajets de camions validés par le Responsable des opérations. Cochez ceux du même client, puis créez la facture : le montant = tonnes × prix par tonne.${bu.waitingValidation ? ' <b>' + bu.waitingValidation + '</b> trajet(s) attendent encore la validation des opérations.' : ''}</div>
+      ${bu.pricePerTon ? '' : '<div class="msg err">Le prix par tonne n\'est pas fixé : le Responsable logistique doit le fixer (écran Camions), ou saisissez-le ci-dessous.</div>'}
+      <div style="overflow:auto"><table><tr><th></th><th>Date</th><th>Camion</th><th>Chauffeur</th><th>Destination</th><th>Mouvements</th><th>Tonnes</th></tr>${bu.rows.map((r) => `<tr><td><input type="checkbox" class="cp-bt" value="${esc(r.id)}" data-t="${r.tons}" ${r.missingTonnage ? 'disabled' : ''} onchange="cpBillSel()" style="width:22px;height:22px"></td><td>${dd(r.date)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.driver)}</td><td>${esc(r.destination || '—')}</td><td class="mono">${r.movements}</td><td class="mono">${r.missingTonnage ? '<span class="badge warn">tonnage manquant</span>' : r.tons}</td></tr>`).join('') || '<tr><td colspan="7"><div class="empty">Aucun trajet validé à facturer.</div></td></tr>'}</table></div>
+      ${bu.rows.length ? `<label>Client à facturer</label><select id="cp-bc"><option value="">— Choisir le client —</option>${cust.map((c) => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join('')}</select>
+      <label>Prix par tonne (GNF)</label><input id="cp-bp" type="number" inputmode="numeric" min="1" value="${bu.pricePerTon || ''}" oninput="cpBillSel()">
+      <div id="cp-bsum" style="margin:10px 0;font-weight:600;color:var(--navy)">Aucun trajet sélectionné.</div><div id="cp-bmsg"></div>
+      <button class="btn gold" style="min-height:48px" onclick="cpBill()">🧾 Créer la facture</button>` : ''}</div>`;
   } else if (cpTab === 'recus') {
     body = `<div class="panel"><h3>📄 Reçus papier à réclamer <span class="badge ${noPaper.length ? 'warn' : 'ok'}">${noPaper.length}</span></h3><div class="desc">Dépenses validées dont le reçu papier n'a pas été déposé chez le responsable. Relancez le Responsable des opérations.</div>
       ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', 'Attente'], noPaper.map((e) => { const j = Math.max(0, Math.floor((Date.now() - new Date(e.decidedAt || e.date)) / 864e5)); return `<tr><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono">${fmt(e.amount)} GNF</td><td><span class="badge ${j > 7 ? 'bad' : 'warn'}">${j} j</span></td></tr>`; }).join(''))}</div>`;
