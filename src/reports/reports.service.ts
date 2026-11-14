@@ -169,7 +169,7 @@ export class ReportsService {
 
     return {
       date: day,
-      organization: site.organization?.name ?? 'SYLLOGISTIQUE',
+      organization: site.organization?.name ?? 'SYL LOGISTIQUE',
       site: site.name,
       kind,
       kindLabel: kind === 'TRUCK' ? 'Camions' : 'Véhicules de service',
@@ -344,7 +344,7 @@ export class ReportsService {
     const vehicles = [...byV.values()].map((r) => ({ ...r, tons: Math.round(r.tons * 10) / 10, liters: Math.round(r.liters * 10) / 10 }));
     const sum = (f: (x: any) => number) => vehicles.reduce((s, x) => s + f(x), 0);
     return {
-      organization: site.organization?.name ?? 'SYLLOGISTIQUE', site: site.name, from: start.toISOString().slice(0, 10), to: new Date(+end - 1).toISOString().slice(0, 10),
+      organization: site.organization?.name ?? 'SYL LOGISTIQUE', site: site.name, from: start.toISOString().slice(0, 10), to: new Date(+end - 1).toISOString().slice(0, 10),
       kind: k ?? 'ALL', kindLabel: k === 'TRUCK' ? 'Camions' : k === 'SERVICE_VEHICLE' ? 'Véhicules de service' : 'Camions et véhicules de service',
       totals: { missions: trips.length, km: sum((x) => x.km), movements: sum((x) => x.movements), tons: Math.round(sum((x) => x.tons) * 10) / 10, liters: Math.round(sum((x) => x.liters) * 10) / 10, cost: sum((x) => x.cost) },
       vehicles,

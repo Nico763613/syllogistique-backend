@@ -26,7 +26,7 @@ export class BrandingController {
   @Get()
   async get() {
     const o = await this.prisma.organization.findFirst({ orderBy: { createdAt: 'asc' } });
-    return { name: o?.name ?? 'SYLLOGISTIQUE', logoUrl: o?.logoUrl ?? null, brandColor: o?.brandColor ?? null };
+    return { name: o?.name ?? 'SYL LOGISTIQUE', logoUrl: o?.logoUrl ?? null, brandColor: o?.brandColor ?? null };
   }
 
   @Patch()

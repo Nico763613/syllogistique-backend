@@ -186,7 +186,7 @@ export class TripsService {
     const liters = fuel.reduce((s, f) => s + Number(f.quantityLiters), 0);
     const hm = (d?: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
 
-    const { doc, done } = startDoc(trip.site.organization?.name ?? 'SYLLOGISTIQUE', 'FICHE DE BORD');
+    const { doc, done } = startDoc(trip.site.organization?.name ?? 'SYL LOGISTIQUE', 'FICHE DE BORD');
     keyValues(doc, [
       ['Date', new Date(trip.tripDate).toLocaleDateString('fr-FR')],
       ['Site', trip.site.name],

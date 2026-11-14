@@ -16,7 +16,7 @@ export function startDoc(orgName: string, title: string) {
     doc.on('error', reject);
   });
   doc.rect(0, 0, doc.page.width, 70).fill(NAVY);
-  doc.fillColor('#FFFFFF').fontSize(18).text(orgName || 'SYLLOGISTIQUE', 50, 20);
+  doc.fillColor('#FFFFFF').fontSize(18).text(orgName || 'SYL LOGISTIQUE', 50, 20);
   doc.fillColor(GOLD).fontSize(12).text(title, 50, 44);
   doc.fillColor('#000000').fontSize(10);
   doc.y = 85;
@@ -37,5 +37,5 @@ export function signatures(doc: PDFKit.PDFDocument, issuer: Issuer, rightLabel: 
   if (issuer.service) doc.text(issuer.service);
   if (issuer.phone) doc.text('Tél. : ' + issuer.phone);
   doc.fillColor(NAVY).text(rightLabel, 330, y, { underline: true });
-  doc.fillColor('#555555').fontSize(8).text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYLLOGISTIQUE`, 50, 780);
+  doc.fillColor('#555555').fontSize(8).text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYL LOGISTIQUE`, 50, 780);
 }

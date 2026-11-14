@@ -123,8 +123,8 @@ export class MessagingService {
   async sendTest(to: string): Promise<MailResult> {
     const r = await this.deliver({
       to,
-      subject: 'Test e-mail — SYLLOGISTIQUE',
-      text: "Ceci est un e-mail de test envoyé par SYLLOGISTIQUE. Si vous le lisez, l'envoi d'e-mails fonctionne.",
+      subject: 'Test e-mail — SYL LOGISTIQUE',
+      text: "Ceci est un e-mail de test envoyé par SYL LOGISTIQUE. Si vous le lisez, l'envoi d'e-mails fonctionne.",
     });
     return r.sent ? { ...r, message: 'E-mail de test envoyé. Vérifiez la boîte de réception (et les spams).' } : r;
   }

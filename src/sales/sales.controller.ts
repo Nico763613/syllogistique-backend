@@ -88,8 +88,8 @@ export class SalesController {
     const buffer = await this.salesDocuments.invoicePdf(id);
     return this.messaging.sendEmailWithAttachment({
       to,
-      subject: `Facture ${invoice.reference} — SYLLOGISTIQUE`,
-      text: `Bonjour,\n\nVeuillez trouver ci-joint la facture ${invoice.reference} d'un montant de ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF.\n\nCordialement,\nSYLLOGISTIQUE`,
+      subject: `Facture ${invoice.reference} — SYL LOGISTIQUE`,
+      text: `Bonjour,\n\nVeuillez trouver ci-joint la facture ${invoice.reference} d'un montant de ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF.\n\nCordialement,\nSYL LOGISTIQUE`,
       filename: `facture_${invoice.reference}.pdf`,
       buffer,
       contentType: 'application/pdf',
@@ -100,7 +100,7 @@ export class SalesController {
   @Get('invoices/:id/whatsapp-link')
   async whatsappLink(@Param('id') id: string, @Query('phone') phone: string) {
     const invoice = await this.salesService.findInvoice(id);
-    const message = `Bonjour ${invoice.customer.name}, voici votre facture ${invoice.reference} d'un montant de ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF. — SYLLOGISTIQUE`;
+    const message = `Bonjour ${invoice.customer.name}, voici votre facture ${invoice.reference} d'un montant de ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF. — SYL LOGISTIQUE`;
     return { link: this.messaging.buildWhatsAppLink(phone, message) };
   }
 

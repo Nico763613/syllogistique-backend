@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>SYLLOGISTIQUE — Gestion Logistique &amp; Flotte</title>
+<title>SYL LOGISTIQUE — Gestion Logistique &amp; Flotte</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#163A5F">
 <link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
@@ -12,7 +12,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="SYLLOGISTIQUE">
+<meta name="apple-mobile-web-app-title" content="SYL LOGISTIQUE">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
@@ -324,7 +324,7 @@
     <button class="btn gold" style="width:100%" onclick="login()">Se connecter</button>
     <div id="login-msg"></div>
     <button id="install-btn-login" class="btn-ghost" style="display:none; width:100%; margin-top:12px; text-align:center;" onclick="installApp()">⬇ Installer sur cet appareil</button>
-    <div class="powered">Powered by Syllogistique</div>
+    <div class="powered">Powered by SYL LOGISTIQUE</div>
   </div>
  </div>
 </div>
@@ -422,7 +422,7 @@
       <nav id="bottom-nav" aria-label="Navigation"></nav>
       <div id="user-menu"><button onclick="openPhotoEditor()">📷 Ma photo de profil</button><button onclick="go('settings')">⚙️ Paramètres</button><button onclick="logout()">🚪 Déconnexion</button></div>
       <div class="content" id="view-root"></div>
-      <div class="powered">Powered by Syllogistique</div>
+      <div class="powered">Powered by SYL LOGISTIQUE</div>
     </div>
   </div>
 </div>
@@ -435,7 +435,7 @@
     <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil">👤</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
-  <div class="powered" style="padding-bottom:18px">Powered by Syllogistique</div>
+  <div class="powered" style="padding-bottom:18px">Powered by SYL LOGISTIQUE</div>
   <nav class="drv-tabs" id="drv-tabs">
     <button data-t="missions" onclick="drvTab('missions')"><span>🏠</span>Accueil</button>
     <button data-t="sheet" onclick="drvTab('sheet')"><span>📋</span>Ma fiche</button>
@@ -3518,7 +3518,7 @@ function drvView() {
 }
 
 function drvIsTruck(me) { return me && ((me.vehicle && me.vehicle.type === 'TRUCK') || (!me.vehicle && me.driver.activity === 'TRUCK')); }
-function drvKind(me) { return (BRAND.name && BRAND.name !== 'SYLLOGISTIQUE' ? BRAND.name + ' · ' : '') + (drvIsTruck(me) ? 'Chauffeur de camion' : 'Chauffeur de véhicule de service') + (me.vehicle && me.vehicle.registrationType === 'IT' ? ' · plaque IT' : ''); }
+function drvKind(me) { return (BRAND.name && !['SYLLOGISTIQUE','SYL LOGISTIQUE'].includes(BRAND.name) ? BRAND.name + ' · ' : '') + (drvIsTruck(me) ? 'Chauffeur de camion' : 'Chauffeur de véhicule de service') + (me.vehicle && me.vehicle.registrationType === 'IT' ? ' · plaque IT' : ''); }
 DRV.hist = []; DRV.ign = 0;
 function drvHb() { try { DRV.ign++; history.back(); } catch (e) { DRV.ign = 0; } }
 function drvTab(t, noPush) {
@@ -4188,16 +4188,16 @@ async function drvHistory(kind, id) {
 
 <script>
 /* ============ PERSONNALISATION (nom, logo, couleur de l'entreprise) ============ */
-const BRAND = (() => { try { return JSON.parse(localStorage.getItem('syllo_brand') || 'null') || { name: 'SYLLOGISTIQUE' }; } catch (e) { return { name: 'SYLLOGISTIQUE' }; } })();
+const BRAND = (() => { try { return JSON.parse(localStorage.getItem('syllo_brand') || 'null') || { name: 'SYL LOGISTIQUE' }; } catch (e) { return { name: 'SYL LOGISTIQUE' }; } })();
 const brandSrc = (u) => (u && u.startsWith('/') ? (state.apiUrl || localStorage.getItem('syllo_api_url') || '').replace(/\/$/, '') + u : u);
 function brandApply() {
-  const n = BRAND.name || 'SYLLOGISTIQUE';
+  const n = BRAND.name || 'SYL LOGISTIQUE';
   document.title = n + ' — Gestion Logistique & Flotte';
   if (BRAND.brandColor) document.documentElement.style.setProperty('--navy', BRAND.brandColor);
   const logo = BRAND.logoUrl ? `<img src="${esc(brandSrc(BRAND.logoUrl))}" alt="" style="height:44px;max-width:120px;object-fit:contain;vertical-align:middle">` : '';
   const lb = document.querySelector('.login-brand .brand'); if (lb) lb.textContent = n;
   const lt = document.querySelector('.login-truck'); if (lt) lt.innerHTML = logo || '🚚';
-  const custom = !!(BRAND.logoUrl || (BRAND.name && BRAND.name !== 'SYLLOGISTIQUE'));
+  const custom = !!(BRAND.logoUrl || (BRAND.name && !['SYLLOGISTIQUE','SYL LOGISTIQUE'].includes(BRAND.name)));
   const sb = document.querySelector('.brand-block .brand'); if (sb) sb.textContent = custom ? n : 'SYL LOGISTIQUE';
   if (custom) { const lg = document.querySelector('.brand-block svg'); if (lg && logo) lg.outerHTML = logo.replace('height:44px', 'height:38px'); const ll = document.querySelector('.lg-logo b'); if (ll) ll.textContent = n; }
   const ds = document.getElementById('drv-sub'); if (ds && !ds.dataset.k) ds.textContent = n;
@@ -4704,11 +4704,11 @@ function licScreen(stateName, message) {
   const act = stateName === 'UNACTIVATED';
   ov.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:26px;text-align:center;font-family:inherit">
     <div style="font-size:42px">${act ? '🔑' : '🔒'}</div>
-    <h2 style="margin:8px 0;color:#163A5F;letter-spacing:.5px">Syllogistique</h2>
+    <h2 style="margin:8px 0;color:#163A5F;letter-spacing:.5px">SYL LOGISTIQUE</h2>
     <p style="color:#4a5a70;font-size:14px">${esc(message || (act ? "Entrez le code d'activation reçu de votre fournisseur." : 'Accès suspendu. Contactez votre fournisseur.'))}</p>
     ${act ? `<input id="lic-code" placeholder="SYLL-XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" autocomplete="off" style="width:100%;padding:12px;border:1px solid #cdd6e2;border-radius:8px;font-size:15px;text-align:center;margin-top:8px">
     <button class="btn gold" style="width:100%;margin-top:12px" onclick="licActivate()">Activer</button><div id="lic-msg" style="margin-top:10px"></div>` : `<button class="btn" style="width:100%;margin-top:12px" onclick="location.reload()">Réessayer</button>`}
-    <div class="powered">Powered by Syllogistique</div></div>`;
+    <div class="powered">Powered by SYL LOGISTIQUE</div></div>`;
   document.body.appendChild(ov);
 }
 async function licActivate() {

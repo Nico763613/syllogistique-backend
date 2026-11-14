@@ -10,11 +10,11 @@ import { ReportsService } from './reports.service';
 export class ExportService {
   constructor(private reportsService: ReportsService) {}
 
-  async periodReportExcel(siteId: string, from: string, to: string, orgName = 'SYLLOGISTIQUE'): Promise<Buffer> {
+  async periodReportExcel(siteId: string, from: string, to: string, orgName = 'SYL LOGISTIQUE'): Promise<Buffer> {
     const report = await this.reportsService.periodReport(siteId, from, to);
 
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'SYLLOGISTIQUE';
+    workbook.creator = 'SYL LOGISTIQUE';
     workbook.created = new Date();
 
     const sheet = workbook.addWorksheet('Rapport');
@@ -53,7 +53,7 @@ export class ExportService {
     return Buffer.from(buffer);
   }
 
-  async periodReportPdf(siteId: string, from: string, to: string, orgName = 'SYLLOGISTIQUE'): Promise<Buffer> {
+  async periodReportPdf(siteId: string, from: string, to: string, orgName = 'SYL LOGISTIQUE'): Promise<Buffer> {
     const report = await this.reportsService.periodReport(siteId, from, to);
 
     return new Promise((resolve, reject) => {
@@ -179,7 +179,7 @@ export class ExportService {
       line(issuer.name);
       if (issuer.service) line(issuer.service);
       if (issuer.phone) line(`Tél. : ${issuer.phone}`);
-      doc.fillColor('#555555').text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYLLOGISTIQUE`);
+      doc.fillColor('#555555').text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYL LOGISTIQUE`);
 
       doc.end();
     });
@@ -220,7 +220,7 @@ export class ExportService {
       if (signer.title) doc.text(signer.title);
       if (signer.phone) doc.text(`Tél. de service : ${signer.phone}`);
       doc.moveDown(1.5).text('Signature : ______________________');
-      doc.fillColor('#555555').text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYLLOGISTIQUE`);
+      doc.fillColor('#555555').text(`Généré le ${new Date().toLocaleString('fr-FR')} — SYL LOGISTIQUE`);
       doc.end();
     });
   }

@@ -70,7 +70,7 @@ export class StaffService {
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: u.id, newValue: { invitation: true } });
     const lines = [
       `Bonjour ${u.firstName},`,
-      `Voici votre application de travail SYLLOGISTIQUE (${LABEL[u.role.name]}) : ${appUrl}`,
+      `Voici votre application de travail SYL LOGISTIQUE (${LABEL[u.role.name]}) : ${appUrl}`,
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
       `2) Connexion : votre numéro de téléphone${temp ? ` et le mot de passe provisoire ${temp} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe'}.`,
       ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre espace de pilotage.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),

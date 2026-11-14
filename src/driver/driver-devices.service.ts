@@ -140,7 +140,7 @@ export class DriverDevicesService {
     const kind = driver.activity === 'SERVICE_VEHICLE' ? 'chauffeur de véhicule de service' : driver.activity === 'TRUCK' ? 'chauffeur de camion' : 'chauffeur';
     const lines = [
       `Bonjour ${driver.firstName},`,
-      `Voici votre application de travail SYLLOGISTIQUE (${kind}) : ${appUrl}`,
+      `Voici votre application de travail SYL LOGISTIQUE (${kind}) : ${appUrl}`,
       ...(veh ? [`Votre véhicule : ${veh.internalNumber} (${veh.registrationNumber}${veh.brand ? ', ' + [veh.brand, veh.model].filter(Boolean).join(' ') : ''}). Vos informations et celles du véhicule sont déjà dans l'application.`] : []),
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
       `2) Connexion : votre numéro de téléphone${tempPassword ? ` et le mot de passe provisoire ${tempPassword} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe habituel'}.`,
