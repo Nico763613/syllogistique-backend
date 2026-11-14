@@ -191,7 +191,7 @@ function clientCard(c) {
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px"><b>${esc(c.name)}</b> ${st === 'NONE' ? '<span class="pill" style="background:#8895A7">Sans licence</span>' : pill(st)}${renewIds().has(c.id) ? ' <span class="pill" style="background:#B7791F">À renouveler</span>' : ''} <span class="muted">${esc(c.country || '')}</span>
     <div class="muted">${esc([c.contact_name, c.phone, c.email].filter(Boolean).join(' · '))}</div>
     ${c.licenses.map((l) => `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
-      ${pill(l.effective)} <span class="muted">· licence n°${l.id} · code …${esc(l.hint)} · ${l.permanent ? 'permanente' : 'jusqu\'au ' + fd(l.expiresAt)} · ${l.maxDevices} appareils max</span>
+      ${pill(l.effective)} <span class="muted">· licence n°${l.id} · code …${esc(l.hint)} · ${l.permanent ? 'permanente' : 'jusqu\'au ' + fd(l.expiresAt)} · ${l.maxDevices} appareils max · ${(l.modules || '').includes('COMMERCIAL') ? 'Caisse &amp; Ventes : oui' : 'Caisse &amp; Ventes : non'}</span>
       ${l.reason ? `<div class="muted">Motif : ${esc(l.reason)}</div>` : ''}${l.lastCheckAt ? `<div class="muted">Dernier contact : ${new Date(l.lastCheckAt).toLocaleString('fr-FR')}${l.appVersion ? ' · v' + esc(l.appVersion) : ''}</div>` : ''}
       <div>${l.status === 'REVOKED' ? '' : `${l.status === 'SUSPENDED' ? `<button class="ghost" onclick="licAct(${l.id},'reactivate')">Rétablir</button>` : `<button class="ghost" onclick="licAct(${l.id},'suspend')">Suspendre</button>`}
         <button class="ghost" onclick="nav('extend',${l.id})">Prolonger</button> <button class="ghost" onclick="licAct(${l.id},'newcode')">Nouveau code</button> <button class="ghost" style="color:var(--danger)" onclick="licAct(${l.id},'revoke')">Révoquer</button>`}
@@ -232,11 +232,11 @@ function screenLicense(cid) {
   const c = CL.find((x) => x.id == cid); if (!c) return showHome();
   DBASE = new Date();
   v.innerHTML = `<div class="card">${bar('Nouvelle licence')}<p class="muted">Client : <b>${esc(c.name)}</b></p>${durHtml({ def: '1y' })}
-    <label>Appareils maximum</label><input id="lm" type="number" min="1" value="50"><div class="err" id="err"></div><button onclick="saveLic(${cid})">Créer la licence</button> <button class="ghost" onclick="back()">Annuler</button></div>`;
+    <label>Appareils maximum</label><input id="lm" type="number" min="1" value="50"><label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input id="lc" type="checkbox" checked style="width:auto"> Module Caisse &amp; Ventes (pour les entreprises qui vendent)</label><div class="err" id="err"></div><button onclick="saveLic(${cid})">Créer la licence</button> <button class="ghost" onclick="back()">Annuler</button></div>`;
   durChange();
 }
 async function saveLic(id) {
-  try { const perm = $('dur').value === 'perm'; const r = await api(`/api/clients/${id}/licenses`, { permanent: perm, expiresAt: $('ld').value, maxDevices: $('lm').value }); CL = await api('/api/clients'); codeModal(r.code); history.replaceState({ r: 'home' }, ''); } catch (e) { fail(e); }
+  try { const perm = $('dur').value === 'perm'; const r = await api(`/api/clients/${id}/licenses`, { permanent: perm, expiresAt: $('ld').value, maxDevices: $('lm').value, commercial: $('lc').checked }); CL = await api('/api/clients'); codeModal(r.code); history.replaceState({ r: 'home' }, ''); } catch (e) { fail(e); }
 }
 
 /* ---------- prolonger ---------- */
@@ -246,11 +246,11 @@ function screenExtend(id) {
   DBASE = l.expiresAt && new Date(l.expiresAt) > new Date() ? new Date(l.expiresAt) : new Date();
   v.innerHTML = `<div class="card">${bar('Prolonger la licence')}<p class="muted">${esc(c.name)} · licence n°${l.id} · actuellement : ${l.permanent ? 'permanente' : 'jusqu\'au ' + fd(l.expiresAt)}</p>
     <p class="muted">La durée choisie s'ajoute à ${l.permanent ? 'aujourd\'hui' : (DBASE > new Date() ? 'la date actuelle d\'expiration' : 'aujourd\'hui')}.</p>${durHtml({ def: '1y' })}
-    <label>Appareils maximum</label><input id="lm" type="number" min="1" value="${l.maxDevices}"><div class="err" id="err"></div><button onclick="saveExt(${l.id})">Enregistrer</button> <button class="ghost" onclick="back()">Annuler</button></div>`;
+    <label>Appareils maximum</label><input id="lm" type="number" min="1" value="${l.maxDevices}"><label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input id="lc" type="checkbox" ${(l.modules || '').includes('COMMERCIAL') ? 'checked' : ''} style="width:auto"> Module Caisse &amp; Ventes</label><div class="err" id="err"></div><button onclick="saveExt(${l.id})">Enregistrer</button> <button class="ghost" onclick="back()">Annuler</button></div>`;
   durChange();
 }
 async function saveExt(id) {
-  try { const perm = $('dur').value === 'perm'; await api(`/api/licenses/${id}/extend`, { permanent: perm, expiresAt: $('ld').value, maxDevices: $('lm').value }); showHome(); } catch (e) { fail(e); }
+  try { const perm = $('dur').value === 'perm'; await api(`/api/licenses/${id}/extend`, { permanent: perm, expiresAt: $('ld').value, maxDevices: $('lm').value, commercial: $('lc').checked }); showHome(); } catch (e) { fail(e); }
 }
 
 /* ---------- appareils ---------- */

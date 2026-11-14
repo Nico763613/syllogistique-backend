@@ -28,6 +28,13 @@ export function verifyToken(token: string, publicPem: string): any | null {
   }
 }
 
+// Modules activés par la licence : null = tous (installation du propriétaire ou ancien jeton sans liste)
+export function modulesOf(enforced: boolean, d: LicData): string[] | null {
+  if (!enforced || !d.token || !d.publicKey) return null;
+  const p = verifyToken(d.token, d.publicKey);
+  return p && Array.isArray(p.modules) ? p.modules.map(String) : null;
+}
+
 export function computeState(enforced: boolean, d: LicData, now = Date.now()): LicView {
   if (!enforced) return { state: 'DISABLED' };
   if (!d.licenseId || !d.token || !d.publicKey) return { state: 'UNACTIVATED', message: "Cette installation n'est pas encore activée." };

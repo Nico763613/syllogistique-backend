@@ -77,3 +77,6 @@ create table if not exists master_devices (
   disconnect_requested boolean not null default false,
   unique (license_id, device_id)
 );
+
+-- Modules activés par licence (liste séparée par des virgules ; COMMERCIAL = Caisse et Ventes)
+alter table master_licenses add column if not exists modules text not null default 'COMMERCIAL';

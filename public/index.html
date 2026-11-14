@@ -1206,11 +1206,18 @@ async function runAction(key) {
   } catch (e) { alert(e.message); }
 }
 
+// Module activé par la licence (null = tout activé)
+function moduleOn(m) {
+  let L = window.LIC_MODULES;
+  if (L === undefined) { try { L = JSON.parse(localStorage.getItem('syllo_modules') || 'null'); } catch (e) { L = null; } }
+  return !Array.isArray(L) || L.includes(m);
+}
 function applyRoleNav() {
   const role = state.user && state.user.role;
   let any = false;
   document.querySelectorAll('.nav-item[data-roles]').forEach((el) => {
-    const ok = el.dataset.roles.split(',').includes(role);
+    let ok = el.dataset.roles.split(',').includes(role);
+    if (ok && ['caisse', 'ventes', 'dash-commercial'].includes(el.dataset.view) && !moduleOn('COMMERCIAL')) ok = false;
     el.style.display = ok ? '' : 'none';
     if (ok) any = true;
   });
@@ -5006,7 +5013,7 @@ async function licLoad() {
     const base = (document.getElementById('api-url') ? document.getElementById('api-url').value : '') || localStorage.getItem('syllo_api_url') || '';
     if (!base) return;
     const r = await fetch(base.replace(/\/$/, '') + '/license/status'); if (!r.ok) return;
-    const j = await r.json(); if (!j.enforced) return;
+    const j = await r.json(); window.LIC_MODULES = j.modules || null; try { localStorage.setItem('syllo_modules', JSON.stringify(j.modules || null)); } catch (e) {} if (typeof applyRoleNav === 'function' && state.user) applyRoleNav(); if (!j.enforced) return;
     if (j.state === 'UNACTIVATED' || j.state === 'BLOCKED') licScreen(j.state, j.message);
     else if (j.state === 'WARNING') {
       const b = document.createElement('div'); b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#E0A72E;color:#1b1b1b;padding:8px 12px;font-size:13px;text-align:center';
