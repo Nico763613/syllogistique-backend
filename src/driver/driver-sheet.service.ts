@@ -147,6 +147,8 @@ export class DriverSheetService {
     if (missing) throw new BadRequestException(`${missing} dépense(s) sans photo de reçu : le reçu scanné est obligatoire avant l'envoi.`);
     const noFuelReceipt = await this.prisma.fuelTransaction.count({ where: { driverId, transactionDate: { gte: day, lt: new Date(+day + 86400000) }, source: 'STATION', totalCost: { gt: 0 }, OR: [{ receiptImageUrl: null }, { receiptImageUrl: '' }] } });
     if (noFuelReceipt) throw new BadRequestException(`${noFuelReceipt} plein(s) en station sans photo du reçu : le reçu scanné est obligatoire avant l'envoi.`);
+    const noMaintReceipt = await this.prisma.driverMaintenance.count({ where: { driverId, date: { gte: day, lt: new Date(+day + 86400000) }, nature: { not: 'ANOMALIE' }, cost: { gt: 0 }, photoUrls: { isEmpty: true } } });
+    if (noMaintReceipt) throw new BadRequestException(`${noMaintReceipt} entretien(s) avec un coût mais sans photo de la facture : le reçu scanné est obligatoire avant l'envoi.`);
     const open = await this.prisma.trip.findFirst({ where: { driverId, status: 'IN_PROGRESS', startTime: { gte: day, lt: new Date(+day + 86400000) } } });
     if (open) throw new BadRequestException("Une mission est encore en cours : déclarez l'arrêt du véhicule avant d'envoyer la fiche.");
     const sheet = await this.build(driverId, date);
