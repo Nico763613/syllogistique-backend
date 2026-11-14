@@ -345,6 +345,7 @@
 
       <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE,RESPONSABLE_OPERATIONS,LECTEUR" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
       <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon">🏠</span> Mon espace de travail</div>
+      <div class="nav-item" data-view="atelier" data-roles="MECANICIEN" onclick="go('atelier')"><span class="nav-icon">🔧</span> Atelier</div>
       <div class="nav-item" data-view="pointage" data-roles="POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
       <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
       <div class="nav-item" data-view="espace-logi" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE" onclick="go('espace-logi')"><span class="nav-icon">🧭</span> Tableau de bord Logistique</div>
@@ -357,8 +358,8 @@
       <div class="nav-item" data-view="fuel" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant &amp; Maintenance</div>
       <div class="nav-item" data-view="ops-validation" data-roles="SUPER_ADMIN,RESPONSABLE_OPERATIONS" onclick="go('ops-validation')"><span class="nav-icon">✅</span> Validation des fiches</div>
       <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,RESPONSABLE_OPERATIONS,COMPTABLE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses</div>
-      <div class="nav-item" data-view="service-vehicles" data-roles="MECANICIEN" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
-      <div class="nav-item" data-view="maintenance" data-roles="MECANICIEN" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
+      <div class="nav-item" data-view="service-vehicles" data-roles="ZZ_NONE" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
+      <div class="nav-item" data-view="maintenance" data-roles="ZZ_NONE" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
       <div class="nav-item" data-view="reports-truck" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,GESTIONNAIRE_HSE,MAGASINIER" onclick="go(reportsHome(state.user.role))"><span class="nav-icon">📊</span> Rapports</div>
 
       <div class="nav-section-label">🏬 Entrepôt &amp; Stocks</div>
@@ -628,6 +629,7 @@ function updateSyncPill() {
 }
 
 const titles = {
+  atelier: 'Atelier',
   home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'ops-validation': 'Validation des fiches', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
@@ -1213,7 +1215,7 @@ function applyRoleNav() {
     any = false;
   }
   if (role === 'MAGASINIER') { const el = document.querySelector('#sidebar .nav-item[data-view="purchases"]'); if (el) el.style.display = 'none'; } // les achats restent au Responsable logistique
-  const extra = { MECANICIEN: ['maintenance', 'trucks', 'service-vehicles', 'stock'], POINTEUR: ['drivers'] }[role] || [];
+  const extra = { POINTEUR: ['drivers'] }[role] || [];
   extra.forEach((v) => { const el = document.querySelector('#sidebar .nav-item[data-view="' + v + '"]'); if (el) el.style.display = ''; });
   const lbl = document.getElementById('nav-dept-label');
   if (lbl) lbl.style.display = any ? '' : 'none';
@@ -1241,6 +1243,7 @@ async function renderView(view) {
     if (view === 'ops-validation') return renderOpsValidation();
     if (view === 'drivers') return renderDrivers();
     if (view === 'fuel') return renderFuel();
+    if (view === 'atelier') return renderAtelier();
     if (view === 'maintenance') return renderMaintenance();
     if (view === 'stock') return renderStock();
     if (view === 'purchases') return renderPurchases();
@@ -3065,6 +3068,7 @@ async function renderWorkspace() {
   const rep = d.myReport ? `Rapport du jour ${stepBadge(staffStep(d.myReport))}` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
   const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
+  const atAct = (ico, label, tab) => `<button onclick="atTab='${tab}';go('atelier')"><span>${ico}</span>${label}</button>`;
   const stAct = (ico, label, tab) => `<button onclick="stockTab='${tab}';go('stock')"><span>${ico}</span>${label}</button>`;
   const actions = (items) => `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${items}${act('📝', 'Mon rapport du jour', 'my-report')}</div></div>`;
   const empty = (t) => `<div class="empty" style="padding:10px">${t}</div>`;
@@ -3088,7 +3092,7 @@ async function renderWorkspace() {
     body = `<div class="ex-kpis">${exKpi('🚛', '#FDE8E4', k.down, 'Véhicules en panne')}${exKpi('🔧', '#FDF1D6', k.inProgress, 'Réparations en cours')}${exKpi('✅', '#E1F4E8', k.doneMonth, 'Terminées (mois)')}${exKpi('📅', '#E3EEFB', k.todo, 'Interventions à faire')}</div>
       <div class="ex-grid"><div class="ex-card"><h3>🛠️ Interventions récentes <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('maintenance')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Véhicule</th><th>Nature</th><th>Statut</th></tr>${d.recent.map((r) => { const [t, c] = st[r.status] || [r.status, 'warn']; return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.nature)}</td><td><span class="badge ${c}">${t}</span></td></tr>`; }).join('')}</table></div>` : empty('Aucune intervention enregistrée.')}</div>
       <div class="ex-card"><h3>🚧 Véhicules à l’arrêt</h3>${d.stopped.length ? d.stopped.map((v) => `<div class="ex-row"><span><b>${esc(v.vehicle)}</b> <span style="color:var(--muted)">${esc(v.plate)}</span></span><span class="badge bad">${v.status === 'MAINTENANCE' ? 'En maintenance' : 'Immobilisé'}</span></div>`).join('') : empty('Aucun véhicule à l’arrêt.')}</div></div>`
-      + actions(act('➕', 'Nouvelle intervention', 'maintenance') + act('🚛', 'Camions', 'trucks') + act('🚙', 'Véhicules de service', 'service-vehicles') + act('📦', 'Pièces en stock', 'stock'));
+      + actions(act('➕', 'Nouvelle intervention', 'maintenance') + atAct('🚧', 'Véhicule à réparer', 'repair') + atAct('📦', 'Pièces', 'parts'));
   } else {
     body = `<div class="ex-kpis">${exKpi('👥', '#E3EEFB', k.total, 'Effectif total')}${exKpi('✅', '#E1F4E8', k.present, 'Présents')}${exKpi('❌', '#FDE8E4', k.absent, 'Absents')}${exKpi('🕒', '#FDF1D6', k.remaining, 'Pointage restant')}</div>
       <div class="ex-grid"><div class="ex-card"><h3>🕒 Pointage du jour</h3>${k.remaining === 0 && k.total > 0 ? '<div class="msg ok">Pointage terminé : tous les chauffeurs sont pointés.</div>' : `<div class="msg err">${k.remaining} chauffeur(s) restent à pointer.</div>`}<button class="btn gold" style="margin-top:8px" onclick="go('pointage')">Faire le pointage</button>${k.others ? `<div class="desc" style="margin-top:8px">${k.others} en repos, permission ou maladie.</div>` : ''}</div>
@@ -4664,6 +4668,54 @@ async function renderDriverSheets(date) {
   root().innerHTML = `<div class="panel"><h3>📋 Fiches de bord du jour</h3><div class="desc">Une fiche par chauffeur et par jour. Circuit : le chauffeur envoie (<b>Soumis</b>), la logistique vérifie et transmet (<b>Vérifié</b>), le Responsable des opérations valide (<b>Validé</b>), puis la Comptabilité traite les dépenses. Une fiche renvoyée (<b>Rejeté</b>) est rouverte au chauffeur.</div>
     <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div><div id="ptr-panel"></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
   loadPointers(d);
+}
+
+/* ---------- Atelier (Mécanicien) : À réparer · En cours · Terminées · Pièces ---------- */
+let atTab = 'repair';
+const AT_TABS = [['repair', '🚧 À réparer'], ['progress', '🔧 En cours'], ['done', '✅ Terminées'], ['parts', '📦 Pièces']];
+async function renderAtelier() {
+  const [dt, maint, items] = await Promise.all([api('/downtimes?siteId=' + encodeURIComponent(state.siteId || '')), api('/maintenance'), atTab === 'parts' ? api('/inventory/items?siteId=' + encodeURIComponent(state.siteId || '')) : Promise.resolve([])]);
+  const open = dt.items.filter((i) => !i.endedAt), closed = dt.items.filter((i) => i.endedAt);
+  const mProg = maint.filter((m) => ['IN_PROGRESS', 'PLANNED', 'OVERDUE'].includes(m.status));
+  const mDone = maint.filter((m) => m.status === 'COMPLETED').slice(0, 20);
+  const nb = { repair: open.length, progress: mProg.length };
+  const bar = `<div class="dp-tabs" id="dp-bar">${AT_TABS.map(([k, t]) => `<button class="${atTab === k ? 'on' : ''}" onclick="atTab='${k}';renderAtelier()">${t}${nb[k] ? ' (' + nb[k] + ')' : ''}</button>`).join('')}</div>`;
+  const d = (x) => new Date(x).toLocaleDateString('fr-FR');
+  const st = { PLANNED: ['warn', 'Planifié'], IN_PROGRESS: ['warn', 'En cours'], OVERDUE: ['bad', 'En retard'], COMPLETED: ['ok', 'Terminé'] };
+  let body = '';
+  if (atTab === 'repair') {
+    body = `<div class="panel"><h3>🚧 Véhicules à réparer <span class="badge ${open.length ? 'bad' : 'ok'}">${open.length}</span></h3><div class="desc">Pannes déclarées par les chauffeurs et véhicules immobilisés. Une fois la réparation faite, cliquez « Réparation terminée » : le véhicule est remis en service.</div>${open.map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b><br><small>${esc(i.category)} · depuis le ${d(i.startedAt)} (${i.days} j)</small><div style="margin-top:4px">${esc(i.reason)}</div></span><button class="btn small gold" onclick="atResolve('${esc(i.id)}')">✔ Réparation terminée</button></div>`).join('') || '<div class="empty">Aucun véhicule à réparer.</div>'}<button class="btn" style="margin-top:10px" onclick="go('maintenance')">➕ Nouvelle intervention (entretien)</button></div>`;
+  } else if (atTab === 'progress') {
+    body = `<div class="panel"><h3>🔧 Interventions en cours et à faire</h3>${mProg.map((m) => { const [c, l] = st[m.status] || ['warn', m.status]; return `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || m.description || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ${c}">${l}</span></div>`; }).join('') || '<div class="empty">Aucune intervention en cours.</div>'}</div>`;
+  } else if (atTab === 'done') {
+    body = `<div class="panel"><h3>✅ Réparations terminées</h3>${closed.slice(0, 30).map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b> · ${esc(i.category)}<br><small>${d(i.startedAt)} → ${d(i.endedAt)} (${i.days} j)</small>${i.resolutionNote ? '<div style="font-size:13px">' + esc(i.resolutionNote) + '</div>' : ''}</span><span style="text-align:right">${i.actualCost != null ? '<b>' + fmt(i.actualCost) + ' GNF</b>' : ''}${i.invoiceUrl ? '<br><a href="' + esc((state.apiUrl || '').replace(/\/$/, '') + i.invoiceUrl) + '" target="_blank" rel="noopener" style="font-size:12px">🧾 Facture</a>' : ''}</span></div>`).join('') || '<div class="empty">Aucune réparation terminée.</div>'}</div>
+      ${mDone.length ? `<div class="panel"><h3>Entretiens réalisés</h3>${mDone.map((m) => `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ok">Terminé</span></div>`).join('')}</div>` : ''}`;
+  } else {
+    body = `<div class="panel"><h3>📦 Pièces en stock <span style="font-size:12px;font-weight:400;color:var(--muted)">(consultation)</span></h3><div class="desc">Pour demander une pièce, voyez le magasinier.</div><div style="overflow:auto"><table><tr><th>Article</th><th>Quantité</th><th>État</th></tr>${items.map((i) => `<tr><td>${esc(i.name)}</td><td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td><td>${Number(i.currentQuantity) <= 0 ? '<span class="badge bad">Rupture</span>' : Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge warn">Sous seuil</span>' : '<span class="badge ok">OK</span>'}</td></tr>`).join('') || '<tr><td colspan="3">Aucun article.</td></tr>'}</table></div></div>`;
+  }
+  root().innerHTML = bar + body;
+}
+function atResolve(id) {
+  DRV_PHOTOS.length = 0;
+  const ov = document.createElement('div'); ov.id = 'at-ov'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,25,45,.55);z-index:90;display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;max-height:92vh;overflow:auto;margin:0"><h3>✔ Réparation terminée</h3>
+    <label>Travaux réalisés (obligatoire)</label><textarea id="at-note" rows="3" placeholder="Ex. remplacement plaquettes avant, purge freins"></textarea>
+    <label>Coût total pièces + main-d'œuvre (GNF) — 0 si aucun</label><input id="at-cost" type="number" inputmode="numeric" value="0">
+    ${drvPhotoField('📷 Photo de la facture — obligatoire si un coût est indiqué', false)}
+    <div id="at-msg"></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn gold" style="flex:1;min-height:48px" onclick="atResolveSend('${esc(id)}')">Remettre en service</button><button class="btn" style="min-height:48px" onclick="document.getElementById('at-ov').remove()">Annuler</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function atResolveSend(id) {
+  const m = document.getElementById('at-msg'), note = document.getElementById('at-note').value.trim(), cost = Number(document.getElementById('at-cost').value);
+  try {
+    if (!note) throw new Error('Indiquez les travaux réalisés.');
+    if (!Number.isFinite(cost) || cost < 0) throw new Error('Coût invalide.');
+    if (cost > 0 && !DRV_PHOTOS.length) throw new Error('La photo de la facture est obligatoire quand un coût est indiqué.');
+    m.innerHTML = '<div class="desc">Envoi en cours…</div>';
+    const invoiceUrl = DRV_PHOTOS.length ? await drvUpload(DRV_PHOTOS[0], 'maintenance_invoice') : undefined;
+    await api('/downtimes/' + id + '/resolve', { method: 'POST', body: { resolutionNote: note, actualCost: cost, ...(invoiceUrl ? { invoiceUrl } : {}) } });
+    document.getElementById('at-ov').remove(); renderAtelier();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
 /* Responsable des opérations : fiches vérifiées par la logistique, à valider puis transférer à la Comptabilité */

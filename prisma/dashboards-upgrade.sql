@@ -294,3 +294,6 @@ ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS receipt_checked_at timestam
 
 --#
 ALTER TABLE staff_reports ADD COLUMN IF NOT EXISTS ops_at timestamp(3), ADD COLUMN IF NOT EXISTS ops_by text, ADD COLUMN IF NOT EXISTS rejected_at timestamp(3), ADD COLUMN IF NOT EXISTS rejected_by text, ADD COLUMN IF NOT EXISTS reject_note text
+
+--#
+ALTER TABLE vehicle_downtimes ADD COLUMN IF NOT EXISTS invoice_url text

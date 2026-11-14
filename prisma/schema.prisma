@@ -1068,6 +1068,7 @@ model VehicleDowntime {
   startedAt      DateTime  @default(now()) @map("started_at")
   endedAt        DateTime? @map("ended_at")
   resolutionNote String?   @map("resolution_note")
+  invoiceUrl     String?   @map("invoice_url")
   createdById    String    @map("created_by")
   resolvedById   String?   @map("resolved_by")
   // Déclaration par le chauffeur

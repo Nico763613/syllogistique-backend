@@ -24,7 +24,7 @@ export class UploadsController {
   constructor(private prisma: PrismaService) {}
 
   @Post()
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER, RoleName.CHAUFFEUR)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER, RoleName.CHAUFFEUR, RoleName.MECANICIEN)
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: MAX_SIZE } }))
   async upload(@UploadedFile() file: Express.Multer.File, @Query('category') category?: string) {

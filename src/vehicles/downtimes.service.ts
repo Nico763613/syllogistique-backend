@@ -40,14 +40,19 @@ export class DowntimesService {
   }
 
   // Remise en service : clôture l'immobilisation, calcule la durée, libère le véhicule
-  async resolve(id: string, dto: ResolveDowntimeDto, actorId: string) {
+  async resolve(id: string, dto: ResolveDowntimeDto, actorId: string, actorRole?: string) {
     const downtime = await this.prisma.vehicleDowntime.findUnique({ where: { id } });
     if (!downtime) throw new NotFoundException('Immobilisation introuvable.');
     if (downtime.endedAt) throw new BadRequestException('Cette immobilisation est déjà clôturée.');
+    if (actorRole === 'MECANICIEN') {
+      if (dto.actualCost === undefined || dto.actualCost === null) throw new BadRequestException('Indiquez le coût de la réparation (0 si aucun).');
+      if (!dto.resolutionNote?.trim()) throw new BadRequestException('Indiquez les travaux réalisés.');
+      if (dto.actualCost > 0 && !dto.invoiceUrl) throw new BadRequestException('La photo de la facture est obligatoire quand un coût est indiqué.');
+    }
     const endedAt = new Date();
     const updated = await this.prisma.vehicleDowntime.update({
       where: { id },
-      data: { endedAt, actualCost: dto.actualCost, resolutionNote: dto.resolutionNote?.trim(), resolvedById: actorId },
+      data: { endedAt, actualCost: dto.actualCost, resolutionNote: dto.resolutionNote?.trim(), resolvedById: actorId, invoiceUrl: dto.invoiceUrl || undefined },
     });
     await this.prisma.vehicle.update({ where: { id: downtime.vehicleId }, data: { status: 'AVAILABLE' } });
     const days = Math.max(1, Math.ceil((endedAt.getTime() - downtime.startedAt.getTime()) / DAY));
@@ -64,7 +69,7 @@ export class DowntimesService {
   }
 
   // Historique + indicateurs (durée, coût)
-  async list(siteId: string, params: { vehicleId?: string; open?: string }) {
+  async list(siteId: string, params: { vehicleId?: string; open?: string }, actor?: { userId?: string; role?: string }) {
     if (!siteId) throw new BadRequestException('Le site (siteId) est obligatoire.');
     const rows = await this.prisma.vehicleDowntime.findMany({
       where: {
@@ -86,9 +91,12 @@ export class DowntimesService {
       startedAt: r.startedAt,
       endedAt: r.endedAt,
       days: Math.max(1, Math.ceil(((r.endedAt?.getTime() ?? now) - r.startedAt.getTime()) / DAY)),
-      estimatedCost: r.estimatedCost === null ? null : Number(r.estimatedCost),
-      actualCost: r.actualCost === null ? null : Number(r.actualCost),
+      // Le mécanicien ne voit les coûts que de ses propres interventions
+      estimatedCost: r.estimatedCost === null || (actor?.role === 'MECANICIEN' && r.resolvedById !== actor.userId) ? null : Number(r.estimatedCost),
+      actualCost: r.actualCost === null || (actor?.role === 'MECANICIEN' && r.resolvedById !== actor.userId) ? null : Number(r.actualCost),
       resolutionNote: r.resolutionNote,
+      invoiceUrl: r.invoiceUrl,
+      mine: r.resolvedById === actor?.userId,
     }));
     return {
       items,
