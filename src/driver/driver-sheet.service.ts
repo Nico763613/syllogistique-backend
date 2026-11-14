@@ -181,7 +181,7 @@ export class DriverSheetService {
     return rows.map((r) => {
       const d = drivers.find((x) => x.id === r.driverId), v = vehicles.find((x) => x.id === r.vehicleId);
       const rep = reps.find((x) => x.driverId === r.driverId && x.reportDate.toISOString().slice(0, 10) === r.date.toISOString().slice(0, 10));
-      return { sheetStep: DriverSheetService.step(rep), receiptCheckedAt: r.receiptCheckedAt, paidAt: r.paidAt, decidedAt: r.decidedAt, id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, insured: r.insured, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
+      return { sheetStep: DriverSheetService.step(rep), receiptCheckedAt: r.receiptCheckedAt, paidAt: r.paidAt, id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, insured: r.insured, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
     });
   }
 
