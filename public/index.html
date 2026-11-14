@@ -373,7 +373,8 @@
       <div class="nav-item" data-view="purchases" onclick="go('purchases')"><span class="nav-icon">🛒</span> Achats</div>
       <div class="nav-item" data-view="needs" onclick="go('needs')"><span class="nav-icon">📝</span> États des besoins</div>
       <div class="nav-item" data-view="caisse" data-roles="CAISSIER" onclick="go('caisse')"><span class="nav-icon">💵</span> Caisse</div>
-      <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
+      <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL" onclick="go('dash-commercial')"><span class="nav-icon">🏠</span> Accueil</div>
+      <div class="nav-item" data-view="ventes" data-roles="RESPONSABLE_COMMERCIAL,DIRECTEUR_GENERAL,COMPTABLE" onclick="go('ventes')"><span class="nav-icon">🛒</span> Ventes</div>
 
       <div class="nav-section-label">🦺 HSE</div>
       <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
@@ -632,6 +633,7 @@ function updateSyncPill() {
 
 const titles = {
   caisse: 'Caisse',
+  ventes: 'Ventes',
   compta: 'Comptabilité',
   atelier: 'Atelier',
   home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
@@ -1243,6 +1245,7 @@ async function renderView(view) {
     if (view === 'driver-missions') return renderMissionHistory();
     if (view === 'driver-board') return renderDriverBoard();
     if (view === 'caisse') return renderCaisse();
+    if (view === 'ventes') return renderVentes();
     if (view === 'compta') return renderCompta();
     if (view === 'driver-expenses') return state.user.role === 'COMPTABLE' ? renderCompta() : renderDriverExpenses();
     if (view === 'driver-sheets') return renderDriverSheets();
@@ -2870,7 +2873,7 @@ function bottomEntries(role) {
   const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
   if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
-  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], CAISSIER: ['💵', 'Caisse', 'caisse'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], RESPONSABLE_COMMERCIAL: ['🛒', 'Ventes', 'ventes'], CAISSIER: ['💵', 'Caisse', 'caisse'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
   const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'].includes(role);
   return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', reportsHome(role)]] : []), ['👤', 'Profil', '#profil']];
 }
@@ -4532,6 +4535,59 @@ async function renderDriverExpenses(status) {
     <label>Afficher</label><select onchange="renderDriverExpenses(this.value)" style="max-width:220px"><option value="PENDING" ${st === 'PENDING' ? 'selected' : ''}>En attente</option><option value="APPROVED" ${st === 'APPROVED' ? 'selected' : ''}>Validées</option><option value="REJECTED" ${st === 'REJECTED' ? 'selected' : ''}>Refusées</option></select></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Reçu scanné</th><th>Reçu papier</th><th>Fiche</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="9" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
 }
+/* ---------- Ventes (Responsable commercial) : Commandes · Factures · Clients · Retours · Caisses à valider ---------- */
+let vtTab = 'caisses';
+const VT_TABS = [['caisses', '🗄 Caisses à valider'], ['commandes', '📋 Commandes'], ['factures', '🧾 Factures'], ['clients', '👥 Clients'], ['retours', '↩ Retours']];
+const VT_ORDER = { QUOTE: ['Devis', 'info'], CONFIRMED: ['Confirmée', 'info'], PARTIALLY_DELIVERED: ['Livrée en partie', 'warn'], DELIVERED: ['Livrée', 'ok'], INVOICED: ['Facturée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
+const VT_INV = { DRAFT: ['Brouillon', 'info'], UNPAID: ['Impayée', 'bad'], PARTIALLY_PAID: ['Partielle', 'warn'], PAID: ['Payée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
+function cashState(c) {
+  if (!c.closedAt) return ['Brouillon', 'info'];
+  if (c.rejectedAt) return ['Rejeté', 'bad'];
+  if (c.opsAt) return ['Validé', 'ok'];
+  if (c.validatedBy) return ['Vérifié', 'warn'];
+  return ['Soumis', 'warn'];
+}
+function vtCanAct() { return ['RESPONSABLE_COMMERCIAL', 'SUPER_ADMIN'].includes(state.user.role); }
+async function renderVentes() {
+  const sid = encodeURIComponent(state.siteId || '');
+  const [sess, orders, invs, rets] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => [])]);
+  const g = (n) => fmt(Math.round(Number(n) || 0)), dd = (x) => new Date(x).toLocaleDateString('fr-FR'), act = vtCanAct();
+  const toCheck = (sess || []).filter((c) => c.closedAt && !c.validatedBy && !c.opsAt);
+  const pendRet = (rets || []).filter((r) => r.status === 'PENDING');
+  const bar = `<div class="dp-tabs" id="dp-bar">${VT_TABS.map(([k, t]) => { const n = k === 'caisses' ? toCheck.length : k === 'retours' ? pendRet.length : 0; return `<button class="${vtTab === k ? 'on' : ''}" onclick="vtTab='${k}';renderVentes()">${t}${n ? ' (' + n + ')' : ''}</button>`; }).join('')}</div>`;
+  const badge = (m, k) => `<span class="badge ${m[1]}">${m[0]}</span>`;
+  const opened = (invs || []).filter((i) => ['UNPAID', 'PARTIALLY_PAID'].includes(i.status));
+  const due = (i) => Math.max(0, Number(i.totalAmount) - Number(i.amountPaid || 0));
+  let body = '';
+  if (vtTab === 'caisses') {
+    const rows = (sess || []).filter((c) => c.closedAt).map((c) => { const st = cashState(c), gap = c.gapAmount == null ? null : Number(c.gapAmount); const who = c.cashier ? c.cashier.firstName + ' ' + c.cashier.lastName : '';
+      return `<tr><td>${dd(c.openedAt)}<div style="font-size:11px;color:var(--muted)">${esc(who)}</div></td><td>${badge(st)}${c.rejectNote ? '<div style="font-size:11px;color:var(--muted)">' + esc(c.rejectNote) + '</div>' : ''}</td><td class="mono">${g(c.expectedCash)}</td><td class="mono">${g(c.countedCash)}</td><td>${gap === 0 ? '<span class="badge ok">0</span>' : '<span class="badge bad">' + (gap > 0 ? '+' : '') + g(gap) + '</span>'}${c.note ? '<div style="font-size:11px;color:var(--muted)">' + esc(c.note) + '</div>' : ''}</td><td style="white-space:nowrap">${act && !c.validatedBy && !c.opsAt ? `<button class="btn small gold" onclick="vtCashOk('${esc(c.id)}', ${gap === 0 ? 0 : 1})">✔ Vérifier</button> ` : ''}${act && !c.opsAt && !c.rejectedAt ? `<button class="btn small" onclick="vtCashNo('${esc(c.id)}')">↩ Rejeter</button>` : ''}</td></tr>`; }).join('');
+    body = `<div class="panel"><h3>🗄 Caisses clôturées <span class="badge ${toCheck.length ? 'warn' : 'ok'}">${toCheck.length} à vérifier</span></h3><div class="desc">Vérifiez la caisse (écart justifié), elle passe ensuite au Responsable des opérations puis à la Comptabilité.</div><div style="overflow:auto"><table><tr><th>Caisse</th><th>État</th><th>Attendu</th><th>Compté</th><th>Écart</th><th></th></tr>${rows || '<tr><td colspan="6"><div class="empty">Aucune caisse clôturée.</div></td></tr>'}</table></div></div>`;
+  } else if (vtTab === 'commandes') {
+    body = `<div class="panel"><h3>📋 Commandes</h3><div style="overflow:auto"><table><tr><th>Référence</th><th>Client</th><th>Date</th><th>Total</th><th>État</th></tr>${(orders || []).map((o) => `<tr><td>${esc(o.reference)}</td><td>${esc(o.customer && o.customer.name)}</td><td>${dd(o.orderDate)}</td><td class="mono">${g((o.lines || []).reduce((a, l) => a + Number(l.lineTotal || 0), 0))}</td><td>${badge(VT_ORDER[o.status] || [o.status, 'info'])}</td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">Aucune commande.</div></td></tr>'}</table></div></div>`;
+  } else if (vtTab === 'factures') {
+    body = `<div class="panel"><h3>🧾 Factures <span class="badge ${opened.length ? 'warn' : 'ok'}">${opened.length} à encaisser</span></h3><div style="overflow:auto"><table><tr><th>Facture</th><th>Client</th><th>Total</th><th>Reste</th><th>État</th><th></th></tr>${(invs || []).map((i) => { const ph = String((i.customer && i.customer.phone) || '').replace(/\D/g, ''), full = ph.length === 9 ? '224' + ph : ph; const msg = `Bonjour ${(i.customer && i.customer.name) || ''}, rappel : la facture ${i.reference} présente un reste à payer de ${g(due(i))} GNF. Merci. — SYL LOGISTIQUE`; return `<tr><td>${esc(i.reference)}<div style="font-size:11px;color:var(--muted)">${dd(i.invoiceDate)}</div></td><td>${esc(i.customer && i.customer.name)}</td><td class="mono">${g(i.totalAmount)}</td><td class="mono">${['UNPAID', 'PARTIALLY_PAID'].includes(i.status) ? '<b>' + g(due(i)) + '</b>' : '—'}</td><td>${badge(VT_INV[i.status] || [i.status, 'info'])}</td><td>${['UNPAID', 'PARTIALLY_PAID'].includes(i.status) && full && act ? `<a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">💬 Relancer</a>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6"><div class="empty">Aucune facture.</div></td></tr>'}</table></div></div>`;
+  } else if (vtTab === 'clients') {
+    const by = {}; (invs || []).filter((i) => i.status !== 'CANCELLED' && i.status !== 'DRAFT').forEach((i) => { const n = (i.customer && i.customer.name) || '—'; const c = by[n] || (by[n] = { n, tot: 0, paid: 0, k: 0 }); c.tot += Number(i.totalAmount); c.paid += Number(i.amountPaid || 0); c.k++; });
+    const list = Object.values(by).sort((a, b) => (b.tot - b.paid) - (a.tot - a.paid));
+    body = `<div class="panel"><h3>👥 Clients — ce qu'ils doivent</h3><div style="overflow:auto"><table><tr><th>Client</th><th>Factures</th><th>Facturé</th><th>Payé</th><th>Reste dû</th></tr>${list.map((c) => `<tr><td>${esc(c.n)}</td><td>${c.k}</td><td class="mono">${g(c.tot)}</td><td class="mono">${g(c.paid)}</td><td class="mono">${c.tot - c.paid > 0 ? '<span class="badge bad">' + g(c.tot - c.paid) + '</span>' : '<span class="badge ok">0</span>'}</td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">Aucun client facturé.</div></td></tr>'}</table></div></div>`;
+  } else {
+    const RS = { PENDING: ['À valider', 'warn'], VALIDATED: ['Validé', 'ok'], REJECTED: ['Rejeté', 'bad'] };
+    body = `<div class="panel"><h3>↩ Retours clients <span class="badge ${pendRet.length ? 'warn' : 'ok'}">${pendRet.length} à valider</span></h3><div style="overflow:auto"><table><tr><th>Retour</th><th>Facture / client</th><th>Motif</th><th>Montant</th><th>État</th><th></th></tr>${(rets || []).map((r) => `<tr><td>${esc(r.reference || '')}<div style="font-size:11px;color:var(--muted)">${dd(r.createdAt)}</div></td><td>${esc(r.salesInvoice && r.salesInvoice.reference)}<div style="font-size:11px;color:var(--muted)">${esc(r.salesInvoice && r.salesInvoice.customer && r.salesInvoice.customer.name)}</div></td><td>${esc(r.reason)}</td><td class="mono">${g(r.totalAmount)}</td><td>${badge(RS[r.status] || [r.status, 'info'])}</td><td style="white-space:nowrap">${act && r.status === 'PENDING' ? `<button class="btn small gold" onclick="vtRet('${esc(r.id)}', true)">✔ Valider</button> <button class="btn small" onclick="vtRet('${esc(r.id)}', false)">↩ Rejeter</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">Aucun retour.</div></td></tr>'}</table></div></div>`;
+  }
+  root().innerHTML = bar + (act ? '' : '<div class="msg">Lecture seule.</div>') + body + '<div id="vt-msg"></div>';
+}
+async function vtDo(fn) { try { await fn(); renderView(state.view); } catch (e) { alert(e.message); } }
+function vtCashOk(id, needNote) {
+  const note = prompt(needNote ? 'Il y a un écart. Justification (obligatoire) :' : 'Observation (facultatif) :', ''); if (note === null) return;
+  vtDo(() => api('/cash-sessions/' + id + '/validate', { method: 'POST', body: note.trim() ? { note: note.trim() } : {} }));
+}
+function vtCashNo(id) { const note = prompt('Motif du rejet (obligatoire) :', ''); if (note === null) return; vtDo(() => api('/cash-sessions/' + id + '/reject', { method: 'POST', body: { note } })); }
+function vtCashOps(id) { if (!confirm('Valider définitivement cette caisse ? Elle passe à la Comptabilité.')) return; vtDo(() => api('/cash-sessions/' + id + '/ops-validate', { method: 'POST', body: {} })); }
+function vtRet(id, ok) {
+  if (ok) { if (!confirm('Valider ce retour ?')) return; return vtDo(() => api('/sales/returns/' + id + '/validate', { method: 'POST', body: {} })); }
+  const note = prompt('Motif du rejet :', ''); if (note === null) return; vtDo(() => api('/sales/returns/' + id + '/reject', { method: 'POST', body: { note } }));
+}
 /* ---------- Caisse (Caissier) : Encaisser · Ma caisse · Factures · Historique ---------- */
 let csTab = 'encaisser', csInvoice = '';
 const CS_TABS = [['encaisser', '💵 Encaisser'], ['caisse', '🗄 Ma caisse'], ['factures', '🧾 Factures'], ['histo', '🗂 Historique']];
@@ -4878,9 +4934,12 @@ async function atResolveSend(id) {
 
 /* Responsable des opérations : fiches vérifiées par la logistique, à valider puis transférer à la Comptabilité */
 async function renderOpsValidation() {
+  const cashAll = await api('/cash-sessions?siteId=' + encodeURIComponent(state.siteId || '')).catch(() => []);
+  const cashTo = (cashAll || []).filter((c) => c.closedAt && c.validatedBy && !c.opsAt && !c.rejectedAt);
+  const cashHtml = cashTo.length ? `<div class="panel"><h3>🗄 Caisses vérifiées à valider <span class="badge warn">${cashTo.length}</span></h3>${cashTo.map((c) => `<div class="drv-row" style="align-items:flex-start"><span><b>${new Date(c.openedAt).toLocaleDateString('fr-FR')}</b> · ${esc(c.cashier ? c.cashier.firstName + ' ' + c.cashier.lastName : '')}<br><small>Attendu ${fmt(Math.round(Number(c.expectedCash) || 0))} · compté ${fmt(Math.round(Number(c.countedCash) || 0))} · écart ${fmt(Math.round(Number(c.gapAmount) || 0))} GNF</small>${c.note ? '<div style="font-size:12px;color:var(--muted)">' + esc(c.note) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="vtCashOps('${esc(c.id)}')">✔ Valider</button> <button class="btn small" onclick="vtCashNo('${esc(c.id)}')">↩ Rejeter</button></span></div>`).join('')}</div>` : '';
   const [list, staff] = await Promise.all([api('/driver-admin/sheets/pending?siteId=' + encodeURIComponent(state.siteId || '')), api('/staff/reports/pending?siteId=' + encodeURIComponent(state.siteId || '')).catch(() => [])]);
   const staffHtml = staff.length ? `<div class="panel"><h3>🧑‍🏭 Rapports du personnel à valider <span class="badge warn">${staff.length}</span></h3>${staff.map((r) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(r.name)}</b> · ${esc(r.date)}<br><small>${esc(r.role)}</small><div style="white-space:pre-wrap;font-size:13px;margin-top:4px">${esc(r.activities)}</div>${r.observations ? '<div style="font-size:12px;color:var(--muted);white-space:pre-wrap">' + esc(r.observations) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="stValidate('${esc(r.id)}')">✔ Valider</button> <button class="btn small" onclick="stReject('${esc(r.id)}')">↩ Rejeter</button></span></div>`).join('')}</div>` : '';
-  root().innerHTML = staffHtml + `<div class="panel"><h3>✅ Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
+  root().innerHTML = cashHtml + staffHtml + `<div class="panel"><h3>✅ Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
     <div style="font-size:26px;font-weight:700;color:var(--navy)">${list.length} <span style="font-size:13px;font-weight:400;color:var(--muted)">fiche(s) en attente</span></div></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune fiche en attente de validation.</div></div>'}`;
 }
 

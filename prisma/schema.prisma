@@ -1267,6 +1267,11 @@ model CashSession {
   gapAmount    Decimal? @map("gap_amount") @db.Decimal(14, 0)
   validatedBy  String?  @map("validated_by")
   note         String?
+  opsAt        DateTime? @map("ops_at")
+  opsBy        String?  @map("ops_by")
+  rejectedAt   DateTime? @map("rejected_at")
+  rejectedBy   String?  @map("rejected_by")
+  rejectNote   String?  @map("reject_note")
 
   site         Site     @relation(fields: [siteId], references: [id])
   cashier      User     @relation(fields: [cashierId], references: [id])
