@@ -76,7 +76,6 @@ export class DriverController {
   }
 
   @Get('trips/:id/timeline')
-  @Roles(...OPS)
   @Roles(RoleName.CHAUFFEUR)
   @UseGuards(DriverDeviceGuard)
   async timeline(@Param('id') id: string, @CurrentUser() user: any) {
@@ -226,6 +225,7 @@ export class DriverAdminController {
   }
 
   @Get('trips/:id/timeline')
+  @Roles(...OPS)
   tripTimeline(@Param('id') id: string) {
     return this.sheets.timeline(id);
   }
