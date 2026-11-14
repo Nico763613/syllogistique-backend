@@ -22,7 +22,7 @@
   button.gold{background:var(--gold);color:#1b1b1b} button.ghost{background:none;color:var(--navy);border:1px solid var(--line)}
   .err{color:var(--danger);font-size:13px;margin-top:8px;min-height:18px} .muted{color:var(--muted);font-size:13px}
   code{background:#EEF2F7;padding:3px 6px;border-radius:5px;word-break:break-all;font-size:14px}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px} .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px} .kpi.click{cursor:pointer} .kpi.warn b{color:#B7791F} .kpi.bad b{color:var(--danger)} .kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
   .kpi b{font-size:22px;color:var(--navy);display:block} .kpi span{font-size:11px;color:var(--muted)}
   .codes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0} .codes code{text-align:center}
   table{width:100%;border-collapse:collapse;font-size:12px} td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
@@ -145,7 +145,9 @@ function clientState(c) {
   if (e.includes('ACTIVE')) return 'ACTIVE'; if (e.includes('PENDING')) return 'PENDING'; if (e.includes('SUSPENDED')) return 'SUSPENDED';
   if (e.includes('EXPIRED')) return 'EXPIRED'; if (e.includes('REVOKED')) return 'REVOKED'; return 'NONE';
 }
-const FILTERS = [['all', 'Tous'], ['ACTIVE', 'Actifs'], ['PENDING', 'En attente'], ['EXPIRED', 'Expirés'], ['REVOKED', 'Révoqués']];
+const FILTERS = [['all', 'Tous'], ['ACTIVE', 'Actifs'], ['RENEW', 'À renouveler'], ['PENDING', 'En attente'], ['SUSPENDED', 'Suspendus'], ['EXPIRED', 'Expirés'], ['REVOKED', 'Révoqués']];
+const renewIds = () => new Set(expiring().map(({ c }) => c.id));
+const showFilter = (k) => { FS = k; drawList(); const el = $('chips'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
 function expiring() {
   const lim = Date.now() + 30 * 864e5;
   return CL.flatMap((c) => c.licenses.filter((l) => !l.permanent && l.expiresAt && ['ACTIVE', 'PENDING', 'SUSPENDED'].includes(l.effective) && new Date(l.expiresAt).getTime() < lim).map((l) => ({ c, l })));
@@ -155,10 +157,10 @@ async function showHome() {
     const me = await api('/api/me'); CL = await api('/api/clients'); LOGGED = true; bump();
     $('out').style.display = 'inline-block';
     const lics = CL.flatMap((c) => c.licenses); const act = lics.filter((l) => l.effective === 'ACTIVE').length;
-    const ex = expiring();
+    const ex = expiring(); const lost = lics.filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length;
     v.innerHTML = `<div class="card"><h2>Bienvenue, Monsieur SYLLA</h2><p class="muted">${esc(me.email)}</p></div>
       ${ex.length ? `<div class="alert"><b>⚠ ${ex.length} licence(s) expirent dans moins de 30 jours</b>${ex.map(({ c, l }) => `<div>${esc(c.name)} · licence n°${l.id} · ${fd(l.expiresAt)} (${Math.max(0, Math.ceil((new Date(l.expiresAt) - Date.now()) / 864e5))} j) <a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></div>`).join('')}</div>` : ''}
-      <div class="grid"><div class="kpi"><b>${CL.length}</b><span>Clients</span></div><div class="kpi"><b>${lics.length}</b><span>Licences</span></div><div class="kpi"><b>${act}</b><span>Actives</span></div></div>
+      <div class="grid"><div class="kpi"><b>${CL.length}</b><span>Clients</span></div><div class="kpi"><b>${lics.length}</b><span>Licences</span></div><div class="kpi click" onclick="showFilter('ACTIVE')"><b>${act}</b><span>Actives</span></div><div class="kpi click ${ex.length ? 'warn' : ''}" onclick="showFilter('RENEW')"><b>${ex.length}</b><span>À renouveler (30 j)</span></div><div class="kpi click ${lost ? 'bad' : ''}" onclick="showFilter('EXPIRED')"><b>${lost}</b><span>Expirées / suspendues</span></div></div>
       <div class="card" style="margin-top:14px"><h2>Clients</h2>
         <input id="q" placeholder="Rechercher un client…" value="${esc(FQ)}" oninput="FQ=this.value;drawList()">
         <div class="chips" id="chips"></div>
@@ -170,15 +172,23 @@ async function showHome() {
     drawList();
   } catch (e) { showLogin(); }
 }
+// Message de rappel de renouvellement (à coller dans WhatsApp) : rien n'est envoyé automatiquement
+function copyReminder(cid, lid) {
+  const c = CL.find((x) => x.id === cid), l = c && c.licenses.find((x) => x.id === lid); if (!l) return;
+  const expired = new Date(l.expiresAt).getTime() < Date.now();
+  const txt = `Bonjour ${c.contact_name || c.name},\n\nVotre licence SYL LOGISTIQUE ${expired ? 'a expiré le' : 'expire le'} ${fd(l.expiresAt)}.\nPour ${expired ? 'la réactiver' : 'la renouveler'} et éviter toute interruption de votre service, contactez-nous dès que possible.\n\nCordialement,\nSYL LOGISTIQUE — Mokonzi Multiservices`;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(() => alert('Message copié. Collez-le dans WhatsApp.'), () => prompt('Copiez ce message :', txt));
+  else prompt('Copiez ce message :', txt);
+}
 function drawList() {
   $('chips').innerHTML = FILTERS.map(([k, t]) => `<button class="ghost ${FS === k ? 'on' : ''}" onclick="FS='${k}';drawList()">${t}</button>`).join('');
   const q = FQ.trim().toLowerCase();
-  const list = CL.filter((c) => (FS === 'all' || clientState(c) === FS) && (!q || [c.name, c.contact_name, c.email, c.phone, c.country].join(' ').toLowerCase().includes(q)));
+  const list = CL.filter((c) => (FS === 'all' || (FS === 'RENEW' ? renewIds().has(c.id) : clientState(c) === FS)) && (!q || [c.name, c.contact_name, c.email, c.phone, c.country].join(' ').toLowerCase().includes(q)));
   $('cl').innerHTML = list.map(clientCard).join('') || `<p class="muted">${CL.length ? 'Aucun client ne correspond.' : 'Aucun client pour le moment.'}</p>`;
 }
 function clientCard(c) {
   const st = clientState(c);
-  return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px"><b>${esc(c.name)}</b> ${st === 'NONE' ? '<span class="pill" style="background:#8895A7">Sans licence</span>' : pill(st)} <span class="muted">${esc(c.country || '')}</span>
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px"><b>${esc(c.name)}</b> ${st === 'NONE' ? '<span class="pill" style="background:#8895A7">Sans licence</span>' : pill(st)}${renewIds().has(c.id) ? ' <span class="pill" style="background:#B7791F">À renouveler</span>' : ''} <span class="muted">${esc(c.country || '')}</span>
     <div class="muted">${esc([c.contact_name, c.phone, c.email].filter(Boolean).join(' · '))}</div>
     ${c.licenses.map((l) => `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)">
       ${pill(l.effective)} <span class="muted">· licence n°${l.id} · code …${esc(l.hint)} · ${l.permanent ? 'permanente' : 'jusqu\'au ' + fd(l.expiresAt)} · ${l.maxDevices} appareils max</span>
@@ -186,6 +196,7 @@ function clientCard(c) {
       <div>${l.status === 'REVOKED' ? '' : `${l.status === 'SUSPENDED' ? `<button class="ghost" onclick="licAct(${l.id},'reactivate')">Rétablir</button>` : `<button class="ghost" onclick="licAct(${l.id},'suspend')">Suspendre</button>`}
         <button class="ghost" onclick="nav('extend',${l.id})">Prolonger</button> <button class="ghost" onclick="licAct(${l.id},'newcode')">Nouveau code</button> <button class="ghost" style="color:var(--danger)" onclick="licAct(${l.id},'revoke')">Révoquer</button>`}
         <button class="ghost" onclick="nav('devices',${l.id})">Appareils</button>
+        ${!l.permanent && l.expiresAt && ['ACTIVE', 'PENDING', 'SUSPENDED', 'EXPIRED'].includes(l.effective) && (l.effective === 'EXPIRED' || new Date(l.expiresAt).getTime() < Date.now() + 30 * 864e5) ? `<button class="ghost" onclick="copyReminder(${c.id},${l.id})">📋 Copier le message de rappel</button>` : ''}
         ${['REVOKED', 'EXPIRED'].includes(l.effective) ? `<button class="danger" onclick="delLic(${l.id},'${esc(c.name).replace(/'/g, '')}')">Supprimer</button>` : ''}</div></div>`).join('')}
     <button class="ghost" onclick="nav('license',${c.id})">+ Licence</button> <button class="ghost" onclick="nav('client',${c.id})">Modifier le client</button> <button class="danger" onclick="delClient(${c.id})">Supprimer</button></div>`;
 }
