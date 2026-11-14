@@ -5,7 +5,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CashService } from './cash.service';
-import { CashExpenseDto, CloseCashSessionDto, OpenCashSessionDto } from './dto/cash.dto';
+import { CashDecisionDto, CashExpenseDto, CloseCashSessionDto, OpenCashSessionDto } from './dto/cash.dto';
 
 const CASH_ROLES = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER];
 
@@ -30,13 +30,13 @@ export class CashController {
   }
 
   @Get()
-  @Roles(...CASH_ROLES, RoleName.LECTEUR)
+  @Roles(...CASH_ROLES, RoleName.LECTEUR, RoleName.RESPONSABLE_OPERATIONS, RoleName.COMPTABLE)
   list(@CurrentUser() actor: any, @Query('siteId') siteId?: string, @Query('from') from?: string, @Query('to') to?: string) {
     return this.cash.list(actor, { siteId, from, to });
   }
 
   @Get(':id')
-  @Roles(...CASH_ROLES, RoleName.LECTEUR)
+  @Roles(...CASH_ROLES, RoleName.LECTEUR, RoleName.RESPONSABLE_OPERATIONS, RoleName.COMPTABLE)
   get(@Param('id') id: string, @CurrentUser() actor: any) {
     return this.cash.get(id, actor);
   }
@@ -55,7 +55,19 @@ export class CashController {
 
   @Post(':id/validate')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL)
-  validate(@Param('id') id: string, @CurrentUser() actor: any) {
-    return this.cash.validate(id, actor);
+  validate(@Param('id') id: string, @Body() dto: CashDecisionDto, @CurrentUser() actor: any) {
+    return this.cash.validate(id, actor, dto.note);
+  }
+
+  @Post(':id/reject')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.RESPONSABLE_COMMERCIAL, RoleName.RESPONSABLE_OPERATIONS)
+  reject(@Param('id') id: string, @Body() dto: CashDecisionDto, @CurrentUser() actor: any) {
+    return this.cash.reject(id, actor, dto.note);
+  }
+
+  @Post(':id/ops-validate')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.RESPONSABLE_OPERATIONS)
+  opsValidate(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.cash.opsValidate(id, actor);
   }
 }

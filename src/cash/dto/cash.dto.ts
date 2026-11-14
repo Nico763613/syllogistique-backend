@@ -14,3 +14,7 @@ export class CashExpenseDto {
   @IsNumber() @Min(1) amount: number;
   @IsString() reason: string;
 }
+
+export class CashDecisionDto {
+  @IsOptional() @IsString() note?: string;
+}

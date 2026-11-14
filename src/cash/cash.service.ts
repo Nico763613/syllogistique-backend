@@ -1,9 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { Actor, isCommercialManager, toNumber } from '../common/actor';
+import { Actor, toNumber } from '../common/actor';
 import { sessionTotals } from './cash-math';
 import { CashExpenseDto, CloseCashSessionDto, OpenCashSessionDto } from './dto/cash.dto';
+
+// Rôles qui voient toutes les caisses du site (validation et rapprochement)
+const CASH_VIEWERS = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_COMMERCIAL', 'RESPONSABLE_OPERATIONS', 'COMPTABLE', 'DIRECTEUR_GENERAL', 'LECTEUR'];
+const canSeeAllCash = (actor: { role: string }) => CASH_VIEWERS.includes(actor.role);
 
 @Injectable()
 export class CashService {
@@ -17,7 +21,7 @@ export class CashService {
   private async load(id: string, actor: Actor) {
     const s = await this.prisma.cashSession.findUnique({ where: { id }, include: { cashier: { select: { firstName: true, lastName: true } } } });
     if (!s) throw new NotFoundException('Session de caisse introuvable.');
-    if (!isCommercialManager(actor) && s.cashierId !== actor.userId) {
+    if (!canSeeAllCash(actor) && s.cashierId !== actor.userId) {
       throw new ForbiddenException('Cette caisse appartient à un autre utilisateur.');
     }
     if (actor.role !== 'SUPER_ADMIN' && actor.siteId && s.siteId !== actor.siteId) {
@@ -63,7 +67,7 @@ export class CashService {
     return this.prisma.cashSession.findMany({
       where: {
         ...(siteId ? { siteId } : {}),
-        ...(isCommercialManager(actor) ? {} : { cashierId: actor.userId }),
+        ...(canSeeAllCash(actor) ? {} : { cashierId: actor.userId }),
         ...(params.from || params.to
           ? { openedAt: { ...(params.from ? { gte: new Date(params.from) } : {}), ...(params.to ? { lte: new Date(params.to) } : {}) } }
           : {}),
@@ -106,15 +110,41 @@ export class CashService {
   }
 
   // Validation de la clôture par la direction commerciale (un écart doit être justifié dans la note)
-  async validate(id: string, actor: Actor) {
+  async validate(id: string, actor: Actor, note?: string) {
     const s = await this.load(id, actor);
     if (!s.closedAt) throw new BadRequestException("La caisse n'est pas encore clôturée.");
     if (s.validatedBy) throw new BadRequestException('Cette clôture est déjà validée.');
-    if (toNumber(s.gapAmount) !== 0 && !s.note) {
+    if (s.opsAt) throw new BadRequestException('Cette caisse est déjà validée par les opérations.');
+    const fullNote = [s.note, note && note.trim() ? 'Responsable commercial : ' + note.trim() : null].filter(Boolean).join(' — ') || null;
+    if (toNumber(s.gapAmount) !== 0 && !fullNote) {
       throw new BadRequestException("Un écart de caisse doit être justifié dans la note avant validation.");
     }
-    const updated = await this.prisma.cashSession.update({ where: { id }, data: { validatedBy: actor.userId } });
+    const updated = await this.prisma.cashSession.update({ where: { id }, data: { validatedBy: actor.userId, note: fullNote, rejectedAt: null, rejectedBy: null, rejectNote: null } });
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'CashSession', entityId: id, newValue: { event: 'VALIDATE' } });
+    return updated;
+  }
+
+  // Rejet (Responsable commercial ou Responsable des opérations) : motif obligatoire
+  async reject(id: string, actor: Actor, note?: string) {
+    const s = await this.load(id, actor);
+    if (!s.closedAt) throw new BadRequestException("La caisse n'est pas encore clôturée.");
+    if (s.opsAt) throw new BadRequestException('Cette caisse est déjà validée par les opérations.');
+    if (!note || note.trim().length < 3) throw new BadRequestException('Indiquez le motif du rejet.');
+    const updated = await this.prisma.cashSession.update({
+      where: { id },
+      data: { rejectedAt: new Date(), rejectedBy: actor.userId, rejectNote: note.trim(), validatedBy: null },
+    });
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'CashSession', entityId: id, newValue: { event: 'REJECT', note } });
+    return updated;
+  }
+
+  // Validation finale par le Responsable des opérations (après le Responsable commercial)
+  async opsValidate(id: string, actor: Actor) {
+    const s = await this.load(id, actor);
+    if (!s.validatedBy) throw new BadRequestException("Le Responsable commercial doit d'abord vérifier cette caisse.");
+    if (s.opsAt) throw new BadRequestException('Cette caisse est déjà validée.');
+    const updated = await this.prisma.cashSession.update({ where: { id }, data: { opsAt: new Date(), opsBy: actor.userId } });
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'CashSession', entityId: id, newValue: { event: 'OPS_VALIDATE' } });
     return updated;
   }
 }

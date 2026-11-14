@@ -303,3 +303,6 @@ ALTER TYPE "AttendanceStatus" ADD VALUE IF NOT EXISTS 'LATE'
 
 --#
 ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS paid_at timestamp(3), ADD COLUMN IF NOT EXISTS paid_by text
+
+--#
+ALTER TABLE cash_sessions ADD COLUMN IF NOT EXISTS ops_at timestamp(3), ADD COLUMN IF NOT EXISTS ops_by text, ADD COLUMN IF NOT EXISTS rejected_at timestamp(3), ADD COLUMN IF NOT EXISTS rejected_by text, ADD COLUMN IF NOT EXISTS reject_note text
