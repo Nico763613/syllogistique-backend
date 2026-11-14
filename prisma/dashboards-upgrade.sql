@@ -291,3 +291,6 @@ CREATE INDEX IF NOT EXISTS staff_reports_role_name_date_idx ON staff_reports(rol
 ALTER TABLE driver_daily_reports ADD COLUMN IF NOT EXISTS ops_at timestamp(3), ADD COLUMN IF NOT EXISTS ops_by text, ADD COLUMN IF NOT EXISTS ops_note text, ADD COLUMN IF NOT EXISTS rejected_at timestamp(3), ADD COLUMN IF NOT EXISTS rejected_by text, ADD COLUMN IF NOT EXISTS reject_note text
 --#
 ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS receipt_checked_at timestamp(3), ADD COLUMN IF NOT EXISTS receipt_checked_by text
+
+--#
+ALTER TABLE staff_reports ADD COLUMN IF NOT EXISTS ops_at timestamp(3), ADD COLUMN IF NOT EXISTS ops_by text, ADD COLUMN IF NOT EXISTS rejected_at timestamp(3), ADD COLUMN IF NOT EXISTS rejected_by text, ADD COLUMN IF NOT EXISTS reject_note text

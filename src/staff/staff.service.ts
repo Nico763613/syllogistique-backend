@@ -116,8 +116,9 @@ export class StaffService {
     const u = await this.prisma.user.findUnique({ where: { id: actor.userId }, include: { role: true } });
     if (!u) throw new NotFoundException('Utilisateur introuvable.');
     const existing = await this.prisma.staffReport.findUnique({ where: { userId_date: { userId: u.id, date: dto.date } } });
-    if (existing?.receivedAt) throw new BadRequestException('Ce rapport a déjà été reçu par le responsable : il ne peut plus être modifié.');
-    const data = { activities: dto.activities.trim(), observations: dto.observations?.trim() || null, sentAt: new Date(), siteId: u.siteId, roleName: u.role.name };
+    if (existing?.opsAt) throw new BadRequestException('Ce rapport est validé : il ne peut plus être modifié.');
+    if (existing?.receivedAt && !existing.rejectedAt) throw new BadRequestException('Ce rapport a déjà été vérifié par le responsable : il ne peut plus être modifié.');
+    const data = { activities: dto.activities.trim(), observations: dto.observations?.trim() || null, sentAt: new Date(), siteId: u.siteId, roleName: u.role.name, receivedAt: null, receivedBy: null, rejectedAt: null, rejectedBy: null, rejectNote: null };
     return existing
       ? this.prisma.staffReport.update({ where: { id: existing.id }, data })
       : this.prisma.staffReport.create({ data: { ...data, userId: u.id, date: dto.date } });
@@ -131,12 +132,40 @@ export class StaffService {
       include: { user: { select: { firstName: true, lastName: true, phone: true } } },
       orderBy: [{ date: 'desc' }, { sentAt: 'desc' }], take: 200,
     });
+    return rows.map((r) => ({ id: r.id, date: r.date, role: r.roleName, name: `${r.user.firstName} ${r.user.lastName}`, phone: r.user.phone, activities: r.activities, observations: r.observations, sentAt: r.sentAt, receivedAt: r.receivedAt, opsAt: r.opsAt, rejectedAt: r.rejectedAt, rejectNote: r.rejectNote }));
+  }
+
+  // Rapports vérifiés par le responsable, en attente de validation (Responsable des opérations)
+  async pendingValidation(siteId?: string) {
+    const rows = await this.prisma.staffReport.findMany({
+      where: { receivedAt: { not: null }, opsAt: null, rejectedAt: null, ...(siteId ? { siteId } : {}) },
+      include: { user: { select: { firstName: true, lastName: true, phone: true } } },
+      orderBy: [{ date: 'desc' }, { sentAt: 'desc' }], take: 200,
+    });
     return rows.map((r) => ({ id: r.id, date: r.date, role: r.roleName, name: `${r.user.firstName} ${r.user.lastName}`, phone: r.user.phone, activities: r.activities, observations: r.observations, sentAt: r.sentAt, receivedAt: r.receivedAt }));
+  }
+
+  async validate(id: string, actor: Actor) {
+    const r = await this.prisma.staffReport.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Rapport introuvable.');
+    if (!r.receivedAt) throw new BadRequestException("Le rapport doit d'abord être vérifié par le responsable.");
+    if (r.rejectedAt) throw new BadRequestException('Ce rapport a été rejeté.');
+    return this.prisma.staffReport.update({ where: { id }, data: { opsAt: new Date(), opsBy: actor.userId } });
+  }
+
+  async reject(id: string, note: string, actor: Actor) {
+    const r = await this.prisma.staffReport.findUnique({ where: { id } });
+    if (!r) throw new NotFoundException('Rapport introuvable.');
+    if (r.opsAt) throw new BadRequestException('Ce rapport est déjà validé.');
+    const motif = (note || '').trim();
+    if (!motif) throw new BadRequestException('Indiquez le motif du rejet.');
+    return this.prisma.staffReport.update({ where: { id }, data: { rejectedAt: new Date(), rejectedBy: actor.userId, rejectNote: motif.slice(0, 500) } });
   }
 
   async receive(id: string, actor: Actor) {
     const r = await this.prisma.staffReport.findUnique({ where: { id } });
     if (!r) throw new NotFoundException('Rapport introuvable.');
+    if (r.opsAt || r.rejectedAt) throw new BadRequestException('Ce rapport est déjà traité.');
     return this.prisma.staffReport.update({ where: { id }, data: { receivedAt: new Date(), receivedBy: actor.userId } });
   }
 }
