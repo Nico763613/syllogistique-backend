@@ -330,7 +330,7 @@
         <span class="nav-icon">🏠</span> Tableau de bord
       </div>
 
-      <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE,LECTEUR" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
+      <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE,RESPONSABLE_OPERATIONS,LECTEUR" onclick="go('home')"><span class="nav-icon">🏠</span> Accueil</div>
       <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon">🏠</span> Mon espace de travail</div>
       <div class="nav-item" data-view="pointage" data-roles="POINTEUR" onclick="go('pointage')"><span class="nav-icon">🕒</span> Pointage des chauffeurs</div>
       <div class="nav-item" data-view="pilotage" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL,LECTEUR" onclick="go('pilotage')"><span class="nav-icon">🎯</span> Pilotage — Direction Générale</div>
@@ -342,7 +342,8 @@
       <div class="nav-item" data-view="drivers" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('drivers')"><span class="nav-icon">👥</span> Équipes terrain</div>
       <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches de bord</div>
       <div class="nav-item" data-view="fuel" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant &amp; Maintenance</div>
-      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses</div>
+      <div class="nav-item" data-view="ops-validation" data-roles="SUPER_ADMIN,RESPONSABLE_OPERATIONS" onclick="go('ops-validation')"><span class="nav-icon">✅</span> Validation des fiches</div>
+      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,RESPONSABLE_OPERATIONS,COMPTABLE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses</div>
       <div class="nav-item" data-view="service-vehicles" data-roles="MECANICIEN" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
       <div class="nav-item" data-view="maintenance" data-roles="MECANICIEN" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
       <div class="nav-item" data-view="reports-truck" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,GESTIONNAIRE_HSE,MAGASINIER" onclick="go(reportsHome(state.user.role))"><span class="nav-icon">📊</span> Rapports</div>
@@ -570,7 +571,7 @@ function enterApp() {
   refreshAvatars(); loadMyPhoto(); buildBottomNav();
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', LECTEUR: 'home' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', RESPONSABLE_OPERATIONS: 'home', LECTEUR: 'home' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -602,7 +603,7 @@ function roleLabel(r) {
     GESTIONNAIRE_FLOTTE: 'Gestionnaire de flotte', MAGASINIER: 'Magasinier',
     CHAUFFEUR: 'Chauffeur', LECTEUR: 'Superviseur',
     RESPONSABLE_COMMERCIAL: 'Responsable commercial', CAISSIER: 'Caissier',
-    GESTIONNAIRE_HSE: 'Responsable HSE', AGENT_HSE: 'Agent HSE', COMPTABLE: 'Comptabilité',
+    GESTIONNAIRE_HSE: 'Responsable HSE', AGENT_HSE: 'Agent HSE', COMPTABLE: 'Comptabilité', RESPONSABLE_OPERATIONS: 'Responsable des opérations',
     DIRECTEUR_GENERAL: 'Directeur Général', MECANICIEN: 'Mécanicien', POINTEUR: 'Pointeur',
   }[r] || esc(r);
 }
@@ -616,7 +617,7 @@ function updateSyncPill() {
 
 const titles = {
   home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
-  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
+  fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'ops-validation': 'Validation des fiches', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
   'dash-fleet': 'Charroi & Flotte', 'dash-hse': 'HSE — Santé, Sécurité, Environnement',
@@ -725,7 +726,7 @@ function go(view, noPush) {
 { const _rv = renderView; renderView = async function (view) { const r = await _rv(view); draftRestore(); return r; }; }
 
 /* ---------- Actualisation automatique du bureau (toutes les 30 s, écran ouvert et visible uniquement) ---------- */
-const LIVE_VIEWS = ['dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance', 'reports-truck', 'reports-service'];
+const LIVE_VIEWS = ['ops-validation', 'dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance', 'reports-truck', 'reports-service'];
 const LIVE = { since: null, timer: null, busy: false };
 function liveCanRun() {
   return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR';
@@ -1194,7 +1195,7 @@ function applyRoleNav() {
     if (ok) any = true;
   });
   // Les rôles départementaux (commercial, caisse, HSE) ne voient que leur espace
-  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR', 'DIRECTEUR_GENERAL', 'COMPTABLE'].includes(role)) {
+  if (['RESPONSABLE_COMMERCIAL', 'CAISSIER', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'MECANICIEN', 'POINTEUR', 'DIRECTEUR_GENERAL', 'COMPTABLE', 'RESPONSABLE_OPERATIONS'].includes(role)) {
     document.querySelectorAll('#sidebar .nav-item:not([data-roles])').forEach((el) => { if (el.dataset.view !== 'settings' || role === 'DIRECTEUR_GENERAL') el.style.display = 'none'; });
     document.querySelectorAll('#sidebar .nav-section-label, #sidebar .nav-sub-label').forEach((el) => { el.style.display = 'none'; });
     any = false;
@@ -1224,6 +1225,7 @@ async function renderView(view) {
     if (view === 'driver-board') return renderDriverBoard();
     if (view === 'driver-expenses') return renderDriverExpenses();
     if (view === 'driver-sheets') return renderDriverSheets();
+    if (view === 'ops-validation') return renderOpsValidation();
     if (view === 'drivers') return renderDrivers();
     if (view === 'fuel') return renderFuel();
     if (view === 'maintenance') return renderMaintenance();
@@ -2723,6 +2725,9 @@ function deptBarHtml(view) {
     const tabs = REPORT_TABS.filter((x) => x.roles.includes(r)); if (tabs.length < 2) return '';
     return `<div class="dp-tabs" id="dp-bar">${tabs.map((x) => btn(x.t, x.go, x.go === view)).join('')}</div>`;
   }
+  if (r === 'RESPONSABLE_OPERATIONS' && ['ops-validation', 'driver-expenses'].includes(view)) {
+    return `<div class="dp-tabs" id="dp-bar">${btn('✅ Fiches à valider', 'ops-validation', view === 'ops-validation')}${btn('💵 Dépenses & reçus', 'driver-expenses', view === 'driver-expenses')}</div>`;
+  }
   if (LOGI_ROLES.includes(r)) {
     const cur = LOGI_TABS.find((x) => x.views.includes(view)); if (!cur) return '';
     const subs = (cur.subs || []).filter((x) => !x[2] || OFFICE_ROLES.includes(r));
@@ -2824,6 +2829,7 @@ const HOME_CARDS = [
   { ico: '🚚', t: 'Logistique & Flotte', d: 'Camions, véhicules, chauffeurs, fiches de bord', v: 'espace-logi', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'], over: { LECTEUR: 'dash-fleet' } },
   { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'espace' } },
   { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER', 'LECTEUR'], over: { MAGASINIER: 'espace' } },
+  { ico: '✅', t: 'Opérations', d: 'Fiches vérifiées à valider, reçus papier', v: 'ops-validation', roles: ['SUPER_ADMIN', 'RESPONSABLE_OPERATIONS'] },
   { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'driver-expenses', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
   { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'reports-hse', MAGASINIER: 'reports-stock' } },
   { ico: '🏢', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
@@ -2840,7 +2846,7 @@ function bottomEntries(role) {
   const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
   if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
-  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
   const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'].includes(role);
   return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', reportsHome(role)]] : []), ['👤', 'Profil', '#profil']];
 }
@@ -3022,9 +3028,9 @@ async function renderExecutive(mode) {
     const crew = `<div class="ex-card"><h3>👥 Chauffeurs & équipe</h3>
       <div class="ex-row"><span>Chauffeurs actifs</span><b>${pe.drivers}</b></div><div class="ex-row"><span>Présents aujourd’hui</span><b>${pe.present}</b></div><div class="ex-row"><span>Absents / non présents</span><b>${pe.absent}</b></div><div class="ex-row"><span>Rapports du personnel reçus</span><b>${pe.staffReportsToday}/${pe.staff}</b></div>
       <div class="ex-row"><span>Véhicules en maintenance</span><b>${f.maintenance}</b></div><div class="ex-row"><span>Véhicules immobilisés</span><b>${f.immobilized}</b></div></div>`;
-    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${act('💬', 'Enrôler par WhatsApp', 'enrol')}${act('🕒', 'Pointage du jour', 'pointage')}${act('📋', 'Fiches de bord', 'driver-sheets')}${act('💵', 'Dépenses à valider', 'driver-expenses')}${act('🚛', 'Flotte', 'trucks')}${act('⛽', 'Carburant & maintenance', 'fuel')}${act('📊', 'Rapports', 'reports-truck')}</div></div>`;
+    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${act('💬', 'Enrôler par WhatsApp', 'enrol')}${act('🕒', 'Pointage du jour', 'pointage')}${act('📋', 'Fiches de bord', 'driver-sheets')}${act('💵', 'Dépenses', 'driver-expenses')}${act('🚛', 'Flotte', 'trucks')}${act('⛽', 'Carburant & maintenance', 'fuel')}${act('📊', 'Rapports', 'reports-truck')}</div></div>`;
     const todo = `<div class="ex-card"><h3>✅ À traiter</h3>
-      <div class="ex-row"><span>Dépenses à valider</span><b>${ex.pendingApproval}</b></div>
+      <div class="ex-row"><span>Dépenses en circuit de validation</span><b>${ex.pendingApproval}</b></div>
       <div class="ex-row"><span>Missions en attente</span><b>${m.planned}</b></div>
       <div class="ex-row"><span>Rapports du personnel non reçus</span><b>${Math.max(0, pe.staff - pe.staffReportsToday)}</b></div>
       <div class="ex-row"><span>Articles sous le seuil de stock</span><b>${st.belowMinimum}</b></div></div>`;
@@ -3102,7 +3108,7 @@ async function ptMark(driverId, status) {
 }
 
 /* ---------------- RESPONSABLES : le Master Admin enregistre le DG et le Responsable logistique et leur envoie le lien ---------------- */
-const MGR_ROLES = { DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique' };
+const MGR_ROLES = { DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité' };
 async function renderManagers() {
   root().innerHTML = `
     <div class="panel"><h3>🏢 Responsables de l'entreprise</h3>
@@ -3601,7 +3607,7 @@ async function drvTxLoad() {
   try { r = await api('/driver/transmissions'); dset('tx', r); } catch (e) { r = dget('tx'); if (!r) { box.innerHTML = '<h4>📬 Suivi de mes transmissions</h4><div class="drv-center">Indisponible hors connexion.</div>'; return; } }
   const dt = (x) => (x ? drvDt(x) : '');
   const step = (ok, label, when) => `<span class="badge ${ok ? 'ok' : 'warn'}">${ok ? '✔' : '⏳'} ${label}${ok && when ? ' ' + dt(when) : ''}</span>`;
-  const sheets = r.sheets.map((x) => `<div style="padding:8px 0;border-bottom:1px dashed #D9E0E8"><b>Fiche du ${esc(x.date.split('-').reverse().join('/'))}</b><div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${step(true, 'Envoyée', x.sentAt)}${step(!!x.receivedAt, 'Reçue', x.receivedAt)}${step(!!x.processedAt, 'Traitée', x.processedAt)}</div>${x.note ? `<div style="font-size:12px;color:#5A6B7D">Note du bureau : ${esc(x.note)}</div>` : ''}</div>`).join('');
+  const sheets = r.sheets.map((x) => `<div style="padding:8px 0;border-bottom:1px dashed #D9E0E8"><b>Fiche du ${esc(x.date.split('-').reverse().join('/'))}</b><div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${x.step === 'REJECTED' ? '<span class="badge bad">↩ Renvoyée pour correction</span>' : step(true, 'Soumise', x.sentAt) + step(!!x.processedAt, 'Vérifiée', x.processedAt) + step(!!x.opsAt, 'Validée', x.opsAt)}</div>${x.note ? `<div style="font-size:12px;color:#5A6B7D">${x.step === 'REJECTED' ? 'Motif' : 'Note du bureau'} : ${esc(x.note)}</div>` : ''}</div>`).join('');
   const exps = r.expenses.map((e) => `<div class="drv-row"><span>${esc(DRV_EXP[e.category] || e.category)} · ${esc(drvDt(e.date))}${e.note ? `<br><small>${esc(e.note)}</small>` : ''}</span><b>${fmt(e.amount)} GNF <span class="badge ${DRV_EXP_ST[e.status][0]}">${DRV_EXP_ST[e.status][1]}</span></b></div>`).join('');
   box.innerHTML = `<h4>📬 Suivi de mes transmissions</h4>${sheets || '<div class="drv-center">Aucune fiche envoyée.</div>'}${exps ? '<h4 style="margin-top:12px">💵 Mes dépenses</h4>' + exps : ''}`;
 }
@@ -4358,7 +4364,8 @@ function drvSheetHtml(sh, offline) {
   return `<div class="drv-card"><h4>📋 Ma fiche — ${esc(sh.day)} ${esc(sh.date.split('-').reverse().join('/'))}</h4>
       <div class="drv-row"><span>Chauffeur</span><b>${esc(me.driver.name)}</b></div>
       <div class="drv-row"><span>Véhicule</span><b>${esc(v ? v.plate : '—')}</b></div>
-      <div class="drv-row"><span>Statut</span><b>${sent ? '<span class="badge ok">Envoyée ' + drvDt(sh.sentAt) + '</span>' : '<span class="badge warn">À envoyer</span>'}</b></div>
+      <div class="drv-row"><span>Statut</span><b>${sent ? stepBadge(sh.step) + ' <small>' + drvDt(sh.sentAt) + '</small>' : sh.step === 'REJECTED' ? '<span class="badge bad">Rejeté : à corriger</span>' : '<span class="badge warn">Brouillon</span>'}</b></div>
+      ${sh.step === 'REJECTED' || sh.rejectNote ? `<div class="drv-warn">Fiche renvoyée par la hiérarchie : ${esc(sh.rejectNote || '')}. Corrigez puis renvoyez-la.</div>` : ''}
       <div class="drv-row"><span>Distance totale</span><b>${fmt(T.km)} km</b></div>
       <div class="drv-row"><span>Carburant</span><b>${T.liters} L · ${fmt(T.fuelCost)} GNF</b></div>
       <div class="drv-row"><span>Consommation</span><b>${T.consumption !== null ? T.consumption + ' L/100 km' : 'calculée après l\'arrivée'}</b></div>
@@ -4407,15 +4414,19 @@ async function drvSheetSend(date) {
 const BOARD_ST = { EN_MISSION: ['🟢', 'En mission', 'ok'], A_ENVOYER: ['🟠', 'Fiche à envoyer', 'warn'], ENVOYEE: ['✅', 'Fiche envoyée', 'ok'], RIEN: ['🔴', 'Rien de saisi', 'bad'] };
 async function renderDriverExpenses(status) {
   const st = status || window._exSt || 'PENDING'; window._exSt = st;
+  const role = state.user.role, canDecide = ['SUPER_ADMIN', 'COMPTABLE'].includes(role), canPaper = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS'].includes(role);
   const rows = await api('/driver-admin/expenses?status=' + st + '&siteId=' + state.siteId);
   const stb = { PENDING: ['warn', 'En attente'], APPROVED: ['ok', 'Validée'], REJECTED: ['bad', 'Refusée'] };
   const tr = rows.map((e) => `<tr><td>${esc(drvDt(e.date))}</td><td><b>${esc(e.driver)}</b><div style="font-size:11px;color:var(--muted)">${esc(e.vehicle || '')}</div></td>
     <td>${esc(DRV_EXP[e.category] || e.category)}<div style="font-size:12px">${esc(e.description || '')}</div></td><td class="mono"><b>${fmt(e.amount)}</b> GNF</td>
+    <td>${receiptLink(e.receiptUrl)}</td>
+    <td>${e.receiptCheckedAt ? '<span class="badge ok">✔ Conforme</span>' : canPaper ? `<button class="btn small" onclick="receiptCheck('${esc(e.id)}')">📄 Reçu papier reçu</button>` : '<span class="badge warn">À contrôler</span>'}</td>
+    <td>${stepBadge(e.sheetStep)}</td>
     <td><span class="badge ${stb[e.status][0]}">${stb[e.status][1]}</span>${e.note ? `<div style="font-size:11px">${esc(e.note)}</div>` : ''}</td>
-    <td>${e.status === 'PENDING' ? `<button class="btn small gold" onclick="decideExpense('${esc(e.id)}','APPROVED')">✔ Valider</button> <button class="btn small" onclick="decideExpense('${esc(e.id)}','REJECTED')">✖ Refuser</button>` : ''}</td></tr>`).join('');
-  root().innerHTML = `<div class="panel"><h3>💵 Dépenses déclarées par les chauffeurs</h3><div class="desc">Une dépense validée est ajoutée aux dépenses du véhicule. Les reçus papier restent à remettre au responsable.</div>
+    <td>${e.status === 'PENDING' && canDecide ? (e.sheetStep === 'VALIDATED' ? `<button class="btn small gold" onclick="decideExpense('${esc(e.id)}','APPROVED')">✔ Valider</button> <button class="btn small" onclick="decideExpense('${esc(e.id)}','REJECTED')">✖ Refuser</button>` : '<span style="font-size:12px;color:var(--muted)">Attend la validation des opérations</span>') : ''}</td></tr>`).join('');
+  root().innerHTML = `<div class="panel"><h3>💵 Dépenses déclarées par les chauffeurs</h3><div class="desc">${canDecide ? 'Vous traitez les dépenses des fiches déjà validées par le Responsable des opérations. Une dépense validée est ajoutée aux dépenses du véhicule.' : 'Suivi des dépenses : seule la Comptabilité les valide, après validation de la fiche par le Responsable des opérations.'}</div>
     <label>Afficher</label><select onchange="renderDriverExpenses(this.value)" style="max-width:220px"><option value="PENDING" ${st === 'PENDING' ? 'selected' : ''}>En attente</option><option value="APPROVED" ${st === 'APPROVED' ? 'selected' : ''}>Validées</option><option value="REJECTED" ${st === 'REJECTED' ? 'selected' : ''}>Refusées</option></select></div>
-    <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="6" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
+    <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Reçu scanné</th><th>Reçu papier</th><th>Fiche</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="9" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
 }
 async function decideExpense(id, decision) {
   let note;
@@ -4541,26 +4552,56 @@ function timelineOverlay(r) {
 }
 async function tripTimeline(id) { try { timelineOverlay(await api('/driver-admin/trips/' + id + '/timeline')); } catch (e) { alert(e.message); } }
 async function drvTimeline(id) { try { timelineOverlay(await api('/driver/trips/' + id + '/timeline')); } catch (e) { alert(e.message); } }
-async function processSheet(driverId, date) {
-  const note = prompt('Note pour le chauffeur (facultatif) :', '');
-  if (note === null) return;
-  try { await api('/driver-admin/sheets/process', { method: 'POST', body: { driverId, date, note: note || undefined } }); renderDriverSheets(date); } catch (e) { alert(e.message); }
+const STEP_ST = { DRAFT: ['info', 'Brouillon'], SUBMITTED: ['warn', 'Soumis'], VERIFIED: ['warn', 'Vérifié'], VALIDATED: ['ok', 'Validé'], REJECTED: ['bad', 'Rejeté'] };
+const stepBadge = (st) => { const x = STEP_ST[st] || STEP_ST.DRAFT; return `<span class="badge ${x[0]}">${x[1]}</span>`; };
+async function sheetAct(kind, driverId, date) {
+  let note;
+  if (kind === 'reject') { note = prompt('Motif du renvoi au chauffeur (obligatoire) :'); if (!note || !note.trim()) return; }
+  else if (kind === 'validate') { if (!confirm('Valider cette fiche et la transférer à la Comptabilité ?')) return; }
+  else { note = prompt('Note pour la suite de la chaîne (facultatif) :', ''); if (note === null) return; }
+  try { await api('/driver-admin/sheets/' + (kind === 'process' ? 'process' : kind), { method: 'POST', body: { driverId, date, note: note || undefined } }); renderView(state.view); } catch (e) { alert(e.message); }
+}
+async function receiptCheck(id) {
+  if (!confirm('Confirmer : le reçu papier est arrivé et il est conforme ?')) return;
+  try { await api('/driver-admin/expenses/' + id + '/receipt-check', { method: 'POST', body: {} }); renderView(state.view); } catch (e) { alert(e.message); }
+}
+function receiptLink(u) { const base = (state.apiUrl || '').replace(/\/$/, ''); return u ? `<a href="${esc(base + u)}" target="_blank" rel="noopener" style="white-space:nowrap">📷 Voir</a>` : '<span class="badge bad">Manquant</span>'; }
+function sheetCardHtml(sh) {
+  const role = state.user.role, hh = (x) => (x ? new Date(x).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
+  const canVerify = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE'].includes(role), canValidate = ['SUPER_ADMIN', 'RESPONSABLE_OPERATIONS'].includes(role), canPaper = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS'].includes(role), canReject = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS'].includes(role);
+  const did = esc(sh.driver.id), dt = esc(sh.date);
+  let acts = '';
+  if (sh.step === 'SUBMITTED' && canVerify) acts += `<button class="btn small gold" onclick="sheetAct('process','${did}','${dt}')">✔ Vérifier et transmettre</button> `;
+  if (sh.step === 'VERIFIED' && canValidate) acts += `<button class="btn small gold" onclick="sheetAct('validate','${did}','${dt}')">✔ Valider et transférer à la Comptabilité</button> `;
+  if (['SUBMITTED', 'VERIFIED'].includes(sh.step) && canReject) acts += `<button class="btn small" onclick="sheetAct('reject','${did}','${dt}')">↩ Renvoyer au chauffeur</button>`;
+  const exps = sh.expenses || [];
+  const expTable = exps.length ? `<h4 style="margin:10px 0 4px">💵 Dépenses déclarées</h4><table><tr><th>Heure</th><th>Nature</th><th>Montant (GNF)</th><th>Reçu scanné</th><th>Reçu papier</th></tr>${exps.map((e) => `<tr><td>${hh(e.time)}</td><td>${esc(DRV_EXP[e.category] || e.category)}<div style="font-size:11px">${esc(e.description || '')}</div></td><td class="mono">${fmt(e.amount)}</td><td>${receiptLink(e.receiptUrl)}</td><td>${e.receiptCheckedAt ? '<span class="badge ok">✔ Conforme</span>' : canPaper ? `<button class="btn small" onclick="receiptCheck('${esc(e.id)}')">📄 Reçu papier reçu</button>` : '<span class="badge warn">À contrôler</span>'}</td></tr>`).join('')}</table>` : '';
+  const fuelRcpt = (f) => (f.source === 'STATION' || f.receiptUrl ? receiptLink(f.receiptUrl) : '—');
+  return `<div class="panel"><h3>${esc(sh.driver.name)} ${stepBadge(sh.step)} ${sh.status === 'SENT' ? '<span style="font-size:12px;font-weight:400;color:var(--muted)">envoyée ' + drvDt(sh.sentAt) + '</span>' : ''}</h3>
+    ${sh.step === 'REJECTED' ? `<div class="msg err">Renvoyée au chauffeur : ${esc(sh.rejectNote || '')}</div>` : ''}${sh.processNote && sh.step !== 'REJECTED' ? `<div class="desc">Note logistique : ${esc(sh.processNote)}</div>` : ''}
+    ${acts ? `<div style="margin:6px 0">${acts}</div>` : ''}
+    <div class="desc">${esc(sh.day)} ${esc(sh.date)} · ${esc(sh.driver.phone || '')} · ${sh.driver.activity === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service'} — <b>${fmt(sh.totals.km)} km</b> · ${sh.totals.liters} L (${fmt(sh.totals.fuelCost)} GNF)${sh.totals.consumption !== null ? ' · ' + sh.totals.consumption + ' L/100 km' : ''}${sh.totals.voyages ? ' · ' + sh.totals.voyages + ' voyage(s)' : ''}${sh.totals.maintenanceCost ? ' · maintenance ' + fmt(sh.totals.maintenanceCost) + ' GNF' : ''}</div>
+    <div style="overflow:auto"><table><tr><th>Véhicule</th><th>Destination / motif</th><th>Horaires</th><th>Km départ</th><th>Km arrivée</th><th>Km arrêt</th><th>Distance</th><th>Observations</th></tr>
+    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:11px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:11px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:11px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:11px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.loadPlaces && t.loadPlaces.length ? '<br>⬆ ' + esc(t.loadPlaces.join(', ')) + ' → ⬇ ' + esc((t.unloadPlaces || []).join(', ')) : ''}${t.pauseMileage != null ? '<br>⏸ pause ' + fmt(t.pauseMileage) + ' km' : ''}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
+    ${sh.fuel.length ? `<h4 style="margin:10px 0 4px">⛽ Carburant</h4><table><tr><th>Heure</th><th>Station</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th><th>Reçu scanné</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${f.liters}</td><td class="mono">${fmt(f.cost)}</td><td>${fuelRcpt(f)}</td></tr>`).join('')}</table>` : ''}
+    ${sh.maintenance.length ? `<h4 style="margin:10px 0 4px">🔧 Maintenance</h4><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${sh.maintenance.map((m) => `<tr><td>${esc(DRV_NAT[m.nature] || m.nature)}</td><td>${esc(m.detail || '')}</td><td class="mono">${m.mileage != null ? fmt(m.mileage) : '—'}</td><td class="mono">${m.nextServiceKm ? fmt(m.nextServiceKm) + ' km' : '—'}</td><td class="mono">${m.cost != null ? fmt(m.cost) : '—'}</td></tr>`).join('')}</table>` : ''}
+    ${expTable}
+  </div>`;
 }
 async function renderDriverSheets(date) {
   const d = date || window._shDate || new Date().toISOString().slice(0, 10);
   window._shDate = d;
   const list = await api('/driver-admin/sheets?date=' + d + '&siteId=' + state.siteId);
-  const hh = (x) => (x ? new Date(x).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
-  const blocks = list.map((sh) => `<div class="panel"><h3>${esc(sh.driver.name)} ${sh.status === 'SENT' ? '<span class="badge ok">Envoyée ' + drvDt(sh.sentAt) + '</span> ' + (sh.processedAt ? '<span class="badge ok">✔ Traitée ' + drvDt(sh.processedAt) + '</span>' : '<span class="badge warn">À traiter</span> <button class="btn small gold" onclick="processSheet(\'' + esc(sh.driver.id) + '\',\'' + esc(sh.date) + '\')">✔ Marquer comme traitée</button>') : '<span class="badge warn">Non envoyée</span>'}</h3>
-    <div class="desc">${esc(sh.day)} ${esc(sh.date)} · ${esc(sh.driver.phone || '')} · ${sh.driver.activity === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service'} — <b>${fmt(sh.totals.km)} km</b> · ${sh.totals.liters} L (${fmt(sh.totals.fuelCost)} GNF)${sh.totals.consumption !== null ? ' · ' + sh.totals.consumption + ' L/100 km' : ''}${sh.totals.voyages ? ' · ' + sh.totals.voyages + ' voyage(s)' : ''}${sh.totals.maintenanceCost ? ' · maintenance ' + fmt(sh.totals.maintenanceCost) + ' GNF' : ''}</div>
-    <div style="overflow:auto"><table><tr><th>Véhicule</th><th>Destination / motif</th><th>Horaires</th><th>Km départ</th><th>Km arrivée</th><th>Km arrêt</th><th>Distance</th><th>Observations</th></tr>
-    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:11px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:11px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:11px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:11px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.loadPlaces && t.loadPlaces.length ? '<br>⬆ ' + esc(t.loadPlaces.join(', ')) + ' → ⬇ ' + esc((t.unloadPlaces || []).join(', ')) : ''}${t.pauseMileage != null ? '<br>⏸ pause ' + fmt(t.pauseMileage) + ' km' : ''}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
-    ${sh.fuel.length ? `<h4 style="margin:10px 0 4px">⛽ Carburant</h4><table><tr><th>Heure</th><th>Station</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${f.liters}</td><td class="mono">${fmt(f.cost)}</td></tr>`).join('')}</table>` : ''}
-    ${sh.maintenance.length ? `<h4 style="margin:10px 0 4px">🔧 Maintenance</h4><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${sh.maintenance.map((m) => `<tr><td>${esc(DRV_NAT[m.nature] || m.nature)}</td><td>${esc(m.detail || '')}</td><td class="mono">${m.mileage != null ? fmt(m.mileage) : '—'}</td><td class="mono">${m.nextServiceKm ? fmt(m.nextServiceKm) + ' km' : '—'}</td><td class="mono">${m.cost != null ? fmt(m.cost) : '—'}</td></tr>`).join('')}</table>` : ''}
-  </div>`).join('');
-  root().innerHTML = `<div class="panel"><h3>📋 Fiches journalières des chauffeurs</h3><div class="desc">Fiches saisies par les chauffeurs ; une fois envoyées, elles ne sont plus modifiables.</div>
-    <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div><div id="ptr-panel"></div>${blocks || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
+  root().innerHTML = `<div class="panel"><h3>📋 Fiches de bord du jour</h3><div class="desc">Une fiche par chauffeur et par jour. Circuit : le chauffeur envoie (<b>Soumis</b>), la logistique vérifie et transmet (<b>Vérifié</b>), le Responsable des opérations valide (<b>Validé</b>), puis la Comptabilité traite les dépenses. Une fiche renvoyée (<b>Rejeté</b>) est rouverte au chauffeur.</div>
+    <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div><div id="ptr-panel"></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
   loadPointers(d);
+}
+
+/* Responsable des opérations : fiches vérifiées par la logistique, à valider puis transférer à la Comptabilité */
+async function renderOpsValidation() {
+  const list = await api('/driver-admin/sheets/pending?siteId=' + encodeURIComponent(state.siteId || ''));
+  root().innerHTML = `<div class="panel"><h3>✅ Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
+    <div style="font-size:26px;font-weight:700;color:var(--navy)">${list.length} <span style="font-size:13px;font-weight:400;color:var(--muted)">fiche(s) en attente</span></div></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune fiche en attente de validation.</div></div>'}`;
 }
 
 /* ---------- Camions : contrôle avec les pointeurs ---------- */

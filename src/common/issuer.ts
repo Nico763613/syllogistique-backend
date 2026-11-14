@@ -12,6 +12,7 @@ const ROLE_LABELS: Record<string, string> = {
   MECANICIEN: 'Mécanicien',
   POINTEUR: 'Pointeur',
   COMPTABLE: 'Comptabilité',
+  RESPONSABLE_OPERATIONS: 'Responsable des opérations',
 };
 
 export async function getIssuer(prisma: PrismaService, userId: string) {
