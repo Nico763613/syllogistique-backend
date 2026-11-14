@@ -1630,6 +1630,8 @@ model DriverExpense {
   decisionNote String?  @map("decision_note")
   receiptCheckedAt DateTime? @map("receipt_checked_at") // reçu papier déposé et conforme
   receiptCheckedBy String?   @map("receipt_checked_by")
+  paidAt       DateTime? @map("paid_at")   // payée par la Comptabilité
+  paidBy       String?   @map("paid_by")
   clientOpId   String?  @unique @map("client_op_id")
   createdAt    DateTime @default(now()) @map("created_at")
   @@index([driverId, date])

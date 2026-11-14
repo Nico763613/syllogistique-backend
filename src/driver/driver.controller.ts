@@ -188,12 +188,18 @@ export class DriverAdminController {
   }
 
   @Get('expenses')
-  @Roles(...OPS_COMPTA)
+  @Roles(...OPS_COMPTA, RoleName.DIRECTEUR_GENERAL)
   expenses(@Query('status') status: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
     return this.sheets.listExpenses(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, status);
   }
 
   // Comptabilité seulement : la dépense n'est traitée qu'après validation de la fiche par le Responsable des opérations
+  @Post('expenses/:id/pay')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.COMPTABLE)
+  payExpense(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.sheets.payExpense(id, actor.userId);
+  }
+
   @Post('expenses/:id/decision')
   @Roles(RoleName.SUPER_ADMIN, RoleName.COMPTABLE)
   decideExpense(@Param('id') id: string, @Body() dto: ExpenseDecisionDto, @CurrentUser() actor: any) {

@@ -300,3 +300,6 @@ ALTER TABLE vehicle_downtimes ADD COLUMN IF NOT EXISTS invoice_url text
 
 --#
 ALTER TYPE "AttendanceStatus" ADD VALUE IF NOT EXISTS 'LATE'
+
+--#
+ALTER TABLE driver_expenses ADD COLUMN IF NOT EXISTS paid_at timestamp(3), ADD COLUMN IF NOT EXISTS paid_by text
