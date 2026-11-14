@@ -73,7 +73,7 @@ function createApp(pool, cfg) {
   async function licenseToken(l, c) {
     const { privateKey } = await keys();
     const st = lic.effectiveStatus(l);
-    return lic.signToken({ lid: Number(l.id), cid: Number(c.id), status: st, plan: l.plan, maxDevices: l.max_devices, permanent: l.permanent, expiresAt: l.expires_at || null,
+    return lic.signToken({ lid: Number(l.id), cid: Number(c.id), status: st, plan: l.plan, maxDevices: l.max_devices, modules: String(l.modules || '').split(',').filter(Boolean), permanent: l.permanent, expiresAt: l.expires_at || null,
       iid: l.instance_id, brand: { name: c.name, logoUrl: c.logo_url || null, color: c.brand_color || null }, iat: Date.now(), exp: Date.now() + 24 * 3600 * 1000 }, privateKey);
   }
   async function handleV1(req, res, p) {
@@ -222,7 +222,7 @@ function createApp(pool, cfg) {
     const clientFields = (b) => [str(b.name, 120), str(b.contactName), str(b.email), str(b.phone, 40), str(b.country, 60), color(b.brandColor), str(b.logoUrl, 400), str(b.notes, 1000)];
     if (req.method === 'GET' && p === '/api/clients') {
       const { rows } = await pool.query(`select c.*, (select coalesce(json_agg(json_build_object('id', l.id, 'status', l.status, 'plan', l.plan, 'hint', l.code_hint, 'permanent', l.permanent,
-          'expiresAt', l.expires_at, 'activatedAt', l.activated_at, 'lastCheckAt', l.last_check_at, 'maxDevices', l.max_devices, 'instanceUrl', l.instance_url, 'appVersion', l.app_version, 'reason', l.status_reason) order by l.id), '[]'::json)
+          'expiresAt', l.expires_at, 'activatedAt', l.activated_at, 'lastCheckAt', l.last_check_at, 'maxDevices', l.max_devices, 'modules', l.modules, 'instanceUrl', l.instance_url, 'appVersion', l.app_version, 'reason', l.status_reason) order by l.id), '[]'::json)
           from master_licenses l where l.client_id=c.id) as licenses from master_clients c order by c.id desc`);
       return send(res, 200, rows.map((c) => ({ ...c, licenses: (typeof c.licenses === 'string' ? JSON.parse(c.licenses) : c.licenses).map((l) => ({ ...l, effective: lic.effectiveStatus({ status: l.status, permanent: l.permanent, expires_at: l.expiresAt }) })) })));
     }
@@ -244,8 +244,8 @@ function createApp(pool, cfg) {
       if (!permanent) { exp = body.expiresAt ? endOfDay(body.expiresAt) : null; if (!exp || isNaN(exp) || exp < new Date()) return send(res, 400, { error: 'Choisissez une date d\'expiration future, ou une licence permanente.' }); }
       const maxDevices = Math.min(Math.max(parseInt(body.maxDevices, 10) || 50, 1), 5000);
       const code = lic.newActivationCode();
-      const r = await pool.query('insert into master_licenses(client_id, code_hash, code_hint, plan, max_devices, permanent, expires_at) values ($1,$2,$3,$4,$5,$6,$7) returning id',
-        [cl.id, lic.hashActivation(code), lic.codeHint(code), str(body.plan, 40) || 'standard', maxDevices, permanent, exp ? exp.toISOString() : null]);
+      const r = await pool.query('insert into master_licenses(client_id, code_hash, code_hint, plan, max_devices, permanent, expires_at, modules) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id',
+        [cl.id, lic.hashActivation(code), lic.codeHint(code), str(body.plan, 40) || 'standard', maxDevices, permanent, exp ? exp.toISOString() : null, body.commercial === false ? '' : 'COMMERCIAL']);
       await audit(s.aid, 'LICENCE_CREEE', `${cl.name} · licence ${r.rows[0].id}`, req);
       return send(res, 200, { id: r.rows[0].id, code });
     }
@@ -298,6 +298,7 @@ function createApp(pool, cfg) {
       else if (!l.permanent) { /* seulement le nombre d'appareils */ } else return send(res, 400, { error: 'Choisissez une date ou laissez la licence permanente.' });
       const maxDevices = body.maxDevices ? Math.min(Math.max(parseInt(body.maxDevices, 10) || l.max_devices, 1), 5000) : l.max_devices;
       await pool.query('update master_licenses set permanent=$2, expires_at=$3, max_devices=$4 where id=$1 returning id', [l.id, permanent, exp, maxDevices]);
+      if (typeof body.commercial === 'boolean') await pool.query('update master_licenses set modules=$2 where id=$1 returning id', [l.id, body.commercial ? 'COMMERCIAL' : '']);
       await audit(s.aid, 'LICENCE_PROLONGEE', `${l.cname} · licence ${l.id} · ${permanent ? 'permanente' : (exp ? String(new Date(exp).toISOString()).slice(0, 10) : '—')} · ${maxDevices} appareils`, req);
       return send(res, 200, { ok: true });
     }

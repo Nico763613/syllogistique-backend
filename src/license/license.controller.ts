@@ -16,7 +16,7 @@ export class LicenseController {
   @Get('status')
   async status() {
     const s = await this.lic.state();
-    return { enforced: this.lic.enforced, state: s.state, reason: s.reason ?? null, daysLeft: s.daysLeft ?? null, message: s.message ?? null };
+    return { enforced: this.lic.enforced, modules: await this.lic.modules(), state: s.state, reason: s.reason ?? null, daysLeft: s.daysLeft ?? null, message: s.message ?? null };
   }
 
   @Public()

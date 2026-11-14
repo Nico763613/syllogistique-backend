@@ -2,7 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger, OnModuleIni
 import { Interval } from '@nestjs/schedule';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma.service';
-import { LicData, LicView, computeState, verifyToken } from './license.logic';
+import { LicData, LicView, computeState, modulesOf, verifyToken } from './license.logic';
 
 const KEY = 'LICENSE_DATA';
 
@@ -49,6 +49,10 @@ export class LicenseService implements OnModuleInit {
 
   async state(): Promise<LicView> {
     return computeState(this.enforced, await this.load());
+  }
+
+  async modules(): Promise<string[] | null> {
+    return modulesOf(this.enforced, await this.load());
   }
 
   private async post(path: string, body: any) {
