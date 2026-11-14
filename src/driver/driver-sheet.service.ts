@@ -174,15 +174,26 @@ export class DriverSheetService {
   async listExpenses(siteId: string | undefined, status?: string) {
     const where: any = { ...(status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status) ? { status } : {}) };
     if (siteId) { const ds = await this.prisma.driver.findMany({ where: { siteId }, select: { id: true } }); where.driverId = { in: ds.map((d) => d.id) }; }
-    const rows = await this.prisma.driverExpense.findMany({ where, orderBy: { date: 'desc' }, take: 200 });
+    const rows = await this.prisma.driverExpense.findMany({ where, orderBy: { date: 'desc' }, take: 500 });
     const drivers = await this.prisma.driver.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.driverId))] } }, select: { id: true, firstName: true, lastName: true } });
     const vehicles = await this.prisma.vehicle.findMany({ where: { id: { in: rows.map((r) => r.vehicleId).filter((x): x is string => !!x) } }, select: { id: true, registrationNumber: true } });
     const reps = await this.prisma.driverDailyReport.findMany({ where: { driverId: { in: drivers.map((d) => d.id) } } });
     return rows.map((r) => {
       const d = drivers.find((x) => x.id === r.driverId), v = vehicles.find((x) => x.id === r.vehicleId);
       const rep = reps.find((x) => x.driverId === r.driverId && x.reportDate.toISOString().slice(0, 10) === r.date.toISOString().slice(0, 10));
-      return { sheetStep: DriverSheetService.step(rep), receiptCheckedAt: r.receiptCheckedAt, id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, insured: r.insured, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
+      return { sheetStep: DriverSheetService.step(rep), receiptCheckedAt: r.receiptCheckedAt, paidAt: r.paidAt, decidedAt: r.decidedAt, id: r.id, date: r.date, driver: d ? `${d.firstName} ${d.lastName}` : '—', vehicle: v?.registrationNumber ?? null, category: r.category, amount: r.amount, description: r.description, receiptUrl: r.receiptUrl, insured: r.insured, status: r.status, decidedAt: r.decidedAt, note: r.decisionNote };
     });
+  }
+
+  // Comptabilité : une dépense validée est marquée « payée » (date de paiement)
+  async payExpense(id: string, actorId: string) {
+    const e = await this.prisma.driverExpense.findUnique({ where: { id } });
+    if (!e) throw new BadRequestException('Dépense introuvable.');
+    if (e.status !== 'APPROVED') throw new BadRequestException("Seule une dépense validée peut être marquée comme payée.");
+    if (e.paidAt) throw new BadRequestException('Cette dépense est déjà marquée comme payée.');
+    const updated = await this.prisma.driverExpense.update({ where: { id }, data: { paidAt: new Date(), paidBy: actorId } });
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'DriverExpense', entityId: id, newValue: { payee: true } });
+    return updated;
   }
 
   async decideExpense(id: string, decision: string, note: string | undefined, actorId: string) {

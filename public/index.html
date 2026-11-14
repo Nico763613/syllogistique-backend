@@ -357,7 +357,8 @@
       <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('driver-sheets')"><span class="nav-icon">📋</span> Fiches de bord</div>
       <div class="nav-item" data-view="fuel" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('fuel')"><span class="nav-icon">⛽</span> Carburant &amp; Maintenance</div>
       <div class="nav-item" data-view="ops-validation" data-roles="SUPER_ADMIN,RESPONSABLE_OPERATIONS" onclick="go('ops-validation')"><span class="nav-icon">✅</span> Validation des fiches</div>
-      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,RESPONSABLE_OPERATIONS,COMPTABLE" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses</div>
+      <div class="nav-item" data-view="compta" data-roles="COMPTABLE,DIRECTEUR_GENERAL" onclick="go('compta')"><span class="nav-icon">🧾</span> Comptabilité</div>
+      <div class="nav-item" data-view="driver-expenses" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,RESPONSABLE_OPERATIONS" onclick="go('driver-expenses')"><span class="nav-icon">💵</span> Dépenses</div>
       <div class="nav-item" data-view="service-vehicles" data-roles="ZZ_NONE" onclick="go('service-vehicles')"><span class="nav-icon">🚙</span> Véhicules de service</div>
       <div class="nav-item" data-view="maintenance" data-roles="ZZ_NONE" onclick="go('maintenance')"><span class="nav-icon">🔧</span> Maintenance</div>
       <div class="nav-item" data-view="reports-truck" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR,GESTIONNAIRE_HSE,MAGASINIER" onclick="go(reportsHome(state.user.role))"><span class="nav-icon">📊</span> Rapports</div>
@@ -629,6 +630,7 @@ function updateSyncPill() {
 }
 
 const titles = {
+  compta: 'Comptabilité',
   atelier: 'Atelier',
   home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'ops-validation': 'Validation des fiches', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
@@ -659,7 +661,7 @@ const capFmt = (v) => (/^\d+([.,]\d+)?$/.test(v) ? v + ' t' : v);
 const HIST_ENT = {
   trucks: ['Vehicle', 'Document', 'VehicleDowntime'], 'service-vehicles': ['Vehicle', 'Document', 'VehicleDowntime'], vehicles: ['Vehicle', 'Document', 'VehicleDowntime'],
   drivers: ['Driver', 'DriverDevice'], 'driver-devices': ['DriverDevice'], fuel: ['FuelTransaction'], maintenance: ['Maintenance', 'DriverMaintenance'],
-  'driver-expenses': ['DriverExpense'], 'driver-sheets': ['DriverDailyReport'], 'driver-board': ['DriverDailyReport', 'Trip'], 'driver-missions': ['Trip'], daily: ['DriverDailyReport', 'Trip'], 'reports-truck': ['DriverDailyReport', 'Trip'], 'reports-service': ['DriverDailyReport', 'Trip'],
+  'driver-expenses': ['DriverExpense'], compta: ['DriverExpense', 'DriverDailyReport'], 'driver-sheets': ['DriverDailyReport'], 'driver-board': ['DriverDailyReport', 'Trip'], 'driver-missions': ['Trip'], daily: ['DriverDailyReport', 'Trip'], 'reports-truck': ['DriverDailyReport', 'Trip'], 'reports-service': ['DriverDailyReport', 'Trip'],
   stock: ['InventoryItem', 'StockMovement'], purchases: ['PurchaseOrder', 'GoodsReceipt'], needs: ['Need'], 'dash-hse': ['HseIncident', 'HseInspection'],
 };
 const HIST_LAB = { CREATE: 'Création', UPDATE: 'Modification', DELETE: 'Suppression' };
@@ -740,7 +742,7 @@ function go(view, noPush) {
 { const _rv = renderView; renderView = async function (view) { const r = await _rv(view); draftRestore(); return r; }; }
 
 /* ---------- Actualisation automatique du bureau (toutes les 30 s, écran ouvert et visible uniquement) ---------- */
-const LIVE_VIEWS = ['ops-validation', 'dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance', 'reports-truck', 'reports-service'];
+const LIVE_VIEWS = ['compta', 'ops-validation', 'dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance', 'reports-truck', 'reports-service'];
 const LIVE = { since: null, timer: null, busy: false };
 function liveCanRun() {
   return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR';
@@ -1238,7 +1240,8 @@ async function renderView(view) {
     if (view === 'driver-devices') return renderDriverDevices();
     if (view === 'driver-missions') return renderMissionHistory();
     if (view === 'driver-board') return renderDriverBoard();
-    if (view === 'driver-expenses') return renderDriverExpenses();
+    if (view === 'compta') return renderCompta();
+    if (view === 'driver-expenses') return state.user.role === 'COMPTABLE' ? renderCompta() : renderDriverExpenses();
     if (view === 'driver-sheets') return renderDriverSheets();
     if (view === 'ops-validation') return renderOpsValidation();
     if (view === 'drivers') return renderDrivers();
@@ -2848,7 +2851,7 @@ const HOME_CARDS = [
   { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'espace' } },
   { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER', 'LECTEUR'], over: { MAGASINIER: 'espace' } },
   { ico: '✅', t: 'Opérations', d: 'Fiches vérifiées à valider, reçus papier', v: 'ops-validation', roles: ['SUPER_ADMIN', 'RESPONSABLE_OPERATIONS'] },
-  { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'driver-expenses', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
+  { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'compta', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
   { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'reports-hse', MAGASINIER: 'reports-stock' } },
   { ico: '🏢', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
 ];
@@ -2864,7 +2867,7 @@ function bottomEntries(role) {
   const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
   if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
-  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'driver-expenses'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
   const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'].includes(role);
   return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', reportsHome(role)]] : []), ['👤', 'Profil', '#profil']];
 }
@@ -4526,10 +4529,62 @@ async function renderDriverExpenses(status) {
     <label>Afficher</label><select onchange="renderDriverExpenses(this.value)" style="max-width:220px"><option value="PENDING" ${st === 'PENDING' ? 'selected' : ''}>En attente</option><option value="APPROVED" ${st === 'APPROVED' ? 'selected' : ''}>Validées</option><option value="REJECTED" ${st === 'REJECTED' ? 'selected' : ''}>Refusées</option></select></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Reçu scanné</th><th>Reçu papier</th><th>Fiche</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="9" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
 }
+/* ---------- Comptabilité : À traiter · Reçus · Synthèse · Historique ---------- */
+let cpTab = 'traiter', cpPeriod = 'month';
+const CP_TABS = [['traiter', '🧾 À traiter'], ['recus', '📄 Reçus'], ['synthese', '📊 Synthèse'], ['histo', '🗂 Historique']];
+async function renderCompta() {
+  const role = state.user.role, ro = role === 'DIRECTEUR_GENERAL'; // le Directeur général ne voit que la synthèse, sans aucune action
+  if (ro) cpTab = 'synthese';
+  const rows = await api('/driver-admin/expenses?siteId=' + encodeURIComponent(state.siteId || ''));
+  window._cpRows = rows;
+  const pend = rows.filter((e) => e.status === 'PENDING'), unpaid = rows.filter((e) => e.status === 'APPROVED' && !e.paidAt), noPaper = rows.filter((e) => e.status === 'APPROVED' && !e.receiptCheckedAt);
+  const nb = { traiter: pend.filter((e) => e.sheetStep === 'VALIDATED').length + unpaid.length, recus: noPaper.length };
+  const bar = ro ? '' : `<div class="dp-tabs" id="dp-bar">${CP_TABS.map(([k, t]) => `<button class="${cpTab === k ? 'on' : ''}" onclick="cpTab='${k}';renderCompta()">${t}${nb[k] ? ' (' + nb[k] + ')' : ''}</button>`).join('')}</div>`;
+  const dd = (x) => new Date(x).toLocaleDateString('fr-FR');
+  const nat = (e) => esc(DRV_EXP[e.category] || e.category) + (e.description ? '<div style="font-size:12px;color:var(--muted)">' + esc(e.description) + '</div>' : '');
+  const who = (e) => '<b>' + esc(e.driver) + '</b>' + (e.vehicle ? '<div style="font-size:11px;color:var(--muted)">' + esc(e.vehicle) + '</div>' : '');
+  const tbl = (head, body) => `<div style="overflow:auto"><table><tr>${head.map((h) => '<th>' + h + '</th>').join('')}</tr>${body || '<tr><td colspan="' + head.length + '"><div class="empty">Rien à afficher.</div></td></tr>'}</table></div>`;
+  let body = '';
+  if (cpTab === 'traiter') {
+    const ready = pend.filter((e) => e.sheetStep === 'VALIDATED'), blocked = pend.filter((e) => e.sheetStep !== 'VALIDATED');
+    body = `<div class="panel"><h3>🧾 Dépenses à traiter <span class="badge ${ready.length ? 'warn' : 'ok'}">${ready.length}</span></h3><div class="desc">Fiches déjà validées par le Responsable des opérations.</div>
+      ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', 'Reçu scanné', 'Reçu papier', ''], ready.map((e) => `<tr><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono"><b>${fmt(e.amount)}</b> GNF</td><td>${receiptLink(e.receiptUrl)}</td><td>${e.receiptCheckedAt ? '<span class="badge ok">✔ Conforme</span>' : '<span class="badge warn">Non reçu</span>'}</td><td style="white-space:nowrap"><button class="btn small gold" onclick="decideExpense('${esc(e.id)}','APPROVED')">✔ Valider</button> <button class="btn small" onclick="decideExpense('${esc(e.id)}','REJECTED')">✖ Refuser</button></td></tr>`).join(''))}</div>
+      <div class="panel"><h3>💳 Validées à payer <span class="badge ${unpaid.length ? 'warn' : 'ok'}">${unpaid.length}</span></h3>
+      ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', ''], unpaid.map((e) => `<tr><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono"><b>${fmt(e.amount)}</b> GNF</td><td><button class="btn small gold" onclick="cpPay('${esc(e.id)}')">💳 Marquer comme payée</button></td></tr>`).join(''))}</div>
+      ${blocked.length ? `<div class="panel"><h3>⏳ En attente de validation de la fiche <span class="badge info">${blocked.length}</span></h3><div class="desc">Ces dépenses se débloqueront quand le Responsable des opérations aura validé la fiche du chauffeur.</div>
+      ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', 'Fiche'], blocked.map((e) => `<tr style="opacity:.75"><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono">${fmt(e.amount)} GNF</td><td>${stepBadge(e.sheetStep)}<div style="font-size:11px;color:var(--muted)">Fiche pas encore validée</div></td></tr>`).join(''))}</div>` : ''}`;
+  } else if (cpTab === 'recus') {
+    body = `<div class="panel"><h3>📄 Reçus papier à réclamer <span class="badge ${noPaper.length ? 'warn' : 'ok'}">${noPaper.length}</span></h3><div class="desc">Dépenses validées dont le reçu papier n'a pas été déposé chez le responsable. Relancez le Responsable des opérations.</div>
+      ${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', 'Attente'], noPaper.map((e) => { const j = Math.max(0, Math.floor((Date.now() - new Date(e.decidedAt || e.date)) / 864e5)); return `<tr><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono">${fmt(e.amount)} GNF</td><td><span class="badge ${j > 7 ? 'bad' : 'warn'}">${j} j</span></td></tr>`; }).join(''))}</div>`;
+  } else if (cpTab === 'synthese') {
+    const now = new Date(), t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const from = cpPeriod === 'day' ? t0 : cpPeriod === 'week' ? new Date(+t0 - ((now.getDay() + 6) % 7) * 864e5) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const sel = rows.filter((e) => e.status === 'APPROVED' && new Date(e.date) >= from);
+    window._cpSel = sel;
+    const sum = (a) => a.reduce((x, e) => x + e.amount, 0);
+    const grp = (f) => { const m = {}; sel.forEach((e) => { const k = f(e) || '—'; m[k] = m[k] || { n: 0, t: 0 }; m[k].n++; m[k].t += e.amount; }); return Object.entries(m).sort((a, b) => b[1].t - a[1].t); };
+    const g = (title, list) => `<div class="panel"><h3>${title}</h3>${tbl(['', 'Nombre', 'Total (GNF)'], list.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="mono">${v.n}</td><td class="mono"><b>${fmt(v.t)}</b></td></tr>`).join(''))}</div>`;
+    body = `<div class="panel"><h3>📊 Synthèse des dépenses validées${ro ? ' <span class="badge info">Lecture seule</span>' : ''}</h3>
+      <div class="dp-sub">${[['day', "Aujourd'hui"], ['week', 'Cette semaine'], ['month', 'Ce mois']].map(([k, t]) => `<button class="${cpPeriod === k ? 'on' : ''}" onclick="cpPeriod='${k}';renderCompta()">${t}</button>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0">${[[fmt(sum(sel)), 'GNF validés'], [sel.length, 'Dépenses'], [fmt(sum(sel.filter((e) => e.paidAt))), 'GNF payés'], [fmt(sum(sel.filter((e) => !e.paidAt))), 'GNF à payer']].map(([n, l]) => `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--navy)">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`).join('')}</div>
+      <button class="btn small" onclick="cpExport()">⬇ Exporter (Excel)</button></div>
+      ${g('Par nature', grp((e) => DRV_EXP[e.category] || e.category))}${g('Par chauffeur', grp((e) => e.driver))}${g('Par véhicule', grp((e) => e.vehicle))}`;
+  } else {
+    const done = rows.filter((e) => e.status !== 'PENDING');
+    body = `<div class="panel"><h3>🗂 Historique</h3>${tbl(['Date', 'Chauffeur', 'Nature', 'Montant', 'Décision', 'Paiement'], done.map((e) => `<tr><td>${dd(e.date)}</td><td>${who(e)}</td><td>${nat(e)}</td><td class="mono">${fmt(e.amount)} GNF</td><td>${e.status === 'APPROVED' ? '<span class="badge ok">Validée</span>' : '<span class="badge bad">Refusée</span>'}${e.note ? '<div style="font-size:11px">' + esc(e.note) + '</div>' : ''}</td><td>${e.status !== 'APPROVED' ? '—' : e.paidAt ? '<span class="badge ok">Payée le ' + dd(e.paidAt) + '</span>' : '<span class="badge warn">À payer</span>'}</td></tr>`).join(''))}</div>`;
+  }
+  root().innerHTML = bar + body;
+}
+async function cpPay(id) { if (!confirm('Marquer cette dépense comme payée ?')) return; try { await api('/driver-admin/expenses/' + id + '/pay', { method: 'POST', body: {} }); renderCompta(); } catch (e) { alert(e.message); } }
+function cpExport() {
+  const q = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [['Date', 'Chauffeur', 'Véhicule', 'Nature', 'Description', 'Montant GNF', 'Payée le'].map(q).join(';')].concat((window._cpSel || []).map((e) => [new Date(e.date).toLocaleDateString('fr-FR'), e.driver, e.vehicle, DRV_EXP[e.category] || e.category, e.description, e.amount, e.paidAt ? new Date(e.paidAt).toLocaleDateString('fr-FR') : ''].map(q).join(';')));
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })); a.download = 'depenses-validees.csv'; a.click();
+}
 async function decideExpense(id, decision) {
   let note;
   if (decision === 'REJECTED') { note = prompt('Motif du refus (obligatoire) :'); if (!note || !note.trim()) return; }
-  try { await api('/driver-admin/expenses/' + id + '/decision', { method: 'POST', body: { decision, note } }); renderDriverExpenses(); }
+  try { await api('/driver-admin/expenses/' + id + '/decision', { method: 'POST', body: { decision, note } }); renderView(state.view); }
   catch (e) { alert(e.message); }
 }
 window._bdKind = window._bdKind || 'ALL';
