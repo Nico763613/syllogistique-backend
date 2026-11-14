@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import PDFDocument = require('pdfkit');
+import { readFile } from 'fs/promises';
+import { join, basename } from 'path';
 import { PrismaService } from '../prisma.service';
 
 // Génère la facture client en PDF — prête à être envoyée par email/WhatsApp
@@ -8,7 +10,23 @@ import { PrismaService } from '../prisma.service';
 export class SalesDocumentsService {
   constructor(private prisma: PrismaService) {}
 
+  // Logo de l'entreprise (envoyé : fichier du serveur ou adresse web). Échec = facture sans logo, jamais d'erreur.
+  private async loadLogo(url?: string | null): Promise<Buffer | null> {
+    if (!url) return null;
+    try {
+      if (url.startsWith('/uploads/')) return await readFile(join(__dirname, '..', '..', 'uploads', basename(url)));
+      if (/^https?:\/\//i.test(url)) {
+        const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        return r.ok ? Buffer.from(await r.arrayBuffer()) : null;
+      }
+    } catch { /* logo indisponible */ }
+    return null;
+  }
+
   async invoicePdf(invoiceId: string, orgName = 'SYL LOGISTIQUE'): Promise<Buffer> {
+    const org = await this.prisma.organization.findFirst({ orderBy: { createdAt: 'asc' }, select: { name: true, logoUrl: true } });
+    const logo = await this.loadLogo(org?.logoUrl);
+    if (org?.name) orgName = org.name;
     const invoice = await this.prisma.salesInvoice.findUnique({
       where: { id: invoiceId },
       include: { customer: true, salesOrder: { include: { lines: { include: { item: true } } } } },
@@ -22,7 +40,16 @@ export class SalesDocumentsService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      doc.fontSize(18).fillColor('#163A5F').text(orgName, { align: 'left' });
+      let drewLogo = false;
+      if (logo) {
+        try {
+          doc.image(logo, 50, 45, { fit: [90, 60] });
+          doc.fontSize(18).fillColor('#163A5F').text(orgName, 155, 60);
+          doc.x = 50; doc.y = Math.max(doc.y, 115);
+          drewLogo = true;
+        } catch { /* format d'image non pris en charge (ex. SVG) : on continue sans logo */ }
+      }
+      if (!drewLogo) doc.fontSize(18).fillColor('#163A5F').text(orgName, { align: 'left' });
       doc.fontSize(12).fillColor('#000').text('FACTURE', { align: 'left' });
       doc.moveDown(0.3);
       doc.fontSize(10).fillColor('#555')
