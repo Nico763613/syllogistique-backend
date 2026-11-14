@@ -372,7 +372,8 @@
       <div class="nav-item" data-view="dash-logistics" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('dash-logistics')"><span class="nav-icon">📊</span> Tableau de bord Achats</div>
       <div class="nav-item" data-view="purchases" onclick="go('purchases')"><span class="nav-icon">🛒</span> Achats</div>
       <div class="nav-item" data-view="needs" onclick="go('needs')"><span class="nav-icon">📝</span> États des besoins</div>
-      <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL,CAISSIER" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
+      <div class="nav-item" data-view="caisse" data-roles="CAISSIER" onclick="go('caisse')"><span class="nav-icon">💵</span> Caisse</div>
+      <div class="nav-item" data-view="dash-commercial" data-roles="RESPONSABLE_COMMERCIAL" onclick="go('dash-commercial')"><span class="nav-icon">💳</span> Commercial &amp; Caisse</div>
 
       <div class="nav-section-label">🦺 HSE</div>
       <div class="nav-item" data-view="dash-hse" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,AGENT_HSE,LECTEUR" onclick="go('dash-hse')"><span class="nav-icon">🦺</span> HSE</div>
@@ -585,7 +586,7 @@ function enterApp() {
   refreshAvatars(); loadMyPhoto(); buildBottomNav();
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'dash-commercial', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', RESPONSABLE_OPERATIONS: 'home', LECTEUR: 'home' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'caisse', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', RESPONSABLE_OPERATIONS: 'home', LECTEUR: 'home' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -630,6 +631,7 @@ function updateSyncPill() {
 }
 
 const titles = {
+  caisse: 'Caisse',
   compta: 'Comptabilité',
   atelier: 'Atelier',
   home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
@@ -1240,6 +1242,7 @@ async function renderView(view) {
     if (view === 'driver-devices') return renderDriverDevices();
     if (view === 'driver-missions') return renderMissionHistory();
     if (view === 'driver-board') return renderDriverBoard();
+    if (view === 'caisse') return renderCaisse();
     if (view === 'compta') return renderCompta();
     if (view === 'driver-expenses') return state.user.role === 'COMPTABLE' ? renderCompta() : renderDriverExpenses();
     if (view === 'driver-sheets') return renderDriverSheets();
@@ -2867,7 +2870,7 @@ function bottomEntries(role) {
   const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
   if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
-  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], CAISSIER: ['💵', 'Caisse', 'caisse'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
   const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'].includes(role);
   return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', reportsHome(role)]] : []), ['👤', 'Profil', '#profil']];
 }
@@ -4528,6 +4531,80 @@ async function renderDriverExpenses(status) {
   root().innerHTML = `<div class="panel"><h3>💵 Dépenses déclarées par les chauffeurs</h3><div class="desc">${canDecide ? 'Vous traitez les dépenses des fiches déjà validées par le Responsable des opérations. Une dépense validée est ajoutée aux dépenses du véhicule.' : 'Suivi des dépenses : seule la Comptabilité les valide, après validation de la fiche par le Responsable des opérations.'}</div>
     <label>Afficher</label><select onchange="renderDriverExpenses(this.value)" style="max-width:220px"><option value="PENDING" ${st === 'PENDING' ? 'selected' : ''}>En attente</option><option value="APPROVED" ${st === 'APPROVED' ? 'selected' : ''}>Validées</option><option value="REJECTED" ${st === 'REJECTED' ? 'selected' : ''}>Refusées</option></select></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Reçu scanné</th><th>Reçu papier</th><th>Fiche</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="9" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
+}
+/* ---------- Caisse (Caissier) : Encaisser · Ma caisse · Factures · Historique ---------- */
+let csTab = 'encaisser', csInvoice = '';
+const CS_TABS = [['encaisser', '💵 Encaisser'], ['caisse', '🗄 Ma caisse'], ['factures', '🧾 Factures'], ['histo', '🗂 Historique']];
+const CS_METHODS = [['CASH', 'Espèces'], ['MOBILE_MONEY', 'Mobile money'], ['ORANGE_MONEY', 'Orange Money'], ['BANK_TRANSFER', 'Virement']];
+async function renderCaisse() {
+  const [cur, invs, hist] = await Promise.all([api('/cash-sessions/current'), api('/sales/invoices?siteId=' + encodeURIComponent(state.siteId || '')), api('/cash-sessions')]);
+  const open = (invs || []).filter((i) => ['UNPAID', 'PARTIALLY_PAID'].includes(i.status)).map((i) => ({ ...i, rest: Math.max(0, Number(i.totalAmount) - Number(i.amountPaid || 0)), age: Math.max(0, Math.floor((Date.now() - new Date(i.invoiceDate)) / 864e5)) })).filter((i) => i.rest > 0);
+  window._csInv = open; window._csCur = cur;
+  const bar = `<div class="dp-tabs" id="dp-bar">${CS_TABS.map(([k, t]) => `<button class="${csTab === k ? 'on' : ''}" onclick="csTab='${k}';renderCaisse()">${t}${k === 'factures' && open.length ? ' (' + open.length + ')' : ''}</button>`).join('')}</div>`;
+  const dd = (x) => new Date(x).toLocaleDateString('fr-FR'), g = (n) => fmt(Math.round(Number(n) || 0));
+  const noSession = `<div class="panel"><h3>🗄 Ouvrir ma caisse</h3><div class="desc">Vous devez ouvrir votre caisse du jour avant d'encaisser des espèces.</div><label>Fonds de départ (GNF)</label><input id="cs-float" type="number" inputmode="numeric" value="0"><div id="cs-msg"></div><button class="btn gold" style="min-height:48px;margin-top:10px" onclick="csOpen()">Ouvrir ma caisse</button></div>`;
+  let body = '';
+  if (csTab === 'encaisser') {
+    body = !cur ? noSession : `<div class="panel"><h3>💵 Encaisser un règlement</h3>
+      <label>Facture</label><select id="cs-inv" onchange="csPick()"><option value="">— Choisir une facture —</option>${open.map((i) => `<option value="${esc(i.id)}" ${csInvoice === i.id ? 'selected' : ''}>${esc(i.reference)} · ${esc(i.customer && i.customer.name)} · reste ${g(i.rest)} GNF</option>`).join('')}</select>
+      <label>Montant reçu (GNF)</label><input id="cs-amt" type="number" inputmode="numeric" min="1" placeholder="Montant">
+      <label>Mode de paiement</label><select id="cs-met" onchange="csMet()">${CS_METHODS.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>
+      <div id="cs-refbox" style="display:none"><label>N° de transaction (obligatoire hors espèces)</label><input id="cs-ref" placeholder="Ex. numéro Orange Money"></div>
+      <div id="cs-msg"></div><button class="btn gold" style="min-height:52px;width:100%;margin-top:12px;font-size:16px" onclick="csPay()">✔ Enregistrer l'encaissement</button><div id="cs-receipt"></div></div>`;
+    if (cur) setTimeout(csPick, 0);
+  } else if (csTab === 'caisse') {
+    if (!cur) body = noSession; else {
+      const m = cur.summary || {};
+      const tile = (n, l, c) => `<div style="background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c || 'var(--navy)'}">${g(n)}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+      body = `<div class="panel"><h3>🗄 Ma caisse — ouverte le ${dd(cur.openedAt)} <span class="badge ok">Ouverte</span></h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:12px 0">${tile(cur.openingFloat, 'Fonds de départ')}${tile(m.cashCollected, 'Espèces encaissées')}${tile(m.expenses, 'Dépenses de caisse')}${tile(m.expectedCash, 'Espèces attendues en caisse')}</div>
+        ${Object.keys(m.collectedByMethod || {}).length ? '<div class="desc">Encaissé par mode : ' + Object.entries(m.collectedByMethod).map(([k, v]) => (CS_METHODS.find((x) => x[0] === k) || [k, k])[1] + ' ' + g(v) + ' GNF').join(' · ') + '</div>' : ''}</div>
+        <div class="panel"><h3>➖ Dépense de caisse</h3><label>Montant (GNF)</label><input id="cs-eamt" type="number" inputmode="numeric" min="1"><label>Motif (obligatoire)</label><input id="cs-ereason" placeholder="Ex. transport, achat fournitures"><div id="cs-emsg"></div><button class="btn" style="min-height:48px;margin-top:8px" onclick="csExpense('${esc(cur.id)}')">Enregistrer la dépense</button></div>
+        <div class="panel"><h3>🔒 Clôturer ma caisse</h3><div class="desc">Comptez les espèces présentes dans la caisse. L'écart avec le montant attendu est calculé.</div><label>Espèces comptées (GNF)</label><input id="cs-count" type="number" inputmode="numeric" min="0"><label>Observation (facultatif)</label><input id="cs-note"><div id="cs-cmsg"></div><button class="btn gold" style="min-height:48px;margin-top:8px" onclick="csClose('${esc(cur.id)}')">Clôturer la caisse</button></div>`;
+    }
+  } else if (csTab === 'factures') {
+    body = `<div class="panel"><h3>🧾 Factures à encaisser <span class="badge ${open.length ? 'warn' : 'ok'}">${open.length}</span></h3><div style="overflow:auto"><table><tr><th>Facture</th><th>Client</th><th>Total</th><th>Reste à payer</th><th>Ancienneté</th><th></th></tr>${open.map((i) => `<tr><td>${esc(i.reference)}<div style="font-size:11px;color:var(--muted)">${dd(i.invoiceDate)}</div></td><td>${esc(i.customer && i.customer.name)}</td><td class="mono">${g(i.totalAmount)}</td><td class="mono"><b>${g(i.rest)}</b> GNF${i.status === 'PARTIALLY_PAID' ? ' <span class="badge warn">Partielle</span>' : ''}</td><td><span class="badge ${i.age > 30 ? 'bad' : i.age > 7 ? 'warn' : 'ok'}">${i.age} j</span></td><td><button class="btn small gold" onclick="csInvoice='${esc(i.id)}';csTab='encaisser';renderCaisse()">Encaisser</button></td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">Aucune facture à encaisser.</div></td></tr>'}</table></div></div>`;
+  } else {
+    body = `<div class="panel"><h3>🗂 Historique de mes caisses</h3><div style="overflow:auto"><table><tr><th>Ouverte le</th><th>État</th><th>Attendu</th><th>Compté</th><th>Écart</th></tr>${(hist || []).map((c) => { const gap = c.gapAmount == null ? null : Number(c.gapAmount); return `<tr><td>${dd(c.openedAt)}</td><td>${c.validatedBy ? '<span class="badge ok">Validée</span>' : c.closedAt ? '<span class="badge info">Clôturée — à vérifier</span>' : '<span class="badge warn">Ouverte</span>'}</td><td class="mono">${c.expectedCash == null ? '—' : g(c.expectedCash)}</td><td class="mono">${c.countedCash == null ? '—' : g(c.countedCash)}</td><td>${gap == null ? '—' : gap === 0 ? '<span class="badge ok">0</span>' : '<span class="badge bad">' + (gap > 0 ? '+' : '') + g(gap) + '</span>'}</td></tr>`; }).join('') || '<tr><td colspan="5"><div class="empty">Aucune caisse.</div></td></tr>'}</table></div></div>`;
+  }
+  root().innerHTML = bar + body;
+}
+function csPick() {
+  const sel = document.getElementById('cs-inv'); if (!sel) return;
+  const i = (window._csInv || []).find((x) => x.id === sel.value); csInvoice = sel.value;
+  const a = document.getElementById('cs-amt'); if (a && i) a.value = Math.round(i.rest);
+}
+function csMet() { const m = document.getElementById('cs-met').value; document.getElementById('cs-refbox').style.display = m === 'CASH' ? 'none' : ''; }
+async function csOpen() { const m = document.getElementById('cs-msg'); try { await api('/cash-sessions/open', { method: 'POST', body: { openingFloat: Math.round(Number(document.getElementById('cs-float').value) || 0) } }); renderCaisse(); } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; } }
+async function csPay() {
+  const m = document.getElementById('cs-msg'), id = document.getElementById('cs-inv').value, amt = Number(document.getElementById('cs-amt').value), met = document.getElementById('cs-met').value, ref = (document.getElementById('cs-ref').value || '').trim();
+  const inv = (window._csInv || []).find((x) => x.id === id);
+  try {
+    if (!inv) throw new Error('Choisissez une facture.');
+    if (!(amt > 0)) throw new Error('Saisissez le montant reçu.');
+    if (amt > inv.rest) throw new Error('Le montant dépasse le reste à payer (' + fmt(Math.round(inv.rest)) + ' GNF).');
+    if (met !== 'CASH' && !ref) throw new Error('Indiquez le numéro de transaction.');
+    await api('/payments', { method: 'POST', body: { direction: 'IN', method: met, amount: amt, paymentDate: new Date().toISOString(), salesInvoiceId: id, ...(ref ? { reference: ref, externalRef: ref } : {}), ...(window._csCur ? { cashSessionId: window._csCur.id } : {}) } });
+    const left = inv.rest - amt, msg = `Bonjour ${inv.customer && inv.customer.name}, nous avons bien reçu votre règlement de ${fmt(Math.round(amt))} GNF pour la facture ${inv.reference}. ${left > 0 ? 'Reste à payer : ' + fmt(Math.round(left)) + ' GNF.' : 'Facture soldée.'} Merci. — SYL LOGISTIQUE`;
+    const phone = String((inv.customer && inv.customer.phone) || '').replace(/\D/g, ''), full = phone.length === 9 ? '224' + phone : phone;
+    csInvoice = '';
+    await renderCaisse();
+    document.getElementById('cs-receipt').innerHTML = `<div class="msg ok" style="margin-top:12px">✔ Encaissement enregistré : ${fmt(Math.round(amt))} GNF — ${esc(inv.reference)}. ${left > 0 ? 'Reste ' + fmt(Math.round(left)) + ' GNF.' : 'Facture soldée.'}</div><a class="btn" style="margin-top:8px;text-decoration:none;display:inline-block" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">💬 Envoyer le reçu par WhatsApp</a>`;
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function csExpense(id) {
+  const m = document.getElementById('cs-emsg'), amount = Math.round(Number(document.getElementById('cs-eamt').value)), reason = document.getElementById('cs-ereason').value.trim();
+  try { if (!(amount > 0)) throw new Error('Saisissez le montant.'); if (reason.length < 2) throw new Error('Indiquez le motif.'); await api('/cash-sessions/' + id + '/expenses', { method: 'POST', body: { amount, reason } }); renderCaisse(); } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function csClose(id) {
+  const m = document.getElementById('cs-cmsg'), v = document.getElementById('cs-count').value;
+  try {
+    if (v === '' || Number(v) < 0) throw new Error('Saisissez les espèces comptées.');
+    if (!confirm('Clôturer la caisse ? Vous ne pourrez plus encaisser avant d\'en rouvrir une.')) return;
+    const r = await api('/cash-sessions/' + id + '/close', { method: 'POST', body: { countedCash: Math.round(Number(v)), note: document.getElementById('cs-note').value.trim() || undefined } });
+    const gap = Number(r.gapAmount || 0); csTab = 'histo'; await renderCaisse();
+    document.getElementById('dp-bar').insertAdjacentHTML('afterend', `<div class="msg ${gap === 0 ? 'ok' : 'err'}">Caisse clôturée. ${gap === 0 ? 'Aucun écart.' : 'Écart : ' + (gap > 0 ? '+' : '') + fmt(gap) + ' GNF.'} Elle sera vérifiée par le Responsable commercial.</div>`);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 /* ---------- Comptabilité : À traiter · Reçus · Synthèse · Historique ---------- */
 let cpTab = 'traiter', cpPeriod = 'month';
