@@ -10,7 +10,7 @@ import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
 import { DriverSheetService } from './driver-sheet.service';
 import { DriverPointersService } from './driver-pointers.service';
-import { VehicleSpecDto, PointerDto, ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { VehicleSpecDto, PointerDto, PointerCountDto, ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -101,6 +101,26 @@ export class DriverController {
   @UseGuards(DriverDeviceGuard)
   sync(@Body() dto: SyncDto, @CurrentUser() user: any) {
     return this.app.sync(user.userId, user.organizationId, dto.ops);
+  }
+}
+
+// --- Pointeur : comptage des mouvements et des tonnes à la barrière ---
+@ApiTags('pointer')
+@ApiBearerAuth()
+@UseGuards(RolesGuard)
+@Roles(RoleName.POINTEUR, RoleName.SUPER_ADMIN)
+@Controller('pointer')
+export class PointerController {
+  constructor(private pointers: DriverPointersService) {}
+
+  @Get('day')
+  day(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
+    return this.pointers.dayForPointer(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);
+  }
+
+  @Post('count')
+  count(@Body() dto: PointerCountDto, @CurrentUser() actor: any, @Query('siteId') siteId?: string) {
+    return this.pointers.saveByPointer(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, dto, actor.userId);
   }
 }
 

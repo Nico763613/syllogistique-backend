@@ -111,7 +111,7 @@ export class DriversService {
     });
 
     const totalDays = records.length;
-    const present = records.filter((r) => r.status === 'PRESENT').length;
+    const present = records.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length; // un retard compte comme présent
     const absent = records.filter((r) => r.status === 'ABSENT').length;
     const leave = records.filter((r) => r.status === 'LEAVE').length;
 

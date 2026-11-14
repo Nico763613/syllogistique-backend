@@ -1215,7 +1215,7 @@ function applyRoleNav() {
     any = false;
   }
   if (role === 'MAGASINIER') { const el = document.querySelector('#sidebar .nav-item[data-view="purchases"]'); if (el) el.style.display = 'none'; } // les achats restent au Responsable logistique
-  const extra = { POINTEUR: ['drivers'] }[role] || [];
+  const extra = [];
   extra.forEach((v) => { const el = document.querySelector('#sidebar .nav-item[data-view="' + v + '"]'); if (el) el.style.display = ''; });
   const lbl = document.getElementById('nav-dept-label');
   if (lbl) lbl.style.display = any ? '' : 'none';
@@ -3069,6 +3069,7 @@ async function renderWorkspace() {
   const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
   const atAct = (ico, label, tab) => `<button onclick="atTab='${tab}';go('atelier')"><span>${ico}</span>${label}</button>`;
+  const ptAct = (ico, label, tab) => `<button onclick="ptTab='${tab}';go('pointage')"><span>${ico}</span>${label}</button>`;
   const stAct = (ico, label, tab) => `<button onclick="stockTab='${tab}';go('stock')"><span>${ico}</span>${label}</button>`;
   const actions = (items) => `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${items}${act('📝', 'Mon rapport du jour', 'my-report')}</div></div>`;
   const empty = (t) => `<div class="empty" style="padding:10px">${t}</div>`;
@@ -3097,26 +3098,51 @@ async function renderWorkspace() {
     body = `<div class="ex-kpis">${exKpi('👥', '#E3EEFB', k.total, 'Effectif total')}${exKpi('✅', '#E1F4E8', k.present, 'Présents')}${exKpi('❌', '#FDE8E4', k.absent, 'Absents')}${exKpi('🕒', '#FDF1D6', k.remaining, 'Pointage restant')}</div>
       <div class="ex-grid"><div class="ex-card"><h3>🕒 Pointage du jour</h3>${k.remaining === 0 && k.total > 0 ? '<div class="msg ok">Pointage terminé : tous les chauffeurs sont pointés.</div>' : `<div class="msg err">${k.remaining} chauffeur(s) restent à pointer.</div>`}<button class="btn gold" style="margin-top:8px" onclick="go('pointage')">Faire le pointage</button>${k.others ? `<div class="desc" style="margin-top:8px">${k.others} en repos, permission ou maladie.</div>` : ''}</div>
       <div class="ex-card"><h3>❌ Absences du jour</h3>${d.absentees.length ? d.absentees.map((a) => `<div class="ex-row"><span>${esc(a.name)}</span><span style="color:var(--muted)">${esc(a.reason || '')}</span></div>`).join('') : empty('Aucune absence enregistrée.')}</div></div>`
-      + actions(act('🕒', 'Pointage', 'pointage') + act('🧑‍✈️', 'Chauffeurs', 'drivers'));
+      + actions(ptAct('🕒', 'Pointer les chauffeurs', 'presence') + ptAct('🚛', 'Compter les camions', 'camions'));
   }
   root().innerHTML = hero + body;
 }
 /* ---------------- POINTAGE des chauffeurs (pointeur, responsable logistique) ---------------- */
-const ATT_ST = [['PRESENT', '✅ Présent', 'ok'], ['ABSENT', '❌ Absent', 'bad'], ['REST', '😴 Repos', 'warn'], ['PERMISSION', '📝 Permission', 'warn'], ['SICK', '🤒 Maladie', 'warn'], ['LEAVE', '🌴 Congé', 'warn']];
+const ATT_ST = [['PRESENT', '✅ Présent', 'ok'], ['LATE', '⏰ Retard', 'warn'], ['ABSENT', '❌ Absent', 'bad'], ['REST', '😴 Repos', 'warn'], ['PERMISSION', '📝 Permission', 'warn'], ['SICK', '🤒 Maladie', 'warn'], ['LEAVE', '🌴 Congé', 'warn']];
+let ptTab = 'presence';
 async function renderPointage() {
+  const bar = `<div class="dp-tabs" id="dp-bar">${[['presence', '🕒 Présence'], ['camions', '🚛 Camions']].map(([k, t]) => `<button class="${ptTab === k ? 'on' : ''}" onclick="ptTab='${k}';renderPointage()">${t}</button>`).join('')}</div>`;
+  if (ptTab === 'camions') return renderPointCamions(bar);
   const date = window._ptDate || new Date().toISOString().slice(0, 10);
   const [drivers, att] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/drivers/attendance/day?siteId=' + state.siteId + '&date=' + date)]);
   const by = {}; att.forEach((a) => { by[a.driverId] = a; });
   const list = drivers.filter((d) => d.status === 'ACTIVE' || !d.status);
   const done = list.filter((d) => by[d.id]).length;
   window._ptDrivers = list; window._ptAtt = by;
-  root().innerHTML = `<div class="panel"><h3>🕒 Pointage des chauffeurs</h3>
+  root().innerHTML = bar + `<div class="panel"><h3>🕒 Pointage des chauffeurs</h3>
     <div class="desc">Touchez le statut de chaque chauffeur. Une correction demande un motif.</div>
     <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._ptDate=this.value;renderPointage()">
     <div class="msg ${done === list.length && list.length ? 'ok' : 'err'}" style="margin-top:10px">${done} / ${list.length} chauffeurs pointés</div></div>
     <div class="panel">${list.map((d) => { const a = by[d.id]; const cur = a && ATT_ST.find((s) => s[0] === a.status);
       return `<div class="drv-row" style="flex-wrap:wrap;gap:6px"><span style="min-width:150px"><b>${esc(d.lastName)}</b> ${esc(d.firstName)} ${cur ? `<span class="badge ${cur[2]}">${cur[1]}</span>` : '<span class="badge warn">Non pointé</span>'}</span>
-      <span>${ATT_ST.map((s) => `<button class="btn small ${a && a.status === s[0] ? 'gold' : ''}" style="margin:2px" onclick="ptMark('${esc(d.id)}','${s[0]}')">${s[1]}</button>`).join('')}</span></div>`; }).join('') || '<div class="empty">Aucun chauffeur enregistré.</div>'}</div>`;
+      <span>${ATT_ST.map((s) => `<button class="btn small ${a && a.status === s[0] ? 'gold' : ''}" style="margin:2px;min-height:44px;min-width:44px" onclick="ptMark('${esc(d.id)}','${s[0]}')">${s[1]}</button>`).join('')}</span></div>`; }).join('') || '<div class="empty">Aucun chauffeur enregistré.</div>'}</div>`;
+}
+async function renderPointCamions(bar) {
+  const date = window._ptDate || new Date().toISOString().slice(0, 10);
+  const r = await api('/pointer/day?date=' + date + '&siteId=' + encodeURIComponent(state.siteId || ''));
+  window._ptCount = {}; r.rows.forEach((x) => { window._ptCount[x.vehicleId] = x; });
+  const done = r.rows.filter((x) => x.pointer).length;
+  root().innerHTML = bar + `<div class="panel"><h3>🚛 Comptage des camions à la barrière</h3>
+    <div class="desc">Saisissez ce que vous avez compté : mouvements et tonnes de chaque camion.</div>
+    <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._ptDate=this.value;renderPointage()">
+    <div class="msg ${done === r.rows.length && r.rows.length ? 'ok' : 'err'}" style="margin-top:10px">${done} / ${r.rows.length} camions comptés</div></div>
+    <div class="panel">${r.rows.map((x) => `<div class="drv-row" style="flex-wrap:wrap;gap:8px;align-items:center"><span style="min-width:150px"><b>${esc(x.vehicle)}</b> ${x.pointer ? '<span class="badge ok">Compté</span>' : '<span class="badge warn">À compter</span>'}${x.locked ? ' <span class="badge info">🔒 Validé</span>' : ''}</span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap"><input id="pc-m-${esc(x.vehicleId)}" type="number" inputmode="numeric" min="0" placeholder="Mouvements" value="${x.pointer ? x.pointer.movements : ''}" style="width:120px;min-height:44px" ${x.locked ? 'disabled' : ''}><input id="pc-t-${esc(x.vehicleId)}" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Tonnes" value="${x.pointer ? x.pointer.tons : ''}" style="width:100px;min-height:44px" ${x.locked ? 'disabled' : ''}>
+      <button class="btn small gold" style="min-height:44px" ${x.locked ? 'disabled' : ''} onclick="ptCount('${esc(x.vehicleId)}')">${x.pointer ? 'Corriger' : 'Enregistrer'}</button></span></div>`).join('') || '<div class="empty">Aucun camion.</div>'}<div id="pc-msg"></div></div>`;
+}
+async function ptCount(vehicleId) {
+  const date = window._ptDate || new Date().toISOString().slice(0, 10), prev = (window._ptCount || {})[vehicleId] && window._ptCount[vehicleId].pointer;
+  const m = document.getElementById('pc-m-' + vehicleId).value, t = document.getElementById('pc-t-' + vehicleId).value;
+  const msg = document.getElementById('pc-msg');
+  if (m === '' || t === '' || isNaN(Number(m)) || isNaN(Number(t))) { msg.innerHTML = '<div class="msg err">Saisissez les mouvements et les tonnes.</div>'; return; }
+  const body = { vehicleId, day: date, movements: Math.round(Number(m)), tons: Number(t) };
+  if (prev) { if (prev.movements === body.movements && prev.tons === body.tons) return; const c = prompt('Comptage déjà saisi. Motif de la correction :', ''); if (!c || c.trim().length < 3) return; body.correctionReason = c.trim(); }
+  try { await api('/pointer/count?siteId=' + encodeURIComponent(state.siteId || ''), { method: 'POST', body }); renderPointage(); } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function ptMark(driverId, status) {
   const date = window._ptDate || new Date().toISOString().slice(0, 10), prev = (window._ptAtt || {})[driverId];

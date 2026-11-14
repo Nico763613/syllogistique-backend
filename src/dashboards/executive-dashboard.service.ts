@@ -58,7 +58,7 @@ export class ExecutiveDashboardService {
     const vc = (s: string) => vehicles.find((v) => v.status === s)?._count ?? 0;
     const vTotal = vehicles.reduce((a, v) => a + v._count, 0);
     const att = (s: string) => attToday.find((a) => a.status === s)?._count ?? 0;
-    const present = att('PRESENT');
+    const present = att('PRESENT') + att('LATE'); // un retard compte comme présent
     const attTotal = attToday.reduce((a, x) => a + x._count, 0);
 
     const byMonth: Array<{ key: string; label: string; total: number; completed: number }> = [];
