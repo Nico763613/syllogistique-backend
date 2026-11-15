@@ -10,6 +10,7 @@ const { makePool, migrate } = require('./db');
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
 const IDLE_MIN = 15; // déconnexion automatique après 15 minutes d'inactivité
+const MASTER_URL = (process.env.RENDER_EXTERNAL_URL || 'https://syllogistique-master.onrender.com').replace(/\/$/, '');
 const PUB = {};
 for (const f of ['manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'icon-512-maskable.png', 'logo-syl.png']) PUB['/' + f] = fs.readFileSync(path.join(__dirname, 'public', f));
 const PUB_TYPE = { '.json': 'application/manifest+json', '.js': 'application/javascript; charset=utf-8', '.png': 'image/png' };
@@ -57,7 +58,7 @@ function createApp(pool, cfg) {
     res.end(out);
   }
   const cookie = (val, maxAge) => `${COOKIE}=${val}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
-  const readBody = (req) => new Promise((ok, ko) => { let d = ''; req.on('data', (c) => { d += c; if (d.length > 20000) { ko(new Error('trop gros')); req.destroy(); } }); req.on('end', () => { try { ok(d ? JSON.parse(d) : {}); } catch (e) { ko(e); } }); });
+  const readBody = (req, max = 20000) => new Promise((ok, ko) => { let d = ''; req.on('data', (c) => { d += c; if (d.length > max) { ko(new Error('trop gros')); req.destroy(); } }); req.on('end', () => { try { ok(d ? JSON.parse(d) : {}); } catch (e) { ko(e); } }); });
   function session(req) {
     const m = /(?:^|;\s*)master_session=([^;]+)/.exec(req.headers.cookie || '');
     return m ? auth.readSession(m[1], secret) : null;
@@ -73,7 +74,7 @@ function createApp(pool, cfg) {
   async function licenseToken(l, c) {
     const { privateKey } = await keys();
     const st = lic.effectiveStatus(l);
-    return lic.signToken({ lid: Number(l.id), cid: Number(c.id), status: st, plan: l.plan, maxDevices: l.max_devices, modules: String(l.modules || '').split(',').filter(Boolean), permanent: l.permanent, expiresAt: l.expires_at || null,
+    return lic.signToken({ lid: Number(l.id), cid: Number(c.id), status: st, plan: l.plan, maxDevices: l.max_devices, modules: String(l.modules || '').split(',').filter(Boolean), paid: l.payment_confirmed !== false, permanent: l.permanent, expiresAt: l.expires_at || null,
       iid: l.instance_id, brand: { name: c.name, logoUrl: (l.payment_confirmed !== false && c.logo_url) || null, color: c.brand_color || null }, iat: Date.now(), exp: Date.now() + 24 * 3600 * 1000 }, privateKey);
   }
   async function handleV1(req, res, p) {
@@ -129,6 +130,14 @@ function createApp(pool, cfg) {
     if (req.method === 'GET' && p === '/health') return send(res, 200, { ok: true });
     if (req.method === 'GET' && (p === '/' || p === '/index.html')) return send(res, 200, UI);
     if (req.method === 'GET' && PUB[p]) return sendFile(res, p, PUB[p]);
+    const lm = req.method === 'GET' && /^\/logo\/(\d+)\.png$/.exec(p);
+    if (lm) {
+      const lr = (await pool.query('select data from master_client_logos where client_id=$1', [Number(lm[1])])).rows[0];
+      const mm = lr && /^data:(image\/(?:png|jpeg));base64,(.+)$/.exec(lr.data);
+      if (!mm) return send(res, 404, { error: 'Introuvable' });
+      res.writeHead(200, { 'content-type': mm[1], 'cache-control': 'public, max-age=3600', 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'cross-origin' });
+      return res.end(Buffer.from(mm[2], 'base64'));
+    }
     if (p.startsWith('/v1/')) return handleV1(req, res, p);
     if (!p.startsWith('/api/')) return send(res, 404, { error: 'Introuvable' });
 
@@ -138,7 +147,7 @@ function createApp(pool, cfg) {
       if (req.headers['x-requested-with'] !== 'master' || (o && new URL(o).host !== req.headers.host)) return send(res, 403, { error: 'Requête refusée.' });
     }
     const s = session(req);
-    const body = req.method === 'POST' ? await readBody(req) : {};
+    const body = req.method === 'POST' ? await readBody(req, /\/logo$/.test(p) ? 300000 : 20000) : {};
 
     if (req.method === 'POST' && p === '/api/login') {
       if (tooMany(req)) return send(res, 429, { error: 'Trop de tentatives. Réessayez dans 15 minutes.' });
@@ -234,9 +243,23 @@ function createApp(pool, cfg) {
     let m;
     if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)$/.exec(p))) {
       const f = clientFields(body); if (!f[0]) return send(res, 400, { error: 'Le nom du client est obligatoire.' });
-      const r = await pool.query('update master_clients set name=$2, contact_name=$3, email=$4, phone=$5, country=$6, brand_color=$7, logo_url=$8, notes=$9 where id=$1 returning id', [Number(m[1]), ...f]);
+      const r = await pool.query('update master_clients set name=$2, contact_name=$3, email=$4, phone=$5, country=$6, brand_color=$7, notes=$8 where id=$1 returning id', [Number(m[1]), f[0], f[1], f[2], f[3], f[4], f[5], f[7]]);
       if (!r.rows.length) return send(res, 404, { error: 'Client introuvable.' });
       await audit(s.aid, 'CLIENT_MODIFIE', f[0], req); return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/logo$/.exec(p))) {
+      const cid = Number(m[1]), ex = (await pool.query('select name from master_clients where id=$1', [cid])).rows[0];
+      if (!ex) return send(res, 404, { error: 'Client introuvable.' });
+      const d = String(body.dataUrl || '');
+      if (!d) {
+        await pool.query('delete from master_client_logos where client_id=$1', [cid]);
+        await pool.query('update master_clients set logo_url=null where id=$1', [cid]);
+        await audit(s.aid, 'LOGO_RETIRE', ex.name, req); return send(res, 200, { ok: true });
+      }
+      if (!/^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*$/.test(d) || d.length > 200000) return send(res, 400, { error: 'Logo invalide : PNG ou JPEG, 150 Ko maximum.' });
+      await pool.query('insert into master_client_logos(client_id, data) values ($1,$2) on conflict (client_id) do update set data=$2, updated_at=now()', [cid, d]);
+      await pool.query('update master_clients set logo_url=$2 where id=$1', [cid, MASTER_URL + '/logo/' + cid + '.png?v=' + Date.now()]);
+      await audit(s.aid, 'LOGO_ENVOYE', ex.name, req); return send(res, 200, { ok: true });
     }
     if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/licenses$/.exec(p))) {
       const cl = (await pool.query('select * from master_clients where id=$1', [Number(m[1])])).rows[0]; if (!cl) return send(res, 404, { error: 'Client introuvable.' });

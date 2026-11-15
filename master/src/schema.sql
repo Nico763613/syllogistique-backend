@@ -83,3 +83,6 @@ alter table master_licenses add column if not exists modules text not null defau
 
 -- Paiement confirmé : le logo personnalisé du client n'est transmis qu'après confirmation (licences existantes = confirmé)
 alter table master_licenses add column if not exists payment_confirmed boolean not null default true;
+
+-- Logo du client envoyé depuis le Master (image réduite, servie publiquement sous /logo/<id>.png)
+create table if not exists master_client_logos (client_id bigint primary key references master_clients(id) on delete cascade, data text not null, updated_at timestamptz not null default now());

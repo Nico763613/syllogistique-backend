@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BrandingController } from './branding.controller';
+import { LicenseModule } from '../license/license.module';
 
-@Module({ controllers: [BrandingController] })
+@Module({ imports: [LicenseModule], controllers: [BrandingController] })
 export class BrandingModule {}
