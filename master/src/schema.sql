@@ -80,3 +80,6 @@ create table if not exists master_devices (
 
 -- Modules activés par licence (liste séparée par des virgules ; COMMERCIAL = Caisse et Ventes)
 alter table master_licenses add column if not exists modules text not null default 'COMMERCIAL';
+
+-- Paiement confirmé : le logo personnalisé du client n'est transmis qu'après confirmation (licences existantes = confirmé)
+alter table master_licenses add column if not exists payment_confirmed boolean not null default true;
