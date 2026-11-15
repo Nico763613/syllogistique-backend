@@ -4259,7 +4259,12 @@ function brandApply() {
   if (BRAND.brandColor) document.documentElement.style.setProperty('--navy', BRAND.brandColor);
   const logo = BRAND.logoUrl ? `<img src="${esc(brandSrc(BRAND.logoUrl))}" alt="" style="height:44px;max-width:120px;object-fit:contain;vertical-align:middle">` : '';
   const lb = document.querySelector('.login-brand .brand'); if (lb) lb.textContent = n;
-  const lt = document.querySelector('.login-truck'); if (lt) lt.innerHTML = logo || '🚚';
+  const isDefault = !BRAND.logoUrl && (!BRAND.name || ['SYLLOGISTIQUE', 'SYL LOGISTIQUE'].includes(BRAND.name));
+  if (isDefault) {
+    const ml = document.querySelector('.lg-mobile-logo'); if (ml) ml.innerHTML = '<img src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:84px;max-width:100%;display:block;margin:0 auto">';
+    const sl = document.querySelector('.lg-logo'); if (sl) sl.innerHTML = '<span style="display:inline-block;background:#fff;border-radius:16px;padding:8px 14px"><img src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:84px;display:block"></span>';
+  }
+  const lt = document.querySelector('.login-truck'); if (lt) lt.innerHTML = logo || (isDefault ? '<span style="display:inline-block;background:#fff;border-radius:16px;padding:8px 14px"><img src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:96px;max-width:100%;display:block"></span>' : '🚚');
   const custom = !!(BRAND.logoUrl || (BRAND.name && !['SYLLOGISTIQUE','SYL LOGISTIQUE'].includes(BRAND.name)));
   const sb = document.querySelector('.brand-block .brand'); if (sb) sb.textContent = custom ? n : 'SYL LOGISTIQUE';
   if (custom) { const lg = document.querySelector('.brand-block svg'); if (lg && logo) lg.outerHTML = logo.replace('height:44px', 'height:38px'); const ll = document.querySelector('.lg-logo b'); if (ll) ll.textContent = n; }

@@ -25,7 +25,8 @@ export class SalesDocumentsService {
 
   async invoicePdf(invoiceId: string, orgName = 'SYL LOGISTIQUE'): Promise<Buffer> {
     const org = await this.prisma.organization.findFirst({ orderBy: { createdAt: 'asc' }, select: { name: true, logoUrl: true } });
-    const logo = await this.loadLogo(org?.logoUrl);
+    // Sans logo propre au client : logo SYL LOGISTIQUE par défaut
+    const logo = (await this.loadLogo(org?.logoUrl)) ?? (await readFile(join(__dirname, '..', '..', 'public', 'logo-syl.png')).catch(() => null));
     if (org?.name) orgName = org.name;
     const invoice = await this.prisma.salesInvoice.findUnique({
       where: { id: invoiceId },
