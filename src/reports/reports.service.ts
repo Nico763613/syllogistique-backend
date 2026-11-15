@@ -58,6 +58,49 @@ export class ReportsService {
     };
   }
 
+  // Récapitulatif automatique kilométrage + carburant par véhicule et par semaine (lundi → dimanche).
+  // Camions et véhicules de service sont toujours séparés (kind). Sources : missions terminées
+  // (distance = km fin − km départ) et ravitaillements enregistrés. Les valeurs incohérentes
+  // (distance négative ou > 2 000 km sur une mission) sont exclues du total et comptées à part.
+  async fleetRecap(siteId: string, kind: string, from?: string, to?: string) {
+    const vtype = kind === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE';
+    const mondayOf = (d: Date) => { const m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); m.setUTCDate(m.getUTCDate() - ((m.getUTCDay() + 6) % 7)); return m; };
+    const today = new Date();
+    const toDate = to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? new Date(`${to}T00:00:00.000Z`) : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const fromDate = from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? new Date(`${from}T00:00:00.000Z`) : (() => { const d = mondayOf(toDate); d.setUTCDate(d.getUTCDate() - 7 * 7); return d; })();
+    if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate) throw new BadRequestException('Période invalide.');
+    if (toDate.getTime() - fromDate.getTime() > 366 * 86400000) throw new BadRequestException('Période limitée à 12 mois.');
+    const end = new Date(toDate); end.setUTCDate(end.getUTCDate() + 1);
+
+    const weeks: string[] = [];
+    for (let w = mondayOf(fromDate); w <= toDate; w = new Date(w.getTime() + 7 * 86400000)) weeks.push(w.toISOString().slice(0, 10));
+
+    const [vehicles, trips, fuel] = await Promise.all([
+      this.prisma.vehicle.findMany({ where: { siteId, vehicleType: vtype as any, deletedAt: null }, select: { id: true, internalNumber: true, registrationNumber: true, brand: true, model: true, currentMileage: true }, orderBy: { internalNumber: 'asc' } }),
+      this.prisma.trip.findMany({ where: { siteId, vehicle: { vehicleType: vtype as any }, tripDate: { gte: fromDate, lt: end }, status: 'COMPLETED' }, select: { vehicleId: true, tripDate: true, distance: true, startMileage: true, endMileage: true } }),
+      this.prisma.fuelTransaction.findMany({ where: { siteId, vehicle: { vehicleType: vtype as any }, transactionDate: { gte: fromDate, lt: end } }, select: { vehicleId: true, quantityLiters: true, totalCost: true } }),
+    ]);
+
+    const rows = new Map<string, any>();
+    vehicles.forEach((v) => rows.set(v.id, { id: v.id, number: v.internalNumber, registration: v.registrationNumber, label: [v.brand, v.model].filter(Boolean).join(' '), weeks: Object.fromEntries(weeks.map((w) => [w, 0])), totalKm: 0, liters: 0, cost: 0, trips: 0, odometer: v.currentMileage }));
+    let anomalies = 0, missing = 0;
+    for (const t of trips) {
+      const r = rows.get(t.vehicleId); if (!r) continue;
+      let d = t.distance;
+      if (d == null && t.endMileage != null) d = t.endMileage - t.startMileage;
+      if (d == null) { missing++; continue; }
+      if (d < 0 || d > 2000) { anomalies++; continue; }
+      const wk = mondayOf(t.tripDate).toISOString().slice(0, 10);
+      if (wk in r.weeks) r.weeks[wk] += d;
+      r.totalKm += d; r.trips++;
+    }
+    for (const f of fuel) { const r = rows.get(f.vehicleId); if (!r) continue; r.liters += Number(f.quantityLiters); r.cost += Number(f.totalCost); }
+    const list = [...rows.values()].map((r) => ({ ...r, liters: Math.round(r.liters * 10) / 10, cost: Math.round(r.cost), l100: r.totalKm > 0 && r.liters > 0 ? Math.round((r.liters / r.totalKm) * 1000) / 10 : null }));
+    const total = { weeks: Object.fromEntries(weeks.map((w) => [w, list.reduce((a, r) => a + r.weeks[w], 0)])), totalKm: list.reduce((a, r) => a + r.totalKm, 0), liters: Math.round(list.reduce((a, r) => a + r.liters, 0) * 10) / 10, cost: list.reduce((a, r) => a + r.cost, 0), trips: list.reduce((a, r) => a + r.trips, 0), l100: null as number | null };
+    if (total.totalKm > 0 && total.liters > 0) total.l100 = Math.round((total.liters / total.totalKm) * 1000) / 10;
+    return { kind: vtype, from: fromDate.toISOString().slice(0, 10), to: toDate.toISOString().slice(0, 10), weeks, vehicles: list, total, quality: { inconsistentTrips: anomalies, tripsWithoutKm: missing } };
+  }
+
   async periodReport(siteId: string, from: string, to: string) {
     const fromDate = new Date(from);
     const toDate = new Date(to);
