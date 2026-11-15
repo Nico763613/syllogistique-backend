@@ -99,6 +99,11 @@
     body.side-min .nav-section-label, body.side-min .nav-sub-label{padding:6px 0; height:6px; overflow:hidden;}
     body.side-min #side-collapse{margin:8px auto 0; font-size:12px;}
   }
+  .nav-section-label.fold{cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none;}
+  .nav-section-label.fold:hover{color:#fff;}
+  .nav-section-label .arr{font-size:10px; transition:transform .15s; opacity:.8;}
+  .nav-section-label.closed .arr{transform:rotate(-90deg);}
+  .nav-folded,.nav-empty{display:none !important;}
   #gs-wrap{position:relative; flex:0 1 320px; min-width:150px; margin-right:8px;}
   #gs-input{width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--line); border-radius:10px; font-size:13px; background:#F5F7FA;}
   #gs-panel{display:none; position:absolute; left:0; top:38px; width:min(420px,92vw); max-height:65vh; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); z-index:60; padding:6px;}
@@ -762,6 +767,7 @@ function go(view, noPush) {
   goBackBtn();
   if (typeof spaceApply === 'function') spaceApply();
   document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === navKey(view)));
+  if (typeof navOpenActive === 'function') navOpenActive();
   document.getElementById('view-title').textContent = titles[view];
   document.getElementById('sidebar').classList.remove('open');
   renderView(view);
@@ -1238,6 +1244,42 @@ function moduleOn(m) {
   if (L === undefined) { try { L = JSON.parse(localStorage.getItem('syllo_modules') || 'null'); } catch (e) { L = null; } }
   return !Array.isArray(L) || L.includes(m);
 }
+/* ---------------- Menu en dossiers dépliables (étape 1) ---------------- */
+function navFolderItems(lbl) { const out = []; let n = lbl.nextElementSibling; while (n && !n.classList.contains('nav-section-label') && !n.classList.contains('sidebar-footer')) { if (n.classList.contains('nav-item') || n.classList.contains('nav-sub-label')) out.push(n); n = n.nextElementSibling; } return out; }
+function navFoldKey(lbl) { return (lbl.textContent || '').replace(/[▾▸]/g, '').trim(); }
+function navFoldSet(lbl, closed, save) {
+  lbl.classList.toggle('closed', closed);
+  navFolderItems(lbl).forEach((el) => el.classList.toggle('nav-folded', closed));
+  if (save) { try { const m = JSON.parse(localStorage.getItem('syl_folds') || '{}'); m[navFoldKey(lbl)] = closed ? 1 : 0; localStorage.setItem('syl_folds', JSON.stringify(m)); } catch (e) {} }
+}
+function navFoldersInit() {
+  let m = {}; try { m = JSON.parse(localStorage.getItem('syl_folds') || '{}'); } catch (e) {}
+  document.querySelectorAll('#sidebar .nav-section-label').forEach((lbl) => {
+    if (!lbl.classList.contains('fold')) {
+      lbl.classList.add('fold'); lbl.setAttribute('role', 'button'); lbl.tabIndex = 0;
+      lbl.innerHTML = '<span>' + lbl.innerHTML + '</span><span class="arr">▾</span>';
+      const t = () => navFoldSet(lbl, !lbl.classList.contains('closed'), true);
+      lbl.addEventListener('click', t);
+      lbl.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); t(); } });
+    }
+    if (m[navFoldKey(lbl)]) navFoldSet(lbl, true, false);
+  });
+  navFoldersRefresh();
+}
+function navFoldersRefresh() {
+  document.querySelectorAll('#sidebar .nav-section-label.fold').forEach((lbl) => {
+    const items = navFolderItems(lbl).filter((el) => el.classList.contains('nav-item'));
+    const any = items.some((el) => el.style.display !== 'none');
+    lbl.classList.toggle('nav-empty', !any);
+  });
+}
+function navOpenActive() {
+  const a = document.querySelector('#sidebar .nav-item.active'); if (!a) return;
+  let n = a.previousElementSibling; while (n && !n.classList.contains('nav-section-label')) n = n.previousElementSibling;
+  if (n && n.classList.contains('closed')) navFoldSet(n, false, false);
+}
+document.addEventListener('DOMContentLoaded', navFoldersInit);
+
 /* ---------------- SOCLE v2 : menu réductible + recherche globale ---------------- */
 function sideToggle() { const on = document.body.classList.toggle('side-min'); try { localStorage.setItem('syl_side_min', on ? '1' : '0'); } catch (e) {} }
 try { if (localStorage.getItem('syl_side_min') === '1') document.body.classList.add('side-min'); } catch (e) {}
@@ -1289,6 +1331,7 @@ function applyRoleNav() {
   extra.forEach((v) => { const el = document.querySelector('#sidebar .nav-item[data-view="' + v + '"]'); if (el) el.style.display = ''; });
   const lbl = document.getElementById('nav-dept-label');
   if (lbl) lbl.style.display = any ? '' : 'none';
+  if (typeof navFoldersRefresh === 'function') navFoldersRefresh();
 }
 
 /* ---------------- DASHBOARD ---------------- */
