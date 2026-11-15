@@ -4309,23 +4309,36 @@ function brandPanel() {
     <div class="desc">Le nom, le logo et la couleur de votre entreprise apparaissent sur l'écran de connexion et dans l'espace de chaque utilisateur.</div>
     <label>Nom de l'entreprise</label><input id="b-name" value="${esc(BRAND.name || '')}">
     <label>Couleur principale</label><input id="b-color" type="color" value="${esc(BRAND.brandColor || '#163A5F')}" style="height:44px;padding:2px">
-    <label>Logo (PNG, JPG ou WebP)</label><input id="b-logo" type="file" accept="image/png,image/jpeg,image/webp">
+    <label>Logo (PNG ou JPG)</label>${window.LIC_PAID === false ? '<div class="msg">Disponible après confirmation du paiement de votre licence. Vous pouvez aussi demander à SYL LOGISTIQUE de l\'ajouter pour vous.</div>' : '<input id="b-logo" type="file" accept="image/png,image/jpeg">'}
     ${BRAND.logoUrl ? `<div style="margin:8px 0"><img src="${esc(brandSrc(BRAND.logoUrl))}" style="height:56px"> <a href="#" onclick="brandSave(true);return false;">retirer le logo</a></div>` : ''}
     <button class="btn gold" onclick="brandSave()">Enregistrer</button><div id="b-msg"></div>`;
   root().appendChild(p);
+}
+// Logo réduit puis enregistré dans la base de l'entreprise (durable, ne dépend d'aucun fichier du serveur)
+function brandLogoData(file) {
+  return new Promise((ok, ko) => {
+    const r = new FileReader(); r.onerror = () => ko(new Error('Fichier illisible.'));
+    r.onload = () => {
+      const im = new Image(); im.onerror = () => ko(new Error('Image non reconnue (PNG ou JPG).'));
+      im.onload = () => {
+        const k = Math.min(1, 360 / im.width), w = Math.round(im.width * k), h = Math.round(im.height * k);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const cx = cv.getContext('2d'); cx.drawImage(im, 0, 0, w, h);
+        let out = cv.toDataURL('image/png');
+        if (out.length > 90000) { cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); cx.drawImage(im, 0, 0, w, h); out = cv.toDataURL('image/jpeg', 0.8); }
+        out.length > 90000 ? ko(new Error('Logo trop lourd : choisissez une image plus simple.')) : ok(out);
+      };
+      im.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
 }
 async function brandSave(removeLogo) {
   const m = document.getElementById('b-msg');
   try {
     const body = { name: document.getElementById('b-name').value.trim(), brandColor: document.getElementById('b-color').value };
-    const f = document.getElementById('b-logo').files[0];
+    const lf = document.getElementById('b-logo'), f = lf && lf.files[0];
     if (removeLogo) body.logoUrl = '';
-    else if (f) {
-      const fd = new FormData(); fd.append('file', f, f.name);
-      const res = await fetch(state.apiUrl.replace(/\/$/, '') + '/uploads?category=logo', { method: 'POST', headers: { Authorization: 'Bearer ' + state.accessToken }, body: fd });
-      if (!res.ok) throw new Error('Logo refusé (PNG, JPG ou WebP, 15 Mo max).');
-      body.logoUrl = (await res.json()).url;
-    }
+    else if (f) body.logoUrl = await brandLogoData(f);
     const r = await api('/branding', { method: 'PATCH', body });
     Object.assign(BRAND, r); localStorage.setItem('syllo_brand', JSON.stringify(BRAND)); brandApply();
     m.innerHTML = '<div class="msg ok">Personnalisation enregistrée.</div>';
@@ -5084,7 +5097,7 @@ async function licLoad() {
     const base = (document.getElementById('api-url') ? document.getElementById('api-url').value : '') || localStorage.getItem('syllo_api_url') || '';
     if (!base) return;
     const r = await fetch(base.replace(/\/$/, '') + '/license/status'); if (!r.ok) return;
-    const j = await r.json(); window.LIC_MODULES = j.modules || null; try { localStorage.setItem('syllo_modules', JSON.stringify(j.modules || null)); } catch (e) {} if (typeof applyRoleNav === 'function' && state.user) applyRoleNav(); if (!j.enforced) return;
+    const j = await r.json(); window.LIC_MODULES = j.modules || null; window.LIC_PAID = j.paid !== false; try { localStorage.setItem('syllo_modules', JSON.stringify(j.modules || null)); } catch (e) {} if (typeof applyRoleNav === 'function' && state.user) applyRoleNav(); if (!j.enforced) return;
     if (j.state === 'UNACTIVATED' || j.state === 'BLOCKED') licScreen(j.state, j.message);
     else if (j.state === 'WARNING') {
       const b = document.createElement('div'); b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#E0A72E;color:#1b1b1b;padding:8px 12px;font-size:13px;text-align:center';

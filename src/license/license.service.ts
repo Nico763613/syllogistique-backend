@@ -82,10 +82,38 @@ export class LicenseService implements OnModuleInit {
     // Personnalisation : nom, logo et couleur du client (modifiables ensuite par l'administrateur).
     const o = await this.org();
     if (o && payload.brand) {
-      await this.prisma.organization.update({ where: { id: o.id }, data: { name: payload.brand.name || o.name, logoUrl: payload.brand.logoUrl ?? o.logoUrl, brandColor: payload.brand.color ?? o.brandColor } });
+      await this.prisma.organization.update({ where: { id: o.id }, data: { name: payload.brand.name || o.name, brandColor: payload.brand.color ?? o.brandColor } });
+      await this.syncBrandLogo(payload);
     }
     this.log.log('Installation activée.');
     return this.state();
+  }
+
+  // Logo envoyé depuis le Master : copié dans la base de l'entreprise (indépendant de la disponibilité du Master)
+  private lastMasterLogo = '';
+  private async syncBrandLogo(payload: any) {
+    const src: string | undefined = payload?.brand?.logoUrl;
+    if (!src || !/^https?:\/\//i.test(src) || src === this.lastMasterLogo) return;
+    try {
+      const r = await fetch(src, { signal: AbortSignal.timeout(10000) });
+      const type = (r.headers.get('content-type') || '').split(';')[0];
+      if (!r.ok || !['image/png', 'image/jpeg'].includes(type)) return;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length > 200000) return;
+      const o = await this.org();
+      if (!o) return;
+      await this.prisma.organization.update({ where: { id: o.id }, data: { logoUrl: `data:${type};base64,${buf.toString('base64')}` } });
+      this.lastMasterLogo = src;
+    } catch { /* nouvel essai à la prochaine vérification */ }
+  }
+
+  // Paiement confirmé par le Master : condition pour que le client ajoute son propre logo
+  async paid(): Promise<boolean> {
+    if (!this.enforced) return true;
+    const d = await this.load();
+    if (!d.token || !d.publicKey) return true;
+    const p: any = verifyToken(d.token, d.publicKey);
+    return !p || p.paid !== false;
   }
 
   @Interval(3600000)
@@ -97,6 +125,7 @@ export class LicenseService implements OnModuleInit {
       const res = await this.post('/v1/check', { licenseId: d.licenseId, instanceKey: d.instanceKey, instanceId: d.instanceId, appVersion: process.env.APP_VERSION || '39' });
       if (res.status === 200 && verifyToken(res.json.token, d.publicKey || '')) {
         await this.save({ ...d, token: res.json.token, lastOkAt: Date.now(), invalid: false });
+        await this.syncBrandLogo(verifyToken(res.json.token, d.publicKey || ''));
       } else if (res.status === 401) {
         await this.save({ ...d, invalid: true });
       }

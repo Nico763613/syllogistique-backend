@@ -1,4 +1,5 @@
-import { Body, Controller, Get, NotFoundException, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, NotFoundException, Patch, UseGuards } from '@nestjs/common';
+import { LicenseService } from '../license/license.service';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
@@ -11,7 +12,7 @@ import { AuditService } from '../audit/audit.service';
 
 class UpdateBrandingDto {
   @IsOptional() @IsString() @MinLength(2) @MaxLength(80) name?: string;
-  @IsOptional() @IsString() @MaxLength(300) logoUrl?: string;
+  @IsOptional() @IsString() @MaxLength(200000) @Matches(/^(|data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+=*|\/uploads\/[\w.\-]+)$/, { message: 'Logo invalide (PNG ou JPEG).' }) logoUrl?: string;
   @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'Couleur invalide (ex. #163A5F).' }) brandColor?: string;
 }
 
@@ -20,7 +21,7 @@ class UpdateBrandingDto {
 @ApiTags('branding')
 @Controller('branding')
 export class BrandingController {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private lic: LicenseService) {}
 
   @Public()
   @Get()
@@ -34,6 +35,7 @@ export class BrandingController {
   @UseGuards(RolesGuard)
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   async update(@Body() dto: UpdateBrandingDto, @CurrentUser() user: any) {
+    if (dto.logoUrl !== undefined && !(await this.lic.paid())) throw new ForbiddenException('Le logo personnalisé sera disponible après confirmation du paiement de votre licence.');
     const org = await this.prisma.organization.findUnique({ where: { id: user.organizationId } });
     if (!org) throw new NotFoundException('Entreprise introuvable.');
     const logoUrl = dto.logoUrl === undefined ? undefined : dto.logoUrl === '' ? null : dto.logoUrl;

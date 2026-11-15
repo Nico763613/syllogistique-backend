@@ -14,6 +14,7 @@ export class SalesDocumentsService {
   private async loadLogo(url?: string | null): Promise<Buffer | null> {
     if (!url) return null;
     try {
+      if (url.startsWith('data:image/')) return Buffer.from(url.split(',')[1] || '', 'base64');
       if (url.startsWith('/uploads/')) return await readFile(join(__dirname, '..', '..', 'uploads', basename(url)));
       if (/^https?:\/\//i.test(url)) {
         const r = await fetch(url, { signal: AbortSignal.timeout(5000) });

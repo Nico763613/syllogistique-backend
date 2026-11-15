@@ -51,7 +51,7 @@ test('API : rien sans connexion, rejet des requêtes d\'un autre site', async ()
   const r2 = await fetch(base + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'master', origin: 'https://pirate.example' }, body: '{}' });
   assert.equal(r2.status, 403);
   assert.equal((await fetch(base + '/health')).status, 200);
-  const ui = await fetch(base + '/'); assert.match(await ui.text(), /SYLLOGISTIQUE/); assert.equal(ui.headers.get('cache-control'), 'no-store');
+  const ui = await fetch(base + '/'); assert.match(await ui.text(), /SYL MASTER ADMIN/); assert.equal(ui.headers.get('cache-control'), 'no-store');
 });
 
 test('parcours complet : mot de passe, activation 2FA, codes de secours, connexion avec code', async () => {
@@ -165,7 +165,7 @@ test('clients et licences : création, activation unique, jeton signé, suspensi
 // ---------- étape 3 : PWA, suppression, prolongation, appareils, export, réinitialisation ----------
 test('PWA : manifest, service worker, icônes', async () => {
   const m = await fetch(base + '/manifest.json'); const j = await m.json();
-  assert.equal(j.name, 'Syllogistique Master'); assert.equal(j.display, 'standalone'); assert.equal(j.theme_color, '#163A5F');
+  assert.equal(j.name, 'SYL MASTER ADMIN'); assert.equal(j.display, 'standalone'); assert.equal(j.theme_color, '#163A5F');
   assert.deepEqual(j.icons.map((i) => i.sizes).filter((v, i, a) => a.indexOf(v) === i), ['192x192', '512x512']);
   assert.equal((await fetch(base + '/sw.js')).headers.get('content-type').split(';')[0], 'application/javascript');
   for (const n of [192, 512]) { const r = await fetch(base + `/icon-${n}.png`); assert.equal(r.headers.get('content-type'), 'image/png'); assert.equal(Buffer.from(await r.arrayBuffer()).slice(1, 4).toString(), 'PNG'); }
