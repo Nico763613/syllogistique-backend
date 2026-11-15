@@ -11,7 +11,7 @@ const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
 const IDLE_MIN = 15; // déconnexion automatique après 15 minutes d'inactivité
 const PUB = {};
-for (const f of ['manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png']) PUB['/' + f] = fs.readFileSync(path.join(__dirname, 'public', f));
+for (const f of ['manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'icon-512-maskable.png', 'logo-syl.png']) PUB['/' + f] = fs.readFileSync(path.join(__dirname, 'public', f));
 const PUB_TYPE = { '.json': 'application/manifest+json', '.js': 'application/javascript; charset=utf-8', '.png': 'image/png' };
 const MAX_FAILS = 5, LOCK_MIN = 15;
 
