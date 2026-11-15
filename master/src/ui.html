@@ -7,8 +7,8 @@
 <meta name="theme-color" content="#0E2740">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon-192.png">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<title>SYLLOGISTIQUE MASTER</title>
+<link rel="apple-touch-icon" href="/icon-180.png">
+<title>SYL MASTER ADMIN</title>
 <style>
   :root{--navy:#163A5F;--navy-dark:#0E2740;--gold:#E0A72E;--bg:#F5F7FA;--text:#16233A;--muted:#6B7A8F;--line:#E4E9F0;--danger:#C0392B;--ok:#1E7B4B}
   *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--text);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -43,7 +43,7 @@
 </style>
 </head>
 <body>
-<header><div><b>SYLLOGISTIQUE</b><small>MASTER · accès privé</small></div><button id="out" class="ghost" style="display:none;margin:0;color:#fff;border-color:#3b5877" onclick="logout()">Déconnexion</button></header>
+<header><div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:8px;padding:3px 6px;display:inline-flex"><img src="/logo-syl.png" alt="SYL LOGISTIQUE" style="height:30px;display:block"></span><div><b>SYL MASTER ADMIN</b><small>Administration générale · accès privé</small></div></div><button id="out" class="ghost" style="display:none;margin:0;color:#fff;border-color:#3b5877" onclick="logout()">Déconnexion</button></header>
 <main id="v"></main>
 <div id="modal"></div>
 <script>
@@ -102,7 +102,7 @@ async function expired() { try { await api('/api/logout', {}); } catch (e) {} sh
 function showLogin(msg) {
   LOGGED = false; clearTimeout(idleT); closeModal();
   $('out').style.display = 'none';
-  v.innerHTML = `<div class="card"><h2>Connexion propriétaire</h2>
+  v.innerHTML = `<div class="card"><img src="/logo-syl.png" alt="SYL LOGISTIQUE" style="height:84px;display:block;margin:0 auto 6px"><h2 style="text-align:center">SYL MASTER ADMIN</h2><div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:6px">Connexion propriétaire</div>
     <label>E-mail</label><input id="em" type="email" autocomplete="username">
     <label>Mot de passe</label><input id="pw" type="password" autocomplete="current-password">
     <div class="err" id="err">${esc(msg || '')}</div><button onclick="doLogin()">Se connecter</button></div>`;

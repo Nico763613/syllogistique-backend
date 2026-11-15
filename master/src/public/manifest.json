@@ -1,6 +1,6 @@
 {
-  "name": "Syllogistique Master",
-  "short_name": "Master",
+  "name": "SYL MASTER ADMIN",
+  "short_name": "SYL MASTER",
   "description": "Tableau de bord privé SYLLOGISTIQUE : clients, licences, appareils",
   "start_url": "/",
   "scope": "/",
@@ -11,6 +11,6 @@
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

@@ -404,6 +404,7 @@
       <div class="topbar">
         <div style="display:flex; align-items:center;">
           <div class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</div>
+          <img id="top-logo" src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:30px;margin-right:8px;border-radius:6px;flex:none"><span id="space-label" style="display:none;font-size:10px;font-weight:700;letter-spacing:.5px;color:#fff;background:var(--navy);border-radius:10px;padding:3px 8px;margin-right:8px;white-space:nowrap"></span>
           <button id="back-btn" class="btn-ghost" style="display:none; font-size:20px; padding:2px 10px; margin-right:6px;" onclick="goBack()" aria-label="Retour">←</button>
           <h2 id="view-title">Tableau de bord</h2>
         </div>
@@ -435,7 +436,7 @@
 <!-- ============ APPLICATION CHAUFFEUR ============ -->
 <div id="driver-app">
   <div class="drv-head">
-    <div style="display:flex;align-items:center;gap:10px"><div class="av" data-avatar="36" onclick="openPhotoEditor()" title="Ma photo"></div><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
+    <div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:8px;padding:3px 6px;display:inline-flex;flex:none"><img id="drv-logo" src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:26px;display:block"></span><div class="av" data-avatar="36" onclick="openPhotoEditor()" title="Ma photo"></div><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
     <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil">👤</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
@@ -736,6 +737,7 @@ function go(view, noPush) {
   if (!noPush && state.view && state.view !== view) { state.hist.push(state.view); if (state.hist.length > 30) state.hist.shift(); try { history.pushState({ off: 1 }, ''); } catch (e) {} }
   state.view = view;
   goBackBtn();
+  if (typeof spaceApply === 'function') spaceApply();
   document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === navKey(view)));
   document.getElementById('view-title').textContent = titles[view];
   document.getElementById('sidebar').classList.remove('open');
@@ -4268,7 +4270,25 @@ function brandApply() {
   const custom = !!(BRAND.logoUrl || (BRAND.name && !['SYLLOGISTIQUE','SYL LOGISTIQUE'].includes(BRAND.name)));
   const sb = document.querySelector('.brand-block .brand'); if (sb) sb.textContent = custom ? n : 'SYL LOGISTIQUE';
   if (custom) { const lg = document.querySelector('.brand-block svg'); if (lg && logo) lg.outerHTML = logo.replace('height:44px', 'height:38px'); const ll = document.querySelector('.lg-logo b'); if (ll) ll.textContent = n; }
-  const ds = document.getElementById('drv-sub'); if (ds && !ds.dataset.k) ds.textContent = n;
+  const ds = document.getElementById('drv-sub'); if (ds && !ds.dataset.k) ds.textContent = isDefault ? 'SYL DRIVER' : n;
+  if (!custom) { const lg = document.querySelector('.brand-block svg'); if (lg) lg.outerHTML = '<span style="background:#fff;border-radius:10px;padding:4px 8px;display:inline-flex;flex:none"><img src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:34px;display:block"></span>'; }
+  spaceApply();
+}
+
+// Espace affiché à côté du logo (le logo ne change jamais, seule la mention varie)
+function spaceName() {
+  const r = state.user && state.user.role, v = state.view || '';
+  if (r === 'CHAUFFEUR') return 'SYL DRIVER';
+  if (r === 'DIRECTEUR_GENERAL' || v === 'dashboard' || /^dash-/.test(v)) return 'SYL DASHBOARD';
+  if (r === 'GESTIONNAIRE_FLOTTE' || ['vehicles', 'trucks', 'service-vehicles', 'drivers', 'fuel', 'maintenance', 'atelier', 'driver-devices', 'driver-sheets', 'driver-board', 'driver-missions'].includes(v)) return 'SYL FLEET';
+  return 'SYL LOGISTIQUE';
+}
+function spaceApply() {
+  const isDef = !BRAND.logoUrl && (!BRAND.name || ['SYLLOGISTIQUE', 'SYL LOGISTIQUE'].includes(BRAND.name));
+  const src = BRAND.logoUrl ? brandSrc(BRAND.logoUrl) : 'logo-syl.png';
+  ['top-logo', 'drv-logo'].forEach((id) => { const el = document.getElementById(id); if (el && el.getAttribute('src') !== src) el.setAttribute('src', src); });
+  const el = document.getElementById('space-label');
+  if (el) { const nme = spaceName(); el.textContent = nme; el.style.display = isDef && nme !== 'SYL LOGISTIQUE' ? 'inline-block' : 'none'; }
 }
 async function brandLoad() {
   brandApply();
