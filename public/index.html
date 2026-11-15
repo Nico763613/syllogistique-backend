@@ -2711,8 +2711,37 @@ async function renderKindReports(kind) {
       <label>Jour</label><input id="d-date" type="date" value="${esc(today)}" onchange="window._krDate=this.value;loadDaily();krLoad()" style="max-width:220px">
       <div id="kr-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
     <div id="kr-list"><div class="empty">Chargement…</div></div>
+    <div class="panel" id="fr-panel"><h3>📈 Kilométrage &amp; carburant — récapitulatif automatique</h3>
+      <div class="desc">Calculé à partir des missions terminées et des ravitaillements enregistrés. Les relevés incohérents sont exclus du total et signalés.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="fr-per" onchange="frLoad()" style="max-width:240px"><option value="4">4 dernières semaines</option><option value="8" selected>8 dernières semaines</option><option value="12">12 dernières semaines</option><option value="m">Mois en cours</option></select><button class="btn small" style="margin:0" onclick="frCsv()">⬇ Exporter (Excel/CSV)</button></div>
+      <div id="fr-body"><div class="empty">Chargement…</div></div></div>
     <div class="panel"><h3>📋 Rapport global du jour</h3><div id="d-body"><div class="empty">Chargement…</div></div></div>`;
-  loadDaily(); krLoad();
+  loadDaily(); krLoad(); frLoad();
+}
+/* Récapitulatif kilométrage + carburant (étape 2) */
+async function frLoad() {
+  const box = document.getElementById('fr-body'); if (!box) return;
+  const per = (document.getElementById('fr-per') || {}).value || '8', now = new Date();
+  const iso = (d) => d.toISOString().slice(0, 10);
+  let from;
+  if (per === 'm') from = iso(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)));
+  else { const m = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())); m.setUTCDate(m.getUTCDate() - ((m.getUTCDay() + 6) % 7) - 7 * (Number(per) - 1)); from = iso(m); }
+  try {
+    const r = await api('/reports/fleet-recap?kind=' + (window._krKind || 'TRUCK') + '&from=' + from + '&to=' + iso(now) + '&siteId=' + state.siteId);
+    window._frData = r;
+    const wl = (w) => 'S ' + w.slice(8, 10) + '/' + w.slice(5, 7);
+    const q = r.quality || {};
+    const warn = (q.inconsistentTrips || q.tripsWithoutKm) ? `<div class="msg" style="margin:6px 0;background:#FFF6E0;color:#8A5A00">⚠ Contrôle nécessaire : ${q.inconsistentTrips || 0} mission(s) avec distance incohérente (exclues) et ${q.tripsWithoutKm || 0} sans kilométrage.</div>` : '';
+    const rowH = (x, tot) => `<tr${tot ? ' style="font-weight:700;background:#F0F4FA"' : ''}><td>${tot ? 'TOTAL FLOTTE' : esc(x.number) + (x.registration ? '<br><small>' + esc(x.registration) + '</small>' : '')}</td>${r.weeks.map((w) => `<td style="text-align:right">${fmt(x.weeks[w])}</td>`).join('')}<td style="text-align:right"><b>${fmt(x.totalKm)}</b></td><td style="text-align:right">${fmt(x.liters)}</td><td style="text-align:right">${fmt(x.cost)}</td><td style="text-align:right">${x.l100 == null ? '—' : x.l100}</td><td style="text-align:right">${tot ? '' : fmt(x.odometer)}</td></tr>`;
+    box.innerHTML = r.vehicles.length ? warn + `<div style="overflow:auto"><table><tr><th>Véhicule</th>${r.weeks.map((w) => `<th style="text-align:right">${wl(w)}</th>`).join('')}<th style="text-align:right">Total km</th><th style="text-align:right">Litres</th><th style="text-align:right">Coût (GNF)</th><th style="text-align:right">L/100 km</th><th style="text-align:right">Compteur</th></tr>${r.vehicles.map((x) => rowH(x, false)).join('')}${rowH(r.total, true)}</table></div><div class="desc" style="margin-top:6px">Semaines du lundi au dimanche · du ${esc(r.from)} au ${esc(r.to)} · « — » = données insuffisantes pour calculer.</div>` : '<div class="empty">Aucun véhicule dans cette catégorie.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function frCsv() {
+  const r = window._frData; if (!r) return;
+  const head = ['Véhicule', 'Immatriculation', ...r.weeks, 'Total km', 'Litres', 'Coût GNF', 'L/100 km', 'Compteur'];
+  const line = (x, t) => [t ? 'TOTAL FLOTTE' : x.number, t ? '' : x.registration || '', ...r.weeks.map((w) => x.weeks[w]), x.totalKm, x.liters, x.cost, x.l100 == null ? '' : x.l100, t ? '' : x.odometer];
+  const csv = [head, ...r.vehicles.map((x) => line(x, false)), line(r.total, true)].map((a) => a.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recap-km-carburant-' + r.kind.toLowerCase() + '-' + r.to + '.csv'; a.click();
 }
 const KR_TABS = [['trips', '🧭 Trajets'], ['fuel', '⛽ Carburant'], ['maint', '🔧 Maintenance'], ['pannes', '⚠ Pannes']];
 async function krLoad() {

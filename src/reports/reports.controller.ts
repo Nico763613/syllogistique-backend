@@ -117,6 +117,13 @@ export class ReportsController {
     return { ...result, recipients };
   }
 
+  // Récapitulatif kilométrage + carburant par véhicule et par semaine (?kind=TRUCK|SERVICE_VEHICLE)
+  @Get('fleet-recap')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.LECTEUR, RoleName.RESPONSABLE_OPERATIONS)
+  fleetRecap(@Query('siteId') siteId: string, @Query('kind') kind: string, @Query('from') from: string, @Query('to') to: string, @CurrentUser() actor: any) {
+    return this.reportsService.fleetRecap(siteId || actor.siteId, kind, from, to);
+  }
+
   @Get('period')
   periodReport(@Query('siteId') siteId: string, @Query('from') from: string, @Query('to') to: string) {
     return this.reportsService.periodReport(siteId, from, to);
