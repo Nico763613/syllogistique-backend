@@ -87,6 +87,27 @@
   .dot.syncing{background:var(--gold); animation:pulse 1s infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
 
+  /* Socle v2 : menu réductible, recherche globale */
+  .nav-item.active{background:#F26B1D; border-left-color:#fff; color:#fff; font-weight:600;}
+  #side-collapse{display:none; margin:8px 20px 0; padding:6px 10px; border:1px solid rgba(255,255,255,.25); background:transparent; color:#C9D6E8; border-radius:8px; font-size:12px; cursor:pointer;}
+  @media(min-width:861px){
+    #side-collapse{display:block;}
+    body.side-min .sidebar{width:64px;}
+    body.side-min .sidebar .brand-block > div, body.side-min .sidebar .side-user > div:last-child, body.side-min .nav-section-label, body.side-min .nav-sub-label, body.side-min .sidebar-footer, body.side-min .nav-item{font-size:0;}
+    body.side-min .nav-item{padding:11px 0; justify-content:center; gap:0;}
+    body.side-min .nav-icon{font-size:17px; width:auto;}
+    body.side-min .nav-section-label, body.side-min .nav-sub-label{padding:6px 0; height:6px; overflow:hidden;}
+    body.side-min #side-collapse{margin:8px auto 0; font-size:12px;}
+  }
+  #gs-wrap{position:relative; flex:0 1 320px; min-width:150px; margin-right:8px;}
+  #gs-input{width:100%; box-sizing:border-box; padding:8px 12px; border:1px solid var(--line); border-radius:10px; font-size:13px; background:#F5F7FA;}
+  #gs-panel{display:none; position:absolute; left:0; top:38px; width:min(420px,92vw); max-height:65vh; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,.18); z-index:60; padding:6px;}
+  #gs-panel h5{margin:8px 8px 4px; font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted);}
+  #gs-panel .gs-r{display:block; width:100%; text-align:left; border:none; background:transparent; padding:8px; border-radius:8px; font:inherit; font-size:13px; cursor:pointer; color:var(--text);}
+  #gs-panel .gs-r:hover{background:#EEF3FA;}
+  #gs-panel .gs-r small{display:block; color:var(--muted); font-size:11.5px;}
+  #gs-panel .gs-none{padding:12px; color:var(--muted); font-size:13px;}
+  @media(max-width:700px){ #gs-wrap{flex-basis:100%; order:9; margin:6px 0 0;} }
   .main{flex:1; min-width:0;}
   .topbar{
     display:flex; align-items:center; justify-content:space-between;
@@ -338,6 +359,7 @@
         <div><div class="brand">SYL LOGISTIQUE</div><div class="tagline">Gestion Logistique &amp; Fret</div></div>
       </div>
       <div class="side-user"><div class="av" data-avatar="46" onclick="openPhotoEditor()" title="Changer ma photo"></div><div><b id="side-name">—</b><small id="side-role">—</small></div></div>
+      <button id="side-collapse" type="button" onclick="sideToggle()" aria-label="Réduire ou agrandir le menu">⇔ Réduire le menu</button>
 
       <div class="nav-item active" data-view="dashboard" onclick="go('dashboard')">
         <span class="nav-icon">🏠</span> Tableau de bord
@@ -408,6 +430,7 @@
           <button id="back-btn" class="btn-ghost" style="display:none; font-size:20px; padding:2px 10px; margin-right:6px;" onclick="goBack()" aria-label="Retour">←</button>
           <h2 id="view-title">Tableau de bord</h2>
         </div>
+        <div id="gs-wrap" style="display:none"><input id="gs-input" type="search" placeholder="Rechercher un camion, un chauffeur, une mission…" autocomplete="off" aria-label="Recherche globale" oninput="gsInput()" onfocus="gsInput()"><div id="gs-panel"></div></div>
         <div style="display:flex;align-items:center;gap:8px;margin-left:auto;margin-right:12px">
           <span id="draft-note" style="font-size:11px;color:var(--muted)"></span>
           <button id="hist-btn" class="btn-ghost" style="font-size:13px;padding:4px 10px" onclick="openHistory()" aria-label="Historique">🕘 Historique</button>
@@ -1215,8 +1238,39 @@ function moduleOn(m) {
   if (L === undefined) { try { L = JSON.parse(localStorage.getItem('syllo_modules') || 'null'); } catch (e) { L = null; } }
   return !Array.isArray(L) || L.includes(m);
 }
+/* ---------------- SOCLE v2 : menu réductible + recherche globale ---------------- */
+function sideToggle() { const on = document.body.classList.toggle('side-min'); try { localStorage.setItem('syl_side_min', on ? '1' : '0'); } catch (e) {} }
+try { if (localStorage.getItem('syl_side_min') === '1') document.body.classList.add('side-min'); } catch (e) {}
+const GS_ROLES = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR', 'DIRECTEUR_GENERAL', 'RESPONSABLE_OPERATIONS'];
+let GS_T = null;
+function gsShow() { const w = document.getElementById('gs-wrap'); if (w) w.style.display = state.user && GS_ROLES.includes(state.user.role) ? '' : 'none'; }
+function gsInput() {
+  const q = (document.getElementById('gs-input').value || '').trim(), p = document.getElementById('gs-panel');
+  clearTimeout(GS_T);
+  if (q.length < 2) { p.style.display = 'none'; return; }
+  GS_T = setTimeout(async () => {
+    p.style.display = 'block'; p.innerHTML = '<div class="gs-none">Recherche…</div>';
+    try {
+      const r = await api('/search?q=' + encodeURIComponent(q));
+      const row = (view, t, sub) => '<button type="button" class="gs-r" onclick="gsGo(\'' + view + '\')">' + esc(t) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</button>';
+      const can = (v) => !!document.querySelector('#sidebar .nav-item[data-view="' + v + '"]');
+      const vTrucks = can('trucks') ? 'trucks' : (can('home') ? 'home' : 'trucks');
+      let h = '';
+      if ((r.vehicles || []).length) h += '<h5>Camions & véhicules</h5>' + r.vehicles.map((v) => row('trucks', (v.internalNumber || '') + ' · ' + (v.registrationNumber || ''), [v.brand, v.model, v.status].filter(Boolean).join(' · '))).join('');
+      if ((r.drivers || []).length) h += '<h5>Chauffeurs</h5>' + r.drivers.map((d) => row('drivers', d.firstName + ' ' + d.lastName, [d.phone, d.status].filter(Boolean).join(' · '))).join('');
+      if ((r.trips || []).length) h += '<h5>Missions</h5>' + r.trips.map((t) => row(vTrucks, (t.destination || 'Mission') + (t.purpose ? ' — ' + t.purpose : ''), String(t.tripDate || '').slice(0, 10))).join('');
+      if ((r.items || []).length && can('stock')) h += '<h5>Stock</h5>' + r.items.map((i) => row('stock', i.name, (i.sku || '') + ' · ' + i.currentQuantity + ' ' + (i.unit || ''))).join('');
+      if ((r.suppliers || []).length && can('purchases')) h += '<h5>Fournisseurs</h5>' + r.suppliers.map((s) => row('purchases', s.name, s.phone || '')).join('');
+      p.innerHTML = h || '<div class="gs-none">Aucun résultat pour « ' + esc(q) + ' ».</div>';
+    } catch (e) { p.innerHTML = '<div class="gs-none">' + esc(e.message || 'Recherche indisponible.') + '</div>'; }
+  }, 300);
+}
+function gsGo(view) { const p = document.getElementById('gs-panel'); if (p) p.style.display = 'none'; const i = document.getElementById('gs-input'); if (i) i.value = ''; go(view); }
+document.addEventListener('click', (e) => { const w = document.getElementById('gs-wrap'), p = document.getElementById('gs-panel'); if (w && p && !w.contains(e.target)) p.style.display = 'none'; });
+
 function applyRoleNav() {
   const role = state.user && state.user.role;
+  gsShow();
   let any = false;
   document.querySelectorAll('.nav-item[data-roles]').forEach((el) => {
     let ok = el.dataset.roles.split(',').includes(role);
