@@ -1986,6 +1986,10 @@ async function renderMaintenance() {
 
   root().innerHTML = `
     <div class="panel"><h3>⚠ Alertes d'échéance</h3>${alertRows}</div>
+    <div class="panel" id="mr-panel"><h3>💰 Coûts de maintenance &amp; prochaines échéances</h3>
+      <div class="desc">Calculé automatiquement à partir des interventions enregistrées. Coût = montant saisi, sinon pièces + main-d'œuvre.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="mr-kind" onchange="mrLoad()" style="max-width:220px"><option value="TRUCK"${window._mrKind === 'SERVICE_VEHICLE' ? '' : ' selected'}>🚛 Camions</option><option value="SERVICE_VEHICLE"${window._mrKind === 'SERVICE_VEHICLE' ? ' selected' : ''}>🚙 Véhicules de service</option></select><select id="mr-per" onchange="mrLoad()" style="max-width:200px"><option value="3">3 derniers mois</option><option value="6" selected>6 derniers mois</option><option value="12">12 derniers mois</option></select><button class="btn small" style="margin:0" onclick="mrCsv()">⬇ Exporter (Excel/CSV)</button></div>
+      <div id="mr-body"><div class="empty">Chargement…</div></div></div>
     <div class="panel"><h3>🔧 Maintenance par véhicule</h3>
       <div style="margin:6px 0">${KIND_TABS(maintKind, 'setMaintKind')}</div>
       <table><thead><tr><th>Véhicule</th><th>Interventions</th><th>Coût (GNF)</th><th>Dernier entretien</th><th>État</th></tr></thead><tbody>${perVeh}</tbody></table></div>
@@ -2743,6 +2747,31 @@ function frCsv() {
   const csv = [head, ...r.vehicles.map((x) => line(x, false)), line(r.total, true)].map((a) => a.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recap-km-carburant-' + r.kind.toLowerCase() + '-' + r.to + '.csv'; a.click();
 }
+/* Récapitulatif maintenance (étape 3) */
+const MR_LV = { OVERDUE: ['🔴 En retard', '#B3261E'], SOON: ['🟠 Bientôt', '#C77D0A'], OK: ['🟢 À jour', '#2E8B57'] };
+async function mrLoad() {
+  const box = document.getElementById('mr-body'); if (!box) return;
+  const kind = document.getElementById('mr-kind').value, per = document.getElementById('mr-per').value; window._mrKind = kind;
+  try {
+    const r = await api('/maintenance/recap?kind=' + kind + '&months=' + per + '&siteId=' + state.siteId);
+    window._mrData = r;
+    const t = r.total, dueTxt = (d) => { if (!d) return '<span style="color:var(--muted)">Aucune échéance enregistrée</span>'; const lv = MR_LV[d.level], parts = []; if (d.nextDate) parts.push(new Date(d.nextDate).toLocaleDateString('fr-FR') + (d.daysLeft != null ? ' (' + (d.daysLeft < 0 ? 'dépassée de ' + (-d.daysLeft) + ' j' : 'dans ' + d.daysLeft + ' j') + ')' : '')); if (d.nextMileage != null) parts.push(fmt(d.nextMileage) + ' km' + (d.kmLeft != null ? ' (' + (d.kmLeft < 0 ? 'dépassé de ' + fmt(-d.kmLeft) : 'reste ' + fmt(d.kmLeft)) + ' km)' : '')); return `<b style="color:${lv[1]}">${lv[0]}</b> · ${esc(d.type)}<br><small>${parts.join(' · ')}</small>`; };
+    const tile = (n, l, c) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+    const max = Math.max(1, ...r.byMonth.map((m) => m.cost));
+    box.innerHTML = r.vehicles.length ? `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">${tile(fmt(t.periodCost), 'Coût sur la période (GNF)', 'var(--navy)')}${tile(t.count, 'Interventions', 'var(--navy)')}${tile(t.overdue, 'Entretiens en retard', t.overdue ? '#B3261E' : '#2E8B57')}${tile(t.soon, 'À prévoir bientôt', t.soon ? '#C77D0A' : '#2E8B57')}${tile(fmt(t.cumulCost), 'Coût cumulé (GNF)', 'var(--navy)')}</div>
+      <div style="overflow:auto"><table><tr><th>Véhicule</th><th style="text-align:right">Interv.</th><th style="text-align:right">Coût période</th><th style="text-align:right">dont préventif</th><th style="text-align:right">dont correctif</th><th style="text-align:right">Coût cumulé</th><th>Dernier entretien</th><th>Prochaine échéance</th></tr>${r.vehicles.map((v) => `<tr><td><b>${esc(v.number)}</b>${v.registration ? '<br><small>' + esc(v.registration) + '</small>' : ''}</td><td style="text-align:right">${v.count}</td><td style="text-align:right"><b>${fmt(v.periodCost)}</b></td><td style="text-align:right">${fmt(v.preventive)}</td><td style="text-align:right">${fmt(v.corrective)}</td><td style="text-align:right">${fmt(v.cumulCost)}</td><td>${v.lastDate ? new Date(v.lastDate).toLocaleDateString('fr-FR') : '—'}</td><td>${dueTxt(v.nextDue)}</td></tr>`).join('')}</table></div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px"><div style="flex:1;min-width:240px"><b style="font-size:13px">Par type d'intervention</b>${r.byType.length ? r.byType.map((x) => `<div class="drv-row"><span>${esc(x.label)} <small>(${x.count})</small></span><b>${fmt(x.cost)}</b></div>`).join('') : '<div class="desc">Aucune intervention sur la période.</div>'}</div>
+      <div style="flex:1;min-width:240px"><b style="font-size:13px">Par mois (GNF)</b>${r.byMonth.map((m) => `<div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-top:5px"><span style="width:56px">${esc(m.month)}</span><div style="flex:1;background:#E9EEF6;border-radius:4px;height:12px"><div style="width:${Math.round((m.cost / max) * 100)}%;background:var(--navy);height:12px;border-radius:4px"></div></div><span style="min-width:78px;text-align:right">${fmt(m.cost)}</span></div>`).join('')}</div></div>` : '<div class="empty">Aucun véhicule dans cette catégorie.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function mrCsv() {
+  const r = window._mrData; if (!r) return;
+  const head = ['Véhicule', 'Immatriculation', 'Interventions', 'Coût période GNF', 'Préventif', 'Correctif', 'Coût cumulé GNF', 'Dernier entretien', 'Prochaine échéance'];
+  const rows = r.vehicles.map((v) => [v.number, v.registration || '', v.count, v.periodCost, v.preventive, v.corrective, v.cumulCost, v.lastDate ? String(v.lastDate).slice(0, 10) : '', v.nextDue ? v.nextDue.type + ' ' + (v.nextDue.nextDate ? String(v.nextDue.nextDate).slice(0, 10) : '') + ' ' + (v.nextDue.nextMileage != null ? v.nextDue.nextMileage + ' km' : '') : '']);
+  const csv = [head, ...rows].map((a) => a.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recap-maintenance-' + r.kind.toLowerCase() + '.csv'; a.click();
+}
+{ const _rm = renderMaintenance; renderMaintenance = async function () { const r = await _rm(); mrLoad(); return r; }; }
 const KR_TABS = [['trips', '🧭 Trajets'], ['fuel', '⛽ Carburant'], ['maint', '🔧 Maintenance'], ['pannes', '⚠ Pannes']];
 async function krLoad() {
   const box = document.getElementById('kr-list'); if (!box) return;
