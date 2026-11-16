@@ -32,6 +32,13 @@ export class MaintenanceController {
     return this.maintenanceService.types();
   }
 
+  // Récapitulatif des coûts et échéances (?kind=TRUCK|SERVICE_VEHICLE&months=6)
+  @Get('recap')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.LECTEUR, RoleName.RESPONSABLE_OPERATIONS)
+  recap(@Query('siteId') siteId: string, @Query('kind') kind: string, @Query('months') months: string, @CurrentUser() actor: any) {
+    return this.maintenanceService.recap(siteId || actor.siteId, kind, Number(months) || 6);
+  }
+
   @Get('alerts')
   alerts(@Query('siteId') siteId: string) {
     return this.maintenanceService.alerts(siteId);
