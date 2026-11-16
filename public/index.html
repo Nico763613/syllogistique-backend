@@ -305,6 +305,7 @@
   .hm-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;}
   .hm-card{background:#fff; border:1px solid #E9EEF7; border-radius:8px; padding:22px; cursor:pointer; box-shadow:var(--shadow); display:flex; gap:16px; align-items:center; min-height:104px; transition:.15s; text-align:left; font:inherit; color:inherit;}
   .hm-card:hover{transform:translateY(-2px); box-shadow:var(--shadow); border-color:#C9D8F6;}
+  .hm-ico .ic{width:24px; height:24px; color:var(--blue);}
   .hm-ico{width:56px; height:56px; border-radius:8px; background:#E8EFFD; display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0;}
   .hm-card b{display:block; font-size:14px; color:var(--navy);} .hm-card span.d{display:block; font-size:14px; color:var(--muted); margin-top:3px; line-height:1.35;}
   .btn.ghost{background:#fff; color:var(--navy); border:1px solid var(--line);} .btn.ghost:hover{background:#F1F5FC;} .btn.danger{background:#fff; color:var(--danger); border:1px solid #F0C9C4;}
@@ -1458,7 +1459,7 @@ async function renderDashboard() {
       <div class="kpi-card"><div class="kpi-label">Valeur du stock</div><div class="kpi-value mono">${fmt(d.stock.stockValue)}</div><div class="kpi-sub">GNF — ${d.stock.itemsCount} articles</div></div>
     </div>
     <div class="panel">
-      <h3>⚠ Alertes</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Alertes</h3>
       <div class="desc">Articles sous le seuil minimum : <b>${d.stock.belowMinimum}</b></div>
       <div id="alert-list" style="margin-top:10px;"></div>
       <button class="btn small" onclick="go('stock')">Voir le stock</button>
@@ -1474,8 +1475,8 @@ async function loadAlerts() {
     const list = await api('/notifications?unreadOnly=true');
     box.innerHTML = list.slice(0, 15).map(n => `
       <div class="msg ${n.severity === 'INFO' ? 'ok' : 'err'}" style="margin-bottom:6px; display:flex; justify-content:space-between; gap:10px;">
-        <span>${n.severity === 'CRITICAL' ? '🔴' : n.severity === 'WARNING' ? '🟠' : '🔵'} <b>${esc(n.title)}</b> — ${esc(n.message)}</span>
-        <button class="btn small" onclick="markAlertRead('${esc(n.id)}')">✓ Lu</button>
+        <span>${n.severity === 'CRITICAL' ? '<svg class="ic ic-bad" aria-hidden="true"><use href="#i-dot"/></svg>' : n.severity === 'WARNING' ? '<svg class="ic ic-warn" aria-hidden="true"><use href="#i-dot"/></svg>' : '<svg class="ic ic-info" aria-hidden="true"><use href="#i-dot"/></svg>'} <b>${esc(n.title)}</b> — ${esc(n.message)}</span>
+        <button class="btn small" onclick="markAlertRead('${esc(n.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Lu</button>
       </div>`).join('') || '<div class="desc">Aucune alerte non lue.</div>';
   } catch (e) { box.innerHTML = ''; }
 }
@@ -1500,7 +1501,7 @@ async function renderVehicles(kind) {
   let drvList = []; if (kind === 'TRUCK') { try { drvList = await api('/drivers?siteId=' + state.siteId); } catch (e) {} }
   const insBadge = (i) => !i || i.status === 'NONE' ? '<span class="badge bad">Aucune assurance</span>'
     : i.status === 'EXPIRED' ? `<span class="badge bad">Non valide — expirée le ${new Date(i.expiryDate).toLocaleDateString('fr-FR')}</span>`
-    : i.status === 'EXPIRING' ? `<span class="badge warn">⚠ Expire dans ${i.daysLeft} j (${new Date(i.expiryDate).toLocaleDateString('fr-FR')})</span>`
+    : i.status === 'EXPIRING' ? `<span class="badge warn"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Expire dans ${i.daysLeft} j (${new Date(i.expiryDate).toLocaleDateString('fr-FR')})</span>`
     : `<span class="badge ok">Valide${i.expiryDate ? ' → ' + new Date(i.expiryDate).toLocaleDateString('fr-FR') : ''}</span>`;
   const insAlerts = kind === 'TRUCK' ? list.filter(v => v.insurance && (v.insurance.status === 'EXPIRING' || v.insurance.status === 'EXPIRED')) : [];
   const truckRows = list.map(v => `
@@ -1515,7 +1516,7 @@ async function renderVehicles(kind) {
       <td>${insBadge(v.insurance)}</td>
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
-      <td style="white-space:nowrap"><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button> <button class="btn small gold" onclick="vehDriverPanel('${esc(v.id)}')">👤 Chauffeur</button></td>
+      <td style="white-space:nowrap"><button class="btn small" onclick="editVehicle('${esc(v.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button> <button class="btn small gold" onclick="vehDriverPanel('${esc(v.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg> Chauffeur</button></td>
     </tr>`).join('') || `<tr><td colspan="11" class="empty">Aucun camion enregistré.</td></tr>`;
   const rows = list.map(v => `
     <tr>
@@ -1525,12 +1526,12 @@ async function renderVehicles(kind) {
       <td>${esc(v.assignedDriver ? v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName : '—')}</td>
       <td class="mono">${fmt(v.currentMileage)} km</td>
       <td>${statusBadge(v.status)}</td>
-      <td style="white-space:nowrap"><button class="btn small" onclick="editVehicle('${esc(v.id)}')">✏️</button> <button class="btn small gold" onclick="vehDriverPanel('${esc(v.id)}')">👤 Chauffeur</button></td>
+      <td style="white-space:nowrap"><button class="btn small" onclick="editVehicle('${esc(v.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button> <button class="btn small gold" onclick="vehDriverPanel('${esc(v.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg> Chauffeur</button></td>
     </tr>`).join('') || `<tr><td colspan="7" class="empty">Aucun ${kindLabel} enregistré.</td></tr>`;
 
   root().innerHTML = `
     <div class="panel">
-      <h3>➕ Ajouter un ${kindLabel}</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un ${kindLabel}</h3>
       <div class="grid-2">
         ${kind ? `<div><label>Type</label><select id="v-type" disabled><option value="${kind}">${kind === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</option></select></div>` : `<div><label>Type</label><select id="v-type"><option value="TRUCK">Camion</option><option value="SERVICE_VEHICLE">Véhicule de service</option></select></div>`}
         <div><label>N° interne</label><input id="v-internal" placeholder="TRUCK-001" /></div>
@@ -1551,14 +1552,14 @@ async function renderVehicles(kind) {
     </div>
     <div class="panel">
       <h3>${kind === 'TRUCK' ? 'Camions' : kind === 'SERVICE_VEHICLE' ? 'Véhicules de service' : 'Parc'} (${list.length}${kind ? '' : ' / ' + fleetTarget + ' prévus'})
-        ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})">✏️ Objectif</button>` : ''}</h3>
+        ${canTarget ? `<button class="btn small" style="margin-left:8px;" onclick="editFleetTarget(${fleetTarget})"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Objectif</button>` : ''}</h3>
       ${!kind && list.length < fleetTarget ? `<div class="desc">Il reste ${fleetTarget - list.length} véhicule(s) à enregistrer pour atteindre l'objectif.</div>` : ''}
-      ${insAlerts.length ? `<div class="msg err" style="margin-bottom:10px">🛡 Assurance à renouveler : ${insAlerts.map(v => esc(v.internalNumber) + (v.insurance.status === 'EXPIRED' ? ' (expirée)' : ' (dans ' + v.insurance.daysLeft + ' j)')).join(', ')}</div>` : ''}
+      ${insAlerts.length ? `<div class="msg err" style="margin-bottom:10px"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg> Assurance à renouveler : ${insAlerts.map(v => esc(v.internalNumber) + (v.insurance.status === 'EXPIRED' ? ' (expirée)' : ' (dans ' + v.insurance.daysLeft + ' j)')).join(', ')}</div>` : ''}
       ${kind === 'TRUCK' ? `<table><thead><tr><th>N° interne</th><th>Plaque</th><th>Marque / modèle</th><th>Type</th><th>Roues</th><th>Capacité</th><th>Chauffeur</th><th>Assurance</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${truckRows}</tbody></table>`
       : `<table><thead><tr><th>N° interne</th><th>Type</th><th>Plaque</th><th>Chauffeur</th><th>Kilométrage</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>`}
     </div>
     <div class="panel">
-      <h3>🧭 Missions et fiches de bord</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg> Missions et fiches de bord</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="tr-vehicle">${list.filter(v => v.status !== 'IMMOBILIZED').map(v => `<option value="${esc(v.id)}" data-km="${v.currentMileage}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
         <div><label>Chauffeur</label><select id="tr-driver"></select></div>
@@ -1571,7 +1572,7 @@ async function renderVehicles(kind) {
       <div id="tr-list" style="margin-top:12px;"></div>
     </div>
     <div class="panel">
-      <h3>📄 Documents des véhicules (assurance, visite technique, carte grise…)</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Documents des véhicules (assurance, visite technique, carte grise…)</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="dc-vehicle">${list.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
         <div><label>Type</label><select id="dc-type"><option value="ASSURANCE">Assurance</option><option value="VISITE_TECHNIQUE">Visite technique</option><option value="CARTE_GRISE">Carte grise</option><option value="CONTRAT">Contrat</option><option value="AUTRE">Autre</option></select></div>
@@ -1583,7 +1584,7 @@ async function renderVehicles(kind) {
       <div id="dc-list" style="margin-top:12px;"></div>
     </div>
     <div class="panel">
-      <h3>🚧 Pannes et immobilisations</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Pannes et immobilisations</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="dt-vehicle">${list.filter(v => v.status !== 'IMMOBILIZED').map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
         <div><label>Catégorie</label><select id="dt-cat"><option value="PANNE">Panne</option><option value="ACCIDENT">Accident</option><option value="ENTRETIEN">Entretien</option><option value="ADMINISTRATIF">Administratif (papiers, assurance)</option><option value="AUTRE">Autre</option></select></div>
@@ -1610,7 +1611,7 @@ async function loadTrips() {
     vs.onchange = fillKm; fillKm();
     box.innerHTML = trips.length ? `<table><thead><tr><th>Date</th><th>Véhicule</th><th>Chauffeur</th><th>Destination</th><th>Client</th><th>Km</th><th></th></tr></thead><tbody>${trips.slice(0, 30).map(t => `
       <tr><td>${new Date(t.tripDate).toLocaleDateString('fr-FR')}</td><td>${esc(t.vehicle?.internalNumber)}</td><td>${esc(t.driver?.firstName)} ${esc(t.driver?.lastName)}</td><td>${esc(t.destination || '—')}</td>
-      <td>${t.customerId ? esc((custs.find((c) => c.id === t.customerId) || {}).name || '—') : '<span class="badge warn">à préciser</span>'} ${t.billedInvoiceId ? '' : `<button class="btn small" onclick="tripClient('${esc(t.id)}')">✎</button>`}</td>
+      <td>${t.customerId ? esc((custs.find((c) => c.id === t.customerId) || {}).name || '—') : '<span class="badge warn">à préciser</span>'} ${t.billedInvoiceId ? '' : `<button class="btn small" onclick="tripClient('${esc(t.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button>`}</td>
       <td class="mono">${t.distance ?? '…'}</td>
       <td>${t.endMileage === null ? `<button class="btn small gold" onclick="closeTrip('${esc(t.id)}')">Clôturer</button>` : ''} <button class="btn small" onclick="tripPdf('${esc(t.id)}')">Fiche de bord</button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune mission enregistrée.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
@@ -1687,7 +1688,7 @@ async function loadDowntimes() {
     box.innerHTML = r.items.length ? `<div class="desc">${r.summary.open} en cours • ${fmt(r.summary.totalDays)} jour(s) cumulés • coût : <b>${fmt(r.summary.totalCost)} GNF</b></div>
       <table><thead><tr><th>Véhicule</th><th>Type</th><th>Motif</th><th>Depuis</th><th>Jours</th><th>Coût</th><th></th></tr></thead><tbody>${r.items.map(i => `
       <tr><td>${esc(i.vehicle)}</td><td>${esc(i.category)}</td><td>${esc(i.reason)}</td><td>${new Date(i.startedAt).toLocaleDateString('fr-FR')}</td><td class="mono">${i.days}</td><td class="mono">${fmt(i.actualCost ?? i.estimatedCost)}</td>
-      <td>${i.endedAt ? '✅ Remis en service' : `<button class="btn small" onclick="resolveDowntime('${esc(i.id)}')">Remettre en service</button>`}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune immobilisation enregistrée.</div>';
+      <td>${i.endedAt ? '<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Remis en service' : `<button class="btn small" onclick="resolveDowntime('${esc(i.id)}')">Remettre en service</button>`}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune immobilisation enregistrée.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function reportDowntime() {
@@ -1750,7 +1751,7 @@ function openEditor(title, fields, onSave) {
       ? `<select data-k="${esc(f.key)}">${f.options.map(o => `<option value="${esc(o[0])}" ${String(f.value ?? '') === o[0] ? 'selected' : ''}>${esc(o[1])}</option>`).join('')}</select>`
       : `<input data-k="${esc(f.key)}" type="${f.type || 'text'}" value="${esc(f.value ?? '')}" />`)).join('')}
     <div id="editor-msg"></div>
-    <div style="margin-top:12px;"><button class="btn gold" id="editor-save">💾 Enregistrer</button> <button class="btn" onclick="document.getElementById('editor-overlay').remove()">Annuler</button></div></div>`;
+    <div style="margin-top:12px;"><button class="btn gold" id="editor-save"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Enregistrer</button> <button class="btn" onclick="document.getElementById('editor-overlay').remove()">Annuler</button></div></div>`;
   document.body.appendChild(ov);
   document.getElementById('editor-save').onclick = async () => {
     const data = {};
@@ -1767,7 +1768,7 @@ function openEditor(title, fields, onSave) {
 }
 const day10 = (d) => (d ? String(d).slice(0, 10) : '');
 function vehInfoCard(v) {
-  const kind = v.vehicleType === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service';
+  const kind = v.vehicleType === 'TRUCK' ? 'Camion' : 'Véhicule de service';
   const row = (a, b) => `<div class="drv-row"><span>${a}</span><b>${b == null || b === '' ? '—' : esc(b)}</b></div>`;
   return `<div><h4 style="margin:0 0 6px">${kind} — informations</h4>${row('N° interne', v.internalNumber)}${row('Plaque', v.registrationNumber)}${row('Marque / modèle', [v.brand, v.model].filter(Boolean).join(' '))}
     ${v.vehicleType === 'TRUCK' ? row('Type', v.truckType ? ttLabel(v.truckType) : '') + row('Roues', v.wheels) + row('Capacité', v.capacity) : ''}${row('Kilométrage', fmt(v.currentMileage) + ' km')}</div>`;
@@ -1779,14 +1780,14 @@ function vehDriverPanel(vid) {
   const ov = document.createElement('div');
   ov.id = 'veh-drv-ov';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
-  const left = d ? `<div><h4 style="margin:0 0 6px">👤 Chauffeur affecté</h4>
+  const left = d ? `<div><h4 style="margin:0 0 6px"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg> Chauffeur affecté</h4>
       <div class="drv-row"><span>Nom</span><b>${esc(d.firstName + ' ' + d.lastName)}</b></div><div class="drv-row"><span>Téléphone</span><b>${esc(d.phone || '—')}</b></div><div class="drv-row"><span>Permis</span><b>${esc(d.licenseNumber || '—')}</b></div>
-      <button class="btn gold" style="margin-top:10px" onclick="vehSendInvite('${esc(d.id)}')">💬 Envoyer le lien par WhatsApp</button></div>`
-    : `<div><h4 style="margin:0 0 6px">➕ Nouveau ${kindLbl}</h4>
+      <button class="btn gold" style="margin-top:10px" onclick="vehSendInvite('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien par WhatsApp</button></div>`
+    : `<div><h4 style="margin:0 0 6px"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau ${kindLbl}</h4>
       <label>Prénom</label><input id="nd-first" /><label>Nom</label><input id="nd-last" /><label>Téléphone (WhatsApp)</label><input id="nd-phone" type="tel" placeholder="6xx xx xx xx" />
       <label>N° de permis</label><input id="nd-lic" /><label>Catégorie du permis</label><input id="nd-cat" placeholder="Ex : C, EC" /><label>Expiration du permis</label><input id="nd-exp" type="date" />
       <button class="btn gold" style="margin-top:10px" onclick="vehSaveDriver('${esc(v.id)}')">Enregistrer le chauffeur</button></div>`;
-  ov.innerHTML = `<div class="panel" style="max-width:760px;width:100%;margin:20px auto;"><h3>👤 Chauffeur — ${esc(v.internalNumber)}</h3>
+  ov.innerHTML = `<div class="panel" style="max-width:760px;width:100%;margin:20px auto;"><h3><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg> Chauffeur — ${esc(v.internalNumber)}</h3>
     <div class="grid-2">${left}${vehInfoCard(v)}</div><div id="nd-msg" style="margin-top:10px"></div>
     <button class="btn" style="margin-top:10px" onclick="document.getElementById('veh-drv-ov').remove();renderView(state.view)">Fermer</button></div>`;
   document.body.appendChild(ov);
@@ -1813,8 +1814,8 @@ async function vehSendInvite(driverId, keep) {
     const num = r.phone.length === 9 ? '224' + r.phone : r.phone;
     window._invMsg = r.message;
     m.innerHTML = (keep ? m.innerHTML : '') + `<div class="msg ok">Message prêt pour ${esc(r.driver)} (${esc(num)}).</div>
-      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Envoyer par WhatsApp</a>
-      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">Envoyer par WhatsApp</a>
+      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">Copier le message</button>
       <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ». Le chauffeur n'aura qu'à choisir son mot de passe : son nom, son téléphone et son véhicule sont déjà enregistrés.</div>`;
   } catch (e) { m.innerHTML = (keep ? m.innerHTML : '') + `<div class="msg err">${esc(e.message)}</div>`; }
 }
@@ -1874,17 +1875,17 @@ async function renderDrivers() {
     return days < 0 ? `<span class="badge bad">Expiré ${dt}</span>` : days <= 30 ? `<span class="badge warn">${dt} (${days} j)</span>` : dt;
   };
   const rows = list.map(d => `
-    <tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '🚛 Camion' : d.activity === 'SERVICE_VEHICLE' ? '🚙 Véhicule de service' : '—'}</td>
+    <tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : d.activity === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '—'}</td>
     <td>${(vehOf[d.id] || []).map(v => esc(v.internalNumber + ' — ' + v.registrationNumber)).join('<br>') || '—'}</td>
-    <td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}')">✏️</button></td>
+    <td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button></td>
     <td>${permis(d)}</td>
     <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td>
-    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')">✏️ Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans cette liste.</td></tr>`;
+    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans cette liste.</td></tr>`;
   const chip = (f, l) => `<button class="btn small ${window.DRVF === f ? 'gold' : ''}" onclick="setDrvFilter('${f}')">${l} (${cnt[f]})</button>`;
 
   root().innerHTML = `
     <div class="panel">
-      <h3>➕ Ajouter un chauffeur</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un chauffeur</h3>
       <div class="grid-2">
         <div><label>Prénom</label><input id="d-first" /></div>
         <div><label>Nom</label><input id="d-last" /></div>
@@ -1899,7 +1900,7 @@ async function renderDrivers() {
     </div>
     <div class="panel">
       <h3>Chauffeurs — une seule base</h3>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${chip('ALL', 'Tous')}${chip('TRUCK', '🚛 Camions')}${chip('SERVICE_VEHICLE', '🚙 Véhicules de service')}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${chip('ALL', 'Tous')}${chip('TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions')}${chip('SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service')}</div>
       <table><thead><tr><th>Nom et prénoms</th><th>Téléphone</th><th>Activité</th><th>Camion / véhicule</th><th>N° de permis</th><th>Expiration</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
     </div>`;
 }
@@ -1923,7 +1924,7 @@ async function createDriver() {
 
 /* ---------------- FUEL ---------------- */
 let fuelKind = 'ALL', fuelPeriod = 'month', fuelDate = new Date().toISOString().slice(0, 10);
-const KIND_TABS = (cur, fn) => [['ALL', 'Tous'], ['TRUCK', '🚛 Camions'], ['SERVICE_VEHICLE', '🚙 Véhicules de service']].map(([k, t]) => `<button class="btn ${cur === k ? 'gold' : ''}" style="margin-right:6px" onclick="${fn}('${k}')">${t}</button>`).join('');
+const KIND_TABS = (cur, fn) => [['ALL', 'Tous'], ['TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions'], ['SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service']].map(([k, t]) => `<button class="btn ${cur === k ? 'gold' : ''}" style="margin-right:6px" onclick="${fn}('${k}')">${t}</button>`).join('');
 function setFuelKind(k) { fuelKind = k; renderFuel(); }
 function setFuelPeriod(p, d) { if (p) fuelPeriod = p; if (d) fuelDate = d; renderFuel(); }
 function fuelBounds() {
@@ -1945,7 +1946,7 @@ function fuelSummaryHtml(all) {
   const rows = Object.values(by).sort((a, b) => b.l - a.l);
   const tot = rows.reduce((a, r) => ({ n: a.n + r.n, l: a.l + r.l, c: a.c + r.c }), { n: 0, l: 0, c: 0 });
   const label = fuelPeriod === 'day' ? new Date(fuelDate + 'T12:00:00').toLocaleDateString('fr-FR', { dateStyle: 'full' }) : fuelPeriod === 'year' ? 'Année ' + fuelDate.slice(0, 4) : new Date(fuelDate + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  return { list, html: `<div class="panel"><h3>📊 Carburant par véhicule</h3>
+  return { list, html: `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg> Carburant par véhicule</h3>
     <div style="margin:6px 0">${KIND_TABS(fuelKind, 'setFuelKind')}</div>
     <div class="grid-2"><div><label>Période</label><select onchange="setFuelPeriod(this.value)"><option value="day" ${fuelPeriod === 'day' ? 'selected' : ''}>Jour</option><option value="month" ${fuelPeriod === 'month' ? 'selected' : ''}>Mois</option><option value="year" ${fuelPeriod === 'year' ? 'selected' : ''}>Année</option></select></div>
     <div><label>Date de référence</label><input type="date" value="${esc(fuelDate)}" onchange="if(this.value)setFuelPeriod(null,this.value)" /></div></div>
@@ -1969,7 +1970,7 @@ async function renderFuel() {
 
   root().innerHTML = `
     <div class="panel">
-      <h3>💰 Tarif du carburant</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Tarif du carburant</h3>
       <div class="desc">Tarif actuel : <b class="mono">${fmt(tariff.pricePerLiter)} GNF/L</b> — appliqué automatiquement à tous les nouveaux calculs.</div>
       ${canEditPrice ? `<div class="grid-2">
         <div><label>Nouveau prix / litre (GNF)</label><input id="fp-price" type="number" min="1" value="${esc(String(tariff.pricePerLiter))}" /></div>
@@ -1980,7 +1981,7 @@ async function renderFuel() {
     </div>
     ${sum.html}
     <div class="panel">
-      <h3>⛽ Nouveau ravitaillement</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg> Nouveau ravitaillement</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="f-vehicle">${options}</select></div>
         <div><label>Date</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
@@ -2033,7 +2034,7 @@ async function renderMaintenance() {
     api('/maintenance/alerts?siteId=' + state.siteId),
     api('/vehicles?siteId=' + state.siteId),
   ]);
-  const alertRows = alerts.map(a => `<div class="msg ${a.level === 'OVERDUE' ? 'err' : 'ok'}" style="margin-bottom:6px;">${a.level === 'OVERDUE' ? '🔴' : '🟠'} ${esc(a.internalNumber)} — entretien ${a.level === 'OVERDUE' ? 'en retard' : 'bientôt dû'}</div>`).join('') || '<div class="desc">Aucune alerte de maintenance.</div>';
+  const alertRows = alerts.map(a => `<div class="msg ${a.level === 'OVERDUE' ? 'err' : 'ok'}" style="margin-bottom:6px;">${a.level === 'OVERDUE' ? '<svg class="ic ic-bad" aria-hidden="true"><use href="#i-dot"/></svg>' : '<svg class="ic ic-warn" aria-hidden="true"><use href="#i-dot"/></svg>'} ${esc(a.internalNumber)} — entretien ${a.level === 'OVERDUE' ? 'en retard' : 'bientôt dû'}</div>`).join('') || '<div class="desc">Aucune alerte de maintenance.</div>';
   const inKind = (t) => maintKind === 'ALL' || t === maintKind;
   const vehs = vehicles.filter((v) => inKind(v.vehicleType));
   const alertOf = {}; alerts.forEach((a) => { alertOf[a.internalNumber] = a.level; });
@@ -2049,16 +2050,16 @@ async function renderMaintenance() {
   const typeOptions = types.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
 
   root().innerHTML = `
-    <div class="panel"><h3>⚠ Alertes d'échéance</h3>${alertRows}</div>
-    <div class="panel" id="mr-panel"><h3>💰 Coûts de maintenance &amp; prochaines échéances</h3>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Alertes d'échéance</h3>${alertRows}</div>
+    <div class="panel" id="mr-panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Coûts de maintenance &amp; prochaines échéances</h3>
       <div class="desc">Calculé automatiquement à partir des interventions enregistrées. Coût = montant saisi, sinon pièces + main-d'œuvre.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="mr-kind" onchange="mrLoad()" style="max-width:220px"><option value="TRUCK"${window._mrKind === 'SERVICE_VEHICLE' ? '' : ' selected'}>🚛 Camions</option><option value="SERVICE_VEHICLE"${window._mrKind === 'SERVICE_VEHICLE' ? ' selected' : ''}>🚙 Véhicules de service</option></select><select id="mr-per" onchange="mrLoad()" style="max-width:200px"><option value="3">3 derniers mois</option><option value="6" selected>6 derniers mois</option><option value="12">12 derniers mois</option></select><button class="btn small" style="margin:0" onclick="mrCsv()">⬇ Exporter (Excel/CSV)</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="mr-kind" onchange="mrLoad()" style="max-width:220px"><option value="TRUCK"${window._mrKind === 'SERVICE_VEHICLE' ? '' : ' selected'}>Camions</option><option value="SERVICE_VEHICLE"${window._mrKind === 'SERVICE_VEHICLE' ? ' selected' : ''}>Véhicules de service</option></select><select id="mr-per" onchange="mrLoad()" style="max-width:200px"><option value="3">3 derniers mois</option><option value="6" selected>6 derniers mois</option><option value="12">12 derniers mois</option></select><button class="btn small" style="margin:0" onclick="mrCsv()"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Exporter (Excel/CSV)</button></div>
       <div id="mr-body"><div class="empty">Chargement…</div></div></div>
-    <div class="panel"><h3>🔧 Maintenance par véhicule</h3>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Maintenance par véhicule</h3>
       <div style="margin:6px 0">${KIND_TABS(maintKind, 'setMaintKind')}</div>
       <table><thead><tr><th>Véhicule</th><th>Interventions</th><th>Coût (GNF)</th><th>Dernier entretien</th><th>État</th></tr></thead><tbody>${perVeh}</tbody></table></div>
     <div class="panel">
-      <h3>🔧 Nouvel entretien</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Nouvel entretien</h3>
       <div class="grid-2">
         <div><label>Véhicule</label><select id="m-vehicle">${options}</select></div>
         <div><label>Type</label><select id="m-type">${typeOptions}</select></div>
@@ -2744,10 +2745,10 @@ async function renderDaily() {
   } catch (e) {}
   root().innerHTML = `
     <div class="panel">
-      <h3>📋 Rapports journaliers</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Rapports journaliers</h3>
       <div class="tabs" style="display:flex;gap:8px;margin:6px 0 12px">
-        <button class="btn ${dailyKind === 'TRUCK' ? 'gold' : ''}" onclick="setDailyKind('TRUCK')">🚛 Camions</button>
-        <button class="btn ${dailyKind === 'SERVICE_VEHICLE' ? 'gold' : ''}" onclick="setDailyKind('SERVICE_VEHICLE')">🚙 Véhicules de service</button>
+        <button class="btn ${dailyKind === 'TRUCK' ? 'gold' : ''}" onclick="setDailyKind('TRUCK')"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions</button>
+        <button class="btn ${dailyKind === 'SERVICE_VEHICLE' ? 'gold' : ''}" onclick="setDailyKind('SERVICE_VEHICLE')"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service</button>
       </div>
       <div class="grid-2">
         <div><label>Date</label><input id="d-date" type="date" value="${today}" onchange="loadDaily()" /></div>
@@ -2755,7 +2756,7 @@ async function renderDaily() {
       <div id="d-body"><div class="empty">Chargement…</div></div>
     </div>
     ${canEdit ? `<div class="panel">
-      <h3>✉️ Hiérarchie — destinataires du rapport</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Hiérarchie — destinataires du rapport</h3>
       <label>E-mails de la hiérarchie (séparés par des virgules)</label>
       <input id="d-emails" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" />
       <label>E-mails de la comptabilité (séparés par des virgules)</label>
@@ -2774,16 +2775,16 @@ async function renderKindReports(kind) {
   const canEdit = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
   try { const all = await api('/settings'); dailyEmails = (all.find(s => s.key === 'REPORT_EMAIL_RECIPIENTS') || {}).value || ''; dailyAccEmails = (all.find(s => s.key === 'REPORT_ACCOUNTING_EMAILS') || {}).value || ''; } catch (e) {}
   root().innerHTML = `
-    <div class="panel"><h3>${kind === 'TRUCK' ? '🚛 Rapports camions' : '🚙 Rapports véhicules de service'}</h3>
+    <div class="panel"><h3>${kind === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Rapports camions' : '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Rapports véhicules de service'}</h3>
       <div class="desc">Les chauffeurs ${kind === 'TRUCK' ? 'de camions' : 'de véhicules de service'} uniquement. Touchez un bouton pour ouvrir le détail d'un chauffeur.</div>
       <label>Jour</label><input id="d-date" type="date" value="${esc(today)}" onchange="window._krDate=this.value;loadDaily();krLoad()" style="max-width:220px">
       <div id="kr-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
     <div id="kr-list"><div class="empty">Chargement…</div></div>
-    <div class="panel" id="fr-panel"><h3>📈 Kilométrage &amp; carburant — récapitulatif automatique</h3>
+    <div class="panel" id="fr-panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg> Kilométrage &amp; carburant — récapitulatif automatique</h3>
       <div class="desc">Calculé à partir des missions terminées et des ravitaillements enregistrés. Les relevés incohérents sont exclus du total et signalés.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="fr-per" onchange="frLoad()" style="max-width:240px"><option value="4">4 dernières semaines</option><option value="8" selected>8 dernières semaines</option><option value="12">12 dernières semaines</option><option value="m">Mois en cours</option></select><button class="btn small" style="margin:0" onclick="frCsv()">⬇ Exporter (Excel/CSV)</button></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="fr-per" onchange="frLoad()" style="max-width:240px"><option value="4">4 dernières semaines</option><option value="8" selected>8 dernières semaines</option><option value="12">12 dernières semaines</option><option value="m">Mois en cours</option></select><button class="btn small" style="margin:0" onclick="frCsv()"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Exporter (Excel/CSV)</button></div>
       <div id="fr-body"><div class="empty">Chargement…</div></div></div>
-    <div class="panel"><h3>📋 Rapport global du jour</h3><div id="d-body"><div class="empty">Chargement…</div></div></div>`;
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Rapport global du jour</h3><div id="d-body"><div class="empty">Chargement…</div></div></div>`;
   loadDaily(); krLoad(); frLoad();
 }
 /* Récapitulatif kilométrage + carburant (étape 2) */
@@ -2799,7 +2800,7 @@ async function frLoad() {
     window._frData = r;
     const wl = (w) => 'S ' + w.slice(8, 10) + '/' + w.slice(5, 7);
     const q = r.quality || {};
-    const warn = (q.inconsistentTrips || q.tripsWithoutKm) ? `<div class="msg" style="margin:6px 0;background:#FFF6E0;color:#8A5A00">⚠ Contrôle nécessaire : ${q.inconsistentTrips || 0} mission(s) avec distance incohérente (exclues) et ${q.tripsWithoutKm || 0} sans kilométrage.</div>` : '';
+    const warn = (q.inconsistentTrips || q.tripsWithoutKm) ? `<div class="msg" style="margin:6px 0;background:#FFF6E0;color:#8A5A00"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Contrôle nécessaire : ${q.inconsistentTrips || 0} mission(s) avec distance incohérente (exclues) et ${q.tripsWithoutKm || 0} sans kilométrage.</div>` : '';
     const rowH = (x, tot) => `<tr${tot ? ' style="font-weight:700;background:#F0F4FA"' : ''}><td>${tot ? 'TOTAL FLOTTE' : esc(x.number) + (x.registration ? '<br><small>' + esc(x.registration) + '</small>' : '')}</td>${r.weeks.map((w) => `<td style="text-align:right">${fmt(x.weeks[w])}</td>`).join('')}<td style="text-align:right"><b>${fmt(x.totalKm)}</b></td><td style="text-align:right">${fmt(x.liters)}</td><td style="text-align:right">${fmt(x.cost)}</td><td style="text-align:right">${x.l100 == null ? '—' : x.l100}</td><td style="text-align:right">${tot ? '' : fmt(x.odometer)}</td></tr>`;
     box.innerHTML = r.vehicles.length ? warn + `<div style="overflow:auto"><table><tr><th>Véhicule</th>${r.weeks.map((w) => `<th style="text-align:right">${wl(w)}</th>`).join('')}<th style="text-align:right">Total km</th><th style="text-align:right">Litres</th><th style="text-align:right">Coût (GNF)</th><th style="text-align:right">L/100 km</th><th style="text-align:right">Compteur</th></tr>${r.vehicles.map((x) => rowH(x, false)).join('')}${rowH(r.total, true)}</table></div><div class="desc" style="margin-top:6px">Semaines du lundi au dimanche · du ${esc(r.from)} au ${esc(r.to)} · « — » = données insuffisantes pour calculer.</div>` : '<div class="empty">Aucun véhicule dans cette catégorie.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
@@ -2812,7 +2813,7 @@ function frCsv() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recap-km-carburant-' + r.kind.toLowerCase() + '-' + r.to + '.csv'; a.click();
 }
 /* Récapitulatif maintenance (étape 3) */
-const MR_LV = { OVERDUE: ['🔴 En retard', '#A8403D'], SOON: ['🟠 Bientôt', '#C77D0A'], OK: ['🟢 À jour', '#3F8F6B'] };
+const MR_LV = { OVERDUE: ['En retard', '#A8403D'], SOON: ['Bientôt', '#C77D0A'], OK: ['À jour', '#3F8F6B'] };
 async function mrLoad() {
   const box = document.getElementById('mr-body'); if (!box) return;
   const kind = document.getElementById('mr-kind').value, per = document.getElementById('mr-per').value; window._mrKind = kind;
@@ -2836,7 +2837,7 @@ function mrCsv() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recap-maintenance-' + r.kind.toLowerCase() + '.csv'; a.click();
 }
 { const _rm = renderMaintenance; renderMaintenance = async function () { const r = await _rm(); mrLoad(); return r; }; }
-const KR_TABS = [['trips', '🧭 Trajets'], ['fuel', '⛽ Carburant'], ['maint', '🔧 Maintenance'], ['pannes', '⚠ Pannes']];
+const KR_TABS = [['trips', 'Trajets'], ['fuel', 'Carburant'], ['maint', 'Maintenance'], ['pannes', 'Pannes']];
 async function krLoad() {
   const box = document.getElementById('kr-list'); if (!box) return;
   const kind = window._krKind, d = document.getElementById('d-date').value;
@@ -2850,11 +2851,11 @@ async function krLoad() {
     box.innerHTML = list.map((x) => {
       const st = BOARD_ST[x.status], sh = window._krSheets[x.id];
       const num = String(x.phone || '').replace(/\D/g, ''), full = num.length === 9 ? '224' + num : num;
-      const relance = x.phone && (x.status === 'A_ENVOYER' || x.status === 'RIEN') ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent('Bonjour ' + x.name + ', merci de compléter et d\'envoyer votre fiche de bord du jour dans l\'application.')}">💬 Relancer</a>` : '';
-      return `<div class="panel" id="kr-${esc(x.id)}"><h3 style="margin-bottom:4px">${esc(x.name)} <span class="badge ${st[2]}">${st[0]} ${st[1]}</span>${sh && sh.processedAt ? ' <span class="badge ok">✔ Traitée</span>' : ''}</h3>
+      const relance = x.phone && (x.status === 'A_ENVOYER' || x.status === 'RIEN') ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent('Bonjour ' + x.name + ', merci de compléter et d\'envoyer votre fiche de bord du jour dans l\'application.')}">Relancer</a>` : '';
+      return `<div class="panel" id="kr-${esc(x.id)}"><h3 style="margin-bottom:4px">${esc(x.name)} <span class="badge ${st[2]}">${st[0]} ${st[1]}</span>${sh && sh.processedAt ? ' <span class="badge ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Traitée</span>' : ''}</h3>
         <div class="desc">${esc(x.vehicle || 'Aucun véhicule')} · ${esc(x.phone || '—')} · <b>${fmt(x.km)} km</b> · ${x.liters} L · ${x.tripsCount} trajet(s)</div>
-        ${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C">⚠ ${esc(a)}</div>`).join('')}
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${sh ? KR_TABS.map(([k, t]) => `<button class="btn small" style="margin:0" onclick="krToggle('${esc(x.id)}','${k}')">${t}</button>`).join('') + (sh.status === 'SENT' && !sh.processedAt ? `<button class="btn small gold" style="margin:0" onclick="krProcess('${esc(x.id)}')">✔ Marquer traitée</button>` : '') : '<span class="desc" style="margin:0">Aucune saisie ce jour.</span>'}${relance}</div>
+        ${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> ${esc(a)}</div>`).join('')}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${sh ? KR_TABS.map(([k, t]) => `<button class="btn small" style="margin:0" onclick="krToggle('${esc(x.id)}','${k}')">${t}</button>`).join('') + (sh.status === 'SENT' && !sh.processedAt ? `<button class="btn small gold" style="margin:0" onclick="krProcess('${esc(x.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Marquer traitée</button>` : '') : '<span class="desc" style="margin:0">Aucune saisie ce jour.</span>'}${relance}</div>
         <div id="kr-d-${esc(x.id)}" style="margin-top:8px"></div></div>`;
     }).join('') || '<div class="panel"><div class="empty">Aucun chauffeur dans cette catégorie.</div></div>';
   } catch (e) { box.innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
@@ -2883,10 +2884,10 @@ async function krProcess(id) {
 }
 /* ---------------- PERSONNEL : agents HSE et magasiniers (enregistrement, lien WhatsApp, rapports) ---------------- */
 const STAFF_CFG = {
-  'staff-hse': { role: 'AGENT_HSE', one: 'agent HSE', title: '👷 Agents HSE', rep: 'Rapports HSE' },
-  'staff-store': { role: 'MAGASINIER', one: 'gestionnaire de stock', title: '🧑‍🏭 Gestionnaires de stock', rep: 'Rapports Entrepôt' },
-  'staff-mech': { role: 'MECANICIEN', one: 'mécanicien', title: '🔧 Mécaniciens', rep: 'Rapports Atelier' },
-  'staff-pointer': { role: 'POINTEUR', one: 'pointeur', title: '🕒 Pointeurs', rep: 'Rapports de pointage' },
+  'staff-hse': { role: 'AGENT_HSE', one: 'agent HSE', title: 'Agents HSE', rep: 'Rapports HSE' },
+  'staff-store': { role: 'MAGASINIER', one: 'gestionnaire de stock', title: '‍ Gestionnaires de stock', rep: 'Rapports Entrepôt' },
+  'staff-mech': { role: 'MECANICIEN', one: 'mécanicien', title: 'Mécaniciens', rep: 'Rapports Atelier' },
+  'staff-pointer': { role: 'POINTEUR', one: 'pointeur', title: 'Pointeurs', rep: 'Rapports de pointage' },
 };
 async function renderStaff(view, reportsOnly) {
   const c = STAFF_CFG[view]; window._stView = view; window._stRo = !!reportsOnly;
@@ -2898,7 +2899,7 @@ async function renderStaff(view, reportsOnly) {
       <label>Jour</label><input id="st-date" type="date" value="${esc(today)}" onchange="window._stDate=this.value;stLoad()" style="max-width:220px">
       <div id="st-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
     <div id="st-reports"><div class="empty">Chargement…</div></div>
-    ${office ? `<div class="panel"><h3>➕ Nouveau ${c.one}</h3>
+    ${office ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau ${c.one}</h3>
       <div class="grid-2"><div><label>Prénom</label><input id="st-first"></div><div><label>Nom</label><input id="st-last"></div><div><label>Téléphone (WhatsApp)</label><input id="st-phone" type="tel" placeholder="6xx xx xx xx"></div></div>
       <button class="btn gold" onclick="stSave()">Enregistrer</button><div id="st-msg"></div></div>` : ''}
     ${reportsOnly ? '' : '<div class="panel"><h3>Équipe</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>'}`;
@@ -2916,18 +2917,18 @@ async function stLoad() {
     const missing = active.filter((u) => !byName[u.firstName + ' ' + u.lastName]);
     const tile = (n, l, col) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${col}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
     document.getElementById('st-sum').innerHTML = tile(active.length, 'Personnes', 'var(--navy)') + tile(reps.length, 'Rapports envoyés', '#3F8F6B') + tile(reps.filter((r) => r.receivedAt).length, 'Reçus', '#3F8F6B') + tile(missing.length, 'Non envoyés', '#A8403D');
-    const wa = (u) => { const n = String(u.phone || '').replace(/\D/g, ''), f = n.length === 9 ? '224' + n : n; return u.phone ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(f)}?text=${encodeURIComponent('Bonjour ' + u.firstName + ', merci d\'envoyer votre rapport du jour dans l\'application.')}">💬 Relancer</a>` : ''; };
+    const wa = (u) => { const n = String(u.phone || '').replace(/\D/g, ''), f = n.length === 9 ? '224' + n : n; return u.phone ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(f)}?text=${encodeURIComponent('Bonjour ' + u.firstName + ', merci d\'envoyer votre rapport du jour dans l\'application.')}">Relancer</a>` : ''; };
     document.getElementById('st-reports').innerHTML = reps.map((r) => `<div class="panel"><h3 style="margin-bottom:4px">${esc(r.name)} ${stepBadge(staffStep(r))} <span style="font-size:12px;font-weight:400;color:var(--muted)">${drvDt(r.sentAt)}</span></h3>
         <div class="desc">${esc(r.phone || '')}</div>
         <h4 style="margin:8px 0 2px">Activités</h4><div style="white-space:pre-wrap">${esc(r.activities)}</div>
         ${r.observations ? `<h4 style="margin:8px 0 2px">Observations</h4><div style="white-space:pre-wrap">${esc(r.observations)}</div>` : ''}
         ${r.rejectNote ? `<div class="msg err">Rejeté : ${esc(r.rejectNote)}</div>` : ''}
-        ${!r.receivedAt && !r.rejectedAt && canReceive ? `<button class="btn small gold" style="margin-top:8px" onclick="stReceive('${esc(r.id)}')">✔ Vérifier et transmettre</button> <button class="btn small" style="margin-top:8px" onclick="stReject('${esc(r.id)}')">↩ Rejeter</button>` : ''}</div>`).join('')
-      + (missing.length ? `<div class="panel"><h3>⏳ Rapport non envoyé</h3>${missing.map((u) => `<div class="drv-row"><span>${esc(u.firstName + ' ' + u.lastName)}</span><span>${wa(u)}</span></div>`).join('')}</div>` : '')
+        ${!r.receivedAt && !r.rejectedAt && canReceive ? `<button class="btn small gold" style="margin-top:8px" onclick="stReceive('${esc(r.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Vérifier et transmettre</button> <button class="btn small" style="margin-top:8px" onclick="stReject('${esc(r.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Rejeter</button>` : ''}</div>`).join('')
+      + (missing.length ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Rapport non envoyé</h3>${missing.map((u) => `<div class="drv-row"><span>${esc(u.firstName + ' ' + u.lastName)}</span><span>${wa(u)}</span></div>`).join('')}</div>` : '')
       || '<div class="panel"><div class="empty">Aucune personne enregistrée.</div></div>';
     const tmEl = document.getElementById('st-team'); if (tmEl) tmEl.innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Téléphone</th><th>Application</th><th>Dernier rapport</th><th></th></tr>${team.map((u) => `<tr><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
       <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td><td>${esc(u.lastReport || '—')}</td>
-      <td>${office ? `<button class="btn small gold" onclick="stInvite('${esc(u.id)}')">💬 Envoyer le lien</button>` : ''}</td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune personne enregistrée.</div>';
+      <td>${office ? `<button class="btn small gold" onclick="stInvite('${esc(u.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien</button>` : ''}</td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune personne enregistrée.</div>';
   } catch (e) { document.getElementById('st-reports').innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
 }
 async function stSave() {
@@ -2948,8 +2949,8 @@ async function stInvite(userId) {
     const r = await api('/staff/invite', { method: 'POST', body: { userId, appUrl: link } });
     const num = r.phone.length === 9 ? '224' + r.phone : r.phone; window._invMsg = r.message;
     box.innerHTML = `<div class="msg ok" style="margin-top:10px">Message prêt pour ${esc(r.name)} (${esc(num)}).</div>
-      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Envoyer par WhatsApp</a>
-      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">Envoyer par WhatsApp</a>
+      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">Copier le message</button>
       <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ».</div>`;
     box.scrollIntoView({ behavior: 'smooth' });
   } catch (e) { box.innerHTML = `<div class="msg err" style="margin-top:10px">${esc(e.message)}</div>`; }
@@ -2962,19 +2963,19 @@ async function stInvite(userId) {
 const LOGI_ROLES = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'];
 const OFFICE_ROLES = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'];
 const LOGI_TABS = [
-  { t: '🚛 Flotte', go: 'trucks', views: ['trucks', 'service-vehicles', 'vehicles'], subs: [['trucks', 'Camions'], ['service-vehicles', 'Véhicules de service']] },
-  { t: '👥 Équipes terrain', go: 'drivers', views: ['drivers', 'pointage', 'enrol', 'driver-board', 'driver-devices'], subs: [['drivers', 'Chauffeurs'], ['pointage', 'Pointage'], ['enrol', 'Enrôlement WhatsApp', 1], ['driver-board', 'Suivi du jour'], ['driver-devices', 'Appareils']] },
-  { t: '📋 Fiches de bord', go: 'driver-sheets', views: ['driver-sheets', 'driver-missions'], subs: [['driver-sheets', 'Du jour'], ['driver-missions', 'Historique']] },
-  { t: '⛽ Carburant & Maintenance', go: 'fuel', views: ['fuel', 'maintenance'], subs: [['fuel', 'Carburant'], ['maintenance', 'Maintenance']] },
-  { t: '💵 Dépenses', go: 'driver-expenses', views: ['driver-expenses'], subs: null },
+  { t: 'Flotte', go: 'trucks', views: ['trucks', 'service-vehicles', 'vehicles'], subs: [['trucks', 'Camions'], ['service-vehicles', 'Véhicules de service']] },
+  { t: 'Équipes terrain', go: 'drivers', views: ['drivers', 'pointage', 'enrol', 'driver-board', 'driver-devices'], subs: [['drivers', 'Chauffeurs'], ['pointage', 'Pointage'], ['enrol', 'Enrôlement WhatsApp', 1], ['driver-board', 'Suivi du jour'], ['driver-devices', 'Appareils']] },
+  { t: 'Fiches de bord', go: 'driver-sheets', views: ['driver-sheets', 'driver-missions'], subs: [['driver-sheets', 'Du jour'], ['driver-missions', 'Historique']] },
+  { t: 'Carburant & Maintenance', go: 'fuel', views: ['fuel', 'maintenance'], subs: [['fuel', 'Carburant'], ['maintenance', 'Maintenance']] },
+  { t: 'Dépenses', go: 'driver-expenses', views: ['driver-expenses'], subs: null },
 ];
 const REPORT_TABS = [
-  { t: '🚛 Camions', go: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
-  { t: '🚙 Véhicules de service', go: 'reports-service', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
-  { t: '👥 Chauffeurs & pointages', go: 'reports-drivers', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
-  { t: '📦 Stock', go: 'reports-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR', 'MAGASINIER'] },
-  { t: '🦺 HSE', go: 'reports-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR', 'GESTIONNAIRE_HSE'] },
-  { t: '🎯 Synthèse DG', go: 'reports-dg', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'] },
+  { t: 'Camions', go: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
+  { t: 'Véhicules de service', go: 'reports-service', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
+  { t: 'Chauffeurs & pointages', go: 'reports-drivers', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'LECTEUR'] },
+  { t: 'Stock', go: 'reports-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR', 'MAGASINIER'] },
+  { t: 'HSE', go: 'reports-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR', 'GESTIONNAIRE_HSE'] },
+  { t: 'Synthèse DG', go: 'reports-dg', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'] },
 ];
 function reportsHome(role) { return role === 'GESTIONNAIRE_HSE' ? 'reports-hse' : role === 'MAGASINIER' ? 'reports-stock' : 'reports-truck'; }
 function navKey(view) {
@@ -2991,7 +2992,7 @@ function deptBarHtml(view) {
     return `<div class="dp-tabs" id="dp-bar">${tabs.map((x) => btn(x.t, x.go, x.go === view)).join('')}</div>`;
   }
   if (r === 'RESPONSABLE_OPERATIONS' && ['ops-validation', 'driver-expenses'].includes(view)) {
-    return `<div class="dp-tabs" id="dp-bar">${btn('✅ Fiches à valider', 'ops-validation', view === 'ops-validation')}${btn('💵 Dépenses & reçus', 'driver-expenses', view === 'driver-expenses')}</div>`;
+    return `<div class="dp-tabs" id="dp-bar">${btn('<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Fiches à valider', 'ops-validation', view === 'ops-validation')}${btn('<svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Dépenses & reçus', 'driver-expenses', view === 'driver-expenses')}</div>`;
   }
   if (LOGI_ROLES.includes(r)) {
     const cur = LOGI_TABS.find((x) => x.views.includes(view)); if (!cur) return '';
@@ -3014,20 +3015,20 @@ async function renderReportDrivers() {
   const tile = (n, l, c) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
   const rows = list.map((d) => {
     const a = by[d.id], cur = a && ATT_ST.find((x) => x[0] === a.status), x = bo[d.id], st = x && BOARD_ST[x.status];
-    return `<tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${d.activity === 'TRUCK' ? '🚛 Camion' : d.activity === 'SERVICE_VEHICLE' ? '🚙 Véhicule de service' : '—'}</td>
+    return `<tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${d.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : d.activity === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '—'}</td>
       <td>${cur ? `<span class="badge ${cur[2]}">${cur[1]}</span>${a.absenceReason ? `<div style="font-size:12px;color:var(--muted)">${esc(a.absenceReason)}</div>` : ''}` : '<span class="badge warn">Non pointé</span>'}</td>
       <td class="mono">${x ? fmt(x.km) + ' km' : '—'}</td><td>${st ? `<span class="badge ${st[2]}">${st[0]} ${st[1]}</span>` : '—'}</td></tr>`;
   }).join('') || '<tr><td colspan="5" class="empty">Aucun chauffeur.</td></tr>';
-  root().innerHTML = `<div class="panel"><h3>👥 Chauffeurs & pointages</h3><div class="desc">Présence et fiches de bord du jour. Lecture seule.</div>
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Chauffeurs & pointages</h3><div class="desc">Présence et fiches de bord du jour. Lecture seule.</div>
     <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._rdDate=this.value;renderReportDrivers().then(()=>{const h=deptBarHtml('reports-drivers');if(h)root().insertAdjacentHTML('afterbegin',h)})">
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(list.length, 'Chauffeurs actifs', 'var(--navy)')}${tile(pres, 'Présents', '#3F8F6B')}${tile(abs, 'Absents', '#A8403D')}${tile(none, 'Non pointés', '#C77D0A')}</div></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Activité</th><th>Pointage</th><th>Km du jour</th><th>Fiche de bord</th></tr>${rows}</table></div></div>`;
 }
 
 /* Enrôlement WhatsApp : 4 catégories, un seul endroit pour enregistrer et envoyer le lien */
-const ENROL_TABS = [['TRUCK', '🚛 Chauffeurs camions'], ['SERVICE_VEHICLE', '🚙 Chauffeurs véhicules de service'], ['HSE', '🦺 Agents HSE'], ['POINTER', '🕒 Pointeurs']];
+const ENROL_TABS = [['TRUCK', 'Chauffeurs camions'], ['SERVICE_VEHICLE', 'Chauffeurs véhicules de service'], ['HSE', 'Agents HSE'], ['POINTER', 'Pointeurs']];
 const ENROL_ONE = { TRUCK: 'chauffeur de camion', SERVICE_VEHICLE: 'chauffeur de véhicule de service', HSE: 'agent HSE', POINTER: 'pointeur' };
-const ENROL_ST = { NON_ENVOYE: ['Non envoyé', 'info'], ENVOYE: ['📤 Envoyé', 'warn'], OUVERT: ['👀 Ouvert', 'warn'], ACTIVE: ['✅ Activé', 'ok'], EXPIRE: ['⏰ Expiré', 'bad'] };
+const ENROL_ST = { NON_ENVOYE: ['Non envoyé', 'info'], ENVOYE: ['Envoyé', 'warn'], OUVERT: ['Ouvert', 'warn'], ACTIVE: ['Activé', 'ok'], EXPIRE: ['Expiré', 'bad'] };
 function enrolLink() { return location.origin + location.pathname.replace(/index\.html$/, ''); }
 async function renderEnrol(kind) {
   const role = state.user.role, tabs = role === 'GESTIONNAIRE_HSE' ? ENROL_TABS.filter((t) => t[0] === 'HSE') : ENROL_TABS;
@@ -3036,12 +3037,12 @@ async function renderEnrol(kind) {
   kind = kind || window._enKind; if (!tabs.some((t) => t[0] === kind)) kind = tabs[0][0]; window._enKind = kind;
   const drv = kind === 'TRUCK' || kind === 'SERVICE_VEHICLE';
   root().innerHTML = `${tabs.length > 1 ? `<div class="dp-sub">${tabs.map((t) => `<button class="${t[0] === kind ? 'on' : ''}" onclick="renderEnrol('${t[0]}').then(()=>{const h=deptBarHtml('enrol');if(h)root().insertAdjacentHTML('afterbegin',h)})">${t[1]}</button>`).join('')}</div>` : ''}
-    <div class="panel"><h3>➕ Nouveau ${ENROL_ONE[kind]}</h3>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau ${ENROL_ONE[kind]}</h3>
       <div class="desc">Enregistrez la personne : le lien de l'application s'ouvre dans WhatsApp, avec son identifiant (son numéro) et son mot de passe provisoire.</div>
       <div class="grid-2"><div><label>Nom</label><input id="en-last" autocomplete="off"></div><div><label>Prénom</label><input id="en-first" autocomplete="off"></div>
         <div><label>N° WhatsApp</label><input id="en-phone" type="tel" inputmode="tel" placeholder="6xx xx xx xx"></div>
         <div>${drv ? '<label>N° de permis</label><input id="en-lic" autocomplete="off">' : `<label>Activité</label><input value="${kind === 'HSE' ? 'Agent HSE' : 'Pointeur'}" disabled>`}</div></div>
-      <button class="btn gold" style="margin-top:10px" onclick="enrolSave()">💬 Envoyer le lien par WhatsApp</button><div id="en-msg"></div><div id="en-send"></div></div>
+      <button class="btn gold" style="margin-top:10px" onclick="enrolSave()"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien par WhatsApp</button><div id="en-msg"></div><div id="en-send"></div></div>
     <div class="panel"><h3>${tabs.find((t) => t[0] === kind)[1]}</h3><div id="en-sum" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div><div id="en-list"><div class="empty">Chargement…</div></div>
       <div class="desc" style="margin-top:10px"><b>Envoyé</b> : lien envoyé, pas encore utilisé · <b>Ouvert</b> : la personne s'est connectée, installation à terminer · <b>Activé</b> : application prête · <b>Expiré</b> : sans suite après 24 h, à renvoyer.</div></div>`;
   enrolLoad();
@@ -3058,7 +3059,7 @@ async function enrolLoad() {
       return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line)">
         <div style="min-width:170px;flex:1"><b>${esc(r.lastName)}</b> ${esc(r.firstName)}<div style="font-size:12px;color:var(--muted)">${esc(r.phone || 'pas de numéro')}${r.detail ? ' · ' + esc(r.detail) : ''}</div></div>
         <div style="text-align:right"><span class="badge ${st[1]}">${st[0]}</span>${r.invitedAt ? `<div style="font-size:12px;color:var(--muted)">envoi ${drvDt(r.invitedAt)}</div>` : ''}</div>
-        ${r.state === 'ACTIVE' || !r.phone ? '' : `<button class="btn small gold" onclick="enrolResend('${r.kind}','${esc(r.id)}')">💬 ${r.state === 'NON_ENVOYE' ? 'Envoyer le lien' : 'Renvoyer le lien'}</button>`}</div>`;
+        ${r.state === 'ACTIVE' || !r.phone ? '' : `<button class="btn small gold" onclick="enrolResend('${r.kind}','${esc(r.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> ${r.state === 'NON_ENVOYE' ? 'Envoyer le lien' : 'Renvoyer le lien'}</button>`}</div>`;
     }).join('') : '<div class="empty">Aucune personne enregistrée dans cette catégorie.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
@@ -3067,8 +3068,8 @@ async function enrolSend(type, id) {
   const r = type === 'DRIVER' ? await api('/driver-admin/invite', { method: 'POST', body: { driverId: id, appUrl: enrolLink() } }) : await api('/staff/invite', { method: 'POST', body: { userId: id, appUrl: enrolLink() } });
   const num = r.phone.length === 9 ? '224' + r.phone : r.phone; window._invMsg = r.message;
   box.innerHTML = `<div class="msg ok" style="margin-top:10px">Message prêt pour ${esc(r.driver || r.name)} (${esc(num)}).</div>
-    <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Ouvrir WhatsApp</a>
-    <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+    <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">Ouvrir WhatsApp</a>
+    <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">Copier le message</button>
     <div class="desc">WhatsApp s'ouvre avec le message prêt : appuyez sur « Envoyer ».</div>`;
   box.scrollIntoView({ behavior: 'smooth', block: 'center' });
   enrolLoad();
@@ -3090,19 +3091,19 @@ async function enrolSave() {
 
 /* ---------------- ACCUEIL : uniquement les cartes des départements ---------------- */
 const HOME_CARDS = [
-  { ico: '🎯', t: 'Direction', d: 'Tableau de bord, alertes et synthèse', v: 'pilotage', roles: ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'] },
-  { ico: '🚚', t: 'Logistique & Flotte', d: 'Camions, véhicules, chauffeurs, fiches de bord', v: 'espace-logi', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'], over: { LECTEUR: 'dash-fleet' } },
-  { ico: '🦺', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'espace' } },
-  { ico: '📦', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER', 'LECTEUR'], over: { MAGASINIER: 'espace' } },
-  { ico: '✅', t: 'Opérations', d: 'Fiches vérifiées à valider, reçus papier', v: 'ops-validation', roles: ['SUPER_ADMIN', 'RESPONSABLE_OPERATIONS'] },
-  { ico: '🧾', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'compta', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
-  { ico: '📊', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'reports-hse', MAGASINIER: 'reports-stock' } },
-  { ico: '🏢', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-target"/></svg>', t: 'Direction', d: 'Tableau de bord, alertes et synthèse', v: 'pilotage', roles: ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'] },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg>', t: 'Logistique & Flotte', d: 'Camions, véhicules, chauffeurs, fiches de bord', v: 'espace-logi', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'LECTEUR'], over: { LECTEUR: 'dash-fleet' } },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-hard-hat"/></svg>', t: 'HSE', d: 'Incidents, audits, équipements de protection', v: 'dash-hse', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'espace' } },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-package"/></svg>', t: 'Stock', d: 'Entrées, sorties, inventaires, alertes', v: 'dash-stock', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'MAGASINIER', 'LECTEUR'], over: { MAGASINIER: 'espace' } },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>', t: 'Opérations', d: 'Fiches vérifiées à valider, reçus papier', v: 'ops-validation', roles: ['SUPER_ADMIN', 'RESPONSABLE_OPERATIONS'] },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg>', t: 'Comptabilité', d: 'Dépenses à valider, rapprochements, facturation', v: 'compta', roles: ['SUPER_ADMIN', 'COMPTABLE'] },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>', t: 'Rapports', d: 'Camions, véhicules, chauffeurs, stock, HSE', v: 'reports-truck', roles: ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'], over: { GESTIONNAIRE_HSE: 'reports-hse', MAGASINIER: 'reports-stock' } },
+  { ico: '<svg class="ic" aria-hidden="true"><use href="#i-building"/></svg>', t: 'Administration', d: 'Responsables, licences, accès', v: 'staff-managers', roles: ['SUPER_ADMIN'] },
 ];
 function homeCardsFor(role) { return HOME_CARDS.filter((c) => c.roles.includes(role)).map((c) => ({ ...c, view: (c.over && c.over[role]) || c.v })); }
 function renderHome() {
   const u = state.user, cards = homeCardsFor(u.role);
-  root().innerHTML = `<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">Bonjour ${esc(u.firstName)} 👋</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
+  root().innerHTML = `<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">Bonjour ${esc(u.firstName)}</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
     <div class="hm-grid">${cards.map((c) => `<button class="hm-card" onclick="go('${c.view}')"><div class="hm-ico">${c.ico}</div><div><b>${esc(c.t)}</b><span class="d">${esc(c.d)}</span></div></button>`).join('')}</div>`;
 }
 
@@ -3257,7 +3258,7 @@ async function renderExecutive(mode) {
   const d = await api('/dashboards/executive' + (state.siteId ? '?siteId=' + state.siteId : ''));
   const u = state.user, f = d.fleet, m = d.missions, pe = d.people, ex = d.expenses, hs = d.hse, st = d.stock;
   const heroTxt = mode === 'dg' ? 'Voici la situation globale de votre entreprise.' : 'Voici l’activité de votre logistique : missions, véhicules et chauffeurs.';
-  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
+  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
   const rate = m.completionRate;
   const ring = (v, col) => `<div class="ex-ring" style="background:conic-gradient(${col} ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
@@ -3313,7 +3314,7 @@ async function renderWorkspace() {
   const names = { STORE: 'Gestionnaire de stock', HSE: 'Agent HSE', MECHANIC: 'Mécanicien', POINTER: 'Pointeur' };
   const hello = { STORE: 'Gérez vos articles, entrées et sorties du jour.', HSE: 'Prévention, inspections et incidents de votre site.', MECHANIC: 'Interventions, diagnostics et véhicules à réparer.', POINTER: 'Pointage du jour et présence des chauffeurs.' }[d.kind];
   const rep = d.myReport ? `Rapport du jour ${stepBadge(staffStep(d.myReport))}` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
-  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)} 👋</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
+  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
   const atAct = (ico, label, tab) => `<button onclick="atTab='${tab}';go('atelier')"><span>${ico}</span>${label}</button>`;
   const ptAct = (ico, label, tab) => `<button onclick="ptTab='${tab}';go('pointage')"><span>${ico}</span>${label}</button>`;
@@ -3374,11 +3375,11 @@ async function renderPointCamions(bar) {
   const r = await api('/pointer/day?date=' + date + '&siteId=' + encodeURIComponent(state.siteId || ''));
   window._ptCount = {}; r.rows.forEach((x) => { window._ptCount[x.vehicleId] = x; });
   const done = r.rows.filter((x) => x.pointer).length;
-  root().innerHTML = bar + `<div class="panel"><h3>🚛 Comptage des camions à la barrière</h3>
+  root().innerHTML = bar + `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Comptage des camions à la barrière</h3>
     <div class="desc">Saisissez ce que vous avez compté : mouvements et tonnes de chaque camion.</div>
     <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._ptDate=this.value;renderPointage()">
     <div class="msg ${done === r.rows.length && r.rows.length ? 'ok' : 'err'}" style="margin-top:10px">${done} / ${r.rows.length} camions comptés</div></div>
-    <div class="panel">${r.rows.map((x) => `<div class="drv-row" style="flex-wrap:wrap;gap:8px;align-items:center"><span style="min-width:150px"><b>${esc(x.vehicle)}</b> ${x.pointer ? '<span class="badge ok">Compté</span>' : '<span class="badge warn">À compter</span>'}${x.locked ? ' <span class="badge info">🔒 Validé</span>' : ''}</span>
+    <div class="panel">${r.rows.map((x) => `<div class="drv-row" style="flex-wrap:wrap;gap:8px;align-items:center"><span style="min-width:150px"><b>${esc(x.vehicle)}</b> ${x.pointer ? '<span class="badge ok">Compté</span>' : '<span class="badge warn">À compter</span>'}${x.locked ? ' <span class="badge info"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Validé</span>' : ''}</span>
       <span style="display:flex;gap:6px;flex-wrap:wrap"><input id="pc-m-${esc(x.vehicleId)}" type="number" inputmode="numeric" min="0" placeholder="Mouvements" value="${x.pointer ? x.pointer.movements : ''}" style="width:120px;min-height:44px" ${x.locked ? 'disabled' : ''}><input id="pc-t-${esc(x.vehicleId)}" type="number" inputmode="decimal" min="0" step="0.1" placeholder="Tonnes" value="${x.pointer ? x.pointer.tons : ''}" style="width:100px;min-height:44px" ${x.locked ? 'disabled' : ''}>
       <button class="btn small gold" style="min-height:44px" ${x.locked ? 'disabled' : ''} onclick="ptCount('${esc(x.vehicleId)}')">${x.pointer ? 'Corriger' : 'Enregistrer'}</button></span></div>`).join('') || '<div class="empty">Aucun camion.</div>'}<div id="pc-msg"></div></div>`;
 }
@@ -3404,9 +3405,9 @@ async function ptMark(driverId, status) {
 const MGR_ROLES = { DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité' };
 async function renderManagers() {
   root().innerHTML = `
-    <div class="panel"><h3>🏢 Responsables de l'entreprise</h3>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-building"/></svg> Responsables de l'entreprise</h3>
       <div class="desc">Vous enregistrez ici le Directeur Général et le Responsable logistique, puis vous leur envoyez le lien de l'application par WhatsApp. Chacun arrive directement dans son propre espace.</div></div>
-    <div class="panel"><h3>➕ Nouveau responsable</h3>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau responsable</h3>
       <div class="grid-2"><div><label>Fonction</label><select id="st-role">${Object.entries(MGR_ROLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
       <div><label>Prénom</label><input id="st-first"></div><div><label>Nom</label><input id="st-last"></div><div><label>Téléphone (WhatsApp)</label><input id="st-phone" type="tel" placeholder="6xx xx xx xx"></div></div>
       <button class="btn gold" onclick="mgSave()">Enregistrer et préparer le message</button><div id="st-msg"></div></div>
@@ -3419,7 +3420,7 @@ async function mgLoad() {
     const team = await api('/staff?role=DIRECTEUR_GENERAL,ADMIN_LOGISTIQUE');
     box.innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Fonction</th><th>Nom</th><th>Téléphone</th><th>Application</th><th></th></tr>${team.map((u) => `<tr><td>${esc(MGR_ROLES[u.role] || u.role)}</td><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
       <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td>
-      <td><button class="btn small gold" onclick="stInvite('${esc(u.id)}')">💬 Envoyer le lien par WhatsApp</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucun responsable enregistré.</div>';
+      <td><button class="btn small gold" onclick="stInvite('${esc(u.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien par WhatsApp</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucun responsable enregistré.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function mgSave() {
@@ -3441,12 +3442,12 @@ async function renderMyReport() {
   const today = new Date().toISOString().slice(0, 10);
   const list = await api('/staff/reports/mine');
   const cur = list.find((r) => r.date === today);
-  root().innerHTML = `<div class="panel"><h3>📝 Mon rapport du jour</h3>
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Mon rapport du jour</h3>
     <div class="desc">Décrivez vos activités de la journée : votre responsable le reçoit directement.</div>
     <label>Date</label><input id="mr-date" type="date" value="${today}" max="${today}" style="max-width:220px">
     <label>Activités de la journée</label><textarea id="mr-act" rows="6" placeholder="Ex : réception de 20 cartons, 3 sorties pour le camion RC-1, inventaire de l'allée B…">${esc(cur ? cur.activities : '')}</textarea>
     <label>Observations (facultatif)</label><textarea id="mr-obs" rows="3">${esc(cur && cur.observations ? cur.observations : '')}</textarea>
-    <button class="btn gold" onclick="sendMyReport()">📤 Envoyer mon rapport</button><div id="mr-msg"></div></div>
+    <button class="btn gold" onclick="sendMyReport()"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> Envoyer mon rapport</button><div id="mr-msg"></div></div>
     <div class="panel"><h3>Mes derniers rapports</h3>${list.length ? list.map((r) => `<div class="drv-row"><span>${esc(r.date)}${r.rejectNote ? '<br><small style="color:var(--bad-fg)">Rejeté : ' + esc(r.rejectNote) + ' — corrigez puis renvoyez.</small>' : ''}</span>${stepBadge(staffStep(r))}</div>`).join('') : '<div class="empty">Aucun rapport envoyé.</div>'}</div>`;
 }
 async function sendMyReport() {
@@ -3462,8 +3463,8 @@ function dailyTripsTable(r) {
   const rows = r.trips.list.map((x) => `<tr>
     <td><b>${esc(x.plate)}</b><div style="font-size:12px;color:var(--muted)">${esc(x.brand)}</div></td>
     <td>${esc(x.driver.split(' (')[0])}<div style="font-size:12px;color:var(--muted)">${esc(x.phone)}</div></td>
-    <td>${esc(x.destination || x.regions.join(', ') || '—')}${x.cargo ? '<div style="font-size:12px">' + esc(x.cargo) + '</div>' : ''}${x.loadPlaces && x.loadPlaces.length ? '<div style="font-size:12px">⬆ ' + esc(x.loadPlaces.join(', ')) + ' → ⬇ ' + esc((x.unloadPlaces || []).join(', ')) + '</div>' : ''}</td>
-    <td>${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? '<div style="font-size:12px">' + x.voyages + ' mouvement(s)' + (x.tons ? ' = ' + x.tons + ' t' : '') + '</div>' : ''}${x.pauseMileage != null ? '<div style="font-size:12px">⏸ pause ' + fmt(x.pauseMileage) + ' km</div>' : ''}</td>
+    <td>${esc(x.destination || x.regions.join(', ') || '—')}${x.cargo ? '<div style="font-size:12px">' + esc(x.cargo) + '</div>' : ''}${x.loadPlaces && x.loadPlaces.length ? '<div style="font-size:12px"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> ' + esc(x.loadPlaces.join(', ')) + ' → <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> ' + esc((x.unloadPlaces || []).join(', ')) + '</div>' : ''}</td>
+    <td>${hh(x.startTime)} → ${hh(x.endTime)}${x.voyages ? '<div style="font-size:12px">' + x.voyages + ' mouvement(s)' + (x.tons ? ' = ' + x.tons + ' t' : '') + '</div>' : ''}${x.pauseMileage != null ? '<div style="font-size:12px">pause ' + fmt(x.pauseMileage) + ' km</div>' : ''}</td>
     <td class="mono">${fmt(x.startMileage)} → ${x.endMileage !== null ? fmt(x.endMileage) : '…'}${x.fuelMileages.length ? '<div style="font-size:12px">plein : ' + x.fuelMileages.map(fmt).join(', ') + '</div>' : ''}</td>
     <td class="mono"><b>${fmt(x.km)} km</b></td>
     <td class="mono">${x.tankStart !== null || x.tankEnd !== null ? 'Réservoir ' + (x.tankStart ?? '?') + ' → ' + (x.tankEnd ?? '?') + ' L' + (x.tankUsed !== null ? '<div style="font-size:12px">' + x.tankUsed + ' L utilisés</div>' : '') : ''}<div style="font-size:12px">${x.liters ? 'Pleins : ' + x.liters + ' L · ' + fmt(x.fuelCost) + ' GNF' : 'Aucun plein'}${x.consumption !== null ? ' · ' + x.consumption + ' L/100' : ''}</div></td>
@@ -3898,7 +3899,7 @@ function drvHomeHtml(me) {
   const pend = drvQueue().filter((o) => !o.rejected).length, ls = dget('lastsync', 0);
   const hm = ls ? new Date(ls).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
   const pause = act && truck ? `<button onclick="drvPauseForm('${tid}')">⏸ Pause${act.pauseMileage != null ? ' (' + fmt(act.pauseMileage) + ' km)' : ''}</button>` : '';
-  return `<div class="drv-hello"><h2>Bonjour ${first} 👋</h2><div>${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div></div>
+  return `<div class="drv-hello"><h2>Bonjour ${first}</h2><div>${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div></div>
     <div class="drv-card"><h4>${v ? (truck ? '🚛 ' : '🚙 ') + esc(v.plate) + (v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : '') : '🚫 Aucun véhicule affecté'}</h4>
       <div class="drv-row"><span>État</span><b>${stateTxt}</b></div>
       ${v ? `<div class="drv-row"><span>Kilométrage</span><b>${fmt(v.mileage)} km</b></div>` : ''}
@@ -4353,28 +4354,28 @@ async function renderDriverDevices() {
     return `<tr><td><b>${esc(d.name)}</b></td><td>${d.linked ? esc(d.userEmail) : '<span class="badge bad">Non lié</span>'}</td>
       <td>${dev ? badge(dev) + (dev.model ? ' ' + esc(dev.model) : '') : '—'}${dev && dev.lastSeenAt ? `<div style="font-size:12px;color:var(--muted)">vu ${new Date(dev.lastSeenAt).toLocaleString('fr-FR')}</div>` : ''}${dev && dev.blockedReason ? `<div style="font-size:12px;color:var(--danger)">${esc(dev.blockedReason)}</div>` : ''}</td>
       <td style="white-space:nowrap">
-        ${d.linked ? '' : `<button class="btn small" onclick="drvLinkForm('${esc(d.id)}')">🔗 Lier un compte</button> `}
-        ${d.linked ? `<button class="btn small gold" onclick="drvProvision('${esc(d.id)}')">🔑 Code / QR</button> ` : ''}
-        ${dev && dev.status === 'ACTIVE' ? `<button class="btn small" onclick="drvTransfer('${esc(dev.id)}','${esc(d.id)}')">🔁 Transférer</button> <button class="btn small" onclick="drvBlock('${esc(dev.id)}')">⛔ Bloquer</button> ` : ''}
-        ${dev && dev.status === 'BLOCKED' ? `<button class="btn small" onclick="drvUnblock('${esc(dev.id)}')">✅ Débloquer</button> ` : ''}
-        <button class="btn small" onclick="drvHistory('driver','${esc(d.id)}')">📜 Historique</button></td></tr>`;
+        ${d.linked ? '' : `<button class="btn small" onclick="drvLinkForm('${esc(d.id)}')">Lier un compte</button> `}
+        ${d.linked ? `<button class="btn small gold" onclick="drvProvision('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg> Code / QR</button> ` : ''}
+        ${dev && dev.status === 'ACTIVE' ? `<button class="btn small" onclick="drvTransfer('${esc(dev.id)}','${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Transférer</button> <button class="btn small" onclick="drvBlock('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg> Bloquer</button> ` : ''}
+        ${dev && dev.status === 'BLOCKED' ? `<button class="btn small" onclick="drvUnblock('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Débloquer</button> ` : ''}
+        <button class="btn small" onclick="drvHistory('driver','${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Historique</button></td></tr>`;
   }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
-  root().innerHTML = `<div class="panel"><h3>📲 Application chauffeur — appareils autorisés</h3>
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Application chauffeur — appareils autorisés</h3>
     <div class="desc">Un chauffeur = un compte personnel = un seul appareil actif. Générez un code (QR + 6 chiffres, valable 24 h) ; l'ancien appareil est automatiquement révoqué à l'activation du nouveau.</div>
-    <button class="btn gold" onclick="drvPlanTrip()">🗓 Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()">➕ Créer un compte chauffeur</button> <button class="btn gold" onclick="drvInvitePanel()">📲 Envoyer l'application aux chauffeurs</button>
+    <button class="btn gold" onclick="drvPlanTrip()">Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Créer un compte chauffeur</button> <button class="btn gold" onclick="drvInvitePanel()"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Envoyer l'application aux chauffeurs</button>
     <div style="overflow:auto;margin-top:12px"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${rows}</table></div></div>
     <div id="drv-hist"></div>`;
 }
 function drvInvitePanel() {
   const list = window._drvOv || [];
-  const act = (a) => (a === 'TRUCK' ? '🚛 Camion' : a === 'SERVICE_VEHICLE' ? '🚙 Véhicule de service' : '<span class="badge warn">Activité à préciser</span>');
+  const act = (a) => (a === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : a === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '<span class="badge warn">Activité à préciser</span>');
   const link = location.origin + location.pathname.replace(/index\.html$/, '');
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
-  ov.innerHTML = `<div class="panel" style="max-width:640px;width:100%;margin:20px auto;"><h3>📲 Envoyer l'application aux chauffeurs</h3>
+  ov.innerHTML = `<div class="panel" style="max-width:640px;width:100%;margin:20px auto;"><h3><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Envoyer l'application aux chauffeurs</h3>
     <div class="desc">Même lien pour tous : <b>${esc(link)}</b>. Pour chaque chauffeur, le message WhatsApp contient le lien, la marche à suivre, son mot de passe provisoire (premier envoi) et son code d'activation personnel.</div>
-    ${[['TRUCK', '🚛 Chauffeurs de camions'], ['SERVICE_VEHICLE', '🚙 Chauffeurs de véhicules de service'], ['', 'Activité à préciser']].map(([k, t]) => { const g = list.filter((d) => (d.activity || '') === k); return g.length ? `<h4 style="margin:14px 0 4px">${t} (${g.length})</h4><table>${g.map((d) => `<tr><td><b>${esc(d.name)}</b><div style="font-size:12px">${esc(d.phone || 'pas de numéro')}</div></td><td>${act(d.activity)}</td>
-      <td><button class="btn small gold" ${d.phone ? '' : 'disabled'} onclick="drvInviteSend('${esc(d.id)}')">💬 WhatsApp</button></td></tr>`).join('')}</table>` : ''; }).join('') || '<div class="empty">Aucun chauffeur.</div>'}
+    ${[['TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Chauffeurs de camions'], ['SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Chauffeurs de véhicules de service'], ['', 'Activité à préciser']].map(([k, t]) => { const g = list.filter((d) => (d.activity || '') === k); return g.length ? `<h4 style="margin:14px 0 4px">${t} (${g.length})</h4><table>${g.map((d) => `<tr><td><b>${esc(d.name)}</b><div style="font-size:12px">${esc(d.phone || 'pas de numéro')}</div></td><td>${act(d.activity)}</td>
+      <td><button class="btn small gold" ${d.phone ? '' : 'disabled'} onclick="drvInviteSend('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> WhatsApp</button></td></tr>`).join('')}</table>` : ''; }).join('') || '<div class="empty">Aucun chauffeur.</div>'}
     <div id="inv-msg"></div><button class="btn" style="margin-top:10px" onclick="this.closest('div[style*=fixed]').remove();renderDriverDevices()">Fermer</button></div>`;
   document.body.appendChild(ov);
 }
@@ -4387,8 +4388,8 @@ async function drvInviteSend(driverId) {
     window._invMsg = r.message;
     // Lien à toucher (les navigateurs bloquent l'ouverture automatique après un appel réseau) + copie du message
     m.innerHTML = `<div class="msg ok">Message prêt pour ${esc(r.driver)} (${esc(num)})${r.newAccount ? ' — compte créé' : ''}.</div>
-      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">💬 Ouvrir WhatsApp</a>
-      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">📋 Copier le message</button>
+      <a class="btn gold" style="display:inline-block;margin:6px 6px 6px 0;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(num)}?text=${encodeURIComponent(r.message)}">Ouvrir WhatsApp</a>
+      <button class="btn" onclick="navigator.clipboard.writeText(window._invMsg).then(()=>alert('Message copié : collez-le dans WhatsApp.'))">Copier le message</button>
       <pre class="mono" style="white-space:pre-wrap;margin-top:8px">${esc(r.message)}</pre>
       <div class="desc">WhatsApp s'ouvre avec le message déjà écrit : appuyez sur « Envoyer ». Le système n'envoie pas le message tout seul.</div>`;
   } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
@@ -4802,17 +4803,17 @@ async function renderDriverExpenses(status) {
   const tr = rows.map((e) => `<tr><td>${esc(drvDt(e.date))}</td><td><b>${esc(e.driver)}</b><div style="font-size:12px;color:var(--muted)">${esc(e.vehicle || '')}</div></td>
     <td>${esc(DRV_EXP[e.category] || e.category)}<div style="font-size:12px">${esc(e.description || '')}</div></td><td class="mono"><b>${fmt(e.amount)}</b> GNF</td>
     <td>${receiptLink(e.receiptUrl)}</td>
-    <td>${e.receiptCheckedAt ? '<span class="badge ok">✔ Conforme</span>' : canPaper ? `<button class="btn small" onclick="receiptCheck('${esc(e.id)}')">📄 Reçu papier reçu</button>` : '<span class="badge warn">À contrôler</span>'}</td>
+    <td>${e.receiptCheckedAt ? '<span class="badge ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Conforme</span>' : canPaper ? `<button class="btn small" onclick="receiptCheck('${esc(e.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Reçu papier reçu</button>` : '<span class="badge warn">À contrôler</span>'}</td>
     <td>${stepBadge(e.sheetStep)}</td>
     <td><span class="badge ${stb[e.status][0]}">${stb[e.status][1]}</span>${e.note ? `<div style="font-size:12px">${esc(e.note)}</div>` : ''}</td>
-    <td>${e.status === 'PENDING' && canDecide ? (e.sheetStep === 'VALIDATED' ? `<button class="btn small gold" onclick="decideExpense('${esc(e.id)}','APPROVED')">✔ Valider</button> <button class="btn small" onclick="decideExpense('${esc(e.id)}','REJECTED')">✖ Refuser</button>` : '<span style="font-size:12px;color:var(--muted)">Attend la validation des opérations</span>') : ''}</td></tr>`).join('');
-  root().innerHTML = `<div class="panel"><h3>💵 Dépenses déclarées par les chauffeurs</h3><div class="desc">${canDecide ? 'Vous traitez les dépenses des fiches déjà validées par le Responsable des opérations. Une dépense validée est ajoutée aux dépenses du véhicule.' : 'Suivi des dépenses : seule la Comptabilité les valide, après validation de la fiche par le Responsable des opérations.'}</div>
+    <td>${e.status === 'PENDING' && canDecide ? (e.sheetStep === 'VALIDATED' ? `<button class="btn small gold" onclick="decideExpense('${esc(e.id)}','APPROVED')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Valider</button> <button class="btn small" onclick="decideExpense('${esc(e.id)}','REJECTED')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg> Refuser</button>` : '<span style="font-size:12px;color:var(--muted)">Attend la validation des opérations</span>') : ''}</td></tr>`).join('');
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Dépenses déclarées par les chauffeurs</h3><div class="desc">${canDecide ? 'Vous traitez les dépenses des fiches déjà validées par le Responsable des opérations. Une dépense validée est ajoutée aux dépenses du véhicule.' : 'Suivi des dépenses : seule la Comptabilité les valide, après validation de la fiche par le Responsable des opérations.'}</div>
     <label>Afficher</label><select onchange="renderDriverExpenses(this.value)" style="max-width:220px"><option value="PENDING" ${st === 'PENDING' ? 'selected' : ''}>En attente</option><option value="APPROVED" ${st === 'APPROVED' ? 'selected' : ''}>Validées</option><option value="REJECTED" ${st === 'REJECTED' ? 'selected' : ''}>Refusées</option></select></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Reçu scanné</th><th>Reçu papier</th><th>Fiche</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="9" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
 }
 /* ---------- Ventes (Responsable commercial) : Commandes · Factures · Clients · Retours · Caisses à valider ---------- */
 let vtTab = 'caisses';
-const VT_TABS = [['caisses', '🗄 Caisses à valider'], ['commandes', '📋 Commandes'], ['factures', '🧾 Factures'], ['clients', '👥 Clients'], ['retours', '↩ Retours']];
+const VT_TABS = [['caisses', 'Caisses à valider'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
 const VT_ORDER = { QUOTE: ['Devis', 'info'], CONFIRMED: ['Confirmée', 'info'], PARTIALLY_DELIVERED: ['Livrée en partie', 'warn'], DELIVERED: ['Livrée', 'ok'], INVOICED: ['Facturée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 const VT_INV = { DRAFT: ['Brouillon', 'info'], UNPAID: ['Impayée', 'bad'], PARTIALLY_PAID: ['Partielle', 'warn'], PAID: ['Payée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 function cashState(c) {
@@ -5041,19 +5042,19 @@ async function renderDriverBoard(date) {
     if (!x.phone) return '';
     const num = String(x.phone).replace(/\D/g, ''); const full = num.length === 9 ? '224' + num : num;
     const msg = x.status === 'A_ENVOYER' ? `Bonjour ${x.name}, merci de compléter et d'envoyer votre fiche de bord du jour dans l'application.` : `Bonjour ${x.name}, merci de renseigner votre fiche de bord du jour (départ, carburant, arrivée) dans l'application.`;
-    return `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">💬 Relancer</a>`;
+    return `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">Relancer</a>`;
   };
   const shown = r.drivers.filter((x) => window._bdKind === 'ALL' || x.kind === window._bdKind);
   const BK = r.summary.byKind || {};
-  const kindTabs = [['ALL', 'Tous (' + r.drivers.length + ')'], ['TRUCK', '🚛 Camions (' + (BK.TRUCK || 0) + ')'], ['SERVICE_VEHICLE', '🚙 Véhicules de service (' + (BK.SERVICE_VEHICLE || 0) + ')'], ['NONE', 'Sans véhicule (' + (BK.NONE || 0) + ')']].map(([k, t]) => `<button class="btn ${window._bdKind === k ? 'gold' : ''}" style="margin-right:6px" onclick="window._bdKind='${k}';renderDriverBoard()">${t}</button>`).join('');
+  const kindTabs = [['ALL', 'Tous (' + r.drivers.length + ')'], ['TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions (' + (BK.TRUCK || 0) + ')'], ['SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service (' + (BK.SERVICE_VEHICLE || 0) + ')'], ['NONE', 'Sans véhicule (' + (BK.NONE || 0) + ')']].map(([k, t]) => `<button class="btn ${window._bdKind === k ? 'gold' : ''}" style="margin-right:6px" onclick="window._bdKind='${k}';renderDriverBoard()">${t}</button>`).join('');
   const rows = shown.map((x) => { const st = BOARD_ST[x.status]; return `<tr>
     <td><b>${esc(x.name)}</b><div style="font-size:12px;color:var(--muted)">${esc(x.phone || '')}</div></td>
     <td>${esc(x.vehicle || '—')}${x.loader ? `<div style="font-size:12px;color:var(--muted)">Chargeur : ${esc(x.loader)}</div>` : ''}</td>
     <td><span class="badge ${st[2]}">${st[0]} ${st[1]}</span>${x.destination ? `<div style="font-size:12px">${esc(x.destination)}</div>` : ''}</td>
     <td class="mono">${fmt(x.km)} km</td><td class="mono">${x.liters} L</td>
-    <td>${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C">⚠ ${esc(a)}</div>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
+    <td>${x.alerts.map((a) => `<div style="font-size:12px;color:#9A6A0C"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> ${esc(a)}</div>`).join('') || '<span style="color:var(--muted)">—</span>'}</td>
     <td>${x.status === 'RIEN' || x.status === 'A_ENVOYER' ? wa(x) : ''}</td></tr>`; }).join('');
-  root().innerHTML = `<div class="panel"><h3>🧭 Suivi des chauffeurs</h3><div class="desc">Situation de chaque chauffeur pour la journée choisie.</div>
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg> Suivi des chauffeurs</h3><div class="desc">Situation de chaque chauffeur pour la journée choisie.</div>
     <div style="margin:8px 0">${kindTabs}</div><label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverBoard(this.value)" style="max-width:220px">
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">${tile(S.total, 'Chauffeurs actifs', 'var(--navy)')}${tile(S.absents || 0, 'Absents', '#A8403D')}${tile(S.enMission, 'En mission', '#3F8F6B')}${tile(S.aEnvoyer, 'Fiche à envoyer', '#C98A0B')}${tile(S.envoyees, 'Fiches envoyées', '#3F8F6B')}${tile(S.rien, 'Rien de saisi', '#C0504D')}</div></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Véhicule</th><th>Situation</th><th>Distance</th><th>Carburant</th><th>Alertes</th><th></th></tr>${rows || '<tr><td colspan="7" class="empty">Aucun chauffeur actif.</td></tr>'}</table></div></div>`;
@@ -5098,9 +5099,9 @@ async function renderMissionHistory(reset) {
   const tr = r.missions.map((m) => `<tr><td><b>${esc(m.reference || '—')}</b><div style="font-size:12px;color:var(--muted)">${esc(drvDt(m.startTime))}</div></td>
     <td>${esc(m.driver)}<div style="font-size:12px;color:var(--muted)">${esc(m.vehicle)}</div></td><td>${esc(m.destination || m.purpose || '—')}</td>
     <td class="mono">${m.km != null ? fmt(m.km) + ' km' : '—'}</td><td class="mono">${m.liters ? m.liters + ' L' : '—'}</td>
-    <td><span class="badge ${MS_ST[m.status][0]}">${MS_ST[m.status][1]}</span></td><td><a href="#" onclick="tripTimeline('${esc(m.id)}');return false;">🕒</a></td></tr>`).join('');
-  const kt = [['TRUCK', '🚛 Camions'], ['SERVICE_VEHICLE', '🚙 Véhicules de service']].map(([k, t]) => `<button class="btn ${f.kind === k ? 'gold' : ''}" style="margin-right:6px" onclick="window._ms.kind='${k}';window._ms.vehicleId='';renderMissionHistory(1)">${t}</button>`).join('');
-  root().innerHTML = `<div class="panel"><h3>📜 Historique des missions</h3><div style="margin-bottom:8px">${kt}</div><div class="desc">${r.total} mission(s) trouvée(s).</div>
+    <td><span class="badge ${MS_ST[m.status][0]}">${MS_ST[m.status][1]}</span></td><td><a href="#" onclick="tripTimeline('${esc(m.id)}');return false;"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg></a></td></tr>`).join('');
+  const kt = [['TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions'], ['SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service']].map(([k, t]) => `<button class="btn ${f.kind === k ? 'gold' : ''}" style="margin-right:6px" onclick="window._ms.kind='${k}';window._ms.vehicleId='';renderMissionHistory(1)">${t}</button>`).join('');
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Historique des missions</h3><div style="margin-bottom:8px">${kt}</div><div class="desc">${r.total} mission(s) trouvée(s).</div>
     <div style="margin-bottom:8px"><label>${f.kind === 'TRUCK' ? 'Camion' : 'Véhicule'}</label><select onchange="window._ms.vehicleId=this.value;renderMissionHistory(1)"><option value="">Tous</option>${vehs.map((v) => `<option value="${esc(v.id)}" ${f.vehicleId === v.id ? 'selected' : ''}>${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <div><label>Du</label><input type="date" value="${esc(f.from)}" onchange="window._ms.from=this.value;renderMissionHistory(1)"></div>
@@ -5109,13 +5110,13 @@ async function renderMissionHistory(reset) {
       <div><label>Recherche (n° ou destination)</label><input value="${esc(f.q)}" placeholder="TRP-2026-0001, Kindia…" onkeydown="if(event.key==='Enter'){window._ms.q=this.value;renderMissionHistory(1)}" onchange="window._ms.q=this.value;renderMissionHistory(1)"></div>
     </div></div>
     <div class="panel"><div style="overflow:auto"><table><tr><th>N° / départ</th><th>Chauffeur / véhicule</th><th>Destination</th><th>Distance</th><th>Carburant</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="7" class="empty">Aucune mission.</td></tr>'}</table></div>
-    <div class="panel"><h3>🧾 Rapport global — à relire, signer et transmettre</h3>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Rapport global — à relire, signer et transmettre</h3>
       <div class="desc">Généré automatiquement pour la période choisie (30 derniers jours par défaut), ${f.kind === 'TRUCK' ? 'camions' : 'véhicules de service'}${f.vehicleId ? ', véhicule sélectionné' : ''}. Complétez vos informations : elles figurent sur le rapport.</div>
       <div class="grid-2"><div><label>Nom *</label><input id="ms-name" value="${esc(sg.name || '')}"></div><div><label>Prénoms *</label><input id="ms-first" value="${esc(sg.firstNames || '')}"></div>
       <div><label>Téléphone de service *</label><input id="ms-phone" value="${esc(sg.phone || '')}"></div><div><label>Fonction</label><input id="ms-title" value="${esc(sg.title || 'Responsable logistique')}"></div></div>
-      <button class="btn gold" onclick="msPdf('folder')">📂 Enregistrer dans un dossier</button> <button class="btn" onclick="msPdf('print')">🖨️ Imprimer</button>
+      <button class="btn gold" onclick="msPdf('folder')"><svg class="ic" aria-hidden="true"><use href="#i-archive"/></svg> Enregistrer dans un dossier</button> <button class="btn" onclick="msPdf('print')"><svg class="ic" aria-hidden="true"><use href="#i-printer"/></svg> Imprimer</button>
       <div class="grid-2" style="margin-top:12px"><div><label>Hiérarchie — e-mail(s)</label><input id="ms-hier" placeholder="(vide = adresses habituelles)"></div><div><label>Comptabilité — e-mail(s)</label><input id="ms-acc" placeholder="(vide = adresses habituelles)"></div></div>
-      <button class="btn" onclick="msPdf('mail','HIERARCHY')">✉️ Envoyer à la hiérarchie</button> <button class="btn" onclick="msPdf('mail','ACCOUNTING')">✉️ Envoyer à la comptabilité</button>
+      <button class="btn" onclick="msPdf('mail','HIERARCHY')"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Envoyer à la hiérarchie</button> <button class="btn" onclick="msPdf('mail','ACCOUNTING')"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Envoyer à la comptabilité</button>
       <div id="ms-msg"></div></div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px"><button class="btn small" ${r.page <= 1 ? 'disabled' : ''} onclick="window._ms.page--;renderMissionHistory()">← Précédent</button><span style="font-size:14px">Page ${r.page} / ${r.pages}</span><button class="btn small" ${r.page >= r.pages ? 'disabled' : ''} onclick="window._ms.page++;renderMissionHistory()">Suivant →</button></div></div>`;
 }
@@ -5127,17 +5128,17 @@ async function drvMissionHistory(page) {
   const old = drvEl('drv-hist-ov'); if (old) old.remove();
   const list = r.missions.map((m) => `<div style="padding:10px 0;border-bottom:1px dashed #D9E0E8"><div style="display:flex;justify-content:space-between"><b>${esc(m.reference || '—')}</b><span class="badge ${MS_ST[m.status][0]}">${MS_ST[m.status][1]}</span></div>
     <div style="font-size:14px;color:#5A6B7D">${esc(drvDt(m.startTime))} · ${esc(m.destination || m.purpose || '—')}</div>
-    <div style="font-size:14px">${m.km != null ? fmt(m.km) + ' km' : ''}${m.liters ? ' · ' + m.liters + ' L' : ''} · ${esc(m.vehicle)} · <a href="#" onclick="drvTimeline('${esc(m.id)}');return false;">🕒 Chronologie</a></div></div>`).join('');
+    <div style="font-size:14px">${m.km != null ? fmt(m.km) + ' km' : ''}${m.liters ? ' · ' + m.liters + ' L' : ''} · ${esc(m.vehicle)} · <a href="#" onclick="drvTimeline('${esc(m.id)}');return false;"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Chronologie</a></div></div>`).join('');
   const o = document.createElement('div'); o.id = 'drv-hist-ov';
   o.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9000;overflow:auto;padding:16px';
-  o.innerHTML = `<a href="#" onclick="document.getElementById('drv-hist-ov').remove();return false;" style="text-decoration:none;font-weight:700;color:#1F3A5F;font-size:14px">← Retour</a><h3>📜 Mes missions passées</h3><div style="font-size:14px;color:#5A6B7D">${r.total} mission(s)</div>${list || '<div style="padding:20px;color:#5A6B7D">Aucune mission.</div>'}
+  o.innerHTML = `<a href="#" onclick="document.getElementById('drv-hist-ov').remove();return false;" style="text-decoration:none;font-weight:700;color:#1F3A5F;font-size:14px">← Retour</a><h3><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Mes missions passées</h3><div style="font-size:14px;color:#5A6B7D">${r.total} mission(s)</div>${list || '<div style="padding:20px;color:#5A6B7D">Aucune mission.</div>'}
     <div style="display:flex;justify-content:space-between;margin-top:14px"><button class="drv-btn ghost" style="width:auto" ${r.page <= 1 ? 'disabled' : ''} onclick="drvMissionHistory(${page - 1})">←</button><span>Page ${r.page}/${r.pages}</span><button class="drv-btn ghost" style="width:auto" ${r.page >= r.pages ? 'disabled' : ''} onclick="drvMissionHistory(${page + 1})">→</button></div>`;
   document.body.appendChild(o); if (!page || page === 1) { try { history.pushState({ drv: 1 }, ''); } catch (e) {} }
 }
-const TL_ICON = { CREATION: '📝', START: '▶️', FUEL: '⛽', MAINTENANCE: '🔧', EXPENSE: '💵', BREAKDOWN: '🛠', INCIDENT: '⚠️', PAUSE: '⏸', RESUME: '▶️', ARRIVE: '🏁', SHEET_SENT: '📤' };
+const TL_ICON = { CREATION: '<svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg>', START: '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg>', FUEL: '<svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg>', MAINTENANCE: '<svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg>', EXPENSE: '<svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg>', BREAKDOWN: '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>', INCIDENT: '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>', PAUSE: '<svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>', RESUME: '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg>', ARRIVE: '<svg class="ic" aria-hidden="true"><use href="#i-flag"/></svg>', SHEET_SENT: '<svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg>' };
 function timelineHtml(r) {
   const ev = r.events.map((e) => `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed #D9E0E8"><div style="min-width:46px;font-size:12px;color:#5A6B7D">${new Date(e.at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}<br><b>${new Date(e.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</b></div><div><div>${TL_ICON[e.type] || '•'} <b>${esc(e.title)}</b></div>${e.detail ? `<div style="font-size:14px;color:#5A6B7D">${esc(e.detail)}</div>` : ''}</div></div>`).join('');
-  return `<h3 style="margin:0 0 4px">🕒 Chronologie — ${esc(r.reference || 'Mission')}</h3><div style="font-size:14px;color:#5A6B7D;margin-bottom:8px">${esc(r.driver)} · ${esc(r.vehicle)}</div>${ev}`;
+  return `<h3 style="margin:0 0 4px"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Chronologie — ${esc(r.reference || 'Mission')}</h3><div style="font-size:14px;color:#5A6B7D;margin-bottom:8px">${esc(r.driver)} · ${esc(r.vehicle)}</div>${ev}`;
 }
 function timelineOverlay(r) {
   const o = document.createElement('div');
@@ -5162,26 +5163,26 @@ async function receiptCheck(id) {
   if (!confirm('Confirmer : le reçu papier est arrivé et il est conforme ?')) return;
   try { await api('/driver-admin/expenses/' + id + '/receipt-check', { method: 'POST', body: {} }); renderView(state.view); } catch (e) { alert(e.message); }
 }
-function receiptLink(u) { const base = (state.apiUrl || '').replace(/\/$/, ''); return u ? `<a href="${esc(base + u)}" target="_blank" rel="noopener" style="white-space:nowrap">📷 Voir</a>` : '<span class="badge bad">Manquant</span>'; }
+function receiptLink(u) { const base = (state.apiUrl || '').replace(/\/$/, ''); return u ? `<a href="${esc(base + u)}" target="_blank" rel="noopener" style="white-space:nowrap"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> Voir</a>` : '<span class="badge bad">Manquant</span>'; }
 function sheetCardHtml(sh) {
   const role = state.user.role, hh = (x) => (x ? new Date(x).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '…');
   const canVerify = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE'].includes(role), canValidate = ['SUPER_ADMIN', 'RESPONSABLE_OPERATIONS'].includes(role), canPaper = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS'].includes(role), canReject = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS'].includes(role);
   const did = esc(sh.driver.id), dt = esc(sh.date);
   let acts = '';
-  if (sh.step === 'SUBMITTED' && canVerify) acts += `<button class="btn small gold" onclick="sheetAct('process','${did}','${dt}')">✔ Vérifier et transmettre</button> `;
-  if (sh.step === 'VERIFIED' && canValidate) acts += `<button class="btn small gold" onclick="sheetAct('validate','${did}','${dt}')">✔ Valider et transférer à la Comptabilité</button> `;
-  if (['SUBMITTED', 'VERIFIED'].includes(sh.step) && canReject) acts += `<button class="btn small" onclick="sheetAct('reject','${did}','${dt}')">↩ Renvoyer au chauffeur</button>`;
+  if (sh.step === 'SUBMITTED' && canVerify) acts += `<button class="btn small gold" onclick="sheetAct('process','${did}','${dt}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Vérifier et transmettre</button> `;
+  if (sh.step === 'VERIFIED' && canValidate) acts += `<button class="btn small gold" onclick="sheetAct('validate','${did}','${dt}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Valider et transférer à la Comptabilité</button> `;
+  if (['SUBMITTED', 'VERIFIED'].includes(sh.step) && canReject) acts += `<button class="btn small" onclick="sheetAct('reject','${did}','${dt}')"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Renvoyer au chauffeur</button>`;
   const exps = sh.expenses || [];
-  const expTable = exps.length ? `<h4 style="margin:10px 0 4px">💵 Dépenses déclarées</h4><table><tr><th>Heure</th><th>Nature</th><th>Montant (GNF)</th><th>Reçu scanné</th><th>Reçu papier</th></tr>${exps.map((e) => `<tr><td>${hh(e.time)}</td><td>${esc(DRV_EXP[e.category] || e.category)}<div style="font-size:12px">${esc(e.description || '')}</div></td><td class="mono">${fmt(e.amount)}</td><td>${receiptLink(e.receiptUrl)}</td><td>${e.receiptCheckedAt ? '<span class="badge ok">✔ Conforme</span>' : canPaper ? `<button class="btn small" onclick="receiptCheck('${esc(e.id)}')">📄 Reçu papier reçu</button>` : '<span class="badge warn">À contrôler</span>'}</td></tr>`).join('')}</table>` : '';
+  const expTable = exps.length ? `<h4 style="margin:10px 0 4px"><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Dépenses déclarées</h4><table><tr><th>Heure</th><th>Nature</th><th>Montant (GNF)</th><th>Reçu scanné</th><th>Reçu papier</th></tr>${exps.map((e) => `<tr><td>${hh(e.time)}</td><td>${esc(DRV_EXP[e.category] || e.category)}<div style="font-size:12px">${esc(e.description || '')}</div></td><td class="mono">${fmt(e.amount)}</td><td>${receiptLink(e.receiptUrl)}</td><td>${e.receiptCheckedAt ? '<span class="badge ok"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Conforme</span>' : canPaper ? `<button class="btn small" onclick="receiptCheck('${esc(e.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Reçu papier reçu</button>` : '<span class="badge warn">À contrôler</span>'}</td></tr>`).join('')}</table>` : '';
   const fuelRcpt = (f) => (f.source === 'STATION' || f.receiptUrl ? receiptLink(f.receiptUrl) : '—');
   return `<div class="panel"><h3>${esc(sh.driver.name)} ${stepBadge(sh.step)} ${sh.status === 'SENT' ? '<span style="font-size:12px;font-weight:400;color:var(--muted)">envoyée ' + drvDt(sh.sentAt) + '</span>' : ''}</h3>
     ${sh.step === 'REJECTED' ? `<div class="msg err">Renvoyée au chauffeur : ${esc(sh.rejectNote || '')}</div>` : ''}${sh.processNote && sh.step !== 'REJECTED' ? `<div class="desc">Note logistique : ${esc(sh.processNote)}</div>` : ''}
     ${acts ? `<div style="margin:6px 0">${acts}</div>` : ''}
-    <div class="desc">${esc(sh.day)} ${esc(sh.date)} · ${esc(sh.driver.phone || '')} · ${sh.driver.activity === 'TRUCK' ? '🚛 Camion' : '🚙 Véhicule de service'} — <b>${fmt(sh.totals.km)} km</b> · ${sh.totals.liters} L (${fmt(sh.totals.fuelCost)} GNF)${sh.totals.consumption !== null ? ' · ' + sh.totals.consumption + ' L/100 km' : ''}${sh.totals.voyages ? ' · ' + sh.totals.voyages + ' voyage(s)' : ''}${sh.totals.maintenanceCost ? ' · maintenance ' + fmt(sh.totals.maintenanceCost) + ' GNF' : ''}</div>
+    <div class="desc">${esc(sh.day)} ${esc(sh.date)} · ${esc(sh.driver.phone || '')} · ${sh.driver.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service'} — <b>${fmt(sh.totals.km)} km</b> · ${sh.totals.liters} L (${fmt(sh.totals.fuelCost)} GNF)${sh.totals.consumption !== null ? ' · ' + sh.totals.consumption + ' L/100 km' : ''}${sh.totals.voyages ? ' · ' + sh.totals.voyages + ' voyage(s)' : ''}${sh.totals.maintenanceCost ? ' · maintenance ' + fmt(sh.totals.maintenanceCost) + ' GNF' : ''}</div>
     <div style="overflow:auto"><table><tr><th>Véhicule</th><th>Destination / motif</th><th>Horaires</th><th>Km départ</th><th>Km arrivée</th><th>Km arrêt</th><th>Distance</th><th>Observations</th></tr>
-    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:12px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:12px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:12px">🕒 Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:12px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.loadPlaces && t.loadPlaces.length ? '<br>⬆ ' + esc(t.loadPlaces.join(', ')) + ' → ⬇ ' + esc((t.unloadPlaces || []).join(', ')) : ''}${t.pauseMileage != null ? '<br>⏸ pause ' + fmt(t.pauseMileage) + ' km' : ''}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
-    ${sh.fuel.length ? `<h4 style="margin:10px 0 4px">⛽ Carburant</h4><table><tr><th>Heure</th><th>Station</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th><th>Reçu scanné</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${f.liters}</td><td class="mono">${fmt(f.cost)}</td><td>${fuelRcpt(f)}</td></tr>`).join('')}</table>` : ''}
-    ${sh.maintenance.length ? `<h4 style="margin:10px 0 4px">🔧 Maintenance</h4><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${sh.maintenance.map((m) => `<tr><td>${esc(DRV_NAT[m.nature] || m.nature)}</td><td>${esc(m.detail || '')}</td><td class="mono">${m.mileage != null ? fmt(m.mileage) : '—'}</td><td class="mono">${m.nextServiceKm ? fmt(m.nextServiceKm) + ' km' : '—'}</td><td class="mono">${m.cost != null ? fmt(m.cost) : '—'}</td></tr>`).join('')}</table>` : ''}
+    ${sh.trips.map((t) => `<tr><td>${esc(t.plate)}<div style="font-size:12px;color:var(--muted)">${esc(t.brand)}</div>${t.reference ? `<div style="font-size:12px"><b>${esc(t.reference)}</b></div><a href="#" onclick="tripTimeline('${esc(t.id)}');return false;" style="font-size:12px"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Chronologie</a>` : ''}</td><td>${esc(t.destination || (t.regions || []).join(', ') || '—')}<div style="font-size:12px">${t.route ? esc(t.route) + '<br>' : ''}${esc([t.cargo, t.purpose].filter(Boolean).join(' — '))}${t.loadPlaces && t.loadPlaces.length ? '<br><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> ' + esc(t.loadPlaces.join(', ')) + ' → <svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> ' + esc((t.unloadPlaces || []).join(', ')) : ''}${t.pauseMileage != null ? '<br>pause ' + fmt(t.pauseMileage) + ' km' : ''}${t.voyages && t.tonnagePerTrip ? '<br><b>' + esc(t.voyages) + ' voyage(s) × ' + esc(t.tonnagePerTrip) + ' t = ' + (Math.round(t.voyages * t.tonnagePerTrip * 10) / 10) + ' t</b>' : ''}</div></td><td>${hh(t.startTime)} → ${hh(t.endTime)}</td><td class="mono">${fmt(t.startMileage)}</td><td class="mono">${t.arrivalMileage != null ? fmt(t.arrivalMileage) : '—'}</td><td class="mono">${t.endMileage != null ? fmt(t.endMileage) : '…'}</td><td class="mono"><b>${fmt(t.km)}</b></td><td>${t.preCondition === 'ANOMALIE' ? '<span class="badge warn">Anomalie</span> ' + esc(t.preAnomalies) : ''}${t.maintenanceNeeded ? '<div><span class="badge bad">Maintenance</span> ' + esc(t.maintenanceReason) + '</div>' : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucune mission.</td></tr>'}</table></div>
+    ${sh.fuel.length ? `<h4 style="margin:10px 0 4px"><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg> Carburant</h4><table><tr><th>Heure</th><th>Station</th><th>Km</th><th>Litres</th><th>Coût (GNF)</th><th>Reçu scanné</th></tr>${sh.fuel.map((f) => `<tr><td>${hh(f.time)}</td><td>${esc(drvSrc(f))}</td><td class="mono">${fmt(f.mileage)}</td><td class="mono">${f.liters}</td><td class="mono">${fmt(f.cost)}</td><td>${fuelRcpt(f)}</td></tr>`).join('')}</table>` : ''}
+    ${sh.maintenance.length ? `<h4 style="margin:10px 0 4px"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Maintenance</h4><table><tr><th>Nature</th><th>Détail</th><th>Km</th><th>Prochaine vidange</th><th>Coût (GNF)</th></tr>${sh.maintenance.map((m) => `<tr><td>${esc(DRV_NAT[m.nature] || m.nature)}</td><td>${esc(m.detail || '')}</td><td class="mono">${m.mileage != null ? fmt(m.mileage) : '—'}</td><td class="mono">${m.nextServiceKm ? fmt(m.nextServiceKm) + ' km' : '—'}</td><td class="mono">${m.cost != null ? fmt(m.cost) : '—'}</td></tr>`).join('')}</table>` : ''}
     ${expTable}
   </div>`;
 }
@@ -5189,14 +5190,14 @@ async function renderDriverSheets(date) {
   const d = date || window._shDate || new Date().toISOString().slice(0, 10);
   window._shDate = d;
   const list = await api('/driver-admin/sheets?date=' + d + '&siteId=' + state.siteId);
-  root().innerHTML = `<div class="panel"><h3>📋 Fiches de bord du jour</h3><div class="desc">Une fiche par chauffeur et par jour. Circuit : le chauffeur envoie (<b>Soumis</b>), la logistique vérifie et transmet (<b>Vérifié</b>), le Responsable des opérations valide (<b>Validé</b>), puis la Comptabilité traite les dépenses. Une fiche renvoyée (<b>Rejeté</b>) est rouverte au chauffeur.</div>
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Fiches de bord du jour</h3><div class="desc">Une fiche par chauffeur et par jour. Circuit : le chauffeur envoie (<b>Soumis</b>), la logistique vérifie et transmet (<b>Vérifié</b>), le Responsable des opérations valide (<b>Validé</b>), puis la Comptabilité traite les dépenses. Une fiche renvoyée (<b>Rejeté</b>) est rouverte au chauffeur.</div>
     <label>Jour</label><input type="date" value="${esc(d)}" onchange="renderDriverSheets(this.value)" style="max-width:220px"></div><div id="ptr-panel"></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune saisie ce jour.</div></div>'}`;
   loadPointers(d);
 }
 
 /* ---------- Atelier (Mécanicien) : À réparer · En cours · Terminées · Pièces ---------- */
 let atTab = 'repair';
-const AT_TABS = [['repair', '🚧 À réparer'], ['progress', '🔧 En cours'], ['done', '✅ Terminées'], ['parts', '📦 Pièces']];
+const AT_TABS = [['repair', 'À réparer'], ['progress', 'En cours'], ['done', 'Terminées'], ['parts', 'Pièces']];
 async function renderAtelier() {
   const [dt, maint, items] = await Promise.all([api('/downtimes?siteId=' + encodeURIComponent(state.siteId || '')), api('/maintenance'), atTab === 'parts' ? api('/inventory/items?siteId=' + encodeURIComponent(state.siteId || '')) : Promise.resolve([])]);
   const open = dt.items.filter((i) => !i.endedAt), closed = dt.items.filter((i) => i.endedAt);
@@ -5208,24 +5209,24 @@ async function renderAtelier() {
   const st = { PLANNED: ['warn', 'Planifié'], IN_PROGRESS: ['warn', 'En cours'], OVERDUE: ['bad', 'En retard'], COMPLETED: ['ok', 'Terminé'] };
   let body = '';
   if (atTab === 'repair') {
-    body = `<div class="panel"><h3>🚧 Véhicules à réparer <span class="badge ${open.length ? 'bad' : 'ok'}">${open.length}</span></h3><div class="desc">Pannes déclarées par les chauffeurs et véhicules immobilisés. Une fois la réparation faite, cliquez « Réparation terminée » : le véhicule est remis en service.</div>${open.map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b><br><small>${esc(i.category)} · depuis le ${d(i.startedAt)} (${i.days} j)</small><div style="margin-top:4px">${esc(i.reason)}</div></span><button class="btn small gold" onclick="atResolve('${esc(i.id)}')">✔ Réparation terminée</button></div>`).join('') || '<div class="empty">Aucun véhicule à réparer.</div>'}<button class="btn" style="margin-top:10px" onclick="go('maintenance')">➕ Nouvelle intervention (entretien)</button></div>`;
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Véhicules à réparer <span class="badge ${open.length ? 'bad' : 'ok'}">${open.length}</span></h3><div class="desc">Pannes déclarées par les chauffeurs et véhicules immobilisés. Une fois la réparation faite, cliquez « Réparation terminée » : le véhicule est remis en service.</div>${open.map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b><br><small>${esc(i.category)} · depuis le ${d(i.startedAt)} (${i.days} j)</small><div style="margin-top:4px">${esc(i.reason)}</div></span><button class="btn small gold" onclick="atResolve('${esc(i.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Réparation terminée</button></div>`).join('') || '<div class="empty">Aucun véhicule à réparer.</div>'}<button class="btn" style="margin-top:10px" onclick="go('maintenance')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouvelle intervention (entretien)</button></div>`;
   } else if (atTab === 'progress') {
-    body = `<div class="panel"><h3>🔧 Interventions en cours et à faire</h3>${mProg.map((m) => { const [c, l] = st[m.status] || ['warn', m.status]; return `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || m.description || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ${c}">${l}</span></div>`; }).join('') || '<div class="empty">Aucune intervention en cours.</div>'}</div>`;
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Interventions en cours et à faire</h3>${mProg.map((m) => { const [c, l] = st[m.status] || ['warn', m.status]; return `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || m.description || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ${c}">${l}</span></div>`; }).join('') || '<div class="empty">Aucune intervention en cours.</div>'}</div>`;
   } else if (atTab === 'done') {
-    body = `<div class="panel"><h3>✅ Réparations terminées</h3>${closed.slice(0, 30).map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b> · ${esc(i.category)}<br><small>${d(i.startedAt)} → ${d(i.endedAt)} (${i.days} j)</small>${i.resolutionNote ? '<div style="font-size:14px">' + esc(i.resolutionNote) + '</div>' : ''}</span><span style="text-align:right">${i.actualCost != null ? '<b>' + fmt(i.actualCost) + ' GNF</b>' : ''}${i.invoiceUrl ? '<br><a href="' + esc((state.apiUrl || '').replace(/\/$/, '') + i.invoiceUrl) + '" target="_blank" rel="noopener" style="font-size:12px">🧾 Facture</a>' : ''}</span></div>`).join('') || '<div class="empty">Aucune réparation terminée.</div>'}</div>
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Réparations terminées</h3>${closed.slice(0, 30).map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b> · ${esc(i.category)}<br><small>${d(i.startedAt)} → ${d(i.endedAt)} (${i.days} j)</small>${i.resolutionNote ? '<div style="font-size:14px">' + esc(i.resolutionNote) + '</div>' : ''}</span><span style="text-align:right">${i.actualCost != null ? '<b>' + fmt(i.actualCost) + ' GNF</b>' : ''}${i.invoiceUrl ? '<br><a href="' + esc((state.apiUrl || '').replace(/\/$/, '') + i.invoiceUrl) + '" target="_blank" rel="noopener" style="font-size:12px"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Facture</a>' : ''}</span></div>`).join('') || '<div class="empty">Aucune réparation terminée.</div>'}</div>
       ${mDone.length ? `<div class="panel"><h3>Entretiens réalisés</h3>${mDone.map((m) => `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ok">Terminé</span></div>`).join('')}</div>` : ''}`;
   } else {
-    body = `<div class="panel"><h3>📦 Pièces en stock <span style="font-size:12px;font-weight:400;color:var(--muted)">(consultation)</span></h3><div class="desc">Pour demander une pièce, voyez le magasinier.</div><div style="overflow:auto"><table><tr><th>Article</th><th>Quantité</th><th>État</th></tr>${items.map((i) => `<tr><td>${esc(i.name)}</td><td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td><td>${Number(i.currentQuantity) <= 0 ? '<span class="badge bad">Rupture</span>' : Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge warn">Sous seuil</span>' : '<span class="badge ok">OK</span>'}</td></tr>`).join('') || '<tr><td colspan="3">Aucun article.</td></tr>'}</table></div></div>`;
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Pièces en stock <span style="font-size:12px;font-weight:400;color:var(--muted)">(consultation)</span></h3><div class="desc">Pour demander une pièce, voyez le magasinier.</div><div style="overflow:auto"><table><tr><th>Article</th><th>Quantité</th><th>État</th></tr>${items.map((i) => `<tr><td>${esc(i.name)}</td><td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td><td>${Number(i.currentQuantity) <= 0 ? '<span class="badge bad">Rupture</span>' : Number(i.currentQuantity) < Number(i.minimumQuantity) ? '<span class="badge warn">Sous seuil</span>' : '<span class="badge ok">OK</span>'}</td></tr>`).join('') || '<tr><td colspan="3">Aucun article.</td></tr>'}</table></div></div>`;
   }
   root().innerHTML = bar + body;
 }
 function atResolve(id) {
   DRV_PHOTOS.length = 0;
   const ov = document.createElement('div'); ov.id = 'at-ov'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,25,45,.55);z-index:90;display:flex;align-items:center;justify-content:center;padding:14px';
-  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;max-height:92vh;overflow:auto;margin:0"><h3>✔ Réparation terminée</h3>
+  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;max-height:92vh;overflow:auto;margin:0"><h3><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Réparation terminée</h3>
     <label>Travaux réalisés (obligatoire)</label><textarea id="at-note" rows="3" placeholder="Ex. remplacement plaquettes avant, purge freins"></textarea>
     <label>Coût total pièces + main-d'œuvre (GNF) — 0 si aucun</label><input id="at-cost" type="number" inputmode="numeric" value="0">
-    ${drvPhotoField('📷 Photo de la facture — obligatoire si un coût est indiqué', false)}
+    ${drvPhotoField('Photo de la facture — obligatoire si un coût est indiqué', false)}
     <div id="at-msg"></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn gold" style="flex:1;min-height:48px" onclick="atResolveSend('${esc(id)}')">Remettre en service</button><button class="btn" style="min-height:48px" onclick="document.getElementById('at-ov').remove()">Annuler</button></div></div>`;
   document.body.appendChild(ov);
 }
@@ -5246,10 +5247,10 @@ async function atResolveSend(id) {
 async function renderOpsValidation() {
   const cashAll = await api('/cash-sessions?siteId=' + encodeURIComponent(state.siteId || '')).catch(() => []);
   const cashTo = (cashAll || []).filter((c) => c.closedAt && c.validatedBy && !c.opsAt && !c.rejectedAt);
-  const cashHtml = cashTo.length ? `<div class="panel"><h3>🗄 Caisses vérifiées à valider <span class="badge warn">${cashTo.length}</span></h3>${cashTo.map((c) => `<div class="drv-row" style="align-items:flex-start"><span><b>${new Date(c.openedAt).toLocaleDateString('fr-FR')}</b> · ${esc(c.cashier ? c.cashier.firstName + ' ' + c.cashier.lastName : '')}<br><small>Attendu ${fmt(Math.round(Number(c.expectedCash) || 0))} · compté ${fmt(Math.round(Number(c.countedCash) || 0))} · écart ${fmt(Math.round(Number(c.gapAmount) || 0))} GNF</small>${c.note ? '<div style="font-size:12px;color:var(--muted)">' + esc(c.note) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="vtCashOps('${esc(c.id)}')">✔ Valider</button> <button class="btn small" onclick="vtCashNo('${esc(c.id)}')">↩ Rejeter</button></span></div>`).join('')}</div>` : '';
+  const cashHtml = cashTo.length ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-archive"/></svg> Caisses vérifiées à valider <span class="badge warn">${cashTo.length}</span></h3>${cashTo.map((c) => `<div class="drv-row" style="align-items:flex-start"><span><b>${new Date(c.openedAt).toLocaleDateString('fr-FR')}</b> · ${esc(c.cashier ? c.cashier.firstName + ' ' + c.cashier.lastName : '')}<br><small>Attendu ${fmt(Math.round(Number(c.expectedCash) || 0))} · compté ${fmt(Math.round(Number(c.countedCash) || 0))} · écart ${fmt(Math.round(Number(c.gapAmount) || 0))} GNF</small>${c.note ? '<div style="font-size:12px;color:var(--muted)">' + esc(c.note) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="vtCashOps('${esc(c.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Valider</button> <button class="btn small" onclick="vtCashNo('${esc(c.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Rejeter</button></span></div>`).join('')}</div>` : '';
   const [list, staff] = await Promise.all([api('/driver-admin/sheets/pending?siteId=' + encodeURIComponent(state.siteId || '')), api('/staff/reports/pending?siteId=' + encodeURIComponent(state.siteId || '')).catch(() => [])]);
-  const staffHtml = staff.length ? `<div class="panel"><h3>🧑‍🏭 Rapports du personnel à valider <span class="badge warn">${staff.length}</span></h3>${staff.map((r) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(r.name)}</b> · ${esc(r.date)}<br><small>${esc(r.role)}</small><div style="white-space:pre-wrap;font-size:14px;margin-top:4px">${esc(r.activities)}</div>${r.observations ? '<div style="font-size:12px;color:var(--muted);white-space:pre-wrap">' + esc(r.observations) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="stValidate('${esc(r.id)}')">✔ Valider</button> <button class="btn small" onclick="stReject('${esc(r.id)}')">↩ Rejeter</button></span></div>`).join('')}</div>` : '';
-  root().innerHTML = cashHtml + staffHtml + `<div class="panel"><h3>✅ Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
+  const staffHtml = staff.length ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg>‍<svg class="ic" aria-hidden="true"><use href="#i-factory"/></svg> Rapports du personnel à valider <span class="badge warn">${staff.length}</span></h3>${staff.map((r) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(r.name)}</b> · ${esc(r.date)}<br><small>${esc(r.role)}</small><div style="white-space:pre-wrap;font-size:14px;margin-top:4px">${esc(r.activities)}</div>${r.observations ? '<div style="font-size:12px;color:var(--muted);white-space:pre-wrap">' + esc(r.observations) + '</div>' : ''}</span><span style="white-space:nowrap"><button class="btn small gold" onclick="stValidate('${esc(r.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Valider</button> <button class="btn small" onclick="stReject('${esc(r.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Rejeter</button></span></div>`).join('')}</div>` : '';
+  root().innerHTML = cashHtml + staffHtml + `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Fiches vérifiées à valider</h3><div class="desc">Contrôlez les kilomètres, le carburant, la maintenance et les dépenses (reçus scannés), puis validez : la fiche passe à la Comptabilité. Cochez « Reçu papier reçu » quand le reçu physique a été déposé et est conforme.</div>
     <div style="font-size:20px;font-weight:700;color:var(--navy)">${list.length} <span style="font-size:14px;font-weight:400;color:var(--muted)">fiche(s) en attente</span></div></div>${list.map(sheetCardHtml).join('') || '<div class="panel"><div class="empty">Aucune fiche en attente de validation.</div></div>'}`;
 }
 
