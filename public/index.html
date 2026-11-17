@@ -1878,7 +1878,7 @@ async function renderDrivers() {
     <tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : d.activity === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '—'}</td>
     <td>${(vehOf[d.id] || []).map(v => esc(v.internalNumber + ' — ' + v.registrationNumber)).join('<br>') || '—'}</td>
     <td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button></td>
-    <td>${permis(d)}</td>
+    <td>${permis(d)}${d.licensePhotoUrl ? ` <a href="${esc(brandSrc(d.licensePhotoUrl))}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> photo</a>` : ''}</td>
     <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td>
     <td><button class="btn small" onclick="editDriver('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans cette liste.</td></tr>`;
   const chip = (f, l) => `<button class="btn small ${window.DRVF === f ? 'gold' : ''}" onclick="setDrvFilter('${f}')">${l} (${cnt[f]})</button>`;
@@ -3973,7 +3973,19 @@ function drvLicenseHtml(me) {
     <div class="drv-row"><span>Catégorie</span><b>${esc(l.category || '—')}</b></div>
     <div class="drv-row"><span>Expiration</span><b>${exp ? exp.toLocaleDateString('fr-FR') : '—'}</b></div>
     <div class="drv-row"><span>Statut</span><b>${badge}</b></div>
-    ${l.number ? '' : '<div style="font-size:12px;color:var(--muted)">À compléter par le gestionnaire de flotte (fiche chauffeur).</div>'}`;
+    ${l.number ? '' : '<div style="font-size:12px;color:var(--muted)">À compléter par le gestionnaire de flotte (fiche chauffeur).</div>'}
+    ${l.photoUrl ? `<div style="margin:8px 0"><img src="${esc(brandSrc(l.photoUrl))}" alt="Photo du permis" style="max-width:100%;border-radius:8px;border:1px solid var(--line)"></div>` : '<div style="font-size:12px;color:var(--muted);margin:8px 0">Photo du permis non fournie.</div>'}
+    <label class="drv-btn" style="display:block;text-align:center;cursor:pointer;margin-top:6px"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> ${l.photoUrl ? 'Remplacer la photo du permis' : 'Photographier mon permis'}<input type="file" accept="image/*" capture="environment" hidden onchange="drvLicensePhoto(this)"></label>`;
+}
+async function drvLicensePhoto(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  try {
+    if (!navigator.onLine) throw new Error('Connexion requise pour envoyer la photo du permis.');
+    const url = await drvUpload(await drvShrink(f), 'driver_license');
+    await api('/driver/license-photo', { method: 'POST', body: { url } });
+    await drvLoad();
+  } catch (e) { alert(e.message || 'Envoi impossible.'); }
+  input.value = '';
 }
 function drvProfileHtml(me) {
   const v = me.vehicle;

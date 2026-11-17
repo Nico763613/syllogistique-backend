@@ -315,3 +315,6 @@ ALTER TABLE sales_invoices ADD COLUMN IF NOT EXISTS description text
 
 --#
 ALTER TABLE trips ADD COLUMN IF NOT EXISTS customer_id text
+
+--#
+ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_photo_url text
