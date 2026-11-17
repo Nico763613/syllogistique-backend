@@ -26,7 +26,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const u = super.handleRequest(err, user, info, context);
     if (u && u.role === 'DIRECTEUR_GENERAL') {
       const req = context.switchToHttp().getRequest();
-      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !String(req.path || '').startsWith('/auth/')) {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !String(req.path || '').startsWith('/auth/') && req.path !== '/support/reports') {
         throw new ForbiddenException('Le Directeur Général a un accès en lecture seule.');
       }
     }

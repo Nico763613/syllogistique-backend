@@ -226,6 +226,9 @@
   .dp-sub{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px;}
   .dp-sub button{min-height:44px; padding:0 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; font-weight:600; color:var(--navy); cursor:pointer;}
   .dp-sub button.on{background:var(--blue); border-color:var(--blue); color:#fff;}
+  #report-fab{position:fixed; right:12px; bottom:12px; z-index:900; display:flex; align-items:center; gap:6px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--navy); font-size:12px; font-weight:600; box-shadow:var(--shadow); cursor:pointer;}
+  #report-fab .ic{color:var(--warn,#B7791F);}
+  @media (max-width:760px){ #report-fab{bottom:72px; padding:8px;} #report-fab span{display:none;} }
   .drv-btn{display:block; width:100%; padding:14px; border:none; border-radius:8px; font-size:14px; font-weight:700; background:var(--navy); color:#fff; margin-top:8px; cursor:pointer;}
   .drv-btn.gold{background:var(--blue); color:#fff;} .drv-btn.red{background:var(--danger);} .drv-btn.ghost{background:#fff; color:var(--navy); border:1px solid var(--line);}
   .drv-hello{padding:4px 2px 12px;} .drv-hello h2{margin:0; font-size:20px; color:var(--navy);} .drv-hello div{font-size:14px; color:var(--muted); margin-top:2px;}
@@ -472,6 +475,7 @@
       <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER,MECANICIEN,POINTEUR" onclick="go('my-report')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg></span> Mon rapport du jour</div>
 
       <div class="nav-section-label"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Équipes</div>
+      <div class="nav-item" data-view="signalements" data-roles="SUPER_ADMIN" onclick="go('signalements')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg></span> Signalements</div>
       <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-building"/></svg></span> Responsables (DG &amp; Logistique)</div>
       <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-mech')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span> Mécaniciens &amp; rapports</div>
 
@@ -663,14 +667,66 @@ async function login() {
 function logout() {
   ['syllo_access_token', 'syllo_refresh_token', 'syllo_user'].forEach((k) => localStorage.removeItem(k));
   state.accessToken = ''; state.user = null; state.hist = []; state.view = null;
+  const fab = document.getElementById('report-fab'); if (fab) fab.remove();
   document.getElementById('app').style.display = 'none';
   const da = document.getElementById('driver-app'); if (da) da.style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
 
+/* ---------- Signaler un problème ---------- */
+const APP_BUILD = '2026-11-17';
+let LAST_ERR = '';
+window.addEventListener('error', (e) => { LAST_ERR = String((e && e.message) || '').slice(0, 300); });
+window.addEventListener('unhandledrejection', (e) => { LAST_ERR = String((e && e.reason && e.reason.message) || e.reason || '').slice(0, 300); });
+function ensureReportFab() {
+  if (document.getElementById('report-fab')) return;
+  const b = document.createElement('button');
+  b.id = 'report-fab'; b.type = 'button'; b.setAttribute('aria-label', 'Signaler un problème');
+  b.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> <span>Signaler un problème</span>';
+  b.onclick = openReportProblem;
+  document.body.appendChild(b);
+}
+function openReportProblem() {
+  const old = document.getElementById('report-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'report-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(31,58,95,.55);z-index:4000;display:flex;align-items:center;justify-content:center;padding:18px;';
+  const screen = (document.getElementById('view-title') && document.getElementById('view-title').textContent) || (typeof DRV !== 'undefined' && DRV.tab ? 'Application chauffeur : ' + DRV.tab : '');
+  ov.innerHTML = `<div class="panel" style="max-width:420px;width:100%"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Signaler un problème</h3>
+    <div class="desc">L'écran, votre compte, l'appareil, le réseau et la dernière erreur sont joints automatiquement.</div>
+    <label>Décrivez le problème en une phrase (facultatif)</label>
+    <textarea id="rp-msg" rows="3" maxlength="500" style="width:100%"></textarea>
+    <div id="rp-res"></div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="rp-send" onclick="sendProblemReport()">Envoyer</button><button class="btn ghost" onclick="document.getElementById('report-ov').remove()">Annuler</button></div></div>`;
+  ov.dataset.screen = screen;
+  document.body.appendChild(ov);
+}
+async function sendProblemReport() {
+  const ov = document.getElementById('report-ov'), res = document.getElementById('rp-res');
+  try {
+    await api('/support/reports', { method: 'POST', body: {
+      message: document.getElementById('rp-msg').value.trim() || undefined, screen: ov.dataset.screen || undefined,
+      device: (navigator.userAgent || '').slice(0, 190), appVersion: APP_BUILD, network: navigator.onLine ? 'en ligne' : 'hors ligne', lastError: LAST_ERR || undefined } });
+    res.innerHTML = '<div class="msg ok">Merci, votre signalement a été envoyé à l\'administration.</div>';
+    setTimeout(() => { const o = document.getElementById('report-ov'); if (o) o.remove(); }, 1600);
+  } catch (e) { res.innerHTML = `<div class="msg err">${esc(navigator.onLine ? e.message : 'Pas de réseau : réessayez dès que la connexion revient.')}</div>`; }
+}
+async function renderProblemReports() {
+  const root = document.getElementById('view-root'); root.innerHTML = '<div class="panel">Chargement…</div>';
+  try {
+    const rows = await api('/support/reports');
+    const lab = { NEW: ['Nouveau', 'bad'], IN_PROGRESS: ['En cours', 'warn'], SOLVED: ['Résolu', 'ok'] };
+    root.innerHTML = `<div class="panel"><h3>${'<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>'} Signalements</h3><div class="desc">Problèmes signalés par les utilisateurs, avec le contexte envoyé automatiquement.</div>
+      ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Utilisateur</th><th>Écran</th><th>Message</th><th>Contexte</th><th>Statut</th></tr></thead><tbody>${rows.map((r) => `<tr>
+        <td>${esc(new Date(r.createdAt).toLocaleString('fr-FR'))}</td><td><b>${esc(r.userName)}</b><br><small>${esc(r.role)}</small></td><td>${esc(r.screen || '—')}</td><td>${esc(r.message || '—')}</td>
+        <td><small>${esc(r.network || '')} · ${esc(r.appVersion || '')}${r.lastError ? '<br>Dernière erreur : ' + esc(r.lastError) : ''}<br>${esc((r.device || '').slice(0, 80))}</small></td>
+        <td><select onchange="setProblemStatus('${esc(r.id)}', this.value)">${Object.keys(lab).map((k) => `<option value="${k}" ${k === r.status ? 'selected' : ''}>${lab[k][0]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Aucun signalement pour le moment.</div>'}</div>`;
+  } catch (e) { root.innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
+}
+async function setProblemStatus(id, status) { try { await api('/support/reports/' + id, { method: 'PATCH', body: { status } }); } catch (e) { alert(e.message); } }
 function enterApp() {
+  ensureReportFab();
   if (state.user && state.user.mustChangePassword) { setTimeout(() => forcePasswordScreen(), 0); return; }
-  if (state.user && state.user.role === 'CHAUFFEUR') { setTimeout(() => drvEnter(), 0); return; }
+  if (state.user && state.user.role === 'CHAUFFEUR') { ensureReportFab(); setTimeout(() => drvEnter(), 0); return; }
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   const realMail = state.user.email && !/@(staff|driver)\.local$/.test(state.user.email);
@@ -726,6 +782,7 @@ function updateSyncPill() {
 }
 
 const titles = {
+  'signalements': 'Signalements',
   caisse: 'Caisse',
   ventes: 'Ventes',
   compta: 'Comptabilité',
@@ -1431,6 +1488,7 @@ async function renderView(view) {
     if (view === 'needs') return renderNeeds();
     if (view === 'daily') return renderDaily();
     if (STAFF_CFG[view]) return renderStaff(view);
+    if (view === 'signalements') return renderProblemReports();
     if (view === 'staff-managers') return renderManagers();
     if (view === 'my-report') return renderMyReport();
     if (view === 'enrol') return renderEnrol();

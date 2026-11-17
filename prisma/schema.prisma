@@ -1693,3 +1693,26 @@ model StaffReport {
   @@index([roleName, date])
   @@map("staff_reports")
 }
+
+// ============================================================
+// SUPPORT : signalements de problèmes envoyés depuis l'application
+// ============================================================
+model ProblemReport {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  userName   String   @map("user_name")
+  role       String
+  screen     String?
+  device     String?
+  appVersion String?  @map("app_version")
+  network    String?
+  lastError  String?  @map("last_error")
+  message    String?
+  status     String   @default("NEW") // NEW | IN_PROGRESS | SOLVED
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@map("problem_reports")
+}
