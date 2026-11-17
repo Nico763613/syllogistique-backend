@@ -65,7 +65,7 @@ function back() { if (history.state && history.state.r && history.state.r !== 'h
 window.addEventListener('popstate', (e) => { closeModal(); if (LOGGED) render(e.state || { r: 'home' }); });
 function render(st) {
   window.scrollTo(0, 0);
-  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails }[st.r] || showHome;
+  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails, backups: screenBackups }[st.r] || showHome;
   return f(st.a);
 }
 const bar = (t) => `<div class="bar"><button class="back" onclick="back()" aria-label="Retour" title="Retour">←</button><h2>${esc(t)}</h2></div>`;
@@ -169,7 +169,7 @@ async function showHome() {
         <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>
       <div class="card"><h2>Supervision</h2><p class="muted">Ce que remontent les installations de vos clients : signalements, erreurs, appareils.</p>
         <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${ov.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${ov.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${ov.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${ov.devicesBlocked}</b><span>Appareils bloqués</span></div><div class="kpi click" onclick="nav('mails',null)"><b>${ov.mailsFailed7d || 0}</b><span>Envois en échec (7 j)</span></div></div>
-        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button></div>
+        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button> <button class="ghost" onclick="nav('backups',null)">Sauvegardes</button></div>
       <div class="card"><h2>Mon compte</h2><button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('audit')">Journal d'audit</button></div>
       <div class="card" style="border-color:var(--danger)"><h2>Mode test</h2><p class="muted">Supprime tous les clients et toutes les licences de test. Le journal d'audit est conservé.</p><button class="ghost" style="color:var(--danger)" onclick="nav('reset')">Tout réinitialiser (mode test)</button></div>`;
     drawList();
@@ -341,6 +341,18 @@ async function screenReports() {
       ${dateBar('RP_F', RP_F, 'screenReports')} <button class="ghost" onclick="RP_ROWS&&dlCsv('signalements', ['Date','Client','Utilisateur','Rôle','Écran','Message','Statut'], RP_ROWS.map((r) => [new Date(r.reported_at).toLocaleString('fr-FR'), r.client_name, r.user_name, r.role, r.screen, r.message, r.status]))">Exporter (CSV)</button>
       ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.reported_at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td><b>${esc(r.user_name || '—')}</b> <span class="muted">${esc(r.role || '')}</span><br>${esc(r.screen || '')}</td><td>${esc(r.message || '—')}<br><span class="muted">${esc(r.context || '')}</span></td>
         <td><select onchange="setReport(${r.id}, this.value)">${Object.keys(lab).map((k) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select></td></tr>`).join('')}</table>` : '<p class="muted">Aucun signalement.</p>'}</div>`;
+  } catch (e) { fail(e); }
+}
+async function screenBackups() {
+  try {
+    const b = await api('/api/backups');
+    const badge = { OK: ['Sauvegarde à jour', 'var(--ok)'], STALE: ['Sauvegarde en retard : à corriger', 'var(--danger,#C0504D)'], UNKNOWN: ['Aucune exécution trouvée', '#C9A24D'] };
+    const how = `<p class="muted">Sauvegarde automatique : chaque nuit, une copie chiffrée de la base de l'application est conservée 30 jours dans un dépôt privé GitHub, puis testée par une restauration de contrôle. <b>La restauration reste volontairement manuelle</b> : elle remplace des données de production, elle se fait avec la clé privée de restauration, en présence de l'administrateur.</p>`;
+    if (!b.configured) { v.innerHTML = `<div class="card">${bar('Sauvegardes')}${how}<p>Le suivi automatique n'est pas encore activé. Dans Render (service Master), ajoutez <code>BACKUP_REPO</code> (nom du dépôt de sauvegardes) et <code>BACKUP_GH_TOKEN</code> (jeton GitHub en lecture seule limité à ce dépôt). Vous verrez ici l'état de chaque sauvegarde, avec une alerte si elle échoue.</p></div>`; return; }
+    if (b.error) { v.innerHTML = `<div class="card">${bar('Sauvegardes')}${how}<p style="color:var(--danger,#C0504D)">${esc(b.error)}</p></div>`; return; }
+    const bd = badge[b.state] || badge.UNKNOWN;
+    v.innerHTML = `<div class="card">${bar('Sauvegardes')}${how}<p><b style="color:${bd[1]}">${bd[0]}</b>${b.lastSuccessAt ? ' — dernière réussite : ' + esc(new Date(b.lastSuccessAt).toLocaleString('fr-FR')) + ' (il y a ' + b.hoursSinceSuccess + ' h)' : ''}</p>
+      <table>${b.runs.map((r) => `<tr><td>${esc(new Date(r.at).toLocaleString('fr-FR'))}</td><td><b style="color:${r.conclusion === 'success' ? 'var(--ok)' : r.conclusion ? 'var(--danger,#C0504D)' : '#C9A24D'}">${r.conclusion === 'success' ? 'Réussie' : r.conclusion ? 'Échec' : 'En cours'}</b></td></tr>`).join('')}</table></div>`;
   } catch (e) { fail(e); }
 }
 let ML_F = { status: '', client: '', from: '', to: '' };
