@@ -4610,6 +4610,7 @@ async function forcePasswordSave() {
     localStorage.setItem('syllo_user', JSON.stringify(state.user));
     document.getElementById('force-pw').remove();
     enterApp();
+    try { bellToast('Vous êtes le seul à détenir votre mot de passe.'); } catch (e) {}
   } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
