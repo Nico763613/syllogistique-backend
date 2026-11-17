@@ -324,3 +324,6 @@ CREATE TABLE IF NOT EXISTS problem_reports (id text PRIMARY KEY, user_id text NO
 
 --#
 CREATE INDEX IF NOT EXISTS problem_reports_status_created_at_idx ON problem_reports (status, created_at)
+
+--#
+CREATE TABLE IF NOT EXISTS driver_signups (id text PRIMARY KEY, first_name text NOT NULL, last_name text NOT NULL, phone text NOT NULL, activity text, status text NOT NULL DEFAULT 'PENDING', created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, decided_by text, decided_at timestamp(3), driver_id text)
