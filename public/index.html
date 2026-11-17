@@ -475,7 +475,7 @@
       <div class="nav-item" data-view="my-report" data-roles="AGENT_HSE,GESTIONNAIRE_HSE,MAGASINIER,MECANICIEN,POINTEUR" onclick="go('my-report')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg></span> Mon rapport du jour</div>
 
       <div class="nav-section-label"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Équipes</div>
-      <div class="nav-item" data-view="reports-problems" data-roles="SUPER_ADMIN" onclick="go('reports-problems')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg></span> Signalements</div>
+      <div class="nav-item" data-view="signalements" data-roles="SUPER_ADMIN" onclick="go('signalements')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg></span> Signalements</div>
       <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-building"/></svg></span> Responsables (DG &amp; Logistique)</div>
       <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-mech')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span> Mécaniciens &amp; rapports</div>
 
@@ -782,7 +782,7 @@ function updateSyncPill() {
 }
 
 const titles = {
-  'reports-problems': 'Signalements',
+  'signalements': 'Signalements',
   caisse: 'Caisse',
   ventes: 'Ventes',
   compta: 'Comptabilité',
@@ -1488,7 +1488,7 @@ async function renderView(view) {
     if (view === 'needs') return renderNeeds();
     if (view === 'daily') return renderDaily();
     if (STAFF_CFG[view]) return renderStaff(view);
-    if (view === 'reports-problems') return renderProblemReports();
+    if (view === 'signalements') return renderProblemReports();
     if (view === 'staff-managers') return renderManagers();
     if (view === 'my-report') return renderMyReport();
     if (view === 'enrol') return renderEnrol();
