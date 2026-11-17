@@ -116,16 +116,40 @@ export class LicenseService implements OnModuleInit {
     return !p || p.paid !== false;
   }
 
+  // Ce que l'installation remonte au Master : appareils chauffeurs et signalements (aucun contenu métier privé)
+  private async telemetry() {
+    const devs = await this.prisma.driverDevice.findMany({ where: { status: { in: ['ACTIVE', 'BLOCKED'] } }, take: 500 });
+    const drivers = await this.prisma.driver.findMany({ where: { id: { in: [...new Set(devs.map((x) => x.driverId))] } }, select: { id: true, firstName: true, lastName: true } });
+    const nm = new Map(drivers.map((x) => [x.id, `${x.firstName} ${x.lastName}`]));
+    const reports = await this.prisma.problemReport.findMany({ orderBy: { createdAt: 'desc' }, take: 50 });
+    return {
+      devices: devs.map((x) => ({ id: x.id, name: `${nm.get(x.driverId) ?? 'Chauffeur'} — ${x.model ?? 'appareil'}`, lastSeenAt: x.lastSeenAt ?? x.activatedAt })),
+      reports: reports.map((r) => ({ id: r.id, userName: r.userName, role: r.role, screen: r.screen, message: r.message, createdAt: r.createdAt, context: [r.network, r.appVersion, r.lastError].filter(Boolean).join(' · ') })),
+    };
+  }
+
+  // Ordres du Master : blocage / déblocage / déconnexion d'appareils chauffeurs (effet à la prochaine synchronisation, au plus 1 h)
+  private async applyDeviceOrders(json: any) {
+    const blocked: string[] = Array.isArray(json.blockedDevices) ? json.blockedDevices : [];
+    const disc: string[] = Array.isArray(json.disconnectDevices) ? json.disconnectDevices : [];
+    const REASON = 'Bloqué par l\'administrateur système';
+    if (blocked.length) await this.prisma.driverDevice.updateMany({ where: { id: { in: blocked }, status: 'ACTIVE' }, data: { status: 'BLOCKED', blockedAt: new Date(), blockedReason: REASON } });
+    await this.prisma.driverDevice.updateMany({ where: { status: 'BLOCKED', blockedReason: REASON, id: { notIn: blocked } }, data: { status: 'ACTIVE', blockedAt: null, blockedReason: null } });
+    if (disc.length) await this.prisma.driverDevice.updateMany({ where: { id: { in: disc }, status: { in: ['ACTIVE', 'BLOCKED'] } }, data: { status: 'REVOKED', blockedAt: new Date(), blockedReason: 'Déconnecté par l\'administrateur système' } });
+  }
+
   @Interval(3600000)
   async check() {
     if (!this.enforced) return;
     const d = await this.load(true);
     if (!d.licenseId || !d.instanceKey) return;
     try {
-      const res = await this.post('/v1/check', { licenseId: d.licenseId, instanceKey: d.instanceKey, instanceId: d.instanceId, appVersion: process.env.APP_VERSION || '39' });
+      const extra = await this.telemetry().catch(() => ({}));
+      const res = await this.post('/v1/check', { licenseId: d.licenseId, instanceKey: d.instanceKey, instanceId: d.instanceId, appVersion: process.env.APP_VERSION || '39', ...extra });
       if (res.status === 200 && verifyToken(res.json.token, d.publicKey || '')) {
         await this.save({ ...d, token: res.json.token, lastOkAt: Date.now(), invalid: false });
         await this.syncBrandLogo(verifyToken(res.json.token, d.publicKey || ''));
+        await this.applyDeviceOrders(res.json).catch(() => {});
       } else if (res.status === 401) {
         await this.save({ ...d, invalid: true });
       }
