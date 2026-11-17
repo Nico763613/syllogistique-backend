@@ -301,7 +301,7 @@
   @media (max-width:860px){ .sidebar{left:-290px !important;} .sidebar.open{left:0 !important;} #hist-btn,#install-btn,#draft-note,.user-chip .meta,.user-chip > span{display:none !important;} .topbar{padding:10px 14px;} .topbar h2{font-size:20px;} }
   @media (max-width:860px){ #bottom-nav.on{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fff; border-top:1px solid var(--line); box-shadow:var(--shadow); padding-bottom:env(safe-area-inset-bottom);}
     #bottom-nav button{flex:1; min-height:58px; border:none; background:none; font-size:12px; color:var(--muted); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;}
-    #bottom-nav button span{font-size:20px; line-height:1;} #bottom-nav button.on{color:var(--blue); font-weight:600;} .content{padding-bottom:90px;} .main .powered{padding-bottom:70px;} }
+    #bottom-nav button span{display:flex; line-height:1;} #bottom-nav button .ic{width:22px; height:22px;} .ex-ico .ic{width:22px; height:22px; color:var(--blue);} .ex-act .ic{width:18px; height:18px;} #bottom-nav button.on{color:var(--blue); font-weight:600;} .content{padding-bottom:90px;} .main .powered{padding-bottom:70px;} }
   .hm-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px;}
   .hm-card{background:#fff; border:1px solid #E9EEF7; border-radius:8px; padding:22px; cursor:pointer; box-shadow:var(--shadow); display:flex; gap:16px; align-items:center; min-height:104px; transition:.15s; text-align:left; font:inherit; color:inherit;}
   .hm-card:hover{transform:translateY(-2px); box-shadow:var(--shadow); border-color:#C9D8F6;}
@@ -1019,7 +1019,7 @@ async function renderDeptDashboard(key) {
   if (state.siteId) q.set('siteId', state.siteId);
   const d = await api('/dashboards/' + key + '?' + q.toString());
   const periods = [['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois'], ['year', 'Année']];
-  const kindBar = key === 'fleet' ? `<div style="margin-bottom:10px">${[['ALL', 'Tous'], ['TRUCK', '🚛 Camions'], ['SERVICE_VEHICLE', '🚙 Véhicules de service']].map(([k, t]) => `<button class="btn ${DEPT_KIND.value === k ? 'gold' : ''}" style="margin-right:6px" onclick="DEPT_KIND.value='${k}'; renderView(state.view)">${t}</button>`).join('')}</div>` : '';
+  const kindBar = key === 'fleet' ? `<div style="margin-bottom:10px">${[['ALL', 'Tous'], ['TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions'], ['SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service']].map(([k, t]) => `<button class="btn ${DEPT_KIND.value === k ? 'gold' : ''}" style="margin-right:6px" onclick="DEPT_KIND.value='${k}'; renderView(state.view)">${t}</button>`).join('')}</div>` : '';
   const bar = kindBar + `<div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:16px;">
     ${periods.map(([v, l]) => `<button class="btn small ${DEPT_PERIOD.value === v ? 'gold' : ''}" onclick="DEPT_PERIOD.value='${v}'; renderView(state.view)">${l}</button>`).join('')}
     <span class="desc" style="margin-left:auto;">${d.access.scope === 'session' ? 'Vue « ma session de caisse » · ' : ''}Période : ${new Date(d.period.from).toLocaleDateString('fr-FR')} → ${new Date(d.period.to).toLocaleDateString('fr-FR')}</span></div>`;
@@ -1042,8 +1042,8 @@ const HSE_SHORT = { declare_incident: 'Incidents', corrective_action: 'Actions c
 async function hsePeople() {
   const [dr, us] = await Promise.all([api('/drivers?siteId=' + state.siteId).catch(() => []), api('/users').catch(() => [])]);
   const out = [];
-  (Array.isArray(dr) ? dr : []).forEach((x) => out.push(['D:' + x.id, `🚛 ${x.firstName} ${x.lastName} (chauffeur)`]));
-  (Array.isArray(us) ? us : []).filter((x) => x.role !== 'CHAUFFEUR').forEach((x) => out.push(['U:' + x.id, `👤 ${x.firstName} ${x.lastName}`]));
+  (Array.isArray(dr) ? dr : []).forEach((x) => out.push(['D:' + x.id, `${x.firstName} ${x.lastName} (chauffeur)`]));
+  (Array.isArray(us) ? us : []).filter((x) => x.role !== 'CHAUFFEUR').forEach((x) => out.push(['U:' + x.id, `${x.firstName} ${x.lastName}`]));
   return needOpt(out, 'agent ou chauffeur');
 }
 const hsePerson = (v) => (v && v.startsWith('D:') ? { driverId: v.slice(2) } : v && v.startsWith('U:') ? { userId: v.slice(2) } : {});
@@ -1275,7 +1275,7 @@ async function stockMove(dir) {
   ];
   if (dir === 'in') fields.push({ key: 'unitPrice', label: 'Prix unitaire (GNF)', type: 'number' }, { key: 'lotNumber', label: 'N° de lot (obligatoire si périssable)' }, { key: 'expiryDate', label: 'Date de péremption', type: 'date' });
   else fields.push({ key: 'reasonCode', label: 'Nature de la sortie', options: [['CONSUMPTION', 'Consommation'], ['SALE', 'Vente'], ['LOSS', 'Perte / vol'], ['BREAKAGE', 'Casse'], ['SCRAP', 'Rebut'], ['DONATION', 'Don']] },
-    { key: 'vehicleId', label: 'Imputer à (camion / véhicule, facultatif)', options: [['', '— Aucun —'], ...(Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1)).map(v => [String(v.id), `${v.vehicleType === 'TRUCK' ? '🚛' : '🚙'} ${v.internalNumber || ''} — ${v.registrationNumber || ''}`])] });
+    { key: 'vehicleId', label: 'Imputer à (camion / véhicule, facultatif)', options: [['', '— Aucun —'], ...(Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1)).map(v => [String(v.id), `${v.internalNumber || ''} — ${v.registrationNumber || ''}`])] });
   openEditor(dir === 'in' ? 'Entrée de stock' : 'Sortie de stock', fields, async (d) => {
     const body = { ...d, siteId: state.siteId };
     if (body.expiryDate) body.expiryDate = new Date(body.expiryDate).toISOString();
@@ -3118,7 +3118,7 @@ function bottomEntries(role) {
 }
 function buildBottomNav() {
   const nav = document.getElementById('bottom-nav'); if (!nav || !state.user || state.user.role === 'CHAUFFEUR') return;
-  nav.innerHTML = bottomEntries(state.user.role).map(([i, l, v]) => `<button data-v="${v}" onclick="bottomGo('${v}')"><span>${i}</span>${l}</button>`).join('');
+  nav.innerHTML = bottomEntries(state.user.role).map(([i, l, v]) => `<button data-v="${v}" onclick="bottomGo('${v}')"><span>${emoIc(i)}</span>${l}</button>`).join('');
   nav.classList.add('on');
 }
 function bottomGo(v) {
@@ -3152,8 +3152,8 @@ function openPhotoEditor() {
   ov.innerHTML = `<div class="ph-card"><h3>Ma photo de profil</h3><div class="desc" style="margin-bottom:0">Faites glisser pour cadrer, utilisez le curseur pour zoomer.</div>
     <canvas id="ph-cv" width="260" height="260"></canvas>
     <input type="range" id="ph-zoom" min="1" max="3" step="0.01" value="1" style="padding:0" oninput="phZoom(this.value)">
-    <div class="row"><label class="btn small">📷 Prendre une photo<input type="file" accept="image/*" capture="user" hidden onchange="phLoad(this.files[0])"></label>
-    <label class="btn small ghost" style="background:#fff;color:var(--navy);border:1px solid var(--line)">🖼️ Galerie<input type="file" accept="image/*" hidden onchange="phLoad(this.files[0])"></label></div>
+    <div class="row"><label class="btn small"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> Prendre une photo<input type="file" accept="image/*" capture="user" hidden onchange="phLoad(this.files[0])"></label>
+    <label class="btn small ghost" style="background:#fff;color:var(--navy);border:1px solid var(--line)"><svg class="ic" aria-hidden="true"><use href="#i-image"/></svg> Galerie<input type="file" accept="image/*" hidden onchange="phLoad(this.files[0])"></label></div>
     <div class="row"><button class="btn small" id="ph-save" onclick="phSave()">Enregistrer</button><button class="btn small danger" onclick="phRemove()">Supprimer</button><button class="btn small ghost" onclick="closePhotoEditor()">Annuler</button></div>
     <div id="ph-msg"></div></div>`;
   document.body.appendChild(ov);
@@ -3241,8 +3241,16 @@ function execStyle() {
   .ex-row{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}.ex-row:last-child{border:0}`;
   document.head.appendChild(st);
 }
+// Convertit un pictogramme hérité (données) en icône SVG ; les icônes SVG passent telles quelles
+const EMO_ICON = {"🚑":"alert","📅":"clock","🔍":"search","🖼":"image","🚛": "truck", "🚚": "truck", "🚙": "car", "🚗": "car", "✅": "check-circle", "✔": "check", "✓": "check", "📋": "clipboard", "➕": "plus", "➖": "minus", "💬": "message", "🕒": "clock", "💵": "banknote", "💰": "banknote", "🧾": "receipt", "👤": "user", "👥": "users", "🔧": "wrench", "🛠": "wrench", "📦": "package", "📷": "camera", "⛽": "fuel", "📝": "pencil", "✏": "pencil", "⬇": "download", "📥": "download", "⬆": "upload", "📤": "upload", "⚠": "alert", "🚨": "alert", "🚧": "alert", "📊": "chart", "📈": "chart", "✉": "mail", "📬": "mail", "📄": "file", "📜": "file", "🦺": "hard-hat", "🔒": "lock", "💾": "save", "🔄": "refresh", "🗄": "archive", "🗂": "archive", "🔔": "bell", "🔑": "key", "📲": "phone", "🏠": "home", "🧭": "compass", "❌": "x", "✖": "x", "🚫": "ban", "🏁": "flag", "⚖": "scale", "🎯": "target", "📍": "map-pin", "🛡": "shield", "👁": "eye", "🏭": "factory", "↩": "chevron-left", "✎": "pencil", "👷": "hard-hat", "🧑": "user", "⏳": "clock", "👀": "eye", "⏰": "clock", "🏢": "building", "🔁": "refresh", "⛔": "ban", "📂": "archive", "🖨": "printer", "▶": "chevron-right", "🛒": "cart", "⚡": "zap"};
+function emoIc(e) {
+  if (!e) return '';
+  if (String(e).charAt(0) === '<') return e;
+  const k = String(e).replace(/[\uFE0F\u200D]/g, '');
+  return EMO_ICON[k] ? '<svg class="ic" aria-hidden="true"><use href="#i-' + EMO_ICON[k] + '"/></svg>' : '';
+}
 function exKpi(ico, bg, val, label, sub) {
-  return `<div class="ex-kpi"><div class="ex-ico" style="background:#E8EFFD">${ico}</div><div><b>${val}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
+  return `<div class="ex-kpi"><div class="ex-ico" style="background:#E8EFFD">${emoIc(ico)}</div><div><b>${val}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div></div>`;
 }
 function exBars(rows) {
   const max = Math.max(1, ...rows.map((r) => r.total));
@@ -3258,13 +3266,13 @@ async function renderExecutive(mode) {
   const d = await api('/dashboards/executive' + (state.siteId ? '?siteId=' + state.siteId : ''));
   const u = state.user, f = d.fleet, m = d.missions, pe = d.people, ex = d.expenses, hs = d.hse, st = d.stock;
   const heroTxt = mode === 'dg' ? 'Voici la situation globale de votre entreprise.' : 'Voici l’activité de votre logistique : missions, véhicules et chauffeurs.';
-  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
+  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Actualiser</button></div></div>`;
   const rate = m.completionRate;
   const ring = (v, col) => `<div class="ex-ring" style="background:conic-gradient(${col} ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
-  const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
-  const alertsCard = `<div class="ex-card"><h3>🔔 Alertes importantes</h3>${exAlerts(d.alerts)}</div>`;
-  const moveCard = `<div class="ex-card"><h3>📦 Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${st.recent.length ? st.recent.map((r) => `<div class="ex-row"><span>${esc(r.item)}</span><span style="color:${r.type === 'IN' || r.type === 'RETURN' ? '#3F8F6B' : '#C0504D'}">${r.type === 'IN' || r.type === 'RETURN' ? '+' : '−'}${fmt(r.quantity)}</span><span style="color:var(--muted)">${drvDt(r.at)}</span></div>`).join('') : '<div class="empty" style="padding:10px">Aucun mouvement.</div>'}${st.belowMinimum ? `<div class="msg err" style="margin-top:8px">Stock faible : ${st.belowMinimum} article(s) sous le seuil minimum.</div>` : ''}</div>`;
-  const chartCard = `<div class="ex-card"><h3>📈 Performance des missions (6 mois) <span class="badge ${m.monthTotal >= m.previousMonthTotal ? 'ok' : 'warn'}">${m.monthTotal} ce mois</span></h3>${exBars(m.byMonth)}</div>`;
+  const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${emoIc(ico)}</span>${label}</button>`;
+  const alertsCard = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes importantes</h3>${exAlerts(d.alerts)}</div>`;
+  const moveCard = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${st.recent.length ? st.recent.map((r) => `<div class="ex-row"><span>${esc(r.item)}</span><span style="color:${r.type === 'IN' || r.type === 'RETURN' ? '#3F8F6B' : '#C0504D'}">${r.type === 'IN' || r.type === 'RETURN' ? '+' : '−'}${fmt(r.quantity)}</span><span style="color:var(--muted)">${drvDt(r.at)}</span></div>`).join('') : '<div class="empty" style="padding:10px">Aucun mouvement.</div>'}${st.belowMinimum ? `<div class="msg err" style="margin-top:8px">Stock faible : ${st.belowMinimum} article(s) sous le seuil minimum.</div>` : ''}</div>`;
+  const chartCard = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg> Performance des missions (6 mois) <span class="badge ${m.monthTotal >= m.previousMonthTotal ? 'ok' : 'warn'}">${m.monthTotal} ce mois</span></h3>${exBars(m.byMonth)}</div>`;
   let body;
   if (mode === 'dg') {
     // Directeur Général : lecture seule absolue — aucun bouton d'action, aucun formulaire
@@ -3273,10 +3281,10 @@ async function renderExecutive(mode) {
       ${exKpi('🚚', '', f.active, 'Véhicules actifs', `sur ${f.total} · ${f.maintenance} en maintenance`)}
       ${exKpi('▶️', '', m.inProgress, 'Missions en cours', `${m.today} aujourd’hui`)}
       ${exKpi('👥', '', pe.present + ' / ' + pe.drivers, 'Chauffeurs présents', 'aujourd’hui')}
-      ${exKpi('💰', '', fmt(ex.today), 'Dépenses du jour (GNF)', `Mois : ${fmt(ex.month)}`)}</div>`;
-    const safety = `<div class="ex-card"><h3>🦺 Alertes sécurité</h3>${exAlerts(d.safetyAlerts)}</div>`;
-    const budget = `<div class="ex-card"><h3>💰 Alertes budget</h3>${exAlerts(d.budgetAlerts.map((a) => ({ ...a, at: d.asOf })))}</div>`;
-    const synth = `<div class="ex-card"><h3>📋 Synthèse du mois <span class="badge info">données validées</span></h3>
+      ${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg>', '', fmt(ex.today), 'Dépenses du jour (GNF)', `Mois : ${fmt(ex.month)}`)}</div>`;
+    const safety = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-hard-hat"/></svg> Alertes sécurité</h3>${exAlerts(d.safetyAlerts)}</div>`;
+    const budget = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Alertes budget</h3>${exAlerts(d.budgetAlerts.map((a) => ({ ...a, at: d.asOf })))}</div>`;
+    const synth = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Synthèse du mois <span class="badge info">données validées</span></h3>
       <div class="ex-row"><span>Missions terminées</span><b>${sy.missionsCompleted} / ${sy.missionsTotal}</b></div>
       <div class="ex-row"><span>Kilomètres parcourus</span><b>${fmt(sy.km)} km</b></div>
       <div class="ex-row"><span>Dépenses validées</span><b>${fmt(sy.expensesValidated)} GNF</b></div>
@@ -3289,13 +3297,13 @@ async function renderExecutive(mode) {
       ${exKpi('🚚', '#E8F0F8', f.active, 'Véhicules actifs', `${f.onMission} en mission · ${f.available} disponibles`)}
       ${exKpi('▶️', '#E1F4E8', m.inProgress, 'Missions en cours', `${m.today} aujourd’hui`)}
       ${exKpi('⏳', '#FDF1D6', m.planned, 'Missions en attente', 'planifiées, non démarrées')}
-      ${exKpi('💰', '#FDE8E4', fmt(ex.today), 'Dépenses du jour (GNF)', `${ex.pendingApproval} frais à valider`)}</div>`;
-    const track = `<div class="ex-card"><h3>🧭 Suivi des missions en cours <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('driver-board')">Voir tout →</a></h3>${m.running.length ? m.running.map((t) => `<div class="ex-row"><span><b>${esc(t.vehicle)}</b> · ${esc(t.driver)}<br><span style="color:var(--muted)">${esc(t.destination || 'Destination non renseignée')}</span></span><span style="text-align:right"><span class="badge ok">En cours</span><br><span style="color:var(--muted);font-size:12px">départ ${drvDt(t.startTime)}</span></span></div>`).join('') : '<div class="empty" style="padding:10px">Aucune mission en cours.</div>'}</div>`;
-    const crew = `<div class="ex-card"><h3>👥 Chauffeurs & équipe</h3>
+      ${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg>', '#FDE8E4', fmt(ex.today), 'Dépenses du jour (GNF)', `${ex.pendingApproval} frais à valider`)}</div>`;
+    const track = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-compass"/></svg> Suivi des missions en cours <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('driver-board')">Voir tout →</a></h3>${m.running.length ? m.running.map((t) => `<div class="ex-row"><span><b>${esc(t.vehicle)}</b> · ${esc(t.driver)}<br><span style="color:var(--muted)">${esc(t.destination || 'Destination non renseignée')}</span></span><span style="text-align:right"><span class="badge ok">En cours</span><br><span style="color:var(--muted);font-size:12px">départ ${drvDt(t.startTime)}</span></span></div>`).join('') : '<div class="empty" style="padding:10px">Aucune mission en cours.</div>'}</div>`;
+    const crew = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Chauffeurs & équipe</h3>
       <div class="ex-row"><span>Chauffeurs actifs</span><b>${pe.drivers}</b></div><div class="ex-row"><span>Présents aujourd’hui</span><b>${pe.present}</b></div><div class="ex-row"><span>Absents / non présents</span><b>${pe.absent}</b></div><div class="ex-row"><span>Rapports du personnel reçus</span><b>${pe.staffReportsToday}/${pe.staff}</b></div>
       <div class="ex-row"><span>Véhicules en maintenance</span><b>${f.maintenance}</b></div><div class="ex-row"><span>Véhicules immobilisés</span><b>${f.immobilized}</b></div></div>`;
-    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${act('💬', 'Enrôler par WhatsApp', 'enrol')}${act('🕒', 'Pointage du jour', 'pointage')}${act('📋', 'Fiches de bord', 'driver-sheets')}${act('💵', 'Dépenses', 'driver-expenses')}${act('🚛', 'Flotte', 'trucks')}${act('⛽', 'Carburant & maintenance', 'fuel')}${act('📊', 'Rapports', 'reports-truck')}</div></div>`;
-    const todo = `<div class="ex-card"><h3>✅ À traiter</h3>
+    const actions = `<div class="ex-card" style="margin-bottom:14px"><h3><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> Actions rapides</h3><div class="ex-act">${act('<svg class="ic" aria-hidden="true"><use href="#i-message"/></svg>', 'Enrôler par WhatsApp', 'enrol')}${act('<svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>', 'Pointage du jour', 'pointage')}${act('<svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg>', 'Fiches de bord', 'driver-sheets')}${act('<svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg>', 'Dépenses', 'driver-expenses')}${act('<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg>', 'Flotte', 'trucks')}${act('<svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg>', 'Carburant & maintenance', 'fuel')}${act('<svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg>', 'Rapports', 'reports-truck')}</div></div>`;
+    const todo = `<div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> À traiter</h3>
       <div class="ex-row"><span>Dépenses en circuit de validation</span><b>${ex.pendingApproval}</b></div>
       <div class="ex-row"><span>Missions en attente</span><b>${m.planned}</b></div>
       <div class="ex-row"><span>Rapports du personnel non reçus</span><b>${Math.max(0, pe.staff - pe.staffReportsToday)}</b></div>
@@ -3314,47 +3322,47 @@ async function renderWorkspace() {
   const names = { STORE: 'Gestionnaire de stock', HSE: 'Agent HSE', MECHANIC: 'Mécanicien', POINTER: 'Pointeur' };
   const hello = { STORE: 'Gérez vos articles, entrées et sorties du jour.', HSE: 'Prévention, inspections et incidents de votre site.', MECHANIC: 'Interventions, diagnostics et véhicules à réparer.', POINTER: 'Pointage du jour et présence des chauffeurs.' }[d.kind];
   const rep = d.myReport ? `Rapport du jour ${stepBadge(staffStep(d.myReport))}` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
-  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)">🔄 Actualiser</button></div></div>`;
-  const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${ico}</span>${label}</button>`;
-  const atAct = (ico, label, tab) => `<button onclick="atTab='${tab}';go('atelier')"><span>${ico}</span>${label}</button>`;
-  const ptAct = (ico, label, tab) => `<button onclick="ptTab='${tab}';go('pointage')"><span>${ico}</span>${label}</button>`;
-  const stAct = (ico, label, tab) => `<button onclick="stockTab='${tab}';go('stock')"><span>${ico}</span>${label}</button>`;
-  const actions = (items) => `<div class="ex-card" style="margin-bottom:14px"><h3>⚡ Actions rapides</h3><div class="ex-act">${items}${act('📝', 'Mon rapport du jour', 'my-report')}</div></div>`;
+  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Actualiser</button></div></div>`;
+  const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${emoIc(ico)}</span>${label}</button>`;
+  const atAct = (ico, label, tab) => `<button onclick="atTab='${tab}';go('atelier')"><span>${emoIc(ico)}</span>${label}</button>`;
+  const ptAct = (ico, label, tab) => `<button onclick="ptTab='${tab}';go('pointage')"><span>${emoIc(ico)}</span>${label}</button>`;
+  const stAct = (ico, label, tab) => `<button onclick="stockTab='${tab}';go('stock')"><span>${emoIc(ico)}</span>${label}</button>`;
+  const actions = (items) => `<div class="ex-card" style="margin-bottom:14px"><h3><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> Actions rapides</h3><div class="ex-act">${items}${act('<svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg>', 'Mon rapport du jour', 'my-report')}</div></div>`;
   const empty = (t) => `<div class="empty" style="padding:10px">${t}</div>`;
   let body = '';
   if (d.kind === 'STORE') {
     const sign = (t) => (t === 'IN' || t === 'RETURN' ? ['+', '#3F8F6B'] : ['−', '#C0504D']);
-    body = `<div class="ex-kpis">${exKpi('📦', '#E8F0F8', fmt(k.items), 'Articles en stock')}${exKpi('⬆️', '#E1F4E8', k.entriesToday, 'Entrées aujourd’hui')}${exKpi('⬇️', '#FDF1D6', k.exitsToday, 'Sorties aujourd’hui')}${exKpi('⚠️', '#FDE8E4', k.belowMinimum, 'Articles sous le seuil')}</div>
-      <div class="ex-grid"><div class="ex-card"><h3>📋 Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Article</th><th>Type</th><th>Qté</th><th>Destination</th></tr>${d.recent.map((r) => { const [sg, c] = sign(r.type); return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.item)}</td><td style="color:${c}">${r.type === 'IN' ? 'Entrée' : r.type === 'OUT' ? 'Sortie' : esc(r.type)}</td><td style="color:${c}">${sg}${fmt(r.quantity)}</td><td>${esc(r.vehicle || r.reason || '—')}</td></tr>`; }).join('')}</table></div>` : empty('Aucun mouvement.')}</div>
-      <div class="ex-card"><h3>🔔 Alertes de stock</h3>${d.alerts.length ? d.alerts.map((a) => `<div class="ex-al"><div class="ex-dot" style="background:${a.quantity <= 0 ? '#C0504D' : '#C9A24D'}"></div><div><b>${esc(a.name)}</b><div style="color:var(--muted)">${fmt(a.quantity)} ${esc(a.unit)} en stock (minimum ${fmt(a.minimum)})</div></div></div>`).join('') : empty('Aucune alerte : tous les articles sont au-dessus du seuil.')}</div></div>`
+    body = `<div class="ex-kpis">${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-package"/></svg>', '#E8F0F8', fmt(k.items), 'Articles en stock')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg>', '#E1F4E8', k.entriesToday, 'Entrées aujourd’hui')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg>', '#FDF1D6', k.exitsToday, 'Sorties aujourd’hui')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>', '#FDE8E4', k.belowMinimum, 'Articles sous le seuil')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Mouvements récents <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('stock')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Article</th><th>Type</th><th>Qté</th><th>Destination</th></tr>${d.recent.map((r) => { const [sg, c] = sign(r.type); return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.item)}</td><td style="color:${c}">${r.type === 'IN' ? 'Entrée' : r.type === 'OUT' ? 'Sortie' : esc(r.type)}</td><td style="color:${c}">${sg}${fmt(r.quantity)}</td><td>${esc(r.vehicle || r.reason || '—')}</td></tr>`; }).join('')}</table></div>` : empty('Aucun mouvement.')}</div>
+      <div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes de stock</h3>${d.alerts.length ? d.alerts.map((a) => `<div class="ex-al"><div class="ex-dot" style="background:${a.quantity <= 0 ? '#C0504D' : '#C9A24D'}"></div><div><b>${esc(a.name)}</b><div style="color:var(--muted)">${fmt(a.quantity)} ${esc(a.unit)} en stock (minimum ${fmt(a.minimum)})</div></div></div>`).join('') : empty('Aucune alerte : tous les articles sont au-dessus du seuil.')}</div></div>`
       + actions(stAct('📥', 'Entrée', 'entrees') + stAct('📤', 'Sortie', 'sorties') + stAct('📋', 'Inventaire', 'inventaire') + stAct('🚨', 'Alertes stock', 'articles') + act('📝', 'États des besoins', 'needs'));
   } else if (d.kind === 'HSE') {
     const sev = { LOW: '#2F6FB5', MEDIUM: '#C9A24D', HIGH: '#C9A24D', CRITICAL: '#C0504D' };
     const ring = (v) => `<div class="ex-ring" style="background:conic-gradient(#3F8F6B ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
-    body = `<div class="ex-kpis">${exKpi('🛡️', '#E8F0F8', k.inspections, 'Inspections (mois)')}${exKpi('⚠️', '#FDF1D6', k.openIncidents, 'Incidents ouverts')}${exKpi('🚑', '#FDE8E4', k.accidents, 'Accidents (mois)')}${exKpi('✅', '#E1F4E8', k.compliance == null ? '—' : k.compliance + ' %', 'Conformité')}</div>
-      <div class="ex-grid"><div class="ex-card"><h3>🦺 État sécurité</h3>${ring(k.compliance)}<div class="desc" style="text-align:center">${k.compliance == null ? 'Aucune inspection ce mois-ci' : k.compliance >= 90 ? 'Très bon niveau' : k.compliance >= 70 ? 'Niveau acceptable' : 'À améliorer'}</div></div>
-      <div class="ex-card"><h3>🔔 Alertes sécurité</h3>${d.incidents.length ? d.incidents.map((i) => `<div class="ex-al"><div class="ex-dot" style="background:${sev[i.severity] || '#2F6FB5'}"></div><div><b>${esc(i.type)} — ${esc(i.severity)}</b><div style="color:var(--muted)">${esc(i.description)}</div><div style="color:var(--muted);font-size:12px">${drvDt(i.at)}</div></div></div>`).join('') : empty('Aucun incident ouvert.')}</div>
-      <div class="ex-card"><h3>🔍 Dernières inspections</h3>${d.inspections.length ? d.inspections.map((i) => `<div class="ex-row"><span>${esc(i.type)}</span><span>${drvDt(i.at)}</span><span class="badge ${i.compliant ? 'ok' : 'warn'}">${i.compliant == null ? '—' : i.compliant ? 'Conforme' : 'Non conforme'}</span></div>`).join('') : empty('Aucune inspection.')}</div></div>`
+    body = `<div class="ex-kpis">${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>', '#E8F0F8', k.inspections, 'Inspections (mois)')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>', '#FDF1D6', k.openIncidents, 'Incidents ouverts')}${exKpi('🚑', '#FDE8E4', k.accidents, 'Accidents (mois)')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>', '#E1F4E8', k.compliance == null ? '—' : k.compliance + ' %', 'Conformité')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-hard-hat"/></svg> État sécurité</h3>${ring(k.compliance)}<div class="desc" style="text-align:center">${k.compliance == null ? 'Aucune inspection ce mois-ci' : k.compliance >= 90 ? 'Très bon niveau' : k.compliance >= 70 ? 'Niveau acceptable' : 'À améliorer'}</div></div>
+      <div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes sécurité</h3>${d.incidents.length ? d.incidents.map((i) => `<div class="ex-al"><div class="ex-dot" style="background:${sev[i.severity] || '#2F6FB5'}"></div><div><b>${esc(i.type)} — ${esc(i.severity)}</b><div style="color:var(--muted)">${esc(i.description)}</div><div style="color:var(--muted);font-size:12px">${drvDt(i.at)}</div></div></div>`).join('') : empty('Aucun incident ouvert.')}</div>
+      <div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg> Dernières inspections</h3>${d.inspections.length ? d.inspections.map((i) => `<div class="ex-row"><span>${esc(i.type)}</span><span>${drvDt(i.at)}</span><span class="badge ${i.compliant ? 'ok' : 'warn'}">${i.compliant == null ? '—' : i.compliant ? 'Conforme' : 'Non conforme'}</span></div>`).join('') : empty('Aucune inspection.')}</div></div>`
       + actions(act('🦺', 'Inspections, incidents, actions', 'dash-hse'));
   } else if (d.kind === 'MECHANIC') {
     const st = { COMPLETED: ['Terminé', 'ok'], IN_PROGRESS: ['En cours', 'warn'], PLANNED: ['Planifié', 'warn'], OVERDUE: ['En retard', 'bad'] };
-    body = `<div class="ex-kpis">${exKpi('🚛', '#FDE8E4', k.down, 'Véhicules en panne')}${exKpi('🔧', '#FDF1D6', k.inProgress, 'Réparations en cours')}${exKpi('✅', '#E1F4E8', k.doneMonth, 'Terminées (mois)')}${exKpi('📅', '#E8F0F8', k.todo, 'Interventions à faire')}</div>
-      <div class="ex-grid"><div class="ex-card"><h3>🛠️ Interventions récentes <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('maintenance')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Véhicule</th><th>Nature</th><th>Statut</th></tr>${d.recent.map((r) => { const [t, c] = st[r.status] || [r.status, 'warn']; return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.nature)}</td><td><span class="badge ${c}">${t}</span></td></tr>`; }).join('')}</table></div>` : empty('Aucune intervention enregistrée.')}</div>
-      <div class="ex-card"><h3>🚧 Véhicules à l’arrêt</h3>${d.stopped.length ? d.stopped.map((v) => `<div class="ex-row"><span><b>${esc(v.vehicle)}</b> <span style="color:var(--muted)">${esc(v.plate)}</span></span><span class="badge bad">${v.status === 'MAINTENANCE' ? 'En maintenance' : 'Immobilisé'}</span></div>`).join('') : empty('Aucun véhicule à l’arrêt.')}</div></div>`
+    body = `<div class="ex-kpis">${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg>', '#FDE8E4', k.down, 'Véhicules en panne')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg>', '#FDF1D6', k.inProgress, 'Réparations en cours')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>', '#E1F4E8', k.doneMonth, 'Terminées (mois)')}${exKpi('📅', '#E8F0F8', k.todo, 'Interventions à faire')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Interventions récentes <a style="font-size:12px;cursor:pointer;color:var(--navy-soft)" onclick="go('maintenance')">Voir tout →</a></h3>${d.recent.length ? `<div style="overflow:auto"><table><tr><th>Date</th><th>Véhicule</th><th>Nature</th><th>Statut</th></tr>${d.recent.map((r) => { const [t, c] = st[r.status] || [r.status, 'warn']; return `<tr><td>${drvDt(r.at)}</td><td>${esc(r.vehicle)}</td><td>${esc(r.nature)}</td><td><span class="badge ${c}">${t}</span></td></tr>`; }).join('')}</table></div>` : empty('Aucune intervention enregistrée.')}</div>
+      <div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Véhicules à l’arrêt</h3>${d.stopped.length ? d.stopped.map((v) => `<div class="ex-row"><span><b>${esc(v.vehicle)}</b> <span style="color:var(--muted)">${esc(v.plate)}</span></span><span class="badge bad">${v.status === 'MAINTENANCE' ? 'En maintenance' : 'Immobilisé'}</span></div>`).join('') : empty('Aucun véhicule à l’arrêt.')}</div></div>`
       + actions(act('➕', 'Nouvelle intervention', 'maintenance') + atAct('🚧', 'Véhicule à réparer', 'repair') + atAct('📦', 'Pièces', 'parts'));
   } else {
-    body = `<div class="ex-kpis">${exKpi('👥', '#E8F0F8', k.total, 'Effectif total')}${exKpi('✅', '#E1F4E8', k.present, 'Présents')}${exKpi('❌', '#FDE8E4', k.absent, 'Absents')}${exKpi('🕒', '#FDF1D6', k.remaining, 'Pointage restant')}</div>
-      <div class="ex-grid"><div class="ex-card"><h3>🕒 Pointage du jour</h3>${k.remaining === 0 && k.total > 0 ? '<div class="msg ok">Pointage terminé : tous les chauffeurs sont pointés.</div>' : `<div class="msg err">${k.remaining} chauffeur(s) restent à pointer.</div>`}<button class="btn gold" style="margin-top:8px" onclick="go('pointage')">Faire le pointage</button>${k.others ? `<div class="desc" style="margin-top:8px">${k.others} en repos, permission ou maladie.</div>` : ''}</div>
-      <div class="ex-card"><h3>❌ Absences du jour</h3>${d.absentees.length ? d.absentees.map((a) => `<div class="ex-row"><span>${esc(a.name)}</span><span style="color:var(--muted)">${esc(a.reason || '')}</span></div>`).join('') : empty('Aucune absence enregistrée.')}</div></div>`
+    body = `<div class="ex-kpis">${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-users"/></svg>', '#E8F0F8', k.total, 'Effectif total')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg>', '#E1F4E8', k.present, 'Présents')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>', '#FDE8E4', k.absent, 'Absents')}${exKpi('<svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg>', '#FDF1D6', k.remaining, 'Pointage restant')}</div>
+      <div class="ex-grid"><div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Pointage du jour</h3>${k.remaining === 0 && k.total > 0 ? '<div class="msg ok">Pointage terminé : tous les chauffeurs sont pointés.</div>' : `<div class="msg err">${k.remaining} chauffeur(s) restent à pointer.</div>`}<button class="btn gold" style="margin-top:8px" onclick="go('pointage')">Faire le pointage</button>${k.others ? `<div class="desc" style="margin-top:8px">${k.others} en repos, permission ou maladie.</div>` : ''}</div>
+      <div class="ex-card"><h3><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg> Absences du jour</h3>${d.absentees.length ? d.absentees.map((a) => `<div class="ex-row"><span>${esc(a.name)}</span><span style="color:var(--muted)">${esc(a.reason || '')}</span></div>`).join('') : empty('Aucune absence enregistrée.')}</div></div>`
       + actions(ptAct('🕒', 'Pointer les chauffeurs', 'presence') + ptAct('🚛', 'Compter les camions', 'camions'));
   }
   root().innerHTML = hero + body;
 }
 /* ---------------- POINTAGE des chauffeurs (pointeur, responsable logistique) ---------------- */
-const ATT_ST = [['PRESENT', '✅ Présent', 'ok'], ['LATE', '⏰ Retard', 'warn'], ['ABSENT', '❌ Absent', 'bad'], ['REST', '😴 Repos', 'warn'], ['PERMISSION', '📝 Permission', 'warn'], ['SICK', '🤒 Maladie', 'warn'], ['LEAVE', '🌴 Congé', 'warn']];
+const ATT_ST = [['PRESENT', 'Présent', 'ok'], ['LATE', 'Retard', 'warn'], ['ABSENT', 'Absent', 'bad'], ['REST', 'Repos', 'warn'], ['PERMISSION', 'Permission', 'warn'], ['SICK', 'Maladie', 'warn'], ['LEAVE', 'Congé', 'warn']];
 let ptTab = 'presence';
 async function renderPointage() {
-  const bar = `<div class="dp-tabs" id="dp-bar">${[['presence', '🕒 Présence'], ['camions', '🚛 Camions']].map(([k, t]) => `<button class="${ptTab === k ? 'on' : ''}" onclick="ptTab='${k}';renderPointage()">${t}</button>`).join('')}</div>`;
+  const bar = `<div class="dp-tabs" id="dp-bar">${[['presence', '<svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Présence'], ['camions', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions']].map(([k, t]) => `<button class="${ptTab === k ? 'on' : ''}" onclick="ptTab='${k}';renderPointage()">${t}</button>`).join('')}</div>`;
   if (ptTab === 'camions') return renderPointCamions(bar);
   const date = window._ptDate || new Date().toISOString().slice(0, 10);
   const [drivers, att] = await Promise.all([api('/drivers?siteId=' + state.siteId), api('/drivers/attendance/day?siteId=' + state.siteId + '&date=' + date)]);
@@ -3362,7 +3370,7 @@ async function renderPointage() {
   const list = drivers.filter((d) => d.status === 'ACTIVE' || !d.status);
   const done = list.filter((d) => by[d.id]).length;
   window._ptDrivers = list; window._ptAtt = by;
-  root().innerHTML = bar + `<div class="panel"><h3>🕒 Pointage des chauffeurs</h3>
+  root().innerHTML = bar + `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Pointage des chauffeurs</h3>
     <div class="desc">Touchez le statut de chaque chauffeur. Une correction demande un motif.</div>
     <label>Jour</label><input type="date" value="${esc(date)}" max="${new Date().toISOString().slice(0, 10)}" style="max-width:220px" onchange="window._ptDate=this.value;renderPointage()">
     <div class="msg ${done === list.length && list.length ? 'ok' : 'err'}" style="margin-top:10px">${done} / ${list.length} chauffeurs pointés</div></div>
@@ -3487,15 +3495,15 @@ async function loadDaily() {
       ${dailyTripsTable(r)}
       <label style="margin-top:14px">Texte du rapport (corps du message envoyé par e-mail)</label>
       <pre class="mono" style="white-space:pre-wrap; margin:6px 0 14px;">${esc(reportText)}</pre>
-      <button class="btn gold" onclick="downloadDailyPdf()">📄 Télécharger le PDF</button>
-      <button class="btn" style="margin-left:8px;" onclick="printDaily()">🖨️ Imprimer</button>
-      <button class="btn" style="margin-left:8px;" onclick="saveDailyToFolder()">💾 Enregistrer dans un dossier</button>
+      <button class="btn gold" onclick="downloadDailyPdf()"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Télécharger le PDF</button>
+      <button class="btn" style="margin-left:8px;" onclick="printDaily()"><svg class="ic" aria-hidden="true"><use href="#i-printer"/></svg> Imprimer</button>
+      <button class="btn" style="margin-left:8px;" onclick="saveDailyToFolder()"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Enregistrer dans un dossier</button>
       <div class="grid-2" style="margin-top:14px;">
         <div><label>Hiérarchie — e-mail(s) du/des destinataire(s)</label><input id="d-email" value="${esc(dailyEmails)}" placeholder="chef@entreprise.com, directeur@entreprise.com" /></div>
         <div><label>Comptabilité — e-mail(s)</label><input id="d-acc" value="${esc(dailyAccEmails)}" placeholder="compta@entreprise.com" /></div>
       </div>
-      <button class="btn" onclick="sendDailyEmail('HIERARCHY')">✉️ Envoyer à la hiérarchie (PDF joint)</button>
-      <button class="btn" style="margin-left:8px;" onclick="sendDailyEmail('ACCOUNTING')">✉️ Envoyer à la comptabilité (PDF joint)</button>
+      <button class="btn" onclick="sendDailyEmail('HIERARCHY')"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Envoyer à la hiérarchie (PDF joint)</button>
+      <button class="btn" style="margin-left:8px;" onclick="sendDailyEmail('ACCOUNTING')"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Envoyer à la comptabilité (PDF joint)</button>
       <div id="d-msg"></div>`;
   } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
@@ -3576,7 +3584,7 @@ async function renderSync() {
 
   root().innerHTML = `
     <div class="panel">
-      <h3>🔄 État de la synchronisation</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> État de la synchronisation</h3>
       <div class="desc">Cette interface web fonctionne en ligne. Le mode Offline complet (file d'attente locale, synchronisation automatique au retour du réseau) est porté par l'application Flutter mobile/desktop — l'API expose déjà <code>/sync/push</code> pour cela.</div>
       <div class="kpi-grid" style="margin-top:14px;">
         <div class="kpi-card"><div class="kpi-label">Opérations en attente</div><div class="kpi-value mono">${pending}</div></div>
@@ -3601,7 +3609,7 @@ function renderSettings() {
       <div id="s-msg"></div>
     </div>
     <div class="panel">
-      <h3>🔑 Changer mon mot de passe</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg> Changer mon mot de passe</h3>
       <label>Mot de passe actuel</label><input id="pw-old" type="password" autocomplete="current-password" />
       <label>Nouveau mot de passe (6 caractères minimum)</label><input id="pw-new" type="password" autocomplete="new-password" />
       <label>Confirmer le nouveau mot de passe</label><input id="pw-new2" type="password" autocomplete="new-password" />
@@ -3614,7 +3622,7 @@ function renderSettings() {
       <div class="desc">${esc(state.user.firstName)} ${esc(state.user.lastName)} — ${roleLabel(state.user.role)}${state.user.department ? ' — Département : ' + esc(deptLabel(state.user.department)) : ''}</div>
     </div>
     ${['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) ? `<div class="panel">
-      <h3>👥 Utilisateurs et départements</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Utilisateurs et départements</h3>
       <div class="desc">Un utilisateur rattaché à un département ne peut modifier que les données de son département (consultation libre). « Tous » = aucune restriction. L'Administrateur Général a toujours un accès global.</div>
       <div id="u-body"><div class="empty">Chargement…</div></div>
       <div id="u-msg"></div>
@@ -3711,12 +3719,12 @@ function installHelp() {
   const url = location.href.split('#')[0];
   const step = (n, t) => `<div class="step"><b class="n">${n}</b><span>${t}</span></div>`;
   const me = inAppBrowser ? `<div class="msg err" style="margin-top:0">Vous êtes dans un navigateur intégré (WhatsApp, Facebook…) : l'installation n'y fonctionne pas.<br><b>Copiez le lien, puis ouvrez-le dans ${isIOS ? 'Safari' : 'Chrome'}.</b>
-      <div style="margin-top:8px"><button class="btn small" onclick="installCopy()">📋 Copier le lien</button></div></div>` : '';
-  const android = `<h4>📱 Android (téléphone ou tablette)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b>.')}${step(2, 'Appuyez sur le menu <b>⋮</b> (en haut à droite).')}${step(3, 'Choisissez <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>, puis confirmez.')}`;
-  const ios = `<h4>🍎 iPhone / iPad</h4>${step(1, 'Ouvrez le lien dans <b>Safari</b> (pas dans WhatsApp ni Chrome).')}${step(2, 'Appuyez sur <b>Partager</b> (le carré avec une flèche vers le haut).')}${step(3, 'Faites défiler et choisissez <b>« Sur l\'écran d\'accueil »</b>, puis <b>Ajouter</b>.')}`;
-  const pc = `<h4>💻 Ordinateur (Windows, Mac, Linux)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b> ou <b>Edge</b>.')}${step(2, 'Cliquez sur l\'icône <b>Installer</b> (un écran avec une flèche) à droite de la barre d\'adresse.')}${step(3, 'Cliquez sur <b>Installer</b> : l\'application s\'ouvre dans sa propre fenêtre.')}`;
+      <div style="margin-top:8px"><button class="btn small" onclick="installCopy()"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Copier le lien</button></div></div>` : '';
+  const android = `<h4><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Android (téléphone ou tablette)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b>.')}${step(2, 'Appuyez sur le menu <b>⋮</b> (en haut à droite).')}${step(3, 'Choisissez <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>, puis confirmez.')}`;
+  const ios = `<h4><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> iPhone / iPad</h4>${step(1, 'Ouvrez le lien dans <b>Safari</b> (pas dans WhatsApp ni Chrome).')}${step(2, 'Appuyez sur <b>Partager</b> (le carré avec une flèche vers le haut).')}${step(3, 'Faites défiler et choisissez <b>« Sur l\'écran d\'accueil »</b>, puis <b>Ajouter</b>.')}`;
+  const pc = `<h4><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Ordinateur (Windows, Mac, Linux)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b> ou <b>Edge</b>.')}${step(2, 'Cliquez sur l\'icône <b>Installer</b> (un écran avec une flèche) à droite de la barre d\'adresse.')}${step(3, 'Cliquez sur <b>Installer</b> : l\'application s\'ouvre dans sa propre fenêtre.')}`;
   const order = isIOS ? [ios, android, pc] : isAndroid ? [android, ios, pc] : [pc, android, ios];
-  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;margin:20px auto;"><h3 style="margin-top:0">📲 Installer l'application</h3>${me}${order.join('')}
+  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;margin:20px auto;"><h3 style="margin-top:0"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Installer l'application</h3>${me}${order.join('')}
     <div class="desc" style="margin-top:12px">Une fois installée, l'application s'ouvre comme une application normale et garde vos saisies hors connexion.</div>
     <div style="margin-top:12px"><button class="btn gold" onclick="document.getElementById('install-help').remove()">Fermer</button></div></div>`;
   document.body.appendChild(ov);
@@ -5293,7 +5301,7 @@ function licScreen(stateName, message) {
   ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#182F4C;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto';
   const act = stateName === 'UNACTIVATED';
   ov.innerHTML = `<div style="background:#fff;border-radius:8px;max-width:420px;width:100%;padding:26px;text-align:center;font-family:inherit">
-    <div style="font-size:20px">${act ? '🔑' : '🔒'}</div>
+    <div style="font-size:20px">${act ? '<svg class="ic" aria-hidden="true"><use href="#i-key"/></svg>' : '<svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg>'}</div>
     <h2 style="margin:8px 0;color:#1F3A5F;">SYL LOGISTIQUE</h2>
     <p style="color:#4a5a70;font-size:14px">${esc(message || (act ? "Entrez le code d'activation reçu de votre fournisseur." : 'Accès suspendu. Contactez votre fournisseur.'))}</p>
     ${act ? `<input id="lic-code" placeholder="SYLL-XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" autocomplete="off" style="width:100%;padding:12px;border:1px solid #cdd6e2;border-radius:6px;font-size:14px;text-align:center;margin-top:8px">
@@ -5321,7 +5329,7 @@ async function licLoad() {
     if (j.state === 'UNACTIVATED' || j.state === 'BLOCKED') licScreen(j.state, j.message);
     else if (j.state === 'WARNING') {
       const b = document.createElement('div'); b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#C9A24D;color:#1b1b1b;padding:8px 12px;font-size:14px;text-align:center';
-      b.textContent = '⚠️ ' + j.message; document.body.appendChild(b);
+      b.textContent = j.message; document.body.appendChild(b);
     }
   } catch (e) {}
 }
