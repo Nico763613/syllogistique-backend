@@ -321,29 +321,40 @@ function screenPassword() {
     <div class="err" id="err"></div><button onclick="doPw()">Modifier</button> <button class="ghost" onclick="back()">Retour</button></div>`;
 }
 async function doPw() { try { await api('/api/password', { current: c1.value, next: c2.value }); $('err').style.color = 'var(--ok)'; $('err').textContent = 'Mot de passe modifié.'; c1.value = c2.value = ''; } catch (e) { fail(e); } }
-let RP_F = { status: '', client: '' };
+let RP_ROWS = null, ML_ROWS = null;
+let RP_F = { status: '', client: '', from: '', to: '' };
+function dlCsv(name, head, rows) {
+  const q = (x) => '"' + String(x == null ? '' : x).replace(/"/g, '""').replace(/[\r\n]+/g, ' ') + '"';
+  const csv = '\ufeff' + [head, ...rows].map((r) => r.map(q).join(';')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = name + '-' + new Date().toISOString().slice(0, 10) + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+const dateBar = (n, F, fn) => `<input type="date" value="${F.from}" onchange="${n}.from=this.value;${fn}()" title="Du" style="width:auto"> <input type="date" value="${F.to}" onchange="${n}.to=this.value;${fn}()" title="Au" style="width:auto">`;
 async function screenReports() {
   try {
-    const qs = new URLSearchParams(); if (RP_F.status) qs.set('status', RP_F.status); if (RP_F.client) qs.set('client', RP_F.client);
+    const qs = new URLSearchParams(); if (RP_F.status) qs.set('status', RP_F.status); if (RP_F.client) qs.set('client', RP_F.client); if (RP_F.from) qs.set('from', RP_F.from); if (RP_F.to) qs.set('to', RP_F.to);
     const [rows, cls] = [await api('/api/reports?' + qs), CL.length ? CL : await api('/api/clients')];
+    RP_ROWS = rows;
     const lab = { NEW: 'Nouveau', IN_PROGRESS: 'En cours', SOLVED: 'Résolu' };
     v.innerHTML = `<div class="card">${bar('Signalements')}<p class="muted">Problèmes signalés par les utilisateurs et erreurs serveur, avec le contexte envoyé automatiquement. Le contenu privé des clients n'est jamais transmis.</p>
       <select onchange="RP_F.status=this.value;screenReports()"><option value="">Tous les statuts</option>${Object.keys(lab).map((k) => `<option value="${k}" ${RP_F.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select>
       <select onchange="RP_F.client=this.value;screenReports()"><option value="">Tous les clients</option>${cls.map((c) => `<option value="${c.id}" ${String(RP_F.client) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+      ${dateBar('RP_F', RP_F, 'screenReports')} <button class="ghost" onclick="RP_ROWS&&dlCsv('signalements', ['Date','Client','Utilisateur','Rôle','Écran','Message','Statut'], RP_ROWS.map((r) => [new Date(r.reported_at).toLocaleString('fr-FR'), r.client_name, r.user_name, r.role, r.screen, r.message, r.status]))">Exporter (CSV)</button>
       ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.reported_at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td><b>${esc(r.user_name || '—')}</b> <span class="muted">${esc(r.role || '')}</span><br>${esc(r.screen || '')}</td><td>${esc(r.message || '—')}<br><span class="muted">${esc(r.context || '')}</span></td>
         <td><select onchange="setReport(${r.id}, this.value)">${Object.keys(lab).map((k) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select></td></tr>`).join('')}</table>` : '<p class="muted">Aucun signalement.</p>'}</div>`;
   } catch (e) { fail(e); }
 }
-let ML_F = { status: '', client: '' };
+let ML_F = { status: '', client: '', from: '', to: '' };
 const MAIL_HELP = { AUTH: "Le serveur d'e-mail a refusé l'identifiant : renouvelez la clé SMTP dans Render (SMTP_USER / SMTP_PASS).", TIMEOUT: "Le serveur d'e-mail ne répond pas : sur l'offre gratuite de Render les ports SMTP sont bloqués (passer à l'offre payante).", CONNECTION: "Connexion impossible : vérifiez SMTP_HOST et SMTP_PORT.", SENDER_REFUSED: "Adresse refusée : l'expéditeur MAIL_FROM doit être validé chez Brevo, ou l'adresse du destinataire est invalide.", CONFIG: "E-mail non configuré chez ce client (variables SMTP manquantes).", UNKNOWN: "Échec d'envoi : cause non identifiée." };
 async function screenMails() {
   try {
-    const qs = new URLSearchParams(); if (ML_F.status) qs.set('status', ML_F.status); if (ML_F.client) qs.set('client', ML_F.client);
+    const qs = new URLSearchParams(); if (ML_F.status) qs.set('status', ML_F.status); if (ML_F.client) qs.set('client', ML_F.client); if (ML_F.from) qs.set('from', ML_F.from); if (ML_F.to) qs.set('to', ML_F.to);
     const [rows, cls] = [await api('/api/mails?' + qs), CL.length ? CL : await api('/api/clients')];
+    ML_ROWS = rows;
     const lab = { SENT: 'Envoyé', FAILED: 'Échec', SIMULATED: 'Non envoyé (non configuré)' };
     v.innerHTML = `<div class="card">${bar("Envois d'e-mails")}<p class="muted">Qui a envoyé, quand, vers quelle adresse (masquée), avec le statut et la raison en clair en cas d'échec. Remonté automatiquement chaque heure par les applications clientes. Aucun contenu de rapport n'est transmis.</p>
       <select onchange="ML_F.status=this.value;screenMails()"><option value="">Tous les statuts</option>${Object.keys(lab).map((k) => `<option value="${k}" ${ML_F.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select>
       <select onchange="ML_F.client=this.value;screenMails()"><option value="">Tous les clients</option>${cls.map((c) => `<option value="${c.id}" ${String(ML_F.client) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+      ${dateBar('ML_F', ML_F, 'screenMails')} <button class="ghost" onclick="ML_ROWS&&dlCsv('envois', ['Date','Client','Objet','Destinataire','Statut','Raison'], ML_ROWS.map((r) => [new Date(r.at).toLocaleString('fr-FR'), r.client_name, r.subject, r.recipient, r.status, r.error || r.message]))">Exporter (CSV)</button>
       ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td>${esc(r.subject || '—')}<br><span class="muted">${esc(r.recipient || '')}</span></td><td><b style="color:${r.status === 'SENT' ? 'var(--ok)' : 'var(--danger,#C0504D)'}">${lab[r.status] || esc(r.status)}</b>${r.status !== 'SENT' ? `<br><span class="muted">${esc(MAIL_HELP[r.error] || r.message || '')}</span>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">Aucun envoi enregistré pour le moment.</p>'}</div>`;
   } catch (e) { fail(e); }
 }

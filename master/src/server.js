@@ -255,11 +255,12 @@ function createApp(pool, cfg) {
     }
 
     // ---------- supervision : signalements et vue d'ensemble ----------
+    const dOk = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || '')) ? x : null);
     if (req.method === 'GET' && p === '/api/reports') {
       const st = url.searchParams.get('status'), cl = Number(url.searchParams.get('client')) || null;
       const { rows } = await pool.query(`select r.id, r.user_name, r.role, r.screen, r.message, r.context, r.status, r.reported_at, c.id as client_id, c.name as client_name
         from master_reports r join master_licenses l on l.id=r.license_id join master_clients c on c.id=l.client_id
-        where ($1::text is null or r.status=$1) and ($2::bigint is null or c.id=$2) order by r.reported_at desc limit 300`, [['NEW', 'IN_PROGRESS', 'SOLVED'].includes(st) ? st : null, cl]);
+        where ($1::text is null or r.status=$1) and ($2::bigint is null or c.id=$2) and ($3::date is null or r.reported_at >= $3::date) and ($4::date is null or r.reported_at < $4::date + 1) order by r.reported_at desc limit 1000`, [['NEW', 'IN_PROGRESS', 'SOLVED'].includes(st) ? st : null, cl, dOk(url.searchParams.get('from')), dOk(url.searchParams.get('to'))]);
       return send(res, 200, rows);
     }
     if (req.method === 'POST' && p === '/api/reports/status') {
@@ -272,7 +273,7 @@ function createApp(pool, cfg) {
       const st = url.searchParams.get('status'), cl = Number(url.searchParams.get('client')) || null;
       const { rows } = await pool.query(`select m.id, m.at, m.recipient, m.subject, m.status, m.error, m.message, c.id as client_id, c.name as client_name
         from master_mails m join master_licenses l on l.id=m.license_id join master_clients c on c.id=l.client_id
-        where ($1::text is null or m.status=$1) and ($2::bigint is null or c.id=$2) order by m.at desc limit 300`, [['SENT', 'FAILED', 'SIMULATED'].includes(st) ? st : null, cl]);
+        where ($1::text is null or m.status=$1) and ($2::bigint is null or c.id=$2) and ($3::date is null or m.at >= $3::date) and ($4::date is null or m.at < $4::date + 1) order by m.at desc limit 1000`, [['SENT', 'FAILED', 'SIMULATED'].includes(st) ? st : null, cl, dOk(url.searchParams.get('from')), dOk(url.searchParams.get('to'))]);
       return send(res, 200, rows);
     }
     if (req.method === 'GET' && p === '/api/overview') {
