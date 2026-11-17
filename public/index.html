@@ -2466,7 +2466,7 @@ async function loadOrders(isAdmin) {
   const box = document.getElementById('pu-orders');
   try {
     const list = await api('/purchases/orders?siteId=' + state.siteId);
-    const st = { DRAFT: '📝 Brouillon', CONFIRMED: '🟠 Confirmé', PARTIALLY_RECEIVED: '🟡 Reçu partiel', RECEIVED: '✅ Reçu', INVOICED: '🧾 Facturé', CANCELLED: '⚪ Annulé' };
+    const st = { DRAFT: 'Brouillon', CONFIRMED: 'Confirmé', PARTIALLY_RECEIVED: 'Reçu partiel', RECEIVED: 'Reçu', INVOICED: 'Facturé', CANCELLED: 'Annulé' };
     box.innerHTML = list.length ? `<table><thead><tr><th>Référence</th><th>Date</th><th>Fournisseur</th><th>État</th><th>Actions</th></tr></thead><tbody>${list.map(o => `
       <tr><td class="mono">${esc(o.reference)}</td><td>${new Date(o.orderDate).toLocaleDateString('fr-FR')}</td><td>${esc(o.supplier?.name)}</td><td>${st[o.status] || esc(o.status)}</td>
       <td><button class="btn small" onclick="orderPdf('${esc(o.id)}','${esc(o.reference)}')">PDF</button>
@@ -2508,7 +2508,7 @@ async function loadSuppliers() {
   try {
     const list = await api('/suppliers');
     window._suppliers = list;
-    box.innerHTML = list.length ? `<table><thead><tr><th>Nom</th><th>Contact</th><th>Téléphone</th><th>E-mail</th><th></th></tr></thead><tbody>${list.map(f => `<tr><td>${esc(f.name)}</td><td>${esc(f.contactName)}</td><td>${esc(f.phone)}</td><td>${esc(f.email)}</td><td><button class="btn small" onclick="editSupplier('${esc(f.id)}')">✏️</button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun fournisseur.</div>';
+    box.innerHTML = list.length ? `<table><thead><tr><th>Nom</th><th>Contact</th><th>Téléphone</th><th>E-mail</th><th></th></tr></thead><tbody>${list.map(f => `<tr><td>${esc(f.name)}</td><td>${esc(f.contactName)}</td><td>${esc(f.phone)}</td><td>${esc(f.email)}</td><td><button class="btn small" onclick="editSupplier('${esc(f.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button></td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun fournisseur.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function addSupplier() {
@@ -2527,7 +2527,7 @@ let editingNeed = null;
 async function renderNeeds() {
   needLines = []; editingNeed = null;
   root().innerHTML = `
-    <div class="panel"><h3 id="nd-title">📝 Nouvel état des besoins</h3>
+    <div class="panel"><h3 id="nd-title"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Nouvel état des besoins</h3>
       <div class="desc">Pour demander à la hiérarchie des articles en rupture, des pièces à changer, du matériel… Vous pouvez charger automatiquement les articles sous le seuil.</div>
       <div class="grid-2">
         <div><label>Objet</label><input id="nd-obj" placeholder="Ex : Pièces de rechange — camion TRUCK-003" /></div>
@@ -2536,13 +2536,13 @@ async function renderNeeds() {
         <div><label>Justification</label><input id="nd-just" placeholder="Pourquoi ce besoin ?" /></div>
       </div>
       <div id="nd-lines" style="margin-top:10px;"></div>
-      <button class="btn small" onclick="addNeedLine()">➕ Ajouter une ligne</button>
-      <button class="btn small" style="margin-left:6px;" onclick="loadNeedSuggestions()">📦 Charger les articles à commander</button>
-      <div style="margin-top:10px;"><button class="btn gold" onclick="saveNeed()">💾 Enregistrer</button>
+      <button class="btn small" onclick="addNeedLine()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter une ligne</button>
+      <button class="btn small" style="margin-left:6px;" onclick="loadNeedSuggestions()"><svg class="ic" aria-hidden="true"><use href="#i-package"/></svg> Charger les articles à commander</button>
+      <div style="margin-top:10px;"><button class="btn gold" onclick="saveNeed()"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Enregistrer</button>
       <button class="btn small" id="nd-cancel" style="display:none;margin-left:6px;" onclick="renderNeeds()">Annuler la modification</button></div>
       <div id="nd-msg"></div>
     </div>
-    ${['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) ? `<div class="panel"><h3>✉️ Circuit de transmission</h3>
+    ${['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Circuit de transmission</h3>
       <div class="desc">1) L'état des besoins est envoyé par e-mail aux Achats ; 2) après leur traitement, il est transmis à la comptabilité.</div>
       <div class="grid-2"><div><label>E-mails des Achats</label><input id="nd-mail-ach" placeholder="achats@entreprise.com" /></div><div><label>E-mails de la comptabilité</label><input id="nd-mail-cpt" placeholder="compta@entreprise.com" /></div></div>
       <button class="btn" onclick="saveNeedMails()">Enregistrer les destinataires</button><div id="nd-mmsg"></div></div>` : ''}
@@ -2567,7 +2567,7 @@ function drawNeedLines() {
     <td><input value="${esc(l.unit || '')}" oninput="needLines[${i}].unit=this.value" style="width:70px;" /></td>
     <td><input type="number" min="0" value="${esc(l.estimatedUnitPrice || '')}" oninput="needLines[${i}].estimatedUnitPrice=this.value" style="width:100px;" /></td>
     <td><input value="${esc(l.note || '')}" oninput="needLines[${i}].note=this.value" /></td>
-    <td><button class="btn small" onclick="needLines.splice(${i},1);drawNeedLines()">✖</button></td></tr>`).join('')}</tbody></table>`;
+    <td><button class="btn small" onclick="needLines.splice(${i},1);drawNeedLines()"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button></td></tr>`).join('')}</tbody></table>`;
 }
 function addNeedLine() { needLines.push({ designation: '', quantity: '1', unit: '', estimatedUnitPrice: '', note: '' }); drawNeedLines(); }
 async function loadNeedSuggestions() {
@@ -2600,7 +2600,7 @@ async function loadNeeds() {
   const box = document.getElementById('nd-list');
   try {
     const list = await api('/needs?siteId=' + state.siteId);
-    const st = { BROUILLON: '📝 Brouillon', ENVOYE: '📤 Envoyé aux Achats', APPROUVE: '✅ Approuvé', REJETE: '❌ Rejeté', SATISFAIT: '📦 Satisfait', TRANSMIS_COMPTA: '💼 Transmis à la comptabilité' };
+    const st = { BROUILLON: 'Brouillon', ENVOYE: 'Envoyé aux Achats', APPROUVE: 'Approuvé', REJETE: 'Rejeté', SATISFAIT: 'Satisfait', TRANSMIS_COMPTA: 'Transmis à la comptabilité' };
     const admin = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
     const canEdit = (n) => n.status === 'BROUILLON' || state.user.role === 'SUPER_ADMIN';
     box.innerHTML = list.length ? `<table><thead><tr><th>N°</th><th>Objet</th><th>Priorité</th><th>Total est.</th><th>État</th><th>Actions</th></tr></thead><tbody>${list.map(n => `
@@ -2608,9 +2608,9 @@ async function loadNeeds() {
       <td>${n.priority === 'URGENTE' ? '<span class="badge bad">Urgente</span>' : 'Normale'}</td><td class="mono">${n.total ? fmt(n.total) : '—'}</td><td>${st[n.status] || esc(n.status)}</td>
       <td><button class="btn small" onclick="needPdf('${esc(n.id)}','${esc(n.reference)}')">PDF</button>
       <button class="btn small" onclick="needWhatsapp('${esc(n.id)}')">WhatsApp</button>
-      <button class="btn small" onclick="needEmail('${esc(n.id)}','PURCHASING')">✉️ Aux Achats</button>
-      <button class="btn small" onclick="needEmail('${esc(n.id)}','ACCOUNTING')" ${n.status === 'BROUILLON' || n.status === 'REJETE' ? 'disabled title="Envoyez d\'abord aux Achats"' : ''}>✉️ À la comptabilité</button>
-      ${canEdit(n) ? `<button class="btn small" onclick="editNeed('${esc(n.id)}')">✏️ Modifier</button>` : ''}
+      <button class="btn small" onclick="needEmail('${esc(n.id)}','PURCHASING')"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> Aux Achats</button>
+      <button class="btn small" onclick="needEmail('${esc(n.id)}','ACCOUNTING')" ${n.status === 'BROUILLON' || n.status === 'REJETE' ? 'disabled title="Envoyez d\'abord aux Achats"' : ''}><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg> À la comptabilité</button>
+      ${canEdit(n) ? `<button class="btn small" onclick="editNeed('${esc(n.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button>` : ''}
       ${admin ? `<select onchange="needStatus('${esc(n.id)}', this.value)"><option value="">État…</option><option value="ENVOYE">Envoyé</option><option value="APPROUVE">Approuvé</option><option value="REJETE">Rejeté</option><option value="SATISFAIT">Satisfait</option></select>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun état des besoins.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
@@ -2618,7 +2618,7 @@ async function editNeed(id) {
   try {
     const n = await api('/needs/' + id);
     editingNeed = id;
-    document.getElementById('nd-title').textContent = '✏️ Modifier ' + n.reference;
+    document.getElementById('nd-title').textContent = 'Modifier ' + n.reference;
     document.getElementById('nd-obj').value = n.title;
     document.getElementById('nd-prio').value = n.priority;
     document.getElementById('nd-to').value = n.recipient || '';
