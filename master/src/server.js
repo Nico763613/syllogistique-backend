@@ -116,6 +116,16 @@ function createApp(pool, cfg) {
           [l.id, did, String(d.name || '').slice(0, 120) || null, d.lastSeenAt && !isNaN(new Date(d.lastSeenAt)) ? new Date(d.lastSeenAt).toISOString() : new Date().toISOString()]);
         }
       }
+      // signalements remontés (utilisateurs + erreurs serveur) : enregistrés une seule fois, le statut reste géré ici
+      if (Array.isArray(b.reports)) {
+        for (const r of b.reports.slice(0, 100)) {
+          const rid = String(r && r.id || '').slice(0, 100); if (!rid) continue;
+          const t = (x, n) => (x === undefined || x === null || x === '' ? null : String(x).slice(0, n));
+          await pool.query(`insert into master_reports(license_id, remote_id, user_name, role, screen, message, context, reported_at) values ($1,$2,$3,$4,$5,$6,$7,$8)
+            on conflict (license_id, remote_id) do nothing returning id`,
+          [l.id, rid, t(r.userName, 120), t(r.role, 40), t(r.screen, 160), t(r.message, 600), t(r.context, 900), r.createdAt && !isNaN(new Date(r.createdAt)) ? new Date(r.createdAt).toISOString() : new Date().toISOString()]);
+        }
+      }
       const dv = (await pool.query('select device_id, blocked, disconnect_requested from master_devices where license_id=$1', [l.id])).rows;
       const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
       const out = { status: lic.effectiveStatus(l), token: await licenseToken(l, c), blockedDevices: dv.filter((d) => d.blocked).map((d) => d.device_id), disconnectDevices: dv.filter((d) => d.disconnect_requested).map((d) => d.device_id) };
@@ -222,6 +232,30 @@ function createApp(pool, cfg) {
     if (req.method === 'GET' && p === '/api/audit') {
       const { rows } = await pool.query('select l.id, l.at, l.action, l.detail, l.ip, a.email from master_audit_log l left join master_admins a on a.id=l.admin_id order by l.id desc limit 50');
       return send(res, 200, rows);
+    }
+
+    // ---------- supervision : signalements et vue d'ensemble ----------
+    if (req.method === 'GET' && p === '/api/reports') {
+      const st = url.searchParams.get('status'), cl = Number(url.searchParams.get('client')) || null;
+      const { rows } = await pool.query(`select r.id, r.user_name, r.role, r.screen, r.message, r.context, r.status, r.reported_at, c.id as client_id, c.name as client_name
+        from master_reports r join master_licenses l on l.id=r.license_id join master_clients c on c.id=l.client_id
+        where ($1::text is null or r.status=$1) and ($2::bigint is null or c.id=$2) order by r.reported_at desc limit 300`, [['NEW', 'IN_PROGRESS', 'SOLVED'].includes(st) ? st : null, cl]);
+      return send(res, 200, rows);
+    }
+    if (req.method === 'POST' && p === '/api/reports/status') {
+      const b = body; if (!['NEW', 'IN_PROGRESS', 'SOLVED'].includes(b.status)) return send(res, 400, { error: 'Statut invalide.' });
+      await pool.query('update master_reports set status=$2 where id=$1 returning id', [Number(b.id) || 0, b.status]);
+      await audit(s.aid, 'REPORT_STATUS', `signalement ${Number(b.id) || 0} : ${b.status}`, req);
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'GET' && p === '/api/overview') {
+      const q = async (sql) => Number((await pool.query(sql)).rows[0].n);
+      return send(res, 200, {
+        newReports: await q("select count(*) n from master_reports where status='NEW'"),
+        devices24h: await q("select count(*) n from master_devices where last_seen_at > now() - interval '24 hours' and not blocked"),
+        devicesBlocked: await q('select count(*) n from master_devices where blocked'),
+        errors7d: await q("select count(*) n from master_reports where role='SYSTEM' and reported_at > now() - interval '7 days'"),
+      });
     }
 
     // ---------- clients et licences ----------

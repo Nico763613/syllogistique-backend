@@ -65,7 +65,7 @@ function back() { if (history.state && history.state.r && history.state.r !== 'h
 window.addEventListener('popstate', (e) => { closeModal(); if (LOGGED) render(e.state || { r: 'home' }); });
 function render(st) {
   window.scrollTo(0, 0);
-  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset }[st.r] || showHome;
+  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports }[st.r] || showHome;
   return f(st.a);
 }
 const bar = (t) => `<div class="bar"><button class="back" onclick="back()" aria-label="Retour" title="Retour">←</button><h2>${esc(t)}</h2></div>`;
@@ -154,7 +154,7 @@ function expiring() {
 }
 async function showHome() {
   try {
-    const me = await api('/api/me'); CL = await api('/api/clients'); LOGGED = true; bump();
+    const me = await api('/api/me'); CL = await api('/api/clients'); const ov = await api('/api/overview').catch(() => ({ newReports: 0, devices24h: 0, errors7d: 0, devicesBlocked: 0 })); LOGGED = true; bump();
     $('out').style.display = 'inline-block';
     const lics = CL.flatMap((c) => c.licenses); const act = lics.filter((l) => l.effective === 'ACTIVE').length;
     const ex = expiring(); const lost = lics.filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length;
@@ -167,6 +167,9 @@ async function showHome() {
         <div id="cl"></div>
         <button class="gold" onclick="nav('client',null)">+ Nouveau client</button>
         <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>
+      <div class="card"><h2>Supervision</h2><p class="muted">Ce que remontent les installations de vos clients : signalements, erreurs, appareils.</p>
+        <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${ov.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${ov.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${ov.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${ov.devicesBlocked}</b><span>Appareils bloqués</span></div></div>
+        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button></div>
       <div class="card"><h2>Mon compte</h2><button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('audit')">Journal d'audit</button></div>
       <div class="card" style="border-color:var(--danger)"><h2>Mode test</h2><p class="muted">Supprime tous les clients et toutes les licences de test. Le journal d'audit est conservé.</p><button class="ghost" style="color:var(--danger)" onclick="nav('reset')">Tout réinitialiser (mode test)</button></div>`;
     drawList();
@@ -318,6 +321,20 @@ function screenPassword() {
     <div class="err" id="err"></div><button onclick="doPw()">Modifier</button> <button class="ghost" onclick="back()">Retour</button></div>`;
 }
 async function doPw() { try { await api('/api/password', { current: c1.value, next: c2.value }); $('err').style.color = 'var(--ok)'; $('err').textContent = 'Mot de passe modifié.'; c1.value = c2.value = ''; } catch (e) { fail(e); } }
+let RP_F = { status: '', client: '' };
+async function screenReports() {
+  try {
+    const qs = new URLSearchParams(); if (RP_F.status) qs.set('status', RP_F.status); if (RP_F.client) qs.set('client', RP_F.client);
+    const [rows, cls] = [await api('/api/reports?' + qs), CL.length ? CL : await api('/api/clients')];
+    const lab = { NEW: 'Nouveau', IN_PROGRESS: 'En cours', SOLVED: 'Résolu' };
+    v.innerHTML = `<div class="card">${bar('Signalements')}<p class="muted">Problèmes signalés par les utilisateurs et erreurs serveur, avec le contexte envoyé automatiquement. Le contenu privé des clients n'est jamais transmis.</p>
+      <select onchange="RP_F.status=this.value;screenReports()"><option value="">Tous les statuts</option>${Object.keys(lab).map((k) => `<option value="${k}" ${RP_F.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select>
+      <select onchange="RP_F.client=this.value;screenReports()"><option value="">Tous les clients</option>${cls.map((c) => `<option value="${c.id}" ${String(RP_F.client) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+      ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.reported_at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td><b>${esc(r.user_name || '—')}</b> <span class="muted">${esc(r.role || '')}</span><br>${esc(r.screen || '')}</td><td>${esc(r.message || '—')}<br><span class="muted">${esc(r.context || '')}</span></td>
+        <td><select onchange="setReport(${r.id}, this.value)">${Object.keys(lab).map((k) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select></td></tr>`).join('')}</table>` : '<p class="muted">Aucun signalement.</p>'}</div>`;
+  } catch (e) { fail(e); }
+}
+async function setReport(id, status) { try { await api('/api/reports/status', { id, status }); } catch (e) { fail(e); } }
 async function screenAudit() {
   try { const log = await api('/api/audit');
     v.innerHTML = `<div class="card">${bar('Journal d\'audit')}<p class="muted">Les 50 dernières actions. Le journal n'est jamais effacé.</p><table>${log.map((l) => `<tr><td>${esc(new Date(l.at).toLocaleString('fr-FR'))}</td><td>${esc(l.action)}</td><td>${esc(l.detail || '')}</td></tr>`).join('')}</table></div>`;

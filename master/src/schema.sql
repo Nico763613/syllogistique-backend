@@ -86,3 +86,18 @@ alter table master_licenses add column if not exists payment_confirmed boolean n
 
 -- Logo du client envoyé depuis le Master (image réduite, servie publiquement sous /logo/<id>.png)
 create table if not exists master_client_logos (client_id bigint primary key references master_clients(id) on delete cascade, data text not null, updated_at timestamptz not null default now());
+
+-- Signalements remontés par les installations (problèmes signalés par les utilisateurs et erreurs serveur)
+create table if not exists master_reports (
+  id          bigserial primary key,
+  license_id  bigint not null references master_licenses(id) on delete cascade,
+  remote_id   text not null,
+  user_name   text,
+  role        text,
+  screen      text,
+  message     text,
+  context     text,
+  status      text not null default 'NEW',
+  reported_at timestamptz not null default now(),
+  unique (license_id, remote_id)
+);
