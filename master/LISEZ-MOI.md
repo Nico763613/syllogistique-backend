@@ -60,3 +60,9 @@ Vérification toutes les heures ; avertissement dès 3 jours sans contact, bloca
 - **Recherche/filtres, badges de statut, alerte « expire dans moins de 30 jours », Modifier le client, Prolonger la licence, export CSV** (clients et licences, ouverture directe dans Excel).
 - **Sécurité** : déconnexion automatique après 15 minutes d'inactivité ; 5 mots de passe faux = verrouillage 15 minutes.
 - **Appareils** : l'installation cliente peut joindre `devices: [{id, name, lastSeenAt}]` à son contrôle `/v1/check` ; le Master répond avec `blockedDevices` et `disconnectDevices`. Tant que l'application cliente n'envoie pas cette liste, l'écran « Appareils » reste vide.
+
+## Notifications immédiates (erreurs, signalements, envois en échec)
+Facultatif, sans mot de passe dans le code. Dans Render (service Master), ajoutez selon le canal voulu :
+- **E-mail** : `BREVO_API_KEY` (clé « API » créée dans Brevo > SMTP & API > Clés API, différente de la clé SMTP), `MAIL_FROM` (expéditeur validé chez Brevo), `MASTER_NOTIFY_EMAIL` (sinon l'e-mail administrateur). Passe par HTTPS : fonctionne sur l'offre gratuite.
+- **Notification sur téléphone** : installez l'application gratuite « ntfy », abonnez-vous à un nom secret de votre choix, puis mettez ce nom dans `NTFY_TOPIC`.
+Un message au plus toutes les 10 minutes par client, avec le résumé (le détail est dans Signalements et Envois).

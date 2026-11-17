@@ -6,6 +6,7 @@ const path = require('path');
 const auth = require('./auth');
 const lic = require('./license');
 const { makePool, migrate } = require('./db');
+const { notify } = require('./notify');
 
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
@@ -107,6 +108,7 @@ function createApp(pool, cfg) {
       const l = rows[0];
       if (!l || !l.instance_key_hash || !lic.safeEqual(lic.hashKey(b.instanceKey || ''), l.instance_key_hash) || l.instance_id !== String(b.instanceId || '')) return send(res, 401, { error: 'Licence non reconnue.' });
       await pool.query('update master_licenses set last_check_at=now(), last_check_ip=$2, app_version=coalesce($3, app_version) where id=$1 returning id', [l.id, ip(req), String(b.appVersion || '').slice(0, 30) || null]);
+      const alerts = [];
       // appareils remontés par l'installation (facultatif) : liste enregistrée, ordres de blocage / déconnexion renvoyés
       if (Array.isArray(b.devices)) {
         for (const d of b.devices.slice(0, 500)) {
@@ -121,9 +123,10 @@ function createApp(pool, cfg) {
         for (const r of b.reports.slice(0, 100)) {
           const rid = String(r && r.id || '').slice(0, 100); if (!rid) continue;
           const t = (x, n) => (x === undefined || x === null || x === '' ? null : String(x).slice(0, n));
-          await pool.query(`insert into master_reports(license_id, remote_id, user_name, role, screen, message, context, reported_at) values ($1,$2,$3,$4,$5,$6,$7,$8)
+          const ins = await pool.query(`insert into master_reports(license_id, remote_id, user_name, role, screen, message, context, reported_at) values ($1,$2,$3,$4,$5,$6,$7,$8)
             on conflict (license_id, remote_id) do nothing returning id`,
           [l.id, rid, t(r.userName, 120), t(r.role, 40), t(r.screen, 160), t(r.message, 600), t(r.context, 900), r.createdAt && !isNaN(new Date(r.createdAt)) ? new Date(r.createdAt).toISOString() : new Date().toISOString()]);
+          if (ins.rowCount) alerts.push({ kind: r.role === 'SYSTEM' ? 'erreur' : 'signalement', text: t(r.message, 200) });
         }
       }
       if (Array.isArray(b.mails)) {
@@ -131,10 +134,17 @@ function createApp(pool, cfg) {
           const mid = String(m && m.id || '').slice(0, 100); if (!mid) continue;
           const t = (x, n) => (x === undefined || x === null || x === '' ? null : String(x).slice(0, n));
           const stt = ['SENT', 'FAILED', 'SIMULATED'].includes(m.status) ? m.status : 'FAILED';
-          await pool.query(`insert into master_mails(license_id, remote_id, at, recipient, subject, status, error, message) values ($1,$2,$3,$4,$5,$6,$7,$8)
+          const ins = await pool.query(`insert into master_mails(license_id, remote_id, at, recipient, subject, status, error, message) values ($1,$2,$3,$4,$5,$6,$7,$8)
             on conflict (license_id, remote_id) do nothing returning id`,
           [l.id, mid, m.at && !isNaN(new Date(m.at)) ? new Date(m.at).toISOString() : new Date().toISOString(), t(m.recipient, 160), t(m.subject, 200), stt, t(m.error, 40), t(m.message, 400)]);
+          if (ins.rowCount && stt === 'FAILED') alerts.push({ kind: 'envoi', text: (t(m.subject, 80) || 'e-mail') + ' — ' + (t(m.error, 40) || '') });
         }
+      }
+      if (alerts.length) {
+        const cn = (await pool.query('select name from master_clients where id=$1', [l.client_id])).rows[0];
+        const nb = (k) => alerts.filter((x) => x.kind === k).length;
+        const parts = [nb('erreur') && nb('erreur') + ' erreur(s) serveur', nb('signalement') && nb('signalement') + ' signalement(s)', nb('envoi') && nb('envoi') + ' envoi(s) d\'e-mail en échec'].filter(Boolean).join(', ');
+        notify('client-' + l.id, 'SYL MASTER — ' + (cn ? cn.name : 'client') + ' : ' + parts, alerts.slice(0, 5).map((x) => '- ' + x.kind + ' : ' + (x.text || '')).join('\n') + '\n\nOuvrez la console Master (Signalements / Envois) pour le détail.').catch(() => {});
       }
       const dv = (await pool.query('select device_id, blocked, disconnect_requested from master_devices where license_id=$1', [l.id])).rows;
       const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
