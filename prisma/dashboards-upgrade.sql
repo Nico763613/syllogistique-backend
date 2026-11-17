@@ -318,3 +318,9 @@ ALTER TABLE trips ADD COLUMN IF NOT EXISTS customer_id text
 
 --#
 ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_photo_url text
+
+--#
+CREATE TABLE IF NOT EXISTS problem_reports (id text PRIMARY KEY, user_id text NOT NULL, user_name text NOT NULL, role text NOT NULL, screen text, device text, app_version text, network text, last_error text, message text, status text NOT NULL DEFAULT 'NEW', note text, created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)
+
+--#
+CREATE INDEX IF NOT EXISTS problem_reports_status_created_at_idx ON problem_reports (status, created_at)

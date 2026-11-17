@@ -38,6 +38,7 @@ import { StockLocationsModule } from './stock-locations/stock-locations.module';
 import { HseModule } from './hse/hse.module';
 import { DriverModule } from './driver/driver.module';
 import { BrandingModule } from './branding/branding.module';
+import { SupportModule } from './support/support.module';
 import { LicenseModule } from './license/license.module';
 
 import { HealthController } from './health.controller';
@@ -82,6 +83,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     HseModule,
     DriverModule,
     BrandingModule,
+    SupportModule,
     LicenseModule,
   ],
   controllers: [HealthController],
