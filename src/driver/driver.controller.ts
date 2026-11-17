@@ -10,7 +10,7 @@ import { DriverDevicesService } from './driver-devices.service';
 import { DriverHistoryService } from './driver-history.service';
 import { DriverSheetService } from './driver-sheet.service';
 import { DriverPointersService } from './driver-pointers.service';
-import { VehicleSpecDto, PointerDto, PointerCountDto, ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto } from './driver.dto';
+import { VehicleSpecDto, PointerDto, PointerCountDto, ProcessSheetDto, ExpenseDecisionDto, ActivateDeviceDto, DeviceReasonDto, LinkDriverDto, ProvisionDeviceDto, InviteDto, SyncDto, SendSheetDto, TakeoverDto, TransferDeviceDto, UpdateProfileDto, LicensePhotoDto } from './driver.dto';
 
 // --- Application mobile du chauffeur (compte personnel + appareil activé) ---
 @ApiTags('driver')
@@ -38,6 +38,13 @@ export class DriverController {
   @UseGuards(DriverDeviceGuard)
   profile(@Body() dto: UpdateProfileDto, @CurrentUser() user: any) {
     return this.app.updateProfile(user.userId, dto.phone);
+  }
+
+  @Post('license-photo')
+  @Roles(RoleName.CHAUFFEUR)
+  @UseGuards(DriverDeviceGuard)
+  licensePhoto(@Body() dto: LicensePhotoDto, @CurrentUser() user: any) {
+    return this.app.setLicensePhoto(user.userId, dto.url);
   }
 
   @Post('vehicle-spec')

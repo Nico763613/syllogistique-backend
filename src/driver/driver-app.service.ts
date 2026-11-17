@@ -77,7 +77,7 @@ export class DriverAppService {
       operationSites: t.operationSites, loaderName: t.loaderName, products: t.products, loadPlaces: t.loadPlaces, unloadPlaces: t.unloadPlaces, pauseMileage: t.pauseMileage, pauseAt: t.pauseAt,
     });
     return {
-      driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
+      driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate, photoUrl: driver.licensePhotoUrl }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
       device: { id: device.id, model: device.model, activatedAt: device.activatedAt },
       vehicle: vehicleRow
         ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, truckType: vehicleRow.truckType, wheels: vehicleRow.wheels, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
@@ -359,6 +359,13 @@ export class DriverAppService {
   }
 
   // Mise à jour du profil : le téléphone est modifiable (nom et véhicule restent ceux du bureau)
+  async setLicensePhoto(userId: string, url: string) {
+    const driver = await this.driverOf(userId);
+    await this.prisma.driver.update({ where: { id: driver.id }, data: { licensePhotoUrl: url } });
+    await this.audit.log({ userId, action: 'UPDATE', entity: 'Driver', entityId: driver.id, newValue: { licensePhotoUrl: url } });
+    return { licensePhotoUrl: url };
+  }
+
   async updateProfile(userId: string, phone: string) {
     const driver = await this.driverOf(userId);
     const clean = phone.trim();

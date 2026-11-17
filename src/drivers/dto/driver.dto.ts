@@ -8,6 +8,7 @@ export class CreateDriverDto {
   @IsOptional() @IsString() licenseNumber?: string;
   @IsOptional() @IsString() licenseCategory?: string;
   @IsOptional() @IsDateString() licenseExpiryDate?: string;
+  @IsOptional() @IsString() licensePhotoUrl?: string;
   @IsOptional() @IsString() photoUrl?: string;
   @IsOptional() @IsString() observations?: string;
   @IsOptional() @IsIn(['TRUCK', 'SERVICE_VEHICLE']) activity?: string;
@@ -21,6 +22,7 @@ export class UpdateDriverDto {
   @IsOptional() @IsString() licenseNumber?: string;
   @IsOptional() @IsString() licenseCategory?: string;
   @IsOptional() @IsDateString() licenseExpiryDate?: string;
+  @IsOptional() @IsString() licensePhotoUrl?: string;
   @IsOptional() @IsEnum(DriverStatus) status?: DriverStatus;
   @IsOptional() @IsIn(['TRUCK', 'SERVICE_VEHICLE']) activity?: string;
   @IsOptional() @IsString() photoUrl?: string;

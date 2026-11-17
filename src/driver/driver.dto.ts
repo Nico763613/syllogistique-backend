@@ -35,6 +35,10 @@ export class SyncDto {
   @IsArray() @ArrayMaxSize(100) ops: SyncOpDto[];
 }
 
+export class LicensePhotoDto {
+  @IsString() @MaxLength(300) url: string;
+}
+
 export class UpdateProfileDto {
   @IsString() @MinLength(6) @MaxLength(30) phone: string;
 }

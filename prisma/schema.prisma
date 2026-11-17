@@ -207,6 +207,7 @@ model Driver {
   licenseNumber     String?   @map("license_number")
   licenseCategory   String?   @map("license_category")
   licenseExpiryDate DateTime? @map("license_expiry_date")
+  licensePhotoUrl   String?   @map("license_photo_url")
   status            DriverStatus @default(ACTIVE)
   photoUrl          String?   @map("photo_url")
   observations      String?
