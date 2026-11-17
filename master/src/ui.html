@@ -80,7 +80,7 @@ function confirmBox(text, ok = 'Supprimer') {
   });
 }
 function copyText(t, btn) {
-  const done = () => { if (btn) btn.textContent = 'Copié ✓'; };
+  const done = () => { if (btn) btn.textContent = 'Copié'; };
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).then(done, () => fb()); else fb();
   function fb() { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(); } catch (e) {} ta.remove(); }
 }
@@ -159,7 +159,7 @@ async function showHome() {
     const lics = CL.flatMap((c) => c.licenses); const act = lics.filter((l) => l.effective === 'ACTIVE').length;
     const ex = expiring(); const lost = lics.filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length;
     v.innerHTML = `<div class="card"><h2>Bienvenue, Monsieur SYLLA</h2><p class="muted">${esc(me.email)}</p></div>
-      ${ex.length ? `<div class="alert"><b>⚠ ${ex.length} licence(s) expirent dans moins de 30 jours</b>${ex.map(({ c, l }) => `<div>${esc(c.name)} · licence n°${l.id} · ${fd(l.expiresAt)} (${Math.max(0, Math.ceil((new Date(l.expiresAt) - Date.now()) / 864e5))} j) <a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></div>`).join('')}</div>` : ''}
+      ${ex.length ? `<div class="alert"><b>${ex.length} licence(s) expirent dans moins de 30 jours</b>${ex.map(({ c, l }) => `<div>${esc(c.name)} · licence n°${l.id} · ${fd(l.expiresAt)} (${Math.max(0, Math.ceil((new Date(l.expiresAt) - Date.now()) / 864e5))} j) <a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></div>`).join('')}</div>` : ''}
       <div class="grid"><div class="kpi"><b>${CL.length}</b><span>Clients</span></div><div class="kpi"><b>${lics.length}</b><span>Licences</span></div><div class="kpi click" onclick="showFilter('ACTIVE')"><b>${act}</b><span>Actives</span></div><div class="kpi click ${ex.length ? 'warn' : ''}" onclick="showFilter('RENEW')"><b>${ex.length}</b><span>À renouveler (30 j)</span></div><div class="kpi click ${lost ? 'bad' : ''}" onclick="showFilter('EXPIRED')"><b>${lost}</b><span>Expirées / suspendues</span></div></div>
       <div class="card" style="margin-top:14px"><h2>Clients</h2>
         <input id="q" placeholder="Rechercher un client…" value="${esc(FQ)}" oninput="FQ=this.value;drawList()">
@@ -196,7 +196,7 @@ function clientCard(c) {
       <div>${l.status === 'REVOKED' ? '' : `${l.status === 'SUSPENDED' ? `<button class="ghost" onclick="licAct(${l.id},'reactivate')">Rétablir</button>` : `<button class="ghost" onclick="licAct(${l.id},'suspend')">Suspendre</button>`}
         <button class="ghost" onclick="nav('extend',${l.id})">Prolonger</button> <button class="ghost" onclick="licAct(${l.id},'newcode')">Nouveau code</button> <button class="ghost" style="color:var(--danger)" onclick="licAct(${l.id},'revoke')">Révoquer</button>`}
         <button class="ghost" onclick="nav('devices',${l.id})">Appareils</button>
-        ${!l.permanent && l.expiresAt && ['ACTIVE', 'PENDING', 'SUSPENDED', 'EXPIRED'].includes(l.effective) && (l.effective === 'EXPIRED' || new Date(l.expiresAt).getTime() < Date.now() + 30 * 864e5) ? `<button class="ghost" onclick="copyReminder(${c.id},${l.id})">📋 Copier le message de rappel</button>` : ''}
+        ${!l.permanent && l.expiresAt && ['ACTIVE', 'PENDING', 'SUSPENDED', 'EXPIRED'].includes(l.effective) && (l.effective === 'EXPIRED' || new Date(l.expiresAt).getTime() < Date.now() + 30 * 864e5) ? `<button class="ghost" onclick="copyReminder(${c.id},${l.id})">Copier le message de rappel</button>` : ''}
         ${['REVOKED', 'EXPIRED'].includes(l.effective) ? `<button class="danger" onclick="delLic(${l.id},'${esc(c.name).replace(/'/g, '')}')">Supprimer</button>` : ''}</div></div>`).join('')}
     <button class="ghost" onclick="nav('license',${c.id})">+ Licence</button> <button class="ghost" onclick="nav('client',${c.id})">Modifier le client</button> <button class="danger" onclick="delClient(${c.id})">Supprimer</button></div>`;
 }
