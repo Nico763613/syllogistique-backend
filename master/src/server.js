@@ -12,8 +12,8 @@ const COOKIE = 'master_session';
 const IDLE_MIN = 15; // déconnexion automatique après 15 minutes d'inactivité
 const MASTER_URL = (process.env.RENDER_EXTERNAL_URL || 'https://syllogistique-master.onrender.com').replace(/\/$/, '');
 const PUB = {};
-for (const f of ['manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'icon-512-maskable.png', 'logo-syl.png']) PUB['/' + f] = fs.readFileSync(path.join(__dirname, 'public', f));
-const PUB_TYPE = { '.json': 'application/manifest+json', '.js': 'application/javascript; charset=utf-8', '.png': 'image/png' };
+for (const f of ['manifest.json', 'sw.js', 'icon-192.png', 'icon-512.png', 'icon-180.png', 'icon-512-maskable.png', 'logo-syl.png', 'master.webp', 'master-sm.webp']) PUB['/' + f] = fs.readFileSync(path.join(__dirname, 'public', f));
+const PUB_TYPE = { '.json': 'application/manifest+json', '.js': 'application/javascript; charset=utf-8', '.png': 'image/png', '.webp': 'image/webp' };
 const MAX_FAILS = 5, LOCK_MIN = 15;
 
 function createApp(pool, cfg) {
@@ -48,7 +48,7 @@ function createApp(pool, cfg) {
   }
   function sendFile(res, name, buf) {
     const ext = path.extname(name);
-    res.writeHead(200, { 'content-type': PUB_TYPE[ext], 'cache-control': ext === '.png' ? 'public, max-age=86400' : 'no-cache', 'x-content-type-options': 'nosniff', ...(name === '/sw.js' ? { 'service-worker-allowed': '/' } : {}) });
+    res.writeHead(200, { 'content-type': PUB_TYPE[ext], 'cache-control': (ext === '.png' || ext === '.webp') ? 'public, max-age=86400' : 'no-cache', 'x-content-type-options': 'nosniff', ...(name === '/sw.js' ? { 'service-worker-allowed': '/' } : {}) });
     res.end(buf);
   }
   function sendCsv(res, name, rows) {

@@ -65,6 +65,15 @@
   .sidebar::-webkit-scrollbar{width:6px;}
   .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25); border-radius:3px;}
   .sidebar > *{flex-shrink:0;}
+  .space-card{display:none;align-items:center;gap:10px;margin:0 14px 10px;padding:8px 10px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff}
+  .space-card.on{display:flex}.space-card img{width:44px;height:44px;border-radius:8px;background:#fff;flex:none;object-fit:cover}
+  .space-card b{display:block;font-size:13px;line-height:1.2}.space-card small{display:block;font-size:11px;color:#B7C7E6;margin-top:2px;line-height:1.25}
+  body.side-min .space-card b,body.side-min .space-card small{display:none}body.side-min .space-card{justify-content:center;margin:0 6px 10px;padding:6px}
+  #space-ico{display:none;height:30px;width:30px;border-radius:7px;margin-right:8px;flex:none;object-fit:cover;border:1px solid var(--line,#E3E8F0)}
+  .home-space{display:flex;align-items:center;gap:12px}.home-space img{width:64px;height:64px;border-radius:12px;flex:none;object-fit:cover;border:1px solid var(--line,#E3E8F0);background:#fff}
+  .lg-space{display:flex;align-items:center;gap:10px;margin-top:12px;color:#fff;font-size:13px}.lg-space img{width:56px;height:56px;border-radius:10px;background:#fff;object-fit:cover}
+  .lg-mobile-space{display:none;align-items:center;gap:10px;margin:0 0 12px;color:var(--navy);font-size:13px;font-weight:600}.lg-mobile-space img{width:48px;height:48px;border-radius:10px;border:1px solid #E3E8F0;object-fit:cover}
+  @media (max-width:760px){.lg-mobile-space.on{display:flex}}
   .brand-block{padding:0 20px 18px; border-bottom:1px solid rgba(255,255,255,.12); margin-bottom:10px;}
   .brand{font-size:20px; font-weight:800;  color:#fff;}
   .tagline{font-size:12px; color:var(--gold-soft); margin-top:2px;  }
@@ -430,6 +439,7 @@
         <svg width="40" height="40"><use href="#syl-logo"/></svg>
         <div><div class="brand">SYL LOGISTIQUE</div><div class="tagline">Gestion Logistique &amp; Fret</div></div>
       </div>
+      <div class="space-card" id="space-card"><img id="space-card-img" alt=""><div><b id="space-card-name"></b><small id="space-card-slogan"></small></div></div>
       <div class="side-user"><div class="av" data-avatar="46" onclick="openPhotoEditor()" title="Changer ma photo"></div><div><b id="side-name">—</b><small id="side-role">—</small></div></div>
       <button id="side-collapse" type="button" onclick="sideToggle()" aria-label="Réduire ou agrandir le menu"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Réduire le menu</button>
 
@@ -499,7 +509,7 @@
       <div class="topbar">
         <div style="display:flex; align-items:center;">
           <div class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg></div>
-          <img id="top-logo" src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:30px;margin-right:8px;border-radius:6px;flex:none"><span id="space-label" style="display:none;font-size:12px;font-weight:700;color:#fff;background:var(--navy);border-radius:8px;padding:3px 8px;margin-right:8px;white-space:nowrap"></span>
+          <img id="top-logo" src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:30px;margin-right:8px;border-radius:6px;flex:none"><img id="space-ico" alt=""><span id="space-label" style="display:none;font-size:12px;font-weight:700;color:#fff;background:var(--navy);border-radius:8px;padding:3px 8px;margin-right:8px;white-space:nowrap"></span>
           <button id="back-btn" class="btn-ghost" style="display:none; font-size:20px; padding:2px 10px; margin-right:6px;" onclick="goBack()" aria-label="Retour">←</button>
           <h2 id="view-title">Tableau de bord</h2>
         </div>
@@ -532,7 +542,7 @@
 <!-- ============ APPLICATION CHAUFFEUR ============ -->
 <div id="driver-app">
   <div class="drv-head">
-    <div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:6px;padding:3px 6px;display:inline-flex;flex:none"><img id="drv-logo" src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:26px;display:block"></span><div class="av" data-avatar="36" onclick="openPhotoEditor()" title="Ma photo"></div><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:20px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
+    <div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:6px;padding:3px 6px;display:inline-flex;flex:none"><img id="drv-logo" src="logo-syl.png" alt="SYL LOGISTIQUE" style="height:26px;display:block"></span><img id="drv-space" alt="" style="display:none;height:34px;width:34px;border-radius:8px;object-fit:cover;background:#fff;flex:none"><div class="av" data-avatar="36" onclick="openPhotoEditor()" title="Ma photo"></div><button id="drv-back" class="drv-pill" style="border:none;color:#fff;cursor:pointer;font-size:20px;padding:4px 12px;display:none" onclick="drvBack()" aria-label="Retour">←</button><div><b id="drv-name">Chauffeur</b><small id="drv-sub">SYLLOGISTIQUE</small></div></div>
     <div style="display:flex; align-items:center; gap:8px;"><button class="drv-pill" id="drv-pill" style="border:none;color:#fff;cursor:pointer" onclick="drvTab('queue')" aria-label="Envois">…</button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvTab('profile')" aria-label="Profil"><svg class="ic" aria-hidden="true"><use href="#i-user"/></svg></button><button class="drv-pill" style="border:none; color:#fff; cursor:pointer;" onclick="drvLogout()" aria-label="Déconnexion">⎋</button></div>
   </div>
   <div id="drv-root"></div>
@@ -799,7 +809,7 @@ function enterApp() {
   document.getElementById('user-role').textContent = roleLabel(state.user.role);
   document.getElementById('side-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
   document.getElementById('side-role').textContent = roleLabel(state.user.role);
-  refreshAvatars(); loadMyPhoto(); buildBottomNav();
+  spaceApply(); refreshAvatars(); loadMyPhoto(); buildBottomNav();
   loadSiteSwitch();
   applyRoleNav();
   const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'caisse', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', RESPONSABLE_OPERATIONS: 'home', LECTEUR: 'home' }[state.user.role];
@@ -3254,7 +3264,7 @@ const HOME_CARDS = [
 function homeCardsFor(role) { return HOME_CARDS.filter((c) => c.roles.includes(role)).map((c) => ({ ...c, view: (c.over && c.over[role]) || c.v })); }
 function renderHome() {
   const u = state.user, cards = homeCardsFor(u.role);
-  root().innerHTML = `<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">Bonjour ${esc(u.firstName)}</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
+  root().innerHTML = `${spaceHome() ? '<div style="margin-bottom:14px">' + spaceHome() + '</div>' : ''}<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">Bonjour ${esc(u.firstName)}</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
     <div class="hm-grid">${cards.map((c) => `<button class="hm-card" onclick="go('${c.view}')"><div class="hm-ico">${c.ico}</div><div><b>${esc(c.t)}</b><span class="d">${esc(c.d)}</span></div></button>`).join('')}</div>`;
 }
 
@@ -3923,6 +3933,7 @@ function drvEnter() {
   drvEl('app').style.display = 'none';
   drvEl('driver-app').style.display = 'block';
   drvEl('drv-name').textContent = `${state.user.firstName} ${state.user.lastName}`;
+  spaceApply();
   refreshAvatars(); loadMyPhoto();
   { const m = dget('me', null); if (m) drvEl('drv-sub').textContent = drvKind(m); }
   window.addEventListener('online', () => { drvLoad(); });
@@ -4689,7 +4700,42 @@ function spaceName() {
   if (r === 'GESTIONNAIRE_FLOTTE' || ['vehicles', 'trucks', 'service-vehicles', 'drivers', 'fuel', 'maintenance', 'atelier', 'driver-devices', 'driver-sheets', 'driver-board', 'driver-missions'].includes(v)) return 'SYL FLEET';
   return 'SYL LOGISTIQUE';
 }
+/* ---- Identité visuelle par espace (logos par département) : s'affiche seulement pour les rôles qui ont un espace dédié ---- */
+const SPACES = {
+  chauffeurs: { n: 'Espace Chauffeurs', s: 'Mes missions, en toute sécurité' },
+  logistique: { n: 'Responsable Logistique', s: 'Planifier • Organiser • Suivre' },
+  operations: { n: 'Responsable des Opérations', s: 'Optimiser • Coordonner • Performer' },
+  hse: { n: 'Responsable HSE', s: 'Prévenir • Protéger • Agir' },
+  stock: { n: 'Gestionnaire de Stock', s: 'Gérer • Contrôler • Optimiser' },
+  dg: { n: 'Direction Générale', s: 'Diriger • Décider • Développer' },
+  comptabilite: { n: 'Espace Comptabilité', s: 'Enregistrer • Contrôler • Rapporter' },
+};
+const ROLE_SPACE = { CHAUFFEUR: 'chauffeurs', ADMIN_LOGISTIQUE: 'logistique', GESTIONNAIRE_FLOTTE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', GESTIONNAIRE_HSE: 'hse', AGENT_HSE: 'hse', MAGASINIER: 'stock', DIRECTEUR_GENERAL: 'dg', COMPTABLE: 'comptabilite' };
+function mySpace() { const k = state.user && ROLE_SPACE[state.user.role]; return k ? Object.assign({ k }, SPACES[k]) : null; }
+function spaceBrandOn() { return !BRAND.logoUrl && (!BRAND.name || ['SYLLOGISTIQUE', 'SYL LOGISTIQUE'].includes(BRAND.name)); }
+function spaceHome() {
+  const sp = spaceBrandOn() && mySpace(); if (!sp) return '';
+  return `<div class="home-space"><img src="logos/${sp.k}-sm.webp" alt="${esc(sp.n)}"><div><b style="color:var(--navy);font-size:15px">${esc(sp.n)}</b><div class="desc" style="margin:2px 0 0">${esc(sp.s)}</div></div></div>`;
+}
+function spaceLoginApply() {
+  let k = null; try { k = localStorage.getItem('syllo_last_space'); } catch (e) {}
+  const sp = spaceBrandOn() && k && SPACES[k]; const on = !!sp;
+  const lg = document.querySelector('.lg-logo'); const ml = document.querySelector('.lg-mobile-logo');
+  const put = (host, cls, after) => { if (!host) return; let el = host.parentNode.querySelector('.' + cls); if (!on) { if (el) el.remove(); return; } if (!el) { el = document.createElement('div'); el.className = cls + (cls === 'lg-mobile-space' ? ' on' : ''); host.insertAdjacentElement('afterend', el); } el.innerHTML = `<img src="logos/${k}-sm.webp" alt=""><span>${esc(sp.n)}</span>`; };
+  put(lg, 'lg-space'); put(ml, 'lg-mobile-space');
+}
 function spaceApply() {
+  try {
+    const sp = spaceBrandOn() && mySpace();
+    if (state.user) { if (sp) localStorage.setItem('syllo_last_space', sp.k); }
+    const ico = document.getElementById('space-ico'); if (ico) { if (sp) { ico.src = 'logos/' + sp.k + '-sm.webp'; ico.alt = sp.n; ico.title = sp.n; ico.style.display = 'block'; } else ico.style.display = 'none'; }
+    const card = document.getElementById('space-card'); if (card) { card.classList.toggle('on', !!sp); if (sp) { document.getElementById('space-card-img').src = 'logos/' + sp.k + '-sm.webp'; document.getElementById('space-card-name').textContent = sp.n; document.getElementById('space-card-slogan').textContent = sp.s; } }
+    const dv = document.getElementById('drv-space'); if (dv) { if (sp && state.user && state.user.role === 'CHAUFFEUR') { dv.src = 'logos/chauffeurs-sm.webp'; dv.alt = sp.n; dv.style.display = 'block'; } else dv.style.display = 'none'; }
+    spaceLoginApply();
+  } catch (e) {}
+  spaceApplyLabel();
+}
+function spaceApplyLabel() {
   const isDef = !BRAND.logoUrl && (!BRAND.name || ['SYLLOGISTIQUE', 'SYL LOGISTIQUE'].includes(BRAND.name));
   const src = BRAND.logoUrl ? brandSrc(BRAND.logoUrl) : 'logo-syl.png';
   ['top-logo', 'drv-logo'].forEach((id) => { const el = document.getElementById(id); if (el && el.getAttribute('src') !== src) el.setAttribute('src', src); });

@@ -43,7 +43,7 @@
 </style>
 </head>
 <body>
-<header><div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:8px;padding:3px 6px;display:inline-flex"><img src="/logo-syl.png" alt="SYL LOGISTIQUE" style="height:30px;display:block"></span><div><b>SYL MASTER ADMIN</b><small>Administration générale · accès privé</small></div></div><button id="out" class="ghost" style="display:none;margin:0;color:#fff;border-color:#3b5877" onclick="logout()">Déconnexion</button></header>
+<header><div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:8px;padding:2px;display:inline-flex"><img src="/master-sm.webp" alt="MASTER ADMIN" style="height:38px;width:38px;object-fit:cover;border-radius:6px;display:block"></span><div><b>SYL MASTER ADMIN</b><small>Administration générale · accès privé</small></div></div><button id="out" class="ghost" style="display:none;margin:0;color:#fff;border-color:#3b5877" onclick="logout()">Déconnexion</button></header>
 <main id="v"></main>
 <div id="modal"></div>
 <script>
@@ -102,7 +102,7 @@ async function expired() { try { await api('/api/logout', {}); } catch (e) {} sh
 function showLogin(msg) {
   LOGGED = false; clearTimeout(idleT); closeModal();
   $('out').style.display = 'none';
-  v.innerHTML = `<div class="card"><img src="/logo-syl.png" alt="SYL LOGISTIQUE" style="height:84px;display:block;margin:0 auto 6px"><h2 style="text-align:center">SYL MASTER ADMIN</h2><div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:6px">Connexion propriétaire</div>
+  v.innerHTML = `<div class="card"><img src="/master.webp" alt="MASTER ADMIN" style="width:min(260px,80%);display:block;margin:0 auto 6px"><h2 style="text-align:center">SYL MASTER ADMIN</h2><div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:6px">Connexion propriétaire</div>
     <label>E-mail</label><input id="em" type="email" autocomplete="username">
     <label>Mot de passe</label><input id="pw" type="password" autocomplete="current-password">
     <div class="err" id="err">${esc(msg || '')}</div><button onclick="doLogin()">Se connecter</button></div>`;
