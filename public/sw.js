@@ -2,7 +2,7 @@
 // Met en cache uniquement l'interface (HTML/manifest/icônes), pas les données de l'API.
 // Les données restent toujours à jour car chaque appel /api reste en direct (network).
 
-const CACHE_NAME = 'syllogistique-shell-v92';
+const CACHE_NAME = 'syllogistique-shell-v93';
 const SHELL_FILES = [
   './index.html',
   './manifest.json',
