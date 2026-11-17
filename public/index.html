@@ -673,6 +673,68 @@ function logout() {
   document.getElementById('login-screen').style.display = 'flex';
 }
 
+/* ---------- Sécurité de l'appareil : déconnexion après inactivité et verrou par code PIN ---------- */
+const IDLE_MS = 30 * 60000;           // 30 min sans activité : déconnexion (profils bureau)
+const PIN_RELOCK_MS = 60000;           // verrou PIN si l'application est restée en arrière-plan plus d'une minute
+let idleTimer = null, hiddenAt = 0;
+function idleBump() {
+  clearTimeout(idleTimer);
+  if (!state.user || state.user.role === 'CHAUFFEUR') return; // le chauffeur garde sa session (saisies hors ligne) ; il peut utiliser le verrou PIN
+  idleTimer = setTimeout(() => { logout(); const m = document.getElementById('login-msg'); if (m) m.innerHTML = '<div class="msg err">Session fermée après 30 minutes d\'inactivité. Reconnectez-vous.</div>'; }, IDLE_MS);
+}
+['click', 'keydown', 'touchstart', 'scroll', 'mousemove'].forEach((ev) => window.addEventListener(ev, idleBump, { passive: true }));
+const pinKey = () => 'syllo_pin_' + ((state.user && state.user.id) || '');
+async function pinHash(pin, salt) {
+  const d = new TextEncoder().encode(salt + ':' + pin);
+  const h = await crypto.subtle.digest('SHA-256', d);
+  return Array.from(new Uint8Array(h)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+function pinIsSet() { try { return !!localStorage.getItem(pinKey()); } catch (e) { return false; } }
+function pinSetup() {
+  const old = document.getElementById('pin-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'pin-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(31,58,95,.6);z-index:4500;display:flex;align-items:center;justify-content:center;padding:18px;';
+  ov.innerHTML = `<div class="panel" style="max-width:340px;width:100%"><h3><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Code PIN de l'appareil</h3><div class="desc">Choisissez un code de 4 à 6 chiffres. Il sera demandé quand l'application revient au premier plan.</div>
+    <input id="pin-a" type="password" inputmode="numeric" maxlength="6" placeholder="Code PIN" autocomplete="off"><input id="pin-b" type="password" inputmode="numeric" maxlength="6" placeholder="Confirmer le code" autocomplete="off" style="margin-top:8px">
+    <div id="pin-msg"></div><div class="row" style="margin-top:10px"><button class="btn" onclick="pinSave()">Enregistrer</button><button class="btn ghost" onclick="document.getElementById('pin-ov').remove()">Annuler</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function pinSave() {
+  const a = document.getElementById('pin-a').value, b = document.getElementById('pin-b').value, m = document.getElementById('pin-msg');
+  if (!/^\d{4,6}$/.test(a)) { m.innerHTML = '<div class="msg err">Le code doit contenir 4 à 6 chiffres.</div>'; return; }
+  if (a !== b) { m.innerHTML = '<div class="msg err">Les deux codes ne correspondent pas.</div>'; return; }
+  const salt = Math.random().toString(36).slice(2);
+  try { localStorage.setItem(pinKey(), JSON.stringify({ salt, hash: await pinHash(a, salt) })); } catch (e) { m.innerHTML = '<div class="msg err">Impossible d\'enregistrer le code sur cet appareil.</div>'; return; }
+  document.getElementById('pin-ov').remove(); bellToast('Code PIN activé sur cet appareil.');
+  if (state.view === 'settings') renderSettings();
+}
+function pinRemove() { try { localStorage.removeItem(pinKey()); } catch (e) {} bellToast('Code PIN désactivé.'); if (state.view === 'settings') renderSettings(); }
+function pinLock() {
+  if (!pinIsSet() || !state.user || document.getElementById('pin-lock')) return;
+  const ov = document.createElement('div'); ov.id = 'pin-lock'; let fails = 0;
+  ov.style.cssText = 'position:fixed;inset:0;background:var(--navy);z-index:6000;display:flex;align-items:center;justify-content:center;padding:18px;';
+  ov.innerHTML = `<div class="panel" style="max-width:320px;width:100%;text-align:center"><h3><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Application verrouillée</h3><div class="desc">Entrez votre code PIN.</div>
+    <input id="pin-in" type="password" inputmode="numeric" maxlength="6" autocomplete="off" style="text-align:center;font-size:20px"><div id="pin-err"></div>
+    <button class="btn" style="width:100%;margin-top:10px" id="pin-ok">Déverrouiller</button><button class="btn ghost" style="width:100%;margin-top:6px" onclick="document.getElementById('pin-lock').remove();logout()">Se déconnecter</button></div>`;
+  document.body.appendChild(ov);
+  const go_ = async () => {
+    let rec = null; try { rec = JSON.parse(localStorage.getItem(pinKey())); } catch (e) {}
+    const v = document.getElementById('pin-in').value;
+    if (rec && (await pinHash(v, rec.salt)) === rec.hash) { ov.remove(); return; }
+    fails++; document.getElementById('pin-in').value = '';
+    if (fails >= 5) { ov.remove(); logout(); return; }
+    document.getElementById('pin-err').innerHTML = `<div class="msg err">Code incorrect (${5 - fails} essai(s) restant(s)).</div>`;
+  };
+  document.getElementById('pin-ok').onclick = go_;
+  document.getElementById('pin-in').addEventListener('keydown', (e) => { if (e.key === 'Enter') go_(); });
+  setTimeout(() => { const i = document.getElementById('pin-in'); if (i) i.focus(); }, 50);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') hiddenAt = Date.now();
+  else if (hiddenAt && Date.now() - hiddenAt > PIN_RELOCK_MS) pinLock();
+});
+const pinPanel = () => `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Verrou de l'appareil</h3><div class="desc">Un code PIN protège l'application sur cet appareil. La session des profils bureau se ferme aussi après 30 minutes d'inactivité.</div>
+  ${pinIsSet() ? '<div class="msg ok">Code PIN activé.</div><button class="btn ghost" onclick="pinRemove()">Désactiver le code PIN</button> <button class="btn" onclick="pinSetup()">Changer le code</button>' : '<button class="btn" onclick="pinSetup()">Activer un code PIN</button>'}</div>`;
 /* ---------- Signaler un problème ---------- */
 const APP_BUILD = '2026-11-17';
 let LAST_ERR = '';
@@ -724,7 +786,7 @@ async function renderProblemReports() {
 }
 async function setProblemStatus(id, status) { try { await api('/support/reports/' + id, { method: 'PATCH', body: { status } }); } catch (e) { alert(e.message); } }
 function enterApp() {
-  ensureReportFab();
+  ensureReportFab(); idleBump(); setTimeout(pinLock, 100);
   if (state.user && state.user.mustChangePassword) { setTimeout(() => forcePasswordScreen(), 0); return; }
   if (state.user && state.user.role === 'CHAUFFEUR') { ensureReportFab(); setTimeout(() => drvEnter(), 0); return; }
   document.getElementById('login-screen').style.display = 'none';
@@ -3666,6 +3728,7 @@ function renderSettings() {
       <button class="btn gold" onclick="saveSettings()">Enregistrer</button>
       <div id="s-msg"></div>
     </div>
+    ${pinPanel()}
     <div class="panel">
       <h3><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg> Changer mon mot de passe</h3>
       <label>Mot de passe actuel</label><input id="pw-old" type="password" autocomplete="current-password" />
@@ -4057,6 +4120,7 @@ function drvProfileHtml(me) {
     <div class="drv-row"><span>Appareil Android</span><b>${esc((me.device && me.device.model) || 'activé')}</b></div>
     <label>Téléphone</label><input id="p-phone" inputmode="tel" value="${esc(me.driver.phone || '')}">
     <button class="drv-btn" onclick="drvSavePhone()">Enregistrer le téléphone</button><div id="p-msg1"></div></div>
+    <div class="drv-card"><h4><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> Verrou de l'appareil</h4><div class="desc" style="font-size:12px;color:var(--muted)">Un code PIN protège l'application sur ce téléphone.</div>${pinIsSet() ? '<div class="drv-row"><span>Code PIN</span><b>Activé</b></div><button class="drv-btn" onclick="pinSetup()">Changer le code</button><button class="drv-btn ghost" onclick="pinRemove();drvRender()">Désactiver</button>' : '<button class="drv-btn" onclick="pinSetup()">Activer un code PIN</button>'}</div>
     ${v && v.type === 'TRUCK' ? `<div class="drv-card"><h4><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Mon camion</h4>
     <label>Type de camion</label><select id="sp-type"><option value="">— Choisir —</option>${TRUCK_TYPES.map(t => `<option value="${t[0]}"${v.truckType === t[0] ? ' selected' : ''}>${t[1]}</option>`).join('')}</select>
     <label>Nombre de roues</label>${otherSel('sp-wheels', TRUCK_WHEELS, n => n + ' roues', 'Nombre de roues', v.wheels)}
