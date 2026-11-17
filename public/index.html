@@ -4545,7 +4545,7 @@ async function drvScan() {
 async function renderDriverDevices() {
   const list = await api('/driver-admin/overview?siteId=' + state.siteId);
   window._drvOv = list;
-  const badge = (d) => ({ ACTIVE: '<span class="badge ok">Actif</span>', PENDING: '<span class="badge warn">Code en attente</span>', BLOCKED: '<span class="badge bad">Bloqué</span>' }[d.status] || esc(d.status));
+  const badge = (d) => ({ ACTIVE: '<span class="badge ok">Actif</span>', PENDING: (d.expiresAt && new Date(d.expiresAt) < new Date() ? '<span class="badge bad">QR expiré</span>' : '<span class="badge warn">QR en attente</span>'), BLOCKED: '<span class="badge bad">Bloqué</span>' }[d.status] || esc(d.status));
   const rows = list.map((d) => {
     const dev = d.devices.find((x) => x.status === 'ACTIVE') || d.devices.find((x) => x.status === 'BLOCKED') || d.devices.find((x) => x.status === 'PENDING');
     return `<tr><td><b>${esc(d.name)}</b></td><td>${d.linked ? esc(d.userEmail) : '<span class="badge bad">Non lié</span>'}</td>
@@ -4555,9 +4555,13 @@ async function renderDriverDevices() {
         ${d.linked ? `<button class="btn small gold" onclick="drvProvision('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg> Code / QR</button> ` : ''}
         ${dev && dev.status === 'ACTIVE' ? `<button class="btn small" onclick="drvTransfer('${esc(dev.id)}','${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Transférer</button> <button class="btn small" onclick="drvBlock('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg> Bloquer</button> ` : ''}
         ${dev && dev.status === 'BLOCKED' ? `<button class="btn small" onclick="drvUnblock('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Débloquer</button> ` : ''}
+        ${dev && dev.status === 'PENDING' ? `<button class="btn small" onclick="drvCancelQr('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg> Annuler le QR</button> ` : ''}
         <button class="btn small" onclick="drvHistory('driver','${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Historique</button></td></tr>`;
   }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
-  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Application chauffeur — appareils autorisés</h3>
+  const allDev = list.flatMap((d) => d.devices), nowT = Date.now();
+  const kp = [['Appareils actifs', allDev.filter((x) => x.status === 'ACTIVE').length], ['QR en attente', allDev.filter((x) => x.status === 'PENDING' && !(x.expiresAt && new Date(x.expiresAt) < nowT)).length], ['QR expirés', allDev.filter((x) => x.status === 'PENDING' && x.expiresAt && new Date(x.expiresAt) < nowT).length], ['Bloqués', allDev.filter((x) => x.status === 'BLOCKED').length], ['Sans compte lié', list.filter((d) => !d.linked).length]];
+  const kpiRow = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px">${kp.map((k) => `<div class="panel" style="margin:0;padding:10px 12px"><div style="font-size:22px;font-weight:800;color:var(--navy)">${k[1]}</div><div class="desc" style="margin:0">${k[0]}</div></div>`).join('')}</div>`;
+  root().innerHTML = `${kpiRow}<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Application chauffeur — appareils autorisés</h3>
     <div class="desc">Un chauffeur = un compte personnel = un seul appareil actif. Générez un code (QR + 6 chiffres, valable 24 h) ; l'ancien appareil est automatiquement révoqué à l'activation du nouveau.</div>
     <button class="btn gold" onclick="drvPlanTrip()">Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Créer un compte chauffeur</button> <button class="btn gold" onclick="drvInvitePanel()"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Envoyer l'application aux chauffeurs</button>
     <div style="overflow:auto;margin-top:12px"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${rows}</table></div></div>
@@ -4627,6 +4631,10 @@ async function drvProvision(driverId) {
       <button class="btn gold" onclick="this.closest('div[style*=fixed]').remove();renderDriverDevices()">Fermer</button></div>`;
     document.body.appendChild(ov);
   } catch (e) { alert(e.message); }
+}
+async function drvCancelQr(id) {
+  if (!confirm("Annuler ce QR d'activation ? Il ne pourra plus être utilisé ; vous pourrez en générer un nouveau.")) return;
+  try { await api('/driver-admin/devices/' + id + '/revoke', { method: 'POST', body: { reason: 'QR annulé par le gestionnaire' } }); renderDriverDevices(); } catch (e) { alert(e.message); }
 }
 function drvTransfer(devId, fromId) {
   const others = (window._drvOv || []).filter((x) => x.id !== fromId && x.linked);
