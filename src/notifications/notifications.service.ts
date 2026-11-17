@@ -124,6 +124,25 @@ export class NotificationsService {
       }
     }
 
+    // --- Entretien / vidange au kilométrage : alerte 500 km avant l'échéance, puis une fois dépassée ---
+    for (const v of vehicles) {
+      const nextKm = v.maintenance[0]?.nextMileage;
+      if (!nextKm) continue;
+      const left = nextKm - v.currentMileage;
+      if (left > 500) continue;
+      if (await alreadyNotified('VehicleKm', v.id)) continue;
+      const over = left <= 0;
+      created.push(
+        await this.create(
+          over ? 'Entretien kilométrique dépassé' : 'Entretien kilométrique proche',
+          `${v.internalNumber} — entretien prévu à ${nextKm.toLocaleString('fr-FR')} km ; ${over ? `dépassé de ${(-left).toLocaleString('fr-FR')} km` : `il reste ${left.toLocaleString('fr-FR')} km`} (compteur : ${v.currentMileage.toLocaleString('fr-FR')} km).`,
+          over ? 'CRITICAL' : 'WARNING',
+          'VehicleKm',
+          v.id,
+        ),
+      );
+    }
+
     // --- Documents de véhicules (assurance, visite technique, carte grise…) §27-28 ---
     const site = await this.prisma.site.findUnique({ where: { id: siteId } });
     const readSetting = async (key: string, fallback: number) => {
