@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcrypt';
@@ -9,6 +9,10 @@ import { ActivateDeviceDto } from './driver.dto';
 
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 const ACTIVATION_TTL_MS = 24 * 3600 * 1000;
+// Tentatives d'activation refusées : au bout de 3 en 1 h, l'activation est bloquée 1 h et l'administration est alertée
+const MAX_ACTIVATION_FAILS = 3;
+const FAIL_WINDOW_MS = 3600 * 1000;
+const activationFails = new Map<string, { n: number; first: number }>();
 
 @Injectable()
 export class DriverDevicesService {
@@ -56,7 +60,22 @@ export class DriverDevicesService {
   }
 
   // Activation côté chauffeur (compte déjà connecté) : l'ancien appareil actif est révoqué
+  private async alertAdmins(userId: string, title: string, message: string, severity: 'WARNING' | 'CRITICAL') {
+    const d = await this.prisma.driver.findFirst({ where: { userId }, select: { id: true, siteId: true } });
+    for (const roleName of ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE']) {
+      await this.prisma.notification
+        .create({ data: { title, message, severity, entity: 'DriverDevice', entityId: d?.id ?? userId, siteId: roleName === 'SUPER_ADMIN' ? undefined : d?.siteId, roleName } })
+        .catch(() => undefined);
+    }
+  }
+
   async activate(userId: string, dto: ActivateDeviceDto) {
+    const rec = activationFails.get(userId);
+    if (rec && Date.now() - rec.first > FAIL_WINDOW_MS) activationFails.delete(userId);
+    const cur = activationFails.get(userId);
+    if (cur && cur.n >= MAX_ACTIVATION_FAILS) {
+      throw new ForbiddenException("Trop de tentatives refusées. Activation bloquée : contactez votre administrateur.");
+    }
     const code = dto.code.trim();
     const now = new Date();
     let dev;
@@ -68,8 +87,20 @@ export class DriverDevicesService {
       dev = await this.prisma.driverDevice.findFirst({ where: { userId, status: 'PENDING', otpHash: sha(`${userId}:${code}`) } });
     }
     if (!dev || !dev.activationExpiresAt || dev.activationExpiresAt < now) {
-      throw new BadRequestException("Code invalide ou expiré. Demandez un nouveau code au gestionnaire de flotte.");
+      const f = activationFails.get(userId) ?? { n: 0, first: Date.now() };
+      f.n += 1;
+      activationFails.set(userId, f);
+      await this.audit.log({ userId, action: 'UPDATE', entity: 'DriverDevice', entityId: userId, newValue: { activationRefused: true, model: dto.model, tentative: f.n } }).catch(() => undefined);
+      const who = (await this.prisma.driver.findFirst({ where: { userId }, select: { firstName: true, lastName: true } })) ?? undefined;
+      const name = who ? `${who.firstName} ${who.lastName}` : 'Un chauffeur';
+      if (f.n >= MAX_ACTIVATION_FAILS) {
+        await this.alertAdmins(userId, 'Activation d\'appareil bloquée', `${name} : ${f.n} tentatives d'activation refusées. Activation bloquée pendant 1 h.`, 'CRITICAL');
+        throw new ForbiddenException("Trop de tentatives refusées. Activation bloquée : contactez votre administrateur.");
+      }
+      await this.alertAdmins(userId, 'Tentative d\'activation refusée', `${name} a saisi un code invalide ou expiré sur un appareil (${dto.model ?? 'inconnu'}).`, 'WARNING');
+      throw new BadRequestException("Code invalide ou expiré. Contactez votre administrateur pour obtenir un nouveau code.");
     }
+    activationFails.delete(userId);
     await this.prisma.driverDevice.updateMany({
       where: { driverId: dev.driverId, status: 'ACTIVE' },
       data: { status: 'REVOKED', blockedAt: now, blockedReason: 'Remplacé par un nouvel appareil' },
