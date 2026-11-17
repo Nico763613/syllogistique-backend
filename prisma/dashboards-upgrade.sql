@@ -333,3 +333,9 @@ CREATE TABLE IF NOT EXISTS user_devices (id text PRIMARY KEY, user_id text NOT N
 
 --#
 CREATE INDEX IF NOT EXISTS user_devices_user_idx ON user_devices (user_id, status)
+
+--#
+CREATE TABLE IF NOT EXISTS mail_log (id text PRIMARY KEY, at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, recipient text, subject text, status text NOT NULL, error text, message text)
+
+--#
+CREATE INDEX IF NOT EXISTS mail_log_at_idx ON mail_log (at)

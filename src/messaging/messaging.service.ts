@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { randomUUID } from 'crypto';
+import { PrismaService } from '../prisma.service';
 
 export type MailResult = {
   sent: boolean;
@@ -24,7 +26,7 @@ export class MessagingService {
   private fromAddress = '';
   private missing: string[] = [];
 
-  constructor(private config: ConfigService) {
+  constructor(private config: ConfigService, private prisma: PrismaService) {
     const host = this.config.get<string>('SMTP_HOST');
     const user = this.config.get<string>('SMTP_USER');
     const pass = this.config.get<string>('SMTP_PASS') || this.config.get<string>('SMTP_PASSWORD');
@@ -79,7 +81,23 @@ export class MessagingService {
     return { error: 'UNKNOWN', message: "Échec d'envoi de l'e-mail (voir les logs du serveur)." };
   }
 
+  // Journal des envois (qui / quand / statut / raison) : alimente la page « Envois » du Master. N'interrompt jamais un envoi.
+  private async journal(mail: { to: string; subject: string }, r: MailResult) {
+    try {
+      const status = r.sent ? 'SENT' : r.simulated ? 'SIMULATED' : 'FAILED';
+      await this.prisma.$executeRawUnsafe('INSERT INTO mail_log (id, recipient, subject, status, error, message) VALUES ($1,$2,$3,$4,$5,$6)', randomUUID(), this.mask(mail.to), String(mail.subject || '').slice(0, 200), status, r.error ?? null, r.message ?? null);
+    } catch {
+      /* journal indisponible : sans conséquence sur l'envoi */
+    }
+  }
+
   private async deliver(mail: { to: string; subject: string; text: string; attachments?: any[] }): Promise<MailResult> {
+    const r = await this.deliverRaw(mail);
+    await this.journal(mail, r);
+    return r;
+  }
+
+  private async deliverRaw(mail: { to: string; subject: string; text: string; attachments?: any[] }): Promise<MailResult> {
     if (!this.transporter) {
       if (this.missing.length) {
         return { sent: false, simulated: true, error: 'CONFIG', message: `Configuration e-mail incomplète : ${this.missing.join(', ')} manquant(e).` };

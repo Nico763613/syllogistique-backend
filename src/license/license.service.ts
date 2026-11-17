@@ -122,7 +122,9 @@ export class LicenseService implements OnModuleInit {
     const drivers = await this.prisma.driver.findMany({ where: { id: { in: [...new Set(devs.map((x) => x.driverId))] } }, select: { id: true, firstName: true, lastName: true } });
     const nm = new Map(drivers.map((x) => [x.id, `${x.firstName} ${x.lastName}`]));
     const reports = await this.prisma.problemReport.findMany({ orderBy: { createdAt: 'desc' }, take: 50 });
+    const mails: any[] = await this.prisma.$queryRawUnsafe('SELECT id, at, recipient, subject, status, error, message FROM mail_log ORDER BY at DESC LIMIT 50').catch(() => []);
     return {
+      mails: mails.map((m) => ({ id: m.id, at: m.at, recipient: m.recipient, subject: m.subject, status: m.status, error: m.error, message: m.message })),
       devices: devs.map((x) => ({ id: x.id, name: `${nm.get(x.driverId) ?? 'Chauffeur'} — ${x.model ?? 'appareil'}`, lastSeenAt: x.lastSeenAt ?? x.activatedAt })),
       reports: reports.map((r) => ({ id: r.id, userName: r.userName, role: r.role, screen: r.screen, message: r.message, createdAt: r.createdAt, context: [r.network, r.appVersion, r.lastError].filter(Boolean).join(' · ') })),
     };
