@@ -39,6 +39,7 @@ import { HseModule } from './hse/hse.module';
 import { DriverModule } from './driver/driver.module';
 import { BrandingModule } from './branding/branding.module';
 import { SupportModule } from './support/support.module';
+import { SignupModule } from './signup/signup.module';
 import { LicenseModule } from './license/license.module';
 
 import { HealthController } from './health.controller';
@@ -84,6 +85,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     DriverModule,
     BrandingModule,
     SupportModule,
+    SignupModule,
     LicenseModule,
   ],
   controllers: [HealthController],
