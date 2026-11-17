@@ -65,7 +65,7 @@ function back() { if (history.state && history.state.r && history.state.r !== 'h
 window.addEventListener('popstate', (e) => { closeModal(); if (LOGGED) render(e.state || { r: 'home' }); });
 function render(st) {
   window.scrollTo(0, 0);
-  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports }[st.r] || showHome;
+  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails }[st.r] || showHome;
   return f(st.a);
 }
 const bar = (t) => `<div class="bar"><button class="back" onclick="back()" aria-label="Retour" title="Retour">←</button><h2>${esc(t)}</h2></div>`;
@@ -168,8 +168,8 @@ async function showHome() {
         <button class="gold" onclick="nav('client',null)">+ Nouveau client</button>
         <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>
       <div class="card"><h2>Supervision</h2><p class="muted">Ce que remontent les installations de vos clients : signalements, erreurs, appareils.</p>
-        <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${ov.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${ov.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${ov.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${ov.devicesBlocked}</b><span>Appareils bloqués</span></div></div>
-        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button></div>
+        <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${ov.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${ov.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${ov.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${ov.devicesBlocked}</b><span>Appareils bloqués</span></div><div class="kpi click" onclick="nav('mails',null)"><b>${ov.mailsFailed7d || 0}</b><span>Envois en échec (7 j)</span></div></div>
+        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button></div>
       <div class="card"><h2>Mon compte</h2><button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('audit')">Journal d'audit</button></div>
       <div class="card" style="border-color:var(--danger)"><h2>Mode test</h2><p class="muted">Supprime tous les clients et toutes les licences de test. Le journal d'audit est conservé.</p><button class="ghost" style="color:var(--danger)" onclick="nav('reset')">Tout réinitialiser (mode test)</button></div>`;
     drawList();
@@ -332,6 +332,19 @@ async function screenReports() {
       <select onchange="RP_F.client=this.value;screenReports()"><option value="">Tous les clients</option>${cls.map((c) => `<option value="${c.id}" ${String(RP_F.client) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
       ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.reported_at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td><b>${esc(r.user_name || '—')}</b> <span class="muted">${esc(r.role || '')}</span><br>${esc(r.screen || '')}</td><td>${esc(r.message || '—')}<br><span class="muted">${esc(r.context || '')}</span></td>
         <td><select onchange="setReport(${r.id}, this.value)">${Object.keys(lab).map((k) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select></td></tr>`).join('')}</table>` : '<p class="muted">Aucun signalement.</p>'}</div>`;
+  } catch (e) { fail(e); }
+}
+let ML_F = { status: '', client: '' };
+const MAIL_HELP = { AUTH: "Le serveur d'e-mail a refusé l'identifiant : renouvelez la clé SMTP dans Render (SMTP_USER / SMTP_PASS).", TIMEOUT: "Le serveur d'e-mail ne répond pas : sur l'offre gratuite de Render les ports SMTP sont bloqués (passer à l'offre payante).", CONNECTION: "Connexion impossible : vérifiez SMTP_HOST et SMTP_PORT.", SENDER_REFUSED: "Adresse refusée : l'expéditeur MAIL_FROM doit être validé chez Brevo, ou l'adresse du destinataire est invalide.", CONFIG: "E-mail non configuré chez ce client (variables SMTP manquantes).", UNKNOWN: "Échec d'envoi : cause non identifiée." };
+async function screenMails() {
+  try {
+    const qs = new URLSearchParams(); if (ML_F.status) qs.set('status', ML_F.status); if (ML_F.client) qs.set('client', ML_F.client);
+    const [rows, cls] = [await api('/api/mails?' + qs), CL.length ? CL : await api('/api/clients')];
+    const lab = { SENT: 'Envoyé', FAILED: 'Échec', SIMULATED: 'Non envoyé (non configuré)' };
+    v.innerHTML = `<div class="card">${bar("Envois d'e-mails")}<p class="muted">Qui a envoyé, quand, vers quelle adresse (masquée), avec le statut et la raison en clair en cas d'échec. Remonté automatiquement chaque heure par les applications clientes. Aucun contenu de rapport n'est transmis.</p>
+      <select onchange="ML_F.status=this.value;screenMails()"><option value="">Tous les statuts</option>${Object.keys(lab).map((k) => `<option value="${k}" ${ML_F.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select>
+      <select onchange="ML_F.client=this.value;screenMails()"><option value="">Tous les clients</option>${cls.map((c) => `<option value="${c.id}" ${String(ML_F.client) === String(c.id) ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+      ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td>${esc(r.subject || '—')}<br><span class="muted">${esc(r.recipient || '')}</span></td><td><b style="color:${r.status === 'SENT' ? 'var(--ok)' : 'var(--danger,#C0504D)'}">${lab[r.status] || esc(r.status)}</b>${r.status !== 'SENT' ? `<br><span class="muted">${esc(MAIL_HELP[r.error] || r.message || '')}</span>` : ''}</td></tr>`).join('')}</table>` : '<p class="muted">Aucun envoi enregistré pour le moment.</p>'}</div>`;
   } catch (e) { fail(e); }
 }
 async function setReport(id, status) { try { await api('/api/reports/status', { id, status }); } catch (e) { fail(e); } }

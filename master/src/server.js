@@ -126,6 +126,16 @@ function createApp(pool, cfg) {
           [l.id, rid, t(r.userName, 120), t(r.role, 40), t(r.screen, 160), t(r.message, 600), t(r.context, 900), r.createdAt && !isNaN(new Date(r.createdAt)) ? new Date(r.createdAt).toISOString() : new Date().toISOString()]);
         }
       }
+      if (Array.isArray(b.mails)) {
+        for (const m of b.mails.slice(0, 100)) {
+          const mid = String(m && m.id || '').slice(0, 100); if (!mid) continue;
+          const t = (x, n) => (x === undefined || x === null || x === '' ? null : String(x).slice(0, n));
+          const stt = ['SENT', 'FAILED', 'SIMULATED'].includes(m.status) ? m.status : 'FAILED';
+          await pool.query(`insert into master_mails(license_id, remote_id, at, recipient, subject, status, error, message) values ($1,$2,$3,$4,$5,$6,$7,$8)
+            on conflict (license_id, remote_id) do nothing returning id`,
+          [l.id, mid, m.at && !isNaN(new Date(m.at)) ? new Date(m.at).toISOString() : new Date().toISOString(), t(m.recipient, 160), t(m.subject, 200), stt, t(m.error, 40), t(m.message, 400)]);
+        }
+      }
       const dv = (await pool.query('select device_id, blocked, disconnect_requested from master_devices where license_id=$1', [l.id])).rows;
       const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
       const out = { status: lic.effectiveStatus(l), token: await licenseToken(l, c), blockedDevices: dv.filter((d) => d.blocked).map((d) => d.device_id), disconnectDevices: dv.filter((d) => d.disconnect_requested).map((d) => d.device_id) };
@@ -248,12 +258,20 @@ function createApp(pool, cfg) {
       await audit(s.aid, 'REPORT_STATUS', `signalement ${Number(b.id) || 0} : ${b.status}`, req);
       return send(res, 200, { ok: true });
     }
+    if (req.method === 'GET' && p === '/api/mails') {
+      const st = url.searchParams.get('status'), cl = Number(url.searchParams.get('client')) || null;
+      const { rows } = await pool.query(`select m.id, m.at, m.recipient, m.subject, m.status, m.error, m.message, c.id as client_id, c.name as client_name
+        from master_mails m join master_licenses l on l.id=m.license_id join master_clients c on c.id=l.client_id
+        where ($1::text is null or m.status=$1) and ($2::bigint is null or c.id=$2) order by m.at desc limit 300`, [['SENT', 'FAILED', 'SIMULATED'].includes(st) ? st : null, cl]);
+      return send(res, 200, rows);
+    }
     if (req.method === 'GET' && p === '/api/overview') {
       const q = async (sql) => Number((await pool.query(sql)).rows[0].n);
       return send(res, 200, {
         newReports: await q("select count(*) n from master_reports where status='NEW'"),
         devices24h: await q("select count(*) n from master_devices where last_seen_at > now() - interval '24 hours' and not blocked"),
         devicesBlocked: await q('select count(*) n from master_devices where blocked'),
+        mailsFailed7d: await q("select count(*) n from master_mails where status='FAILED' and at > now() - interval '7 days'"),
         errors7d: await q("select count(*) n from master_reports where role='SYSTEM' and reported_at > now() - interval '7 days'"),
       });
     }

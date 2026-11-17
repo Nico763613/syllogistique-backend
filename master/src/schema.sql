@@ -101,3 +101,17 @@ create table if not exists master_reports (
   reported_at timestamptz not null default now(),
   unique (license_id, remote_id)
 );
+
+-- Journal des envois d'e-mails remontés par les installations (statut et raison d'échec)
+create table if not exists master_mails (
+  id         bigserial primary key,
+  license_id bigint not null references master_licenses(id) on delete cascade,
+  remote_id  text not null,
+  at         timestamptz not null default now(),
+  recipient  text,
+  subject    text,
+  status     text not null,
+  error      text,
+  message    text,
+  unique (license_id, remote_id)
+);
