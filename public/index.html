@@ -649,7 +649,9 @@ async function login() {
 
   try {
     localStorage.setItem('syllo_api_url', state.apiUrl);
-    const data = await api('/auth/login', { method: 'POST', body: { email, password } });
+    let fp = ''; try { fp = localStorage.getItem('syllo_fp') || ''; if (!fp) { fp = 'w' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('syllo_fp', fp); } } catch (e) {}
+    const kind = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) ? 'MOBILE' : 'DESKTOP';
+    const data = await api('/auth/login', { method: 'POST', body: { email, password, deviceFp: fp || undefined, deviceKind: kind, deviceName: (navigator.userAgent || '').slice(0, 110) } });
     state._pw = password;
     state.accessToken = data.accessToken;
     state.refreshToken = data.refreshToken;
@@ -3746,6 +3748,18 @@ async function renderSync() {
 }
 
 /* ---------------- SETTINGS ---------------- */
+async function loadUserDevices() {
+  const box = document.getElementById('ud-list'); if (!box) return;
+  try {
+    const rows = await api('/user-devices');
+    const st = { ACTIVE: ['Autorisé', 'ok'], REFUSED: ['Refusé', 'warn'], BLOCKED: ['Bloqué', 'bad'] };
+    box.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>Utilisateur</th><th>Appareil</th><th>Dernière connexion</th><th>Statut</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td><b>${esc(r.lastName)}</b> ${esc(r.firstName)}<br><small>${esc(r.role)}</small></td><td>${r.kind === 'DESKTOP' ? 'Ordinateur' : 'Téléphone'}<br><small>${esc((r.name || '').slice(0, 60))}</small></td><td>${esc(new Date(r.lastSeen).toLocaleString('fr-FR'))}</td><td><span class="badge ${st[r.status][1]}">${st[r.status][0]}${r.attempts ? ' (' + r.attempts + '/3)' : ''}</span></td><td><button class="btn small" onclick="releaseUserDevice('${esc(r.id)}')">Libérer</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">Aucun appareil enregistré pour le moment.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function releaseUserDevice(id) {
+  if (!confirm('Libérer cet appareil ? L\'utilisateur pourra enregistrer un nouvel appareil à sa prochaine connexion.')) return;
+  try { await api('/user-devices/' + id + '/release', { method: 'POST' }); loadUserDevices(); } catch (e) { alert(e.message); }
+}
 function renderSettings() {
   root().innerHTML = `
     <div class="panel">
@@ -3758,6 +3772,7 @@ function renderSettings() {
       <div id="s-msg"></div>
     </div>
     ${pinPanel()}
+    ${state.user && state.user.role === 'SUPER_ADMIN' ? '<div class="panel" id="ud-panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg> Appareils autorisés des utilisateurs</h3><div class="desc">Directeur général : 1 ordinateur et 1 téléphone. Autres profils : 1 appareil. Un autre appareil est refusé et signalé ; libérez la place pour autoriser un changement.</div><div id="ud-list">Chargement…</div></div>' : ''}
     <div class="panel">
       <h3><svg class="ic" aria-hidden="true"><use href="#i-key"/></svg> Changer mon mot de passe</h3>
       <label>Mot de passe actuel</label><input id="pw-old" type="password" autocomplete="current-password" />
@@ -3778,7 +3793,7 @@ function renderSettings() {
       <div id="u-msg"></div>
     </div>` : ''}`;
   if (['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role)) loadUsersPanel();
-  brandPanel();
+  brandPanel(); loadUserDevices();
 }
 async function changePassword() {
   const msg = document.getElementById('pw-msg');

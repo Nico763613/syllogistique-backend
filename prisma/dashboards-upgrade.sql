@@ -327,3 +327,9 @@ CREATE INDEX IF NOT EXISTS problem_reports_status_created_at_idx ON problem_repo
 
 --#
 CREATE TABLE IF NOT EXISTS driver_signups (id text PRIMARY KEY, first_name text NOT NULL, last_name text NOT NULL, phone text NOT NULL, activity text, status text NOT NULL DEFAULT 'PENDING', created_at timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, decided_by text, decided_at timestamp(3), driver_id text)
+
+--#
+CREATE TABLE IF NOT EXISTS user_devices (id text PRIMARY KEY, user_id text NOT NULL, fp text NOT NULL, kind text NOT NULL DEFAULT 'MOBILE', name text, status text NOT NULL DEFAULT 'ACTIVE', attempts integer NOT NULL DEFAULT 0, first_seen timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, last_seen timestamp(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)
+
+--#
+CREATE INDEX IF NOT EXISTS user_devices_user_idx ON user_devices (user_id, status)
