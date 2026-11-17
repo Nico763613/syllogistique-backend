@@ -66,3 +66,6 @@ Facultatif, sans mot de passe dans le code. Dans Render (service Master), ajoute
 - **E-mail** : `BREVO_API_KEY` (clé « API » créée dans Brevo > SMTP & API > Clés API, différente de la clé SMTP), `MAIL_FROM` (expéditeur validé chez Brevo), `MASTER_NOTIFY_EMAIL` (sinon l'e-mail administrateur). Passe par HTTPS : fonctionne sur l'offre gratuite.
 - **Notification sur téléphone** : installez l'application gratuite « ntfy », abonnez-vous à un nom secret de votre choix, puis mettez ce nom dans `NTFY_TOPIC`.
 Un message au plus toutes les 10 minutes par client, avec le résumé (le détail est dans Signalements et Envois).
+
+## Suivi des sauvegardes (facultatif)
+Dans Render (service Master) : `BACKUP_REPO` = `Nico763613/syllogistique-sauvegardes-` et `BACKUP_GH_TOKEN` = jeton GitHub « fine-grained » en lecture seule (permission Actions : Read) limité à ce seul dépôt. La page Master > Sauvegardes affiche alors l'état de chaque sauvegarde, et une alerte part (voir Notifications) si aucune n'a réussi depuis 36 h. La restauration reste manuelle, avec la clé privée.

@@ -7,6 +7,7 @@ const auth = require('./auth');
 const lic = require('./license');
 const { makePool, migrate } = require('./db');
 const { notify } = require('./notify');
+const backups = require('./backups');
 
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
@@ -269,6 +270,7 @@ function createApp(pool, cfg) {
       await audit(s.aid, 'REPORT_STATUS', `signalement ${Number(b.id) || 0} : ${b.status}`, req);
       return send(res, 200, { ok: true });
     }
+    if (req.method === 'GET' && p === '/api/backups') return send(res, 200, await backups.status());
     if (req.method === 'GET' && p === '/api/mails') {
       const st = url.searchParams.get('status'), cl = Number(url.searchParams.get('client')) || null;
       const { rows } = await pool.query(`select m.id, m.at, m.recipient, m.subject, m.status, m.error, m.message, c.id as client_id, c.name as client_name
@@ -451,6 +453,8 @@ if (require.main === module) {
     const cfg = configFromEnv(); const pool = makePool();
     await migrate(pool); await bootstrapAdmin(pool, cfg);
     createApp(pool, cfg).listen(cfg.port, () => console.log('[master] en ligne sur le port ' + cfg.port));
+    // Contrôle toutes les 6 h : alerte immédiate si la sauvegarde quotidienne n'a pas réussi depuis plus de 36 h (si le suivi est configuré)
+    setInterval(async () => { try { const b = await backups.status(); if (b.configured && b.state === 'STALE') notify('backup', 'SYL MASTER — sauvegarde en retard', 'La dernière sauvegarde réussie date de ' + (b.hoursSinceSuccess == null ? 'plus de 15 jours' : b.hoursSinceSuccess + ' h') + '. Ouvrez Master > Sauvegardes.'); } catch (e) {} }, 6 * 3600e3).unref();
   })().catch((e) => { console.error('[master] arrêt :', e.message); process.exit(1); });
 }
 module.exports = { createApp, bootstrapAdmin, configFromEnv };
