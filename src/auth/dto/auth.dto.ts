@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class SetPhotoDto {
@@ -21,6 +21,11 @@ export class LoginDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  // Identité de l'appareil (limite d'appareils par utilisateur)
+  @IsOptional() @IsString() @MaxLength(64) deviceFp?: string;
+  @IsOptional() @IsIn(['MOBILE', 'DESKTOP']) deviceKind?: string;
+  @IsOptional() @IsString() @MaxLength(120) deviceName?: string;
 }
 
 export class RefreshTokenDto {
