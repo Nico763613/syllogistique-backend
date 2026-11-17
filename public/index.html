@@ -4757,7 +4757,9 @@ const SPACES = {
   comptabilite: { n: 'Espace Comptabilité', s: 'Enregistrer • Contrôler • Rapporter' },
 };
 const ROLE_SPACE = { CHAUFFEUR: 'chauffeurs', ADMIN_LOGISTIQUE: 'logistique', GESTIONNAIRE_FLOTTE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', GESTIONNAIRE_HSE: 'hse', AGENT_HSE: 'hse', MAGASINIER: 'stock', DIRECTEUR_GENERAL: 'dg', COMPTABLE: 'comptabilite' };
-function mySpace() { const k = state.user && ROLE_SPACE[state.user.role]; return k ? Object.assign({ k }, SPACES[k]) : null; }
+// Les logos des autres départements restent des ressources d'identité (documents, application mobile) : l'application affiche le logo de l'entreprise cliente. Seul l'espace Chauffeur garde son emblème.
+const SPACE_VISIBLE = { chauffeurs: true };
+function mySpace() { const k = state.user && ROLE_SPACE[state.user.role]; return k && SPACE_VISIBLE[k] ? Object.assign({ k }, SPACES[k]) : null; }
 function spaceBrandOn() { return !BRAND.logoUrl && (!BRAND.name || ['SYLLOGISTIQUE', 'SYL LOGISTIQUE'].includes(BRAND.name)); }
 function spaceHome() {
   const sp = spaceBrandOn() && mySpace(); if (!sp) return '';
