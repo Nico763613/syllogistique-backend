@@ -1,0 +1,41 @@
+{
+  "name": "SYL Direction — SYL LOGISTIQUE",
+  "short_name": "SYL Direction",
+  "description": "Gestion logistique, transport, flotte, stocks et achats/ventes.",
+  "start_url": "./index.html?espace=dg",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5F7FA",
+  "theme_color": "#163A5F",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icons/dg-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/dg-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/dg-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./index.html?espace=dg",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "categories": [
+    "business",
+    "productivity"
+  ]
+}

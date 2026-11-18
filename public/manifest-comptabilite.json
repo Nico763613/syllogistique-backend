@@ -1,0 +1,41 @@
+{
+  "name": "SYL Comptabilité — SYL LOGISTIQUE",
+  "short_name": "SYL Comptabilité",
+  "description": "Gestion logistique, transport, flotte, stocks et achats/ventes.",
+  "start_url": "./index.html?espace=comptabilite",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5F7FA",
+  "theme_color": "#163A5F",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icons/comptabilite-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/comptabilite-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/comptabilite-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./index.html?espace=comptabilite",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "categories": [
+    "business",
+    "productivity"
+  ]
+}
