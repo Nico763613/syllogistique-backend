@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
 import { CreateStaffDto, StaffReportDto, STAFF_ROLES, MANAGER_ROLES, ALL_STAFF_ROLES } from './staff.dto';
 
+const ESPACE: Record<string, string> = { AGENT_HSE: 'hse', GESTIONNAIRE_HSE: 'hse', MAGASINIER: 'stock', MECANICIEN: 'atelier', POINTEUR: 'pointage', DIRECTEUR_GENERAL: 'dg', ADMIN_LOGISTIQUE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', COMPTABLE: 'comptabilite', RESPONSABLE_COMMERCIAL: 'commercial', CAISSIER: 'caisse' };
 const LABEL: Record<string, string> = { AGENT_HSE: 'agent HSE', GESTIONNAIRE_HSE: 'responsable HSE', MAGASINIER: 'gestionnaire de stock', MECANICIEN: 'mécanicien', POINTEUR: 'pointeur', DIRECTEUR_GENERAL: 'Directeur Général', ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité' };
 const isManager = (r: string) => (MANAGER_ROLES as readonly string[]).includes(r);
 
@@ -70,7 +71,7 @@ export class StaffService {
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: u.id, newValue: { invitation: true } });
     const lines = [
       `Bonjour ${u.firstName},`,
-      `Voici votre application de travail SYL LOGISTIQUE (${LABEL[u.role.name]}) : ${appUrl}`,
+      `Voici votre application de travail SYL LOGISTIQUE (${LABEL[u.role.name]}) : ${ESPACE[u.role.name] ? appUrl + (appUrl.includes('?') ? '&' : '?') + 'espace=' + ESPACE[u.role.name] : appUrl}`,
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
       `2) Connexion : votre numéro de téléphone${temp ? ` et le mot de passe provisoire ${temp} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe'}.`,
       ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre espace de pilotage.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),

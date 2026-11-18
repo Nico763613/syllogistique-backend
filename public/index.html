@@ -4759,6 +4759,26 @@ const SPACES = {
 const ROLE_SPACE = { CHAUFFEUR: 'chauffeurs', ADMIN_LOGISTIQUE: 'logistique', GESTIONNAIRE_FLOTTE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', GESTIONNAIRE_HSE: 'hse', AGENT_HSE: 'hse', MAGASINIER: 'stock', DIRECTEUR_GENERAL: 'dg', COMPTABLE: 'comptabilite' };
 // Les logos des autres départements restent des ressources d'identité (documents, application mobile) : l'application affiche le logo de l'entreprise cliente. Seul l'espace Chauffeur garde son emblème.
 const SPACE_VISIBLE = { chauffeurs: true };
+// Icône d'installation (écran d'accueil du téléphone) = logo du département, choisi avant même la connexion.
+const ICON_ROLE = Object.assign({}, ROLE_SPACE, { RESPONSABLE_COMMERCIAL: 'commercial', CAISSIER: 'caisse', MECANICIEN: 'atelier', POINTEUR: 'pointage' });
+const ICON_SPACES = ['chauffeurs', 'logistique', 'operations', 'hse', 'stock', 'dg', 'comptabilite', 'commercial', 'caisse', 'atelier', 'pointage', 'achats'];
+function applySpaceIcon(k) {
+  try {
+    if (!k || ICON_SPACES.indexOf(k) < 0) return;
+    const set = (sel, attr, v) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, v); };
+    set('link[rel="manifest"]', 'href', 'manifest-' + k + '.json');
+    set('link[rel="apple-touch-icon"]', 'href', 'icons/' + k + '-180.png');
+    document.querySelectorAll('link[rel="icon"]').forEach((el) => el.setAttribute('href', 'icons/' + k + '-192.png'));
+    localStorage.setItem('syllo_icon_space', k);
+  } catch (e) {}
+}
+(function () {
+  try {
+    const q = new URLSearchParams(location.search).get('espace');
+    const k = q || localStorage.getItem('syllo_icon_space');
+    applySpaceIcon(k);
+  } catch (e) {}
+})();
 function mySpace() { const k = state.user && ROLE_SPACE[state.user.role]; return k && SPACE_VISIBLE[k] ? Object.assign({ k }, SPACES[k]) : null; }
 function spaceBrandOn() { return !BRAND.logoUrl && (!BRAND.name || ['SYLLOGISTIQUE', 'SYL LOGISTIQUE'].includes(BRAND.name)); }
 function spaceHome() {
@@ -4775,7 +4795,7 @@ function spaceLoginApply() {
 function spaceApply() {
   try {
     const sp = spaceBrandOn() && mySpace();
-    if (state.user && !state.demo) { if (sp) localStorage.setItem('syllo_last_space', sp.k); }
+    if (state.user && !state.demo) { if (sp) localStorage.setItem('syllo_last_space', sp.k); applySpaceIcon(ICON_ROLE[state.user.role]); }
     const ico = document.getElementById('space-ico'); if (ico) { if (sp) { ico.src = 'logos/' + sp.k + '-sm.webp'; ico.alt = sp.n; ico.title = sp.n; ico.style.display = 'block'; } else ico.style.display = 'none'; }
     const card = document.getElementById('space-card'); if (card) { card.classList.toggle('on', !!sp); if (sp) { document.getElementById('space-card-img').src = 'logos/' + sp.k + '-sm.webp'; document.getElementById('space-card-name').textContent = sp.n; document.getElementById('space-card-slogan').textContent = sp.s; } }
     const dv = document.getElementById('drv-space'); if (dv) { if (sp && state.user && state.user.role === 'CHAUFFEUR') { dv.src = 'logos/chauffeurs-sm.webp'; dv.alt = sp.n; dv.style.display = 'block'; } else dv.style.display = 'none'; }

@@ -1,0 +1,41 @@
+{
+  "name": "SYL Logistique — SYL LOGISTIQUE",
+  "short_name": "SYL Logistique",
+  "description": "Gestion logistique, transport, flotte, stocks et achats/ventes.",
+  "start_url": "./index.html?espace=logistique",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5F7FA",
+  "theme_color": "#163A5F",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icons/logistique-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logistique-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/logistique-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "./index.html?espace=logistique",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "categories": [
+    "business",
+    "productivity"
+  ]
+}
