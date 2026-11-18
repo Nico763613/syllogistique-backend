@@ -182,7 +182,7 @@ export class AuthService {
       include: { role: true },
     });
 
-    if (!user || !user.refreshTokenHash) {
+    if (!user || !user.refreshTokenHash || user.deletedAt || user.status !== 'ACTIVE') {
       throw new UnauthorizedException('Session invalide.');
     }
 

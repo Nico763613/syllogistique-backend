@@ -96,6 +96,7 @@ export class UsersService {
         lastName: dto.lastName,
         phone: dto.phone,
         status: dto.status,
+        ...((dto.status && dto.status !== 'ACTIVE') || roleId ? { refreshTokenHash: null } : {}),
         siteId: dto.siteId,
         department: dto.department,
         roleId,
@@ -117,7 +118,7 @@ export class UsersService {
   }
 
   async remove(id: string, actorId: string) {
-    await this.prisma.user.update({ where: { id }, data: { deletedAt: new Date(), status: 'DISABLED' } });
+    await this.prisma.user.update({ where: { id }, data: { deletedAt: new Date(), status: 'DISABLED', refreshTokenHash: null } });
     await this.audit.log({ userId: actorId, action: 'DELETE', entity: 'User', entityId: id });
     return { success: true };
   }
