@@ -1,4 +1,6 @@
 import PDFDocument = require('pdfkit');
+import { readFile } from 'fs/promises';
+import { join, basename } from 'path';
 
 export const NAVY = '#163A5F';
 export const GOLD = '#E0A72E';
@@ -7,7 +9,23 @@ export const fmtN = (v: number) => Math.round(Number(v) || 0).toLocaleString('fr
 export interface Issuer { name: string; phone: string; service: string }
 
 // Document A4 avec bandeau d'en-tête (organisation + titre) : socle commun des documents imprimables
-export function startDoc(orgName: string, title: string) {
+// Logo de l'entreprise cliente (fichier envoyé, image intégrée ou adresse web). Indisponible = document sans logo, jamais d'erreur.
+export async function orgLogo(prisma: { organization: { findFirst: (a: any) => Promise<{ logoUrl?: string | null } | null> } }): Promise<Buffer | null> {
+  try {
+    const org = await prisma.organization.findFirst({ orderBy: { createdAt: 'asc' }, select: { logoUrl: true } });
+    const url = org?.logoUrl;
+    if (!url) return null;
+    if (url.startsWith('data:image/')) return Buffer.from(url.split(',')[1] || '', 'base64');
+    if (url.startsWith('/uploads/')) return await readFile(join(__dirname, '..', '..', 'uploads', basename(url)));
+    if (/^https?:\/\//i.test(url)) {
+      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      return r.ok ? Buffer.from(await r.arrayBuffer()) : null;
+    }
+  } catch { /* logo indisponible */ }
+  return null;
+}
+
+export function startDoc(orgName: string, title: string, logo?: Buffer | null) {
   const doc = new PDFDocument({ margin: 50 });
   const chunks: Buffer[] = [];
   doc.on('data', (c: Buffer) => chunks.push(c));
@@ -16,8 +34,18 @@ export function startDoc(orgName: string, title: string) {
     doc.on('error', reject);
   });
   doc.rect(0, 0, doc.page.width, 70).fill(NAVY);
-  doc.fillColor('#FFFFFF').fontSize(18).text(orgName || 'SYL LOGISTIQUE', 50, 20);
-  doc.fillColor(GOLD).fontSize(12).text(title, 50, 44);
+  let textX = 50;
+  if (logo) {
+    try {
+      doc.roundedRect(50, 10, 66, 50, 4).fill('#FFFFFF');
+      doc.image(logo, 54, 13, { fit: [58, 44], align: 'center', valign: 'center' });
+      textX = 128;
+    } catch { /* format non pris en charge (ex. SVG) : en-tête sans logo */ }
+  }
+  doc.fillColor('#FFFFFF').fontSize(18).text(orgName || 'SYL LOGISTIQUE', textX, 20);
+  doc.fillColor(GOLD).fontSize(12).text(title, textX, 44);
+  // Petite signature discrète de l'éditeur (le logo mis en avant est celui de l'entreprise cliente)
+  doc.fillColor('#B7C7E6').fontSize(7.5).text('by SYL LOGISTIQUE', doc.page.width - 170, 56, { width: 120, align: 'right', lineBreak: false });
   doc.fillColor('#000000').fontSize(10);
   doc.y = 85;
   return { doc, done };

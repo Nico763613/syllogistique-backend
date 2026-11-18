@@ -4,7 +4,7 @@ import { AuditService } from '../audit/audit.service';
 import { InventoryService } from '../inventory/inventory.service';
 import { MessagingService } from '../messaging/messaging.service';
 import { getIssuer } from '../common/issuer';
-import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN } from '../common/pdf-doc';
+import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN, orgLogo } from '../common/pdf-doc';
 import { CreateNeedDto, NeedLineDto, SendNeedEmailDto, SetNeedStatusDto, UpdateNeedDto } from './dto/need.dto';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -133,7 +133,7 @@ export class NeedsService {
       : [];
     const vname = new Map(vehicles.map((v) => [v.id, v.internalNumber]));
 
-    const { doc, done } = startDoc(site?.organization?.name ?? 'SYL LOGISTIQUE', 'ÉTAT DES BESOINS');
+    const { doc, done } = startDoc(site?.organization?.name ?? 'SYL LOGISTIQUE', 'ÉTAT DES BESOINS', await orgLogo(this.prisma));
     keyValues(doc, [
       ['N°', need.reference],
       ['Date', new Date(need.createdAt).toLocaleDateString('fr-FR')],
