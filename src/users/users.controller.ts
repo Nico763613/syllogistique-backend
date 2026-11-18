@@ -17,7 +17,7 @@ export class UsersController {
   @Post()
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   create(@Body() dto: CreateUserDto, @CurrentUser() actor: any) {
-    return this.usersService.create(dto, actor.organizationId, actor.userId);
+    return this.usersService.create(dto, actor.organizationId, actor.userId, actor.role);
   }
 
   @Get()
@@ -35,13 +35,13 @@ export class UsersController {
   @Patch(':id')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   update(@Param('id') id: string, @Body() dto: UpdateUserDto, @CurrentUser() actor: any) {
-    return this.usersService.update(id, dto, actor.userId);
+    return this.usersService.update(id, dto, actor.userId, actor.role);
   }
 
   @Post(':id/reset-password')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto, @CurrentUser() actor: any) {
-    return this.usersService.resetPassword(id, dto.newPassword, actor.userId);
+    return this.usersService.resetPassword(id, dto.newPassword, actor.userId, actor.role);
   }
 
   @Delete(':id')
