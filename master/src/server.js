@@ -8,6 +8,7 @@ const lic = require('./license');
 const { makePool, migrate } = require('./db');
 const { notify } = require('./notify');
 const backups = require('./backups');
+const { diagnose } = require('./diagnose');
 
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
@@ -262,7 +263,7 @@ function createApp(pool, cfg) {
       const { rows } = await pool.query(`select r.id, r.user_name, r.role, r.screen, r.message, r.context, r.status, r.reported_at, c.id as client_id, c.name as client_name
         from master_reports r join master_licenses l on l.id=r.license_id join master_clients c on c.id=l.client_id
         where ($1::text is null or r.status=$1) and ($2::bigint is null or c.id=$2) and ($3::date is null or r.reported_at >= $3::date) and ($4::date is null or r.reported_at < $4::date + 1) order by r.reported_at desc limit 1000`, [['NEW', 'IN_PROGRESS', 'SOLVED'].includes(st) ? st : null, cl, dOk(url.searchParams.get('from')), dOk(url.searchParams.get('to'))]);
-      return send(res, 200, rows);
+      return send(res, 200, rows.map((r) => ({ ...r, diagnosis: diagnose(r) })));
     }
     if (req.method === 'POST' && p === '/api/reports/status') {
       const b = body; if (!['NEW', 'IN_PROGRESS', 'SOLVED'].includes(b.status)) return send(res, 400, { error: 'Statut invalide.' });
