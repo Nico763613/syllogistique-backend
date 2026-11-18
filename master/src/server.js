@@ -312,6 +312,12 @@ function createApp(pool, cfg) {
       if (!r.rows.length) return send(res, 404, { error: 'Client introuvable.' });
       await audit(s.aid, 'CLIENT_MODIFIE', f[0], req); return send(res, 200, { ok: true });
     }
+    if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/folder$/.exec(p))) {
+      const fo = str(body.folder, 80), sf = fo ? str(body.subfolder, 80) : null;
+      const r = await pool.query('update master_clients set folder=$2, subfolder=$3 where id=$1 returning name', [Number(m[1]), fo, sf]);
+      if (!r.rows.length) return send(res, 404, { error: 'Client introuvable.' });
+      await audit(s.aid, 'CLIENT_CLASSE', r.rows[0].name + ' → ' + (fo || 'sans dossier') + (sf ? ' / ' + sf : ''), req); return send(res, 200, { ok: true });
+    }
     if (req.method === 'POST' && (m = /^\/api\/clients\/(\d+)\/logo$/.exec(p))) {
       const cid = Number(m[1]), ex = (await pool.query('select name from master_clients where id=$1', [cid])).rows[0];
       if (!ex) return send(res, 404, { error: 'Client introuvable.' });

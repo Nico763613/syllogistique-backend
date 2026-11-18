@@ -115,3 +115,7 @@ create table if not exists master_mails (
   message    text,
   unique (license_id, remote_id)
 );
+
+-- Classement des clients en dossiers et sous-dossiers (facultatif)
+alter table master_clients add column if not exists folder text;
+alter table master_clients add column if not exists subfolder text;
