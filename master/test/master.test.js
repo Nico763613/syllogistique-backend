@@ -109,6 +109,7 @@ test('clients et licences : création, activation unique, jeton signé, suspensi
   assert.equal(cl.status, 200);
   assert.equal((await call('POST', `/api/clients/${cl.json.id}/folder`, { folder: 'Transport', subfolder: 'Conakry' })).status, 200, 'classement en dossier');
   assert.equal((await call('POST', '/api/clients/999999/folder', { folder: 'X' })).status, 404);
+  const gl = await call('GET', '/api/global?from=2020-01-01&folder=Transport'); assert.equal(gl.status, 200); assert.ok(gl.json.some((r) => r.id === cl.json.id && r.reports === 0 && r.devices === 0), 'rapports globaux');
   const fl = (await call('GET', '/api/clients')).json.find((x) => x.id === cl.json.id); assert.equal(fl.folder, 'Transport'); assert.equal(fl.subfolder, 'Conakry');
   assert.equal((await call('POST', `/api/clients/${cl.json.id}/licenses`, { permanent: false })).status, 400, 'date requise');
   assert.equal((await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: '2001-01-01' })).status, 400, 'date passée refusée');
