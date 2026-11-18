@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -8,7 +8,23 @@ import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 export class UsersService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  async create(dto: CreateUserDto, organizationId: string, actorId: string) {
+  // Seul l'Administrateur Général peut créer, modifier ou réinitialiser un compte Administrateur Général
+  // ou attribuer ce rôle : empêche un administrateur logistique de prendre le contrôle de la plateforme.
+  private assertCanManage(actorRole: string | undefined, targetRole?: string | null, requestedRole?: string | null) {
+    if (actorRole === 'SUPER_ADMIN') return;
+    if (targetRole === 'SUPER_ADMIN' || requestedRole === 'SUPER_ADMIN') {
+      throw new ForbiddenException('Seul l\'Administrateur Général peut gérer un compte Administrateur Général.');
+    }
+  }
+
+  private clean(u: any) {
+    if (!u) return u;
+    const { passwordHash, refreshTokenHash, ...rest } = u;
+    return rest;
+  }
+
+  async create(dto: CreateUserDto, organizationId: string, actorId: string, actorRole?: string) {
+    this.assertCanManage(actorRole, null, dto.role);
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Cet email est déjà utilisé.');
 
@@ -62,9 +78,10 @@ export class UsersService {
     return safe;
   }
 
-  async update(id: string, dto: UpdateUserDto, actorId: string) {
-    const before = await this.prisma.user.findUnique({ where: { id } });
+  async update(id: string, dto: UpdateUserDto, actorId: string, actorRole?: string) {
+    const before = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!before) throw new NotFoundException('Utilisateur introuvable.');
+    this.assertCanManage(actorRole, before.role?.name, dto.role);
 
     let roleId: string | undefined;
     if (dto.role) {
@@ -91,7 +108,7 @@ export class UsersService {
       action: 'UPDATE',
       entity: 'User',
       entityId: id,
-      oldValue: before,
+      oldValue: this.clean(before),
       newValue: dto,
     });
 
@@ -107,9 +124,10 @@ export class UsersService {
 
   // Réinitialisation du mot de passe par un administrateur (utilisateur qui a oublié le sien).
   // Les sessions existantes sont invalidées (refresh token supprimé).
-  async resetPassword(id: string, newPassword: string, actorId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async resetPassword(id: string, newPassword: string, actorId: string, actorRole?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!user) throw new NotFoundException('Utilisateur introuvable.');
+    this.assertCanManage(actorRole, user.role?.name);
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({ where: { id }, data: { passwordHash, refreshTokenHash: null } });
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'User', entityId: id, newValue: { passwordReset: true } });

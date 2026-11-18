@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, HttpException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -78,7 +78,24 @@ export class AuthService {
     throw new ForbiddenException("Cet appareil n'est pas autorisé pour votre compte. Contactez votre administrateur.");
   }
 
+  // Verrouillage temporaire par compte : 10 échecs consécutifs = 10 minutes de blocage (en plus de la limite par adresse IP).
+  // En mémoire (une seule instance) : aucune donnée en base, remis à zéro au redémarrage et à la première connexion réussie.
+  private static fails = new Map<string, { n: number; until: number }>();
+  private static readonly MAX_FAILS = 10;
+  private static readonly LOCK_MS = 10 * 60 * 1000;
+
   async login(dto: LoginDto, meta?: { deviceId?: string; ipAddress?: string }) {
+    const lockKey = dto.email.trim().toLowerCase().replace(/^\+?224/, '').slice(0, 120);
+    const lk = AuthService.fails.get(lockKey);
+    if (lk && lk.until > Date.now()) {
+      throw new HttpException(`Trop de tentatives. Réessayez dans ${Math.ceil((lk.until - Date.now()) / 60000)} minute(s).`, 429);
+    }
+    const fail = () => {
+      const cur = AuthService.fails.get(lockKey);
+      const n = (cur && cur.until <= Date.now() && cur.n >= AuthService.MAX_FAILS ? 0 : cur?.n ?? 0) + 1;
+      AuthService.fails.set(lockKey, { n, until: n >= AuthService.MAX_FAILS ? Date.now() + AuthService.LOCK_MS : 0 });
+      if (AuthService.fails.size > 5000) AuthService.fails.clear();
+    };
     let user;
     if (dto.email.includes('@')) {
       user = await this.prisma.user.findUnique({ where: { email: dto.email }, include: { role: true } });
@@ -92,13 +109,16 @@ export class AuthService {
     }
 
     if (!user || user.status !== 'ACTIVE') {
+      fail();
       throw new UnauthorizedException('Identifiants invalides.');
     }
 
     const passwordOk = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordOk) {
+      fail();
       throw new UnauthorizedException('Identifiants invalides.');
     }
+    AuthService.fails.delete(lockKey);
 
     await this.enforceDeviceLimit(user, dto);
 
@@ -195,6 +215,7 @@ export class AuthService {
 
     const ok = await bcrypt.compare(dto.currentPassword, user.passwordHash);
     if (!ok) throw new BadRequestException('Mot de passe actuel incorrect.');
+    if (dto.newPassword === dto.currentPassword) throw new BadRequestException('Le nouveau mot de passe doit être différent de l\'ancien.');
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: false } });
