@@ -270,6 +270,22 @@ function createApp(pool, cfg) {
       await audit(s.aid, 'REPORT_STATUS', `signalement ${Number(b.id) || 0} : ${b.status}`, req);
       return send(res, 200, { ok: true });
     }
+    if (req.method === 'GET' && p === '/api/global') {
+      const from = dOk(url.searchParams.get('from')), to = dOk(url.searchParams.get('to')), fo = url.searchParams.get('folder') || null;
+      const { rows } = await pool.query(`select c.id, c.name, c.folder, c.subfolder, c.country,
+        (select count(*) from master_licenses l where l.client_id=c.id) as licenses,
+        (select max(l.last_check_at) from master_licenses l where l.client_id=c.id) as last_contact,
+        (select max(l.app_version) from master_licenses l where l.client_id=c.id) as app_version,
+        (select count(*) from master_devices d join master_licenses l on l.id=d.license_id where l.client_id=c.id) as devices,
+        (select count(*) from master_devices d join master_licenses l on l.id=d.license_id where l.client_id=c.id and d.blocked) as devices_blocked,
+        (select count(*) from master_reports r join master_licenses l on l.id=r.license_id where l.client_id=c.id and r.role <> 'SYSTEM' and ($1::date is null or r.reported_at >= $1::date) and ($2::date is null or r.reported_at < $2::date + 1)) as reports,
+        (select count(*) from master_reports r join master_licenses l on l.id=r.license_id where l.client_id=c.id and r.role = 'SYSTEM' and ($1::date is null or r.reported_at >= $1::date) and ($2::date is null or r.reported_at < $2::date + 1)) as errors,
+        (select count(*) from master_reports r join master_licenses l on l.id=r.license_id where l.client_id=c.id and r.status='NEW') as reports_open,
+        (select count(*) from master_mails m join master_licenses l on l.id=m.license_id where l.client_id=c.id and m.status='SENT' and ($1::date is null or m.at >= $1::date) and ($2::date is null or m.at < $2::date + 1)) as mails_sent,
+        (select count(*) from master_mails m join master_licenses l on l.id=m.license_id where l.client_id=c.id and m.status='FAILED' and ($1::date is null or m.at >= $1::date) and ($2::date is null or m.at < $2::date + 1)) as mails_failed
+        from master_clients c where ($3::text is null or c.folder = $3) order by c.folder nulls last, c.name`, [from, to, fo]);
+      return send(res, 200, rows.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, /^(licenses|devices|devices_blocked|reports|errors|reports_open|mails_sent|mails_failed)$/.test(k) ? Number(v) : v]))));
+    }
     if (req.method === 'GET' && p === '/api/backups') return send(res, 200, await backups.status());
     if (req.method === 'GET' && p === '/api/mails') {
       const st = url.searchParams.get('status'), cl = Number(url.searchParams.get('client')) || null;

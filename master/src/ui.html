@@ -65,7 +65,7 @@ function back() { if (history.state && history.state.r && history.state.r !== 'h
 window.addEventListener('popstate', (e) => { closeModal(); if (LOGGED) render(e.state || { r: 'home' }); });
 function render(st) {
   window.scrollTo(0, 0);
-  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails, backups: screenBackups }[st.r] || showHome;
+  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails, backups: screenBackups, global: screenGlobal }[st.r] || showHome;
   return f(st.a);
 }
 const bar = (t) => `<div class="bar"><button class="back" onclick="back()" aria-label="Retour" title="Retour">←</button><h2>${esc(t)}</h2></div>`;
@@ -169,7 +169,7 @@ async function showHome() {
         <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>
       <div class="card"><h2>Supervision</h2><p class="muted">Ce que remontent les installations de vos clients : signalements, erreurs, appareils.</p>
         <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${ov.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${ov.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${ov.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${ov.devicesBlocked}</b><span>Appareils bloqués</span></div><div class="kpi click" onclick="nav('mails',null)"><b>${ov.mailsFailed7d || 0}</b><span>Envois en échec (7 j)</span></div></div>
-        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button> <button class="ghost" onclick="nav('backups',null)">Sauvegardes</button></div>
+        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button> <button class="ghost" onclick="nav('backups',null)">Sauvegardes</button> <button class="ghost" onclick="nav('global',null)">Rapports globaux</button></div>
       <div class="card"><h2>Mon compte</h2><button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('audit')">Journal d'audit</button></div>
       <div class="card" style="border-color:var(--danger)"><h2>Mode test</h2><p class="muted">Supprime tous les clients et toutes les licences de test. Le journal d'audit est conservé.</p><button class="ghost" style="color:var(--danger)" onclick="nav('reset')">Tout réinitialiser (mode test)</button></div>`;
     drawList();
@@ -349,6 +349,21 @@ async function screenReports() {
       ${dateBar('RP_F', RP_F, 'screenReports')} <button class="ghost" onclick="RP_ROWS&&dlCsv('signalements', ['Date','Client','Utilisateur','Rôle','Écran','Message','Statut'], RP_ROWS.map((r) => [new Date(r.reported_at).toLocaleString('fr-FR'), r.client_name, r.user_name, r.role, r.screen, r.message, r.status]))">Exporter (CSV)</button>
       ${rows.length ? `<table>${rows.map((r) => `<tr><td>${esc(new Date(r.reported_at).toLocaleString('fr-FR'))}<br><b>${esc(r.client_name)}</b></td><td><b>${esc(r.user_name || '—')}</b> <span class="muted">${esc(r.role || '')}</span><br>${esc(r.screen || '')}</td><td>${esc(r.message || '—')}<br><span class="muted">${esc(r.context || '')}</span></td>
         <td><select onchange="setReport(${r.id}, this.value)">${Object.keys(lab).map((k) => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${lab[k]}</option>`).join('')}</select></td></tr>`).join('')}</table>` : '<p class="muted">Aucun signalement.</p>'}</div>`;
+  } catch (e) { fail(e); }
+}
+let GL_F = { from: '', to: '', folder: '' }, GL_ROWS = null;
+async function screenGlobal() {
+  try {
+    const qs = new URLSearchParams(); ['from', 'to', 'folder'].forEach((k) => GL_F[k] && qs.set(k, GL_F[k]));
+    const rows = await api('/api/global?' + qs); GL_ROWS = rows;
+    const folders = [...new Set((CL.length ? CL : await api('/api/clients')).map((c) => c.folder).filter(Boolean))].sort();
+    const sum = (k) => rows.reduce((t, r) => t + r[k], 0);
+    const kp = [['Clients', rows.length], ['Appareils', sum('devices')], ['Signalements', sum('reports')], ['Erreurs serveur', sum('errors')], ['E-mails envoyés', sum('mails_sent')], ['Envois en échec', sum('mails_failed')]];
+    v.innerHTML = `<div class="card">${bar('Rapports globaux')}<p class="muted">Vue consolidée de tous les clients, remontée automatiquement par les installations. Les dates filtrent signalements, erreurs et e-mails.</p>
+      <select onchange="GL_F.folder=this.value;screenGlobal()"><option value="">Tous les dossiers</option>${folders.map((f) => `<option ${GL_F.folder === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select>
+      ${dateBar('GL_F', GL_F, 'screenGlobal')} <button class="ghost" onclick="GL_ROWS&&dlCsv('rapports-globaux', ['Client','Dossier','Sous-dossier','Pays','Licences','Appareils','Appareils bloqués','Signalements','Erreurs','Signalements ouverts','E-mails envoyés','E-mails en échec','Dernier contact','Version'], GL_ROWS.map((r) => [r.name, r.folder, r.subfolder, r.country, r.licenses, r.devices, r.devices_blocked, r.reports, r.errors, r.reports_open, r.mails_sent, r.mails_failed, r.last_contact ? new Date(r.last_contact).toLocaleString('fr-FR') : '', r.app_version]))">Exporter (CSV)</button>
+      <div class="grid">${kp.map((k) => `<div class="kpi"><b>${k[1]}</b><span>${k[0]}</span></div>`).join('')}</div>
+      <div style="overflow:auto"><table><tr><th>Client</th><th>App.</th><th>Signal.</th><th>Erreurs</th><th>E-mails</th><th>Dernier contact</th></tr>${rows.map((r) => `<tr><td><b>${esc(r.name)}</b><br><span class="muted">${esc([r.folder, r.subfolder].filter(Boolean).join(' / '))}</span></td><td>${r.devices}${r.devices_blocked ? ` <span class="muted">(${r.devices_blocked} bloqué(s))</span>` : ''}</td><td>${r.reports}${r.reports_open ? ` <b style="color:var(--danger,#C0504D)">(${r.reports_open} ouvert(s))</b>` : ''}</td><td>${r.errors}</td><td>${r.mails_sent}${r.mails_failed ? ` <b style="color:var(--danger,#C0504D)">/ ${r.mails_failed} échec(s)</b>` : ''}</td><td>${r.last_contact ? esc(new Date(r.last_contact).toLocaleString('fr-FR')) : '—'}${r.app_version ? '<br><span class="muted">v' + esc(r.app_version) + '</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Aucun client.</td></tr>'}</table></div></div>`;
   } catch (e) { fail(e); }
 }
 async function screenBackups() {
