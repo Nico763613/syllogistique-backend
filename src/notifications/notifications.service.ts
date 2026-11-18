@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
 // Centre de notifications : génère les alertes du cahier des charges §27
@@ -19,14 +19,49 @@ export class NotificationsService {
               ...(actor.siteId ? [{ OR: [{ siteId: null }, { siteId: actor.siteId }] }] : []),
             ],
           };
-    return this.prisma.notification.findMany({
-      where: { ...(unreadOnly ? { isRead: false } : {}), ...scope },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
+    return this.prisma.notification
+      .findMany({
+        where: { ...(unreadOnly ? { isRead: false } : {}), ...scope },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      })
+      .then((list) => (actor ? list.filter((n) => NotificationsService.relevantFor(actor.role, n)) : list).slice(0, 100));
   }
 
-  markRead(id: string) {
+  // Pertinence métier des alertes générales (sans destinataire) : chaque rôle ne voit que ce qui le concerne.
+  // Une alerte adressée nommément à un rôle ou à un utilisateur reste toujours visible ; entité inconnue = visible (rien n'est masqué par erreur).
+  private static readonly AUDIENCE: Record<string, string[]> = {
+    Driver: ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'RESPONSABLE_OPERATIONS', 'GESTIONNAIRE_HSE', 'AGENT_HSE', 'DIRECTEUR_GENERAL'],
+    DriverDevice: ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    DriverSignup: ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    Vehicle: ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'RESPONSABLE_OPERATIONS', 'MECANICIEN', 'GESTIONNAIRE_HSE', 'DIRECTEUR_GENERAL'],
+    InventoryItem: ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'RESPONSABLE_OPERATIONS', 'MAGASINIER', 'COMPTABLE', 'DIRECTEUR_GENERAL'],
+    InventoryCount: ['MAGASINIER', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS', 'COMPTABLE', 'DIRECTEUR_GENERAL'],
+    HseIncident: ['GESTIONNAIRE_HSE', 'AGENT_HSE', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    HseInspection: ['GESTIONNAIRE_HSE', 'AGENT_HSE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    HseCorrectiveAction: ['GESTIONNAIRE_HSE', 'AGENT_HSE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    HseTraining: ['GESTIONNAIRE_HSE', 'AGENT_HSE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    HseToolboxTalk: ['GESTIONNAIRE_HSE', 'AGENT_HSE', 'RESPONSABLE_OPERATIONS', 'DIRECTEUR_GENERAL'],
+    Expense: ['COMPTABLE', 'RESPONSABLE_OPERATIONS', 'ADMIN_LOGISTIQUE', 'DIRECTEUR_GENERAL'],
+    DriverExpense: ['COMPTABLE', 'RESPONSABLE_OPERATIONS', 'ADMIN_LOGISTIQUE', 'DIRECTEUR_GENERAL'],
+    FuelTransaction: ['COMPTABLE', 'RESPONSABLE_OPERATIONS', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'DIRECTEUR_GENERAL'],
+    CashSession: ['CAISSIER', 'RESPONSABLE_COMMERCIAL', 'COMPTABLE', 'DIRECTEUR_GENERAL'],
+    CashExpense: ['CAISSIER', 'RESPONSABLE_COMMERCIAL', 'COMPTABLE', 'DIRECTEUR_GENERAL'],
+    Customer: ['RESPONSABLE_COMMERCIAL', 'COMPTABLE', 'DIRECTEUR_GENERAL'],
+  };
+
+  static relevantFor(role: string, n: { roleName?: string | null; userId?: string | null; entity?: string | null }) {
+    if (role === 'SUPER_ADMIN' || n.roleName || n.userId || !n.entity) return true;
+    const aud = NotificationsService.AUDIENCE[n.entity];
+    return !aud || aud.includes(role);
+  }
+
+  // Marquer « lu » : seulement une alerte que l'utilisateur est autorisé à voir (aucune modification des alertes d'autres rôles).
+  async markRead(id: string, actor?: { role: string; siteId?: string }) {
+    if (actor && actor.role !== 'SUPER_ADMIN') {
+      const visible = await this.findAll(false, actor);
+      if (!visible.some((n) => n.id === id)) throw new ForbiddenException('Alerte non accessible.');
+    }
     return this.prisma.notification.update({ where: { id }, data: { isRead: true } });
   }
 
