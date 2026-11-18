@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { TransferStockDto, CorrectStockMovementDto, CreateInventoryItemDto, StockInDto, StockOutDto, UpdateInventoryItemDto } from './dto/inventory.dto';
 import { getIssuer } from '../common/issuer';
-import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN } from '../common/pdf-doc';
+import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN, orgLogo } from '../common/pdf-doc';
 import { alertStockThresholds } from '../common/stock-alerts';
 
 @Injectable()
@@ -384,7 +384,7 @@ export class InventoryService {
     const issuer = await getIssuer(this.prisma, userId);
     const d = (v?: string) => (v ? new Date(v).toLocaleDateString('fr-FR') : '');
 
-    const { doc, done } = startDoc(site.organization?.name ?? 'SYL LOGISTIQUE', 'BON DE SORTIE / LIVRAISON');
+    const { doc, done } = startDoc(site.organization?.name ?? 'SYL LOGISTIQUE', 'BON DE SORTIE / LIVRAISON', await orgLogo(this.prisma));
     keyValues(doc, [
       ['Site', site.name],
       ['Période', params.from || params.to ? `${d(params.from) || '…'} au ${d(params.to) || '…'}` : 'Toutes les sorties récentes'],

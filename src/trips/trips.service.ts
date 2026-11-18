@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { getIssuer } from '../common/issuer';
-import { startDoc, keyValues, signatures, NAVY } from '../common/pdf-doc';
+import { startDoc, keyValues, signatures, NAVY, orgLogo } from '../common/pdf-doc';
 import { CreateTripDto, CloseTripDto, CorrectTripDto } from './dto/trip.dto';
 
 @Injectable()
@@ -200,7 +200,7 @@ export class TripsService {
     const liters = fuel.reduce((s, f) => s + Number(f.quantityLiters), 0);
     const hm = (d?: Date | null) => (d ? new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '');
 
-    const { doc, done } = startDoc(trip.site.organization?.name ?? 'SYL LOGISTIQUE', 'FICHE DE BORD');
+    const { doc, done } = startDoc(trip.site.organization?.name ?? 'SYL LOGISTIQUE', 'FICHE DE BORD', await orgLogo(this.prisma));
     keyValues(doc, [
       ['Date', new Date(trip.tripDate).toLocaleDateString('fr-FR')],
       ['Site', trip.site.name],
