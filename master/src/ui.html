@@ -187,7 +187,13 @@ function drawList() {
   $('chips').innerHTML = FILTERS.map(([k, t]) => `<button class="ghost ${FS === k ? 'on' : ''}" onclick="FS='${k}';drawList()">${t}</button>`).join('');
   const q = FQ.trim().toLowerCase();
   const list = CL.filter((c) => (FS === 'all' || (FS === 'RENEW' ? renewIds().has(c.id) : clientState(c) === FS)) && (!q || [c.name, c.contact_name, c.email, c.phone, c.country].join(' ').toLowerCase().includes(q)));
-  $('cl').innerHTML = list.map(clientCard).join('') || `<p class="muted">${CL.length ? 'Aucun client ne correspond.' : 'Aucun client pour le moment.'}</p>`;
+  if (!list.length) { $('cl').innerHTML = `<p class="muted">${CL.length ? 'Aucun client ne correspond.' : 'Aucun client pour le moment.'}</p>`; return; }
+  if (!CL.some((c) => c.folder)) { $('cl').innerHTML = list.map(clientCard).join(''); return; }
+  // Vue par dossiers et sous-dossiers (les clients sans dossier restent visibles en bas)
+  const by = {}; list.forEach((c) => { const f = c.folder || 'Sans dossier', sf = c.folder ? c.subfolder || '' : ''; ((by[f] = by[f] || {})[sf] = by[f][sf] || []).push(c); });
+  const names = Object.keys(by).sort((a, b) => (a === 'Sans dossier') - (b === 'Sans dossier') || a.localeCompare(b));
+  $('cl').innerHTML = names.map((f) => { const subs = by[f], n = Object.values(subs).reduce((t, x) => t + x.length, 0);
+    return `<details open style="margin-bottom:10px"><summary style="cursor:pointer;font-weight:700;color:var(--navy);padding:6px 0">${esc(f)} <span class="muted">(${n})</span></summary>${Object.keys(subs).sort().map((sf) => (sf ? `<div style="margin:6px 0 4px 10px;font-weight:600">${esc(sf)} <span class="muted">(${subs[sf].length})</span></div>` : '') + `<div style="${sf ? 'margin-left:10px' : ''}">${subs[sf].map(clientCard).join('')}</div>`).join('')}</details>`; }).join('');
 }
 function clientCard(c) {
   const st = clientState(c);
@@ -210,6 +216,8 @@ function screenClient(id) {
   v.innerHTML = `<div class="card">${bar(c ? 'Modifier le client' : 'Nouveau client')}
     <label>Nom du client *</label><input id="n1" value="${esc(c && c.name)}"><label>Contact</label><input id="n2" value="${esc(c && c.contact_name)}"><label>Téléphone</label><input id="n3" value="${esc(c && c.phone)}"><label>E-mail</label><input id="n4" value="${esc(c && c.email)}"><label>Pays</label><input id="n5" value="${esc(c && c.country)}">
     <label>Couleur (ex. #1E7B4B)</label><input id="n6" placeholder="#163A5F" value="${esc(c && c.brand_color)}">
+    <label>Dossier (ex. Mines, Transport, Distribution)</label><input id="n7" list="dl-fo" value="${esc(c && c.folder)}"><datalist id="dl-fo">${[...new Set(CL.map((x) => x.folder).filter(Boolean))].map((f) => `<option value="${esc(f)}">`).join('')}</datalist>
+    <label>Sous-dossier (facultatif)</label><input id="n8" list="dl-sf" value="${esc(c && c.subfolder)}"><datalist id="dl-sf">${[...new Set(CL.map((x) => x.subfolder).filter(Boolean))].map((f) => `<option value="${esc(f)}">`).join('')}</datalist>
     ${c ? `<label>Logo du client (PNG ou JPEG)</label>${c.logo_url ? `<img src="/logo/${c.id}.png?t=${Date.now()}" alt="" style="height:56px;display:block;margin:6px 0">` : ""}<input id="lg-file" type="file" accept="image/png,image/jpeg" onchange="uploadLogo(${c.id})"> ${c.logo_url ? `<button class="ghost" onclick="removeLogo(${c.id})">Retirer le logo</button>` : ""}<div style="font-size:12px;color:var(--muted);margin-top:4px">Le logo est envoyé à l'application du client dès que le paiement de sa licence est confirmé.</div>` : '<div style="font-size:12px;color:var(--muted);margin-top:8px">Enregistrez le client, puis ajoutez son logo.</div>'}
     <div class="err" id="err"></div><button onclick="saveClient(${c ? c.id : 'null'})">Enregistrer</button> <button class="ghost" onclick="back()">Annuler</button></div>`;
 }
@@ -235,7 +243,7 @@ async function uploadLogo(id) {
   try { await api('/api/clients/' + id + '/logo', { dataUrl: await fileToLogo(f) }); CL = await api('/api/clients'); screenClient(id); } catch (e) { fail(e); }
 }
 async function removeLogo(id) { if (!confirm('Retirer le logo de ce client ?')) return; try { await api('/api/clients/' + id + '/logo', { dataUrl: '' }); CL = await api('/api/clients'); screenClient(id); } catch (e) { fail(e); } }
-async function saveClient(id) { try { await api(id ? '/api/clients/' + id : '/api/clients', { name: n1.value, contactName: n2.value, phone: n3.value, email: n4.value, country: n5.value, brandColor: n6.value }); showHome(); } catch (e) { fail(e); } }
+async function saveClient(id) { try { const r = await api(id ? '/api/clients/' + id : '/api/clients', { name: n1.value, contactName: n2.value, phone: n3.value, email: n4.value, country: n5.value, brandColor: n6.value }); await api('/api/clients/' + (id || r.id) + '/folder', { folder: n7.value, subfolder: n8.value }); showHome(); } catch (e) { fail(e); } }
 
 /* ---------- durée de licence (menu + date avec année bien visible) ---------- */
 const DURS = [['14d', 'Essai 14 jours'], ['3m', '3 mois'], ['6m', '6 mois'], ['1y', '1 an'], ['perm', 'Permanente'], ['custom', 'Date personnalisée']];

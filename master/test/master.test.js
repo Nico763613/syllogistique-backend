@@ -107,6 +107,9 @@ test('clients et licences : création, activation unique, jeton signé, suspensi
   assert.equal((await call('POST', '/api/clients', { name: '  ' })).status, 400);
   const cl = await call('POST', '/api/clients', { name: 'Transports Diallo', country: 'Guinée', brandColor: '#1a7f37', email: 'a@b.c' });
   assert.equal(cl.status, 200);
+  assert.equal((await call('POST', `/api/clients/${cl.json.id}/folder`, { folder: 'Transport', subfolder: 'Conakry' })).status, 200, 'classement en dossier');
+  assert.equal((await call('POST', '/api/clients/999999/folder', { folder: 'X' })).status, 404);
+  const fl = (await call('GET', '/api/clients')).json.find((x) => x.id === cl.json.id); assert.equal(fl.folder, 'Transport'); assert.equal(fl.subfolder, 'Conakry');
   assert.equal((await call('POST', `/api/clients/${cl.json.id}/licenses`, { permanent: false })).status, 400, 'date requise');
   assert.equal((await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: '2001-01-01' })).status, 400, 'date passée refusée');
   const lic = await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: new Date(Date.now() + 86400000 * 30).toISOString(), maxDevices: 20 });
