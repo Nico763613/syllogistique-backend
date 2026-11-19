@@ -3863,10 +3863,21 @@ async function loadUsersPanel() {
     const users = await api('/users');
     const opts = (cur) => ['', 'LOGISTIQUE', 'CARBURANT', 'STOCK', 'RH']
       .map(d => `<option value="${d}" ${(cur || '') === d ? 'selected' : ''}>${d ? deptLabel(d) : 'Tous (sans restriction)'}</option>`).join('');
-    body.innerHTML = `<table><thead><tr><th>Nom</th><th>Rôle</th><th>Département</th></tr></thead><tbody>${users.map(u => `
+    body.innerHTML = `<table><thead><tr><th>Nom</th><th>Rôle</th><th>Département</th><th>Session</th></tr></thead><tbody>${users.map(u => `
       <tr><td>${esc(u.firstName)} ${esc(u.lastName)}</td><td>${roleLabel(u.role.name)}</td>
-      <td>${u.role.name === 'SUPER_ADMIN' ? 'Accès global' : `<select onchange="setUserDepartment('${esc(u.id)}', this.value)">${opts(u.department)}</select>`}</td></tr>`).join('')}</tbody></table>`;
+      <td>${u.role.name === 'SUPER_ADMIN' ? 'Accès global' : `<select onchange="setUserDepartment('${esc(u.id)}', this.value)">${opts(u.department)}</select>`}</td>
+      <td>${u.id === (state.user && state.user.id) ? '—' : `<button class="btn small" onclick="revokeUserSessions('${esc(u.id)}')">Déconnecter</button>`}</td></tr>`).join('')}</tbody></table>${state.user && state.user.role === 'SUPER_ADMIN' ? `<div style="margin-top:12px"><button class="btn" onclick="revokeAllSessions()">Déconnecter tous les appareils</button><div class="desc" style="margin-top:4px">Ferme les sessions de tous les utilisateurs, sauf la vôtre. Aucun compte ni donnée n'est touché.</div></div>` : ''}`;
   } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function revokeUserSessions(id) {
+  const msg = document.getElementById('u-msg');
+  if (!confirm('Déconnecter cet utilisateur ? Son compte et ses données restent intacts.')) return;
+  try { const r = await api('/users/' + id + '/revoke-sessions', { method: 'POST' }); msg.innerHTML = `<div class="msg ok">${esc(r.message)}</div>`; } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function revokeAllSessions() {
+  const msg = document.getElementById('u-msg');
+  if (!confirm('Déconnecter tous les utilisateurs (sauf vous) ? Aucun compte ni donnée ne sera supprimé.')) return;
+  try { const r = await api('/users/revoke-all-sessions', { method: 'POST' }); msg.innerHTML = `<div class="msg ok">${esc(r.message)}</div>`; } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function setUserDepartment(id, value) {
   const msg = document.getElementById('u-msg');
