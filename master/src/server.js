@@ -303,7 +303,20 @@ function createApp(pool, cfg) {
         devicesBlocked: await q('select count(*) n from master_devices where blocked'),
         mailsFailed7d: await q("select count(*) n from master_mails where status='FAILED' and at > now() - interval '7 days'"),
         errors7d: await q("select count(*) n from master_reports where role='SYSTEM' and reported_at > now() - interval '7 days'"),
+        dbMb: Math.round((await q('select pg_database_size(current_database()) n')) / 104857.6) / 10,
+        version: (() => { try { return require('../package.json').version; } catch (e) { return null; } })(),
       });
+    }
+
+    // Activité réelle des installations clients, jour par jour (licences créées, e-mails envoyés, signalements reçus)
+    if (req.method === 'GET' && p === '/api/activity') {
+      const days = Math.min(90, Math.max(7, Number(url.searchParams.get('days')) || 30));
+      const { rows } = await pool.query(`select to_char(d::date,'YYYY-MM-DD') as day,
+        (select count(*) from master_licenses where created_at::date = d::date) as licenses,
+        (select count(*) from master_mails where at::date = d::date) as mails,
+        (select count(*) from master_reports where reported_at::date = d::date) as reports
+        from generate_series(current_date - ($1::int - 1), current_date, interval '1 day') d order by d`, [days]);
+      return send(res, 200, rows.map((r) => ({ day: r.day, licenses: Number(r.licenses), mails: Number(r.mails), reports: Number(r.reports) })));
     }
 
     // ---------- clients et licences ----------

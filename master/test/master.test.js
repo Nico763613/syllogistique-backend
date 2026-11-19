@@ -105,6 +105,10 @@ test('clients et licences : création, activation unique, jeton signé, suspensi
   const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
   cookie = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
   assert.equal((await call('POST', '/api/clients', { name: '  ' })).status, 400);
+  // Tableau de bord : activité réelle sur la période et indicateurs de base de données
+  const actv = await call('GET', '/api/activity?days=7'); assert.equal(actv.status, 200); assert.equal(actv.json.length, 7);
+  assert.ok(actv.json.every((r) => /^\d{4}-\d{2}-\d{2}$/.test(r.day) && Number.isInteger(r.licenses) && Number.isInteger(r.mails) && Number.isInteger(r.reports)));
+  const ov = await call('GET', '/api/overview'); assert.equal(ov.status, 200); assert.ok(ov.json.dbMb > 0);
   const cl = await call('POST', '/api/clients', { name: 'Transports Diallo', country: 'Guinée', brandColor: '#1a7f37', email: 'a@b.c' });
   assert.equal(cl.status, 200);
   assert.equal((await call('POST', `/api/clients/${cl.json.id}/folder`, { folder: 'Transport', subfolder: 'Conakry' })).status, 200, 'classement en dossier');

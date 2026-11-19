@@ -40,11 +40,95 @@
   .big{font-size:20px;letter-spacing:1px;text-align:center;display:block;padding:12px 8px;margin:10px 0}
   .spin{width:34px;height:34px;border:4px solid var(--line);border-top-color:var(--gold);border-radius:50%;animation:sp 1s linear infinite;margin:10px auto}
   @keyframes sp{to{transform:rotate(360deg)}}
+  /* ===== Habillage « centre de commandement » ===== */
+  :root{--blue:#2F5FA7;--side:#0B1F3A}
+  .shell{display:flex;min-height:100vh}
+  .sb{width:248px;flex:none;background:linear-gradient(180deg,#0B1F3A,#0A2A4D);color:#fff;display:flex;flex-direction:column;padding:14px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;z-index:20}
+  .sb-logo{background:#fff;border-radius:12px;padding:8px 10px;margin-bottom:14px;display:flex;justify-content:center}
+  .sb-logo img{width:100%;max-width:190px;height:auto;display:block}
+  .sb a.it{display:flex;align-items:center;gap:10px;color:#DCE6F5;text-decoration:none;padding:10px 12px;border-radius:9px;font-size:14px;cursor:pointer;margin-bottom:2px}
+  .sb a.it:hover{background:rgba(255,255,255,.08)} .sb a.it.on{background:var(--blue);color:#fff;font-weight:600}
+  .sb a.it svg{flex:none} .sb a.it .ch{margin-left:auto;opacity:.6}
+  .sb h6{margin:14px 12px 6px;font-size:11px;letter-spacing:.8px;text-transform:uppercase;color:#8FA6C6;font-weight:600}
+  .sb hr{border:0;border-top:1px solid rgba(255,255,255,.12);margin:10px 4px}
+  .sb button#out{background:#C0392B;width:100%;margin-top:auto;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600}
+  .mainwrap{flex:1;min-width:0;display:flex;flex-direction:column}
+  .topbar{background:linear-gradient(90deg,#0B1F3A,#0E2F57);color:#fff;display:flex;align-items:center;gap:14px;padding:10px 20px;position:sticky;top:0;z-index:15}
+  .topbar .ttl{flex:1;min-width:0;border-left:1px solid rgba(255,255,255,.25);padding-left:14px}
+  .topbar .ttl b{font-size:20px;letter-spacing:.3px;display:flex;align-items:center;gap:8px} .topbar .ttl small{color:#C8D6EC;font-size:12.5px;display:block}
+  .topbar .tb{background:none;border:0;margin:0;padding:8px;color:#fff;border-radius:9px;display:inline-flex;position:relative;cursor:pointer}
+  .topbar .tb:hover{background:rgba(255,255,255,.1)}
+  .topbar .cnt{position:absolute;top:0;right:0;background:#E5484D;color:#fff;border-radius:99px;font-size:11px;min-width:17px;height:17px;line-height:17px;text-align:center;font-weight:700;padding:0 4px}
+  .me{display:flex;align-items:center;gap:8px;font-size:12.5px;line-height:1.2} .me .av{width:38px;height:38px;border-radius:50%;background:#C9A24D;color:#0B1F3A;display:flex;align-items:center;justify-content:center;font-weight:800}
+  #menu{display:none}
+  main#v{max-width:860px;width:100%;margin:0 auto;padding:18px 16px;flex:1} main#v.wide{max-width:1240px}
+  .foot{background:#0B1F3A;color:#C8D6EC;font-size:12.5px;display:flex;gap:14px;align-items:center;justify-content:space-between;padding:12px 20px;flex-wrap:wrap}
+  .foot i{opacity:.9} .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#2BB673;margin-right:6px}
+  body.guest .sb,body.guest .topbar,body.guest .foot{display:none} body.guest main#v{max-width:560px}
+  .ban{position:relative;overflow:hidden;border-radius:14px;background:linear-gradient(100deg,#0B1F3A 0%,#12365F 55%,#C9742B 135%);color:#fff;padding:22px 24px;min-height:150px;box-shadow:0 6px 18px rgba(11,31,58,.18);margin-bottom:16px}
+  .ban .pillw{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.14);border-radius:99px;padding:5px 12px;font-size:12.5px}
+  .ban h1{margin:10px 0 2px;font-size:30px;line-height:1.1} .ban p{margin:0;font-size:17px;color:#DCE6F5}
+  .ban .tag{position:absolute;right:18px;bottom:10px;font-style:italic;font-size:12.5px;color:#E6EEF9} .ban svg.art{position:absolute;right:0;bottom:0;height:100%;max-width:60%}
+  .ban .tx{position:relative;z-index:1}
+  .kp6{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
+  .kc{border-radius:13px;padding:14px 10px;text-align:center;cursor:pointer;border:1px solid rgba(0,0,0,.06);box-shadow:0 2px 8px rgba(22,35,58,.06);transition:transform .12s}
+  .kc:hover{transform:translateY(-2px)} .kc svg{display:block;margin:0 auto 6px} .kc b{display:block;font-size:30px;line-height:1.1;color:#16233A} .kc span{font-size:13px;color:#33435A}
+  .c-blue{background:linear-gradient(160deg,#EAF1FF,#D9E6FB);color:#2F5FA7} .c-green{background:linear-gradient(160deg,#E7F7EE,#D3F0DF);color:#1E7B4B}
+  .c-purple{background:linear-gradient(160deg,#F1EAFE,#E3D8FA);color:#6B3FC4} .c-orange{background:linear-gradient(160deg,#FFF1E0,#FFE2C2);color:#D9731A}
+  .c-red{background:linear-gradient(160deg,#FFECEC,#FFD8D8);color:#D0393E} .c-cyan{background:linear-gradient(160deg,#E4F8FB,#CDEFF5);color:#1496AB} .c-indigo{background:linear-gradient(160deg,#E9ECFB,#D6DBF6);color:#2A3A9C}
+  .two{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;margin-bottom:16px} .two > .card{margin:0}
+  .al{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer} .al:last-child{border:0}
+  .al .ico{flex:none;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff}
+  .al .t{flex:1;font-size:13.5px;line-height:1.3} .al .d{font-size:12px;color:var(--muted);white-space:nowrap}
+  .sp8{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .sp{border-radius:13px;padding:14px 12px;text-align:center;border:1px solid rgba(0,0,0,.06);box-shadow:0 2px 8px rgba(22,35,58,.06);cursor:pointer;display:flex;flex-direction:column;align-items:center}
+  .sp .ib{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;margin-bottom:8px} .sp b{font-size:15px;color:#16233A} .sp small{font-size:12.5px;color:#4A5A72;margin:4px 0 10px;min-height:32px}
+  .sp .go{background:#0B2A55;color:#fff;border-radius:8px;padding:6px 16px;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+  .stbar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;background:linear-gradient(90deg,#EAF1FF,#E7F7EE);border:1px solid var(--line);border-radius:13px;padding:12px 16px;margin-bottom:6px}
+  .stbar .ok{background:#1E9E5A;color:#fff;border-radius:99px;padding:3px 12px;font-size:12.5px;font-weight:700}
+  .stbar .cell{display:flex;gap:8px;align-items:center;font-size:12.5px;color:#33435A;border-left:1px solid #C7D3E6;padding-left:16px}
+  h3.sec{display:flex;gap:8px;align-items:center;margin:4px 0 10px;font-size:17px;color:var(--navy)}
+  @media(max-width:1180px){.kp6{grid-template-columns:repeat(3,1fr)} .sp8{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:980px){
+    .sb{position:fixed;left:0;top:0;transform:translateX(-102%);transition:transform .2s;box-shadow:0 0 30px rgba(0,0,0,.4)} body.sb-open .sb{transform:none}
+    body.sb-open::after{content:"";position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:19} #menu{display:inline-flex}
+    .two{grid-template-columns:1fr}
+  }
+  @media(max-width:640px){
+    .topbar{padding:8px 10px;gap:6px} .topbar .ttl{padding-left:8px} .topbar .ttl b{font-size:15px} .topbar .ttl small{display:none} .me span{display:none} #fs{display:none}
+    .ban{padding:16px} .ban h1{font-size:22px} .ban p{font-size:14px} .ban svg.art{opacity:.35} .ban .tag{display:none}
+    .kp6{grid-template-columns:repeat(2,1fr);gap:10px} .kc b{font-size:26px} .sp8{gap:10px} .sp small{min-height:0} .stbar .cell{border:0;padding:0}
+    .foot{justify-content:center;text-align:center} main#v{padding:12px 10px}
+  }
 </style>
 </head>
-<body>
-<header><div style="display:flex;align-items:center;gap:10px"><span style="background:#fff;border-radius:8px;padding:2px;display:inline-flex"><img src="/master-sm.webp" alt="MASTER ADMIN" style="height:38px;width:38px;object-fit:cover;border-radius:6px;display:block"></span><div><b>SYL MASTER ADMIN</b><small>Administration générale · accès privé</small></div></div><button id="out" class="ghost" style="display:none;margin:0;color:#fff;border-color:#3b5877" onclick="logout()">Déconnexion</button></header>
-<main id="v"></main>
+<body class="guest">
+<div class="shell">
+  <aside class="sb" id="sb" aria-label="Navigation">
+    <div class="sb-logo"><img src="/logo-syl.png" alt="SYL LOGISTIQUE"></div>
+    <div id="sbnav"></div>
+    <h6>Outils</h6>
+    <a class="it" onclick="exportBox()"><span data-ic="download"></span> Export CSV</a>
+    <a class="it" onclick="nav('global')"><span data-ic="chart"></span> Rapports</a>
+    <hr><h6>Administration</h6>
+    <a class="it" onclick="nav('password')"><span data-ic="lock"></span> Changer mot de passe</a>
+    <a class="it" onclick="nav('audit')"><span data-ic="list"></span> Journal d'audit</a>
+    <button id="out" onclick="logout()" style="display:none"><span data-ic="power"></span> Déconnexion</button>
+  </aside>
+  <div class="mainwrap">
+    <div class="topbar">
+      <button class="tb" id="menu" onclick="document.body.classList.toggle('sb-open')" aria-label="Menu"><span data-ic="menu" data-s="24"></span></button>
+      <div class="ttl"><b>SYL MASTER ADMIN <svg width="22" height="22" viewBox="0 0 24 24" fill="#E0A72E" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></svg></b><small>Centre de Commandement de SYL LOGISTIQUE</small></div>
+      <button class="tb" id="bellb" onclick="bellGo()" aria-label="Alertes"><span data-ic="bell" data-s="24"></span><span class="cnt" id="bellc" style="display:none"></span></button>
+      <button class="tb" id="fs" onclick="toggleFs()" aria-label="Plein écran"><span data-ic="max" data-s="22"></span></button>
+      <div class="me"><div class="av" id="avt">MS</div><span>Bonjour,<br><b>M. SYLLA</b></span></div>
+    </div>
+    <main id="v" class="wide"></main>
+    <div class="foot"><span><b>SYL LOGISTIQUE</b> © <span id="yr"></span> — Tous droits réservés</span><i>Ensemble, bâtissons une logistique plus moderne et plus performante</i><span><span id="ver"></span> <span class="dot" id="onl"></span><span id="onlt">En ligne</span></span></div>
+  </div>
+</div>
+
+
 <div id="modal"></div>
 <script>
 const v = document.getElementById('v');
@@ -65,7 +149,8 @@ function back() { if (history.state && history.state.r && history.state.r !== 'h
 window.addEventListener('popstate', (e) => { closeModal(); if (LOGGED) render(e.state || { r: 'home' }); });
 function render(st) {
   window.scrollTo(0, 0);
-  const f = { home: showHome, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails, backups: screenBackups, global: screenGlobal }[st.r] || showHome;
+  if (LOGGED) { CUR = st.r; v.className = st.r === 'home' ? 'wide' : ''; paintSide(); document.body.classList.remove('sb-open'); }
+  const f = { home: showHome, clients: showClients, licences: showLicences, finance: showFinance, supervision: showSupervision, security: showSecurity, config: showConfig, client: screenClient, license: screenLicense, extend: screenExtend, devices: screenDevices, password: screenPassword, audit: screenAudit, reset: screenReset, reports: screenReports, mails: screenMails, backups: screenBackups, global: screenGlobal }[st.r] || showHome;
   return f(st.a);
 }
 const bar = (t) => `<div class="bar"><button class="back" onclick="back()" aria-label="Retour" title="Retour">←</button><h2>${esc(t)}</h2></div>`;
@@ -89,7 +174,7 @@ function codeModal(code) {
     <code class="big" id="fullcode">${esc(code)}</code>
     <button class="gold" id="cp">Copier</button> <button class="ghost" id="rt">Retour</button>`);
   $('cp').onclick = () => copyText(code, $('cp'));
-  $('rt').onclick = () => { closeModal(); showHome(); };
+  $('rt').onclick = () => { closeModal(); showClients(); };
 }
 
 /* ---------- déconnexion automatique après 15 minutes d'inactivité ---------- */
@@ -100,7 +185,7 @@ async function expired() { try { await api('/api/logout', {}); } catch (e) {} sh
 
 /* ---------- connexion ---------- */
 function showLogin(msg) {
-  LOGGED = false; clearTimeout(idleT); closeModal();
+  LOGGED = false; clearTimeout(idleT); closeModal(); document.body.classList.add('guest'); v.className = '';
   $('out').style.display = 'none';
   v.innerHTML = `<div class="card"><img src="/master.webp" alt="MASTER ADMIN" style="width:min(260px,80%);display:block;margin:0 auto 6px"><h2 style="text-align:center">SYL MASTER ADMIN</h2><div style="text-align:center;color:var(--muted);font-size:13px;margin-bottom:6px">Connexion propriétaire</div>
     <label>E-mail</label><input id="em" type="email" autocomplete="username">
@@ -152,29 +237,190 @@ function expiring() {
   const lim = Date.now() + 30 * 864e5;
   return CL.flatMap((c) => c.licenses.filter((l) => !l.permanent && l.expiresAt && ['ACTIVE', 'PENDING', 'SUSPENDED'].includes(l.effective) && new Date(l.expiresAt).getTime() < lim).map((l) => ({ c, l })));
 }
+/* ---------- habillage : icônes, barre latérale, navigation par espaces ---------- */
+const IC = {
+  home: '<path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
+  building: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4M8 6h.01M12 6h.01M16 6h.01M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M16 14h.01"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/>',
+  card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4M6 12l3-3 3 3 4-5"/>',
+  shield: '<path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/>',
+  db: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
+  cog: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  chart: '<path d="M18 20V10M12 20V4M6 20v-6"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+  power: '<path d="M18.4 6.6a9 9 0 1 1-12.8 0M12 2v10"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/>',
+  max: '<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>',
+  menu: '<path d="M3 12h18M3 6h18M3 18h18"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  check: '<circle cx="12" cy="12" r="10"/><path d="M8 12l3 3 5-6"/>',
+  alert: '<path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  file: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M16 13H8M16 17H8"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+};
+const ic = (n, s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
+function paintIcons(root) { (root || document).querySelectorAll('[data-ic]').forEach((e) => { if (!e.firstChild) e.innerHTML = ic(e.dataset.ic, Number(e.dataset.s) || 20); }); }
+const SIDE = [['home', 'Tableau de bord', 'home'], ['clients', 'Entreprises clientes', 'building'], ['licences', 'Licences & abonnements', 'key'], ['finance', 'Finance & facturation', 'card'], ['supervision', 'Supervision technique', 'monitor'], ['security', 'Sécurité & audit', 'shield'], ['backups', 'Sauvegardes & maintenance', 'db'], ['config', 'Configuration générale', 'cog']];
+const SIDE_OF = { home: 'home', clients: 'clients', client: 'clients', licences: 'licences', license: 'licences', extend: 'licences', devices: 'licences', finance: 'finance', supervision: 'supervision', reports: 'supervision', mails: 'supervision', global: 'supervision', security: 'security', audit: 'security', backups: 'backups', config: 'config', password: 'config', reset: 'config' };
+let CUR = 'home', OV = {}, ME = {};
+function paintSide() {
+  const on = SIDE_OF[CUR];
+  $('sbnav').innerHTML = SIDE.map(([r, t, i]) => `<a class="it ${r === on ? 'on' : ''}" onclick="nav('${r}')">${ic(i)} ${t}${r === 'home' ? '' : `<span class="ch">${ic('chev', 14)}</span>`}</a>`).join('');
+}
+function toggleFs() { try { document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); } catch (e) {} }
+function exportBox() {
+  document.body.classList.remove('sb-open');
+  openModal(`<h2>Export CSV</h2><p class="muted">Téléchargez la liste de vos clients ou de vos licences.</p><a class="btn" href="/api/export/clients.csv">Clients (CSV)</a> <a class="btn" href="/api/export/licenses.csv">Licences (CSV)</a><div style="margin-top:12px"><button class="ghost" onclick="closeModal()">Fermer</button></div>`);
+}
+function bellGo() { if (CUR !== 'home') nav('home'); setTimeout(() => { const e = $('alp'); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 250); }
+window.addEventListener('online', () => setOnline()); window.addEventListener('offline', () => setOnline());
+function setOnline() { const on = navigator.onLine; const d = $('onl'), t = $('onlt'); if (d) d.style.background = on ? '#2BB673' : '#E5484D'; if (t) t.textContent = on ? 'En ligne' : 'Hors connexion'; }
+
+/* ---------- chargement commun et habillage ---------- */
+async function loadAll() {
+  ME = await api('/api/me'); CL = await api('/api/clients');
+  OV = await api('/api/overview').catch(() => ({ newReports: 0, devices24h: 0, errors7d: 0, devicesBlocked: 0, mailsFailed7d: 0 }));
+  LOGGED = true; bump(); document.body.classList.remove('guest'); $('out').style.display = 'flex';
+  $('yr').textContent = new Date().getFullYear(); $('ver').textContent = OV.version ? 'v' + OV.version : ''; setOnline(); paintIcons();
+  $('avt').textContent = ((ME.email || 'M')[0] + 'S').toUpperCase();
+}
+function stage(route, wide) { CUR = route; document.body.classList.remove('sb-open'); v.className = wide ? 'wide' : ''; paintSide(); window.scrollTo(0, 0); }
+const lic = () => CL.flatMap((c) => c.licenses);
+const kc = (cls, i, n, t, on) => `<div class="kc ${cls}" onclick="${on}">${ic(i, 34)}<b>${n}</b><span>${t}</span></div>`;
+const goLic = (f) => { FS = f; nav('licences'); };
+
+/* ---------- alertes réelles ---------- */
+async function buildAlerts() {
+  const out = []; const today = fd(new Date());
+  expiring().sort((a, b) => new Date(a.l.expiresAt) - new Date(b.l.expiresAt)).forEach(({ c, l }) => {
+    const d = Math.max(0, Math.ceil((new Date(l.expiresAt) - Date.now()) / 864e5));
+    out.push({ lvl: d <= 7 ? 'red' : 'orange', t: `<b>${esc(c.name)}</b> : licence n°${l.id} expire ${d === 0 ? 'aujourd\'hui' : 'dans ' + d + ' jour' + (d > 1 ? 's' : '')}`, d: fd(l.expiresAt), go: `nav('extend',${l.id})` });
+  });
+  const lost = lic().filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length;
+  if (lost) out.push({ lvl: 'orange', t: `<b>${lost} licence(s)</b> expirée(s) ou suspendue(s)`, d: today, go: "goLic('EXPIRED')" });
+  const unpaid = lic().filter((l) => !l.paymentConfirmed && !['REVOKED', 'EXPIRED'].includes(l.effective)).length;
+  if (unpaid) out.push({ lvl: 'orange', t: `<b>${unpaid} licence(s)</b> en attente de confirmation de paiement`, d: today, go: "nav('finance')" });
+  if (OV.newReports) out.push({ lvl: 'red', t: `<b>${OV.newReports} signalement(s)</b> nouveau(x) à traiter`, d: today, go: "nav('reports')" });
+  if (OV.errors7d) out.push({ lvl: 'red', t: `<b>${OV.errors7d} erreur(s) serveur</b> remontée(s) sur 7 jours`, d: today, go: "nav('supervision')" });
+  if (OV.mailsFailed7d) out.push({ lvl: 'orange', t: `<b>${OV.mailsFailed7d} envoi(s) d'e-mail</b> en échec sur 7 jours`, d: today, go: "nav('mails')" });
+  if (OV.devicesBlocked) out.push({ lvl: 'blue', t: `<b>${OV.devicesBlocked} appareil(s)</b> bloqué(s)`, d: today, go: "nav('security')" });
+  const b = await api('/api/backups').catch(() => null);
+  if (b && b.configured && !b.error) {
+    if (b.state === 'OK') out.push({ lvl: 'blue', t: 'Sauvegarde automatique à jour', d: b.lastSuccessAt ? fd(b.lastSuccessAt) : today, go: "nav('backups')" });
+    else out.push({ lvl: 'red', t: '<b>Sauvegarde automatique</b> en retard ou en échec', d: today, go: "nav('backups')" });
+  }
+  return out;
+}
+const ALC = { red: ['#E5484D', 'alert'], orange: ['#F08A24', 'clock'], blue: ['#2F6FD6', 'info'] };
+
+/* ---------- graphique réel : activité des installations ---------- */
+async function drawChart(days) {
+  const box = $('chart'); if (!box) return;
+  let rows; try { rows = await api('/api/activity?days=' + days); } catch (e) { box.innerHTML = '<p class="muted">Activité indisponible.</p>'; return; }
+  const tot = rows.map((r) => r.licenses + r.mails + r.reports); const max = Math.max(1, ...tot);
+  const top = Math.max(4, Math.ceil(max / 4) * 4);
+  const W = 560, H = 210, L = 34, R = 10, T = 12, B = 28, n = rows.length;
+  const x = (i) => L + (n === 1 ? 0 : (i * (W - L - R)) / (n - 1)), y = (val) => T + (H - T - B) * (1 - val / top);
+  const pts = tot.map((t, i) => `${x(i).toFixed(1)},${y(t).toFixed(1)}`);
+  const grid = [0, 1, 2, 3, 4].map((k) => { const val = (top * k) / 4; return `<line x1="${L}" x2="${W - R}" y1="${y(val)}" y2="${y(val)}" stroke="#E4E9F0"/><text x="${L - 6}" y="${y(val) + 4}" text-anchor="end" font-size="11" fill="#6B7A8F">${val}</text>`; }).join('');
+  const step = Math.ceil(n / 8);
+  const lab = rows.map((r, i) => (i % step === 0 ? `<text x="${x(i)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#6B7A8F">${r.day.slice(8)}/${r.day.slice(5, 7)}</text>` : '')).join('');
+  const dots = rows.map((r, i) => `<circle cx="${x(i)}" cy="${y(tot[i])}" r="${tot[i] ? 3.5 : 0}" fill="#2F5FA7"><title>${r.day.slice(8)}/${r.day.slice(5, 7)} : ${r.licenses} licence(s) créée(s), ${r.mails} e-mail(s), ${r.reports} signalement(s)</title></circle>`).join('');
+  const sum = tot.reduce((a, b) => a + b, 0);
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Activité sur ${days} jours">${grid}${lab}<polygon points="${x(0)},${y(0)} ${pts.join(' ')} ${x(n - 1)},${y(0)}" fill="#2F5FA7" fill-opacity=".12"/><polyline points="${pts.join(' ')}" fill="none" stroke="#2F5FA7" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>${sum ? '' : '<p class="muted" style="text-align:center;margin:0">Aucune activité enregistrée sur cette période.</p>'}`;
+}
+
+/* ---------- tableau de bord ---------- */
+const TRUCK = '<svg class="art" viewBox="0 0 480 160" preserveAspectRatio="xMaxYMax meet" aria-hidden="true"><defs><linearGradient id="sk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0B1F3A" stop-opacity="0"/><stop offset="1" stop-color="#F2A04B" stop-opacity=".75"/></linearGradient></defs><rect width="480" height="160" fill="url(#sk)"/><circle cx="410" cy="70" r="26" fill="#FFD9A0" opacity=".85"/><path d="M0 140 L480 118 L480 160 L0 160Z" fill="#0A1A30"/><path d="M0 150 L480 132" stroke="#C9A24D" stroke-width="2" stroke-dasharray="14 12" opacity=".7"/><g transform="translate(150 66)"><rect x="0" y="0" width="150" height="50" rx="3" fill="#DCE6F5"/><rect x="152" y="14" width="56" height="36" rx="5" fill="#EEF3FA"/><path d="M160 18h30l12 16h-42z" fill="#3A5B8C"/><rect x="0" y="50" width="208" height="8" fill="#16233A"/><circle cx="30" cy="62" r="11" fill="#0A1A30"/><circle cx="62" cy="62" r="11" fill="#0A1A30"/><circle cx="176" cy="62" r="11" fill="#0A1A30"/><circle cx="30" cy="62" r="4" fill="#9FB2CF"/><circle cx="62" cy="62" r="4" fill="#9FB2CF"/><circle cx="176" cy="62" r="4" fill="#9FB2CF"/></g></svg>';
+const SPACES = [
+  ['global', '1. Vue générale', 'Indicateurs stratégiques et aperçu global', 'chart', 'c-blue', '#2F6FD6'], ['clients', '2. Entreprises clientes', 'Gestion complète des clients', 'users', 'c-green', '#1E9E5A'],
+  ['licences', '3. Licences et abonnements', 'Suivi et gestion des licences', 'key', 'c-purple', '#7C4DDB'], ['finance', '4. Finance et facturation', 'Paiements et échéances', 'card', 'c-orange', '#F08A24'],
+  ['supervision', '5. Supervision technique', 'État des services et incidents', 'monitor', 'c-cyan', '#1AA66B'], ['security', '6. Sécurité et audit', 'Contrôle des accès et journal', 'shield', 'c-red', '#D0393E'],
+  ['backups', '7. Sauvegardes et maintenance', 'Gestion des sauvegardes', 'db', 'c-cyan', '#1496AB'], ['config', '8. Configuration générale', 'Paramètres de la plateforme', 'cog', 'c-indigo', '#2A3A9C'],
+];
 async function showHome() {
   try {
-    const me = await api('/api/me'); CL = await api('/api/clients'); const ov = await api('/api/overview').catch(() => ({ newReports: 0, devices24h: 0, errors7d: 0, devicesBlocked: 0 })); LOGGED = true; bump();
-    $('out').style.display = 'inline-block';
-    const lics = CL.flatMap((c) => c.licenses); const act = lics.filter((l) => l.effective === 'ACTIVE').length;
-    const ex = expiring(); const lost = lics.filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length;
-    v.innerHTML = `<div class="card"><h2>Bienvenue, Monsieur SYLLA</h2><p class="muted">${esc(me.email)}</p></div>
-      ${ex.length ? `<div class="alert"><b>${ex.length} licence(s) expirent dans moins de 30 jours</b>${ex.map(({ c, l }) => `<div>${esc(c.name)} · licence n°${l.id} · ${fd(l.expiresAt)} (${Math.max(0, Math.ceil((new Date(l.expiresAt) - Date.now()) / 864e5))} j) <a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></div>`).join('')}</div>` : ''}
-      <div class="grid"><div class="kpi"><b>${CL.length}</b><span>Clients</span></div><div class="kpi"><b>${lics.length}</b><span>Licences</span></div><div class="kpi click" onclick="showFilter('ACTIVE')"><b>${act}</b><span>Actives</span></div><div class="kpi click ${ex.length ? 'warn' : ''}" onclick="showFilter('RENEW')"><b>${ex.length}</b><span>À renouveler (30 j)</span></div><div class="kpi click ${lost ? 'bad' : ''}" onclick="showFilter('EXPIRED')"><b>${lost}</b><span>Expirées / suspendues</span></div></div>
-      <div class="card" style="margin-top:14px"><h2>Clients</h2>
-        <input id="q" placeholder="Rechercher un client…" value="${esc(FQ)}" oninput="FQ=this.value;drawList()">
-        <div class="chips" id="chips"></div>
-        <div id="cl"></div>
-        <button class="gold" onclick="nav('client',null)">+ Nouveau client</button>
-        <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>
-      <div class="card"><h2>Supervision</h2><p class="muted">Ce que remontent les installations de vos clients : signalements, erreurs, appareils.</p>
-        <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${ov.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${ov.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${ov.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${ov.devicesBlocked}</b><span>Appareils bloqués</span></div><div class="kpi click" onclick="nav('mails',null)"><b>${ov.mailsFailed7d || 0}</b><span>Envois en échec (7 j)</span></div></div>
-        <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button> <button class="ghost" onclick="nav('backups',null)">Sauvegardes</button> <button class="ghost" onclick="nav('global',null)">Rapports globaux</button></div>
-      <div class="card"><h2>Mon compte</h2><button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('audit')">Journal d'audit</button></div>
-      <div class="card" style="border-color:var(--danger)"><h2>Mode test</h2><p class="muted">Supprime tous les clients et toutes les licences de test. Le journal d'audit est conservé.</p><button class="ghost" style="color:var(--danger)" onclick="nav('reset')">Tout réinitialiser (mode test)</button></div>`;
+    await loadAll(); stage('home', true);
+    const L2 = lic(); const act = L2.filter((l) => l.effective === 'ACTIVE').length; const ex = expiring().length; const lost = L2.filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length;
+    const tech = (OV.newReports || 0) + (OV.errors7d || 0);
+    v.innerHTML = `<div class="ban"><div class="tx"><span class="pillw">${ic('check', 16)} Bienvenue sur votre espace d'administration</span><h1>Bonjour, Monsieur SYLLA</h1><p>Vue globale de SYL LOGISTIQUE</p></div>${TRUCK}<span class="tag">Performance • Sécurité • Innovation</span></div>
+      <div class="kp6">${kc('c-blue', 'building', CL.length, 'Entreprises clientes', "nav('clients')")}${kc('c-green', 'key', L2.length, 'Licences émises', "goLic('all')")}${kc('c-purple', 'check', act, 'Licences actives', "goLic('ACTIVE')")}${kc('c-orange', 'clock', ex, 'À renouveler (30 j)', "goLic('RENEW')")}${kc('c-red', 'alert', tech, 'Alertes techniques', "nav('supervision')")}${kc('c-cyan', 'file', lost, 'Expirées / suspendues', "goLic('EXPIRED')")}</div>
+      <div class="two"><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h2 style="margin:0;display:flex;gap:8px;align-items:center">${ic('chart', 22)} Activité de la plateforme</h2><select id="per" style="width:auto;padding:7px 10px" onchange="drawChart(this.value)"><option value="7">7 derniers jours</option><option value="30" selected>30 derniers jours</option><option value="90">90 derniers jours</option></select></div><p class="muted" style="margin:4px 0 6px">Licences créées, e-mails envoyés et signalements reçus, jour par jour.</p><div id="chart"><div class="spin"></div></div></div>
+      <div class="card" id="alp"><h2 style="display:flex;justify-content:space-between;align-items:center">${ic('bell', 22)}&nbsp;Alertes importantes <span id="alc"></span></h2><div id="alb"><div class="spin"></div></div></div></div>
+      <h3 class="sec">${ic('grid', 22)} Nos espaces de gestion</h3>
+      <div class="sp8">${SPACES.map(([r, n, d, i, cl, col]) => `<div class="sp ${cl}" onclick="nav('${r}')"><div class="ib" style="background:${col}">${ic(i, 28)}</div><b>${n}</b><small>${d}</small><span class="go">Accéder ${ic('arrow', 14)}</span></div>`).join('')}</div>
+      <div class="stbar"><span style="display:flex;gap:10px;align-items:center;color:#1E9E5A">${ic('check', 30)}<span style="color:#16233A"><b>État général de la plateforme</b><br><small class="muted">Tous les services répondent correctement.</small></span></span><span class="ok">Opérationnel</span>
+        <span class="cell">${ic('clock', 22)}<span>Dernière mise à jour<br><b>${esc(new Date().toLocaleString('fr-FR'))}</b></span></span><span class="cell">${ic('db', 22)}<span>Base de données<br><b>${OV.dbMb != null ? OV.dbMb + ' Mo' : '—'}</b></span></span><span class="cell">${ic('shield', 22)}<span>Sécurité<br><b>Active (double authentification)</b></span></span></div>`;
+    drawChart(30);
+    const al = await buildAlerts(); const n = al.filter((a) => a.lvl !== 'blue').length;
+    $('alc').innerHTML = n ? `<span class="pill" style="background:#E5484D">${n}</span>` : '';
+    const bc = $('bellc'); if (bc) { bc.style.display = n ? 'block' : 'none'; bc.textContent = n; }
+    $('alb').innerHTML = al.length ? al.slice(0, 7).map((a) => `<div class="al" onclick="${a.go}"><span class="ico" style="background:${ALC[a.lvl][0]}">${ic(ALC[a.lvl][1], 18)}</span><span class="t">${a.t}</span><span class="d">${a.d}</span></div>`).join('') + (al.length > 7 ? `<p class="muted" style="margin:8px 0 0">+ ${al.length - 7} autre(s) alerte(s)</p>` : '') : '<p class="muted">Aucune alerte : tout est en ordre.</p>';
+  } catch (e) { showLogin(); }
+}
+
+/* ---------- espaces : chacun regroupe des fonctions déjà existantes ---------- */
+const clientsBlock = () => `<div class="card"><h2>Clients</h2>
+  <input id="q" placeholder="Rechercher un client…" value="${esc(FQ)}" oninput="FQ=this.value;drawList()"><div class="chips" id="chips"></div><div id="cl"></div>
+  <button class="gold" onclick="nav('client',null)">+ Nouveau client</button>
+  <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>`;
+async function showClients() { try { await loadAll(); stage('clients'); v.innerHTML = `<div class="card">${bar('Entreprises clientes')}<p class="muted">Tous vos clients, leurs licences et leurs appareils.</p></div>` + clientsBlock(); drawList(); } catch (e) { showLogin(); } }
+function alertBlock() {
+  const ex = expiring(); if (!ex.length) return '';
+  return `<div class="alert"><b>${ex.length} licence(s) expirent dans moins de 30 jours</b>${ex.map(({ c, l }) => `<div>${esc(c.name)} · licence n°${l.id} · ${fd(l.expiresAt)} (${Math.max(0, Math.ceil((new Date(l.expiresAt) - Date.now()) / 864e5))} j) <a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></div>`).join('')}</div>`;
+}
+async function showLicences() {
+  try {
+    await loadAll(); stage('licences'); const L2 = lic(); const act = L2.filter((l) => l.effective === 'ACTIVE').length; const ex = expiring().length; const lost = L2.filter((l) => ['EXPIRED', 'SUSPENDED'].includes(l.effective)).length; const unp = L2.filter((l) => !l.paymentConfirmed).length;
+    v.innerHTML = `<div class="card">${bar('Licences et abonnements')}<p class="muted">Durée, statut, codes d'activation et appareils de chaque licence.</p></div>${alertBlock()}
+      <div class="grid" style="margin-bottom:14px"><div class="kpi click" onclick="showFilter('all')"><b>${L2.length}</b><span>Licences émises</span></div><div class="kpi click" onclick="showFilter('ACTIVE')"><b>${act}</b><span>Actives</span></div><div class="kpi click ${ex ? 'warn' : ''}" onclick="showFilter('RENEW')"><b>${ex}</b><span>À renouveler (30 j)</span></div><div class="kpi click ${lost ? 'bad' : ''}" onclick="showFilter('EXPIRED')"><b>${lost}</b><span>Expirées / suspendues</span></div><div class="kpi ${unp ? 'warn' : ''}"><b>${unp}</b><span>Paiement non confirmé</span></div></div>` + clientsBlock();
     drawList();
   } catch (e) { showLogin(); }
 }
+async function showFinance() {
+  try {
+    await loadAll(); stage('finance'); const L2 = lic(); const live = L2.filter((l) => !['REVOKED'].includes(l.effective));
+    const paid = live.filter((l) => l.paymentConfirmed).length, unp = live.filter((l) => !l.paymentConfirmed); const perm = live.filter((l) => l.permanent).length; const shop = live.filter((l) => (l.modules || '').includes('COMMERCIAL')).length;
+    const rows = (arr) => arr.map(({ c, l }) => `<tr><td><b>${esc(c.name)}</b></td><td>n°${l.id}</td><td>${l.permanent ? 'Permanente' : fd(l.expiresAt)}</td><td>${pill(l.effective)}</td><td><a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></td></tr>`).join('');
+    const unpRows = CL.flatMap((c) => c.licenses.filter((l) => !l.paymentConfirmed && l.effective !== 'REVOKED').map((l) => ({ c, l })));
+    v.innerHTML = `<div class="card">${bar('Finance et facturation')}<p class="muted">Statut de paiement et échéances de chaque licence. Les montants et les factures ne sont pas encore suivis dans le Master : seuls le paiement confirmé ou non, et les dates d'échéance, le sont.</p>
+      <div class="grid"><div class="kpi"><b>${paid}</b><span>Paiements confirmés</span></div><div class="kpi ${unp.length ? 'warn' : ''}"><b>${unp.length}</b><span>Paiements à confirmer</span></div><div class="kpi"><b>${perm}</b><span>Licences permanentes</span></div><div class="kpi"><b>${live.length - perm}</b><span>Licences à durée limitée</span></div><div class="kpi"><b>${shop}</b><span>Avec Caisse &amp; Ventes</span></div></div></div>
+      <div class="card"><h2>Paiements à confirmer</h2>${unpRows.length ? `<div style="overflow:auto"><table><tr><th>Client</th><th>Licence</th><th>Échéance</th><th>Statut</th><th></th></tr>${rows(unpRows)}</table></div>` : '<p class="muted">Aucun paiement en attente de confirmation.</p>'}</div>
+      <div class="card"><h2>Échéances dans les 30 jours</h2>${expiring().length ? `<div style="overflow:auto"><table><tr><th>Client</th><th>Licence</th><th>Échéance</th><th>Statut</th><th></th></tr>${rows(expiring())}</table></div>` : '<p class="muted">Aucune échéance dans les 30 prochains jours.</p>'}
+      <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div>`;
+  } catch (e) { showLogin(); }
+}
+async function showSupervision() {
+  try {
+    await loadAll(); stage('supervision');
+    v.innerHTML = `<div class="card">${bar('Supervision technique')}<p class="muted">Ce que remontent les installations de vos clients : signalements, erreurs, appareils.</p>
+      <div class="grid"><div class="kpi click" onclick="nav('reports',null)"><b>${OV.newReports}</b><span>Signalements nouveaux</span></div><div class="kpi"><b>${OV.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>${OV.errors7d}</b><span>Erreurs serveur (7 j)</span></div><div class="kpi"><b>${OV.devicesBlocked}</b><span>Appareils bloqués</span></div><div class="kpi click" onclick="nav('mails',null)"><b>${OV.mailsFailed7d || 0}</b><span>Envois en échec (7 j)</span></div></div>
+      <button class="ghost" onclick="nav('reports',null)">Ouvrir les signalements</button> <button class="ghost" onclick="nav('mails',null)">Envois d'e-mails</button> <button class="ghost" onclick="nav('backups',null)">Sauvegardes</button> <button class="ghost" onclick="nav('global',null)">Rapports globaux</button></div>`;
+  } catch (e) { showLogin(); }
+}
+async function showSecurity() {
+  try {
+    await loadAll(); stage('security');
+    v.innerHTML = `<div class="card">${bar('Sécurité et audit')}<p class="muted">Contrôle des accès à la plateforme et traçabilité des actions.</p>
+      <div class="grid"><div class="kpi ${OV.devicesBlocked ? 'warn' : ''}"><b>${OV.devicesBlocked}</b><span>Appareils bloqués</span></div><div class="kpi"><b>${OV.devices24h}</b><span>Appareils connectés (24 h)</span></div><div class="kpi"><b>2FA</b><span>Double authentification active</span></div><div class="kpi"><b>15 min</b><span>Déconnexion automatique</span></div></div>
+      <button class="ghost" onclick="nav('audit')">Journal d'audit</button> <button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('global')">Appareils par client</button></div>`;
+  } catch (e) { showLogin(); }
+}
+async function showConfig() {
+  try {
+    await loadAll(); stage('config');
+    v.innerHTML = `<div class="card">${bar('Configuration générale')}<p class="muted">Compte administrateur : <b>${esc(ME.email)}</b></p><button class="ghost" onclick="nav('password')">Changer mon mot de passe</button> <button class="ghost" onclick="nav('audit')">Journal d'audit</button> <button class="ghost" onclick="exportBox()">Export CSV</button></div>
+      <div class="card" style="border-color:var(--danger)"><h2>Mode test</h2><p class="muted">Supprime tous les clients et toutes les licences de test. Le journal d'audit est conservé.</p><button class="ghost" style="color:var(--danger)" onclick="nav('reset')">Tout réinitialiser (mode test)</button></div>`;
+  } catch (e) { showLogin(); }
+}
+
 // Message de rappel de renouvellement (à coller dans WhatsApp) : rien n'est envoyé automatiquement
 function copyReminder(cid, lid) {
   const c = CL.find((x) => x.id === cid), l = c && c.licenses.find((x) => x.id === lid); if (!l) return;
@@ -243,7 +489,7 @@ async function uploadLogo(id) {
   try { await api('/api/clients/' + id + '/logo', { dataUrl: await fileToLogo(f) }); CL = await api('/api/clients'); screenClient(id); } catch (e) { fail(e); }
 }
 async function removeLogo(id) { if (!confirm('Retirer le logo de ce client ?')) return; try { await api('/api/clients/' + id + '/logo', { dataUrl: '' }); CL = await api('/api/clients'); screenClient(id); } catch (e) { fail(e); } }
-async function saveClient(id) { try { const r = await api(id ? '/api/clients/' + id : '/api/clients', { name: n1.value, contactName: n2.value, phone: n3.value, email: n4.value, country: n5.value, brandColor: n6.value }); await api('/api/clients/' + (id || r.id) + '/folder', { folder: n7.value, subfolder: n8.value }); showHome(); } catch (e) { fail(e); } }
+async function saveClient(id) { try { const r = await api(id ? '/api/clients/' + id : '/api/clients', { name: n1.value, contactName: n2.value, phone: n3.value, email: n4.value, country: n5.value, brandColor: n6.value }); await api('/api/clients/' + (id || r.id) + '/folder', { folder: n7.value, subfolder: n8.value }); showClients(); } catch (e) { fail(e); } }
 
 /* ---------- durée de licence (menu + date avec année bien visible) ---------- */
 const DURS = [['14d', 'Essai 14 jours'], ['3m', '3 mois'], ['6m', '6 mois'], ['1y', '1 an'], ['perm', 'Permanente'], ['custom', 'Date personnalisée']];
@@ -285,7 +531,7 @@ function screenExtend(id) {
   durChange();
 }
 async function saveExt(id) {
-  try { const perm = $('dur').value === 'perm'; await api(`/api/licenses/${id}/extend`, { permanent: perm, expiresAt: $('ld').value, maxDevices: $('lm').value, commercial: $('lc').checked, paid: $('lp').checked }); showHome(); } catch (e) { fail(e); }
+  try { const perm = $('dur').value === 'perm'; await api(`/api/licenses/${id}/extend`, { permanent: perm, expiresAt: $('ld').value, maxDevices: $('lm').value, commercial: $('lc').checked, paid: $('lp').checked }); showClients(); } catch (e) { fail(e); }
 }
 
 /* ---------- appareils ---------- */
@@ -311,16 +557,16 @@ async function licAct(id, action) {
   let reason;
   if (action === 'suspend' || action === 'revoke') { reason = prompt(action === 'revoke' ? 'Révocation DÉFINITIVE. Motif :' : 'Motif de la suspension :'); if (!reason) return; }
   else if (action === 'newcode' && !(await confirmBox('Un nouveau code annule l\'ancien et l\'installation devra être réactivée. Continuer ?', 'Continuer'))) return;
-  try { const r = await api(`/api/licenses/${id}/action`, { action, reason }); if (r.code) { CL = await api('/api/clients'); codeModal(r.code); } else showHome(); } catch (e) { alert(e.message); }
+  try { const r = await api(`/api/licenses/${id}/action`, { action, reason }); if (r.code) { CL = await api('/api/clients'); codeModal(r.code); } else showClients(); } catch (e) { alert(e.message); }
 }
 async function delLic(id, name) {
   if (!(await confirmBox(`Supprimer définitivement la licence n°${id} de « ${name} » ?`))) return;
-  try { await api(`/api/licenses/${id}/delete`, {}); showHome(); } catch (e) { alert(e.message); }
+  try { await api(`/api/licenses/${id}/delete`, {}); showClients(); } catch (e) { alert(e.message); }
 }
 async function delClient(id) {
   const c = CL.find((x) => x.id == id); if (!c) return;
   if (!(await confirmBox(`Supprimer définitivement le client « ${c.name} » ? Ses ${c.licenses.length} licence(s) seront supprimées et ses appareils libérés.`))) return;
-  try { await api(`/api/clients/${id}/delete`, {}); showHome(); } catch (e) { alert(e.message); }
+  try { await api(`/api/clients/${id}/delete`, {}); showClients(); } catch (e) { alert(e.message); }
 }
 
 /* ---------- mot de passe, journal, réinitialisation ---------- */
@@ -409,6 +655,7 @@ async function logout() { try { await api('/api/logout', {}); } catch (e) {} sho
 
 /* ---------- démarrage : message d'attente pendant le réveil du serveur (offre gratuite Render) ---------- */
 async function boot() {
+  paintIcons();
   history.replaceState({ r: 'home' }, '');
   const t0 = Date.now();
   v.innerHTML = `<div class="card" style="text-align:center"><div class="spin"></div><h2>Réveil du serveur…</h2><p class="muted" id="wk">Sur l'offre gratuite, le premier chargement peut prendre jusqu'à 50 secondes. Merci de patienter.</p></div>`;
