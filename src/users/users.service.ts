@@ -134,4 +134,19 @@ export class UsersService {
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'User', entityId: id, newValue: { passwordReset: true } });
     return { message: 'Mot de passe réinitialisé. Communiquez-le à l\'utilisateur et demandez-lui de le changer.' };
   }
+
+  async revokeSessions(id: string, actorId: string, actorRole?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable.');
+    this.assertCanManage(actorRole, user.role?.name);
+    await this.prisma.user.update({ where: { id }, data: { refreshTokenHash: null } });
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'User', entityId: id, newValue: { sessionsRevoked: true } });
+    return { message: "Sessions fermées. L'utilisateur devra se reconnecter (au plus tard dans 15 minutes). Son compte et ses données sont intacts." };
+  }
+
+  async revokeAllSessions(organizationId: string, actorId: string) {
+    const r = await this.prisma.user.updateMany({ where: { organizationId, deletedAt: null, id: { not: actorId } }, data: { refreshTokenHash: null } });
+    await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'User', entityId: actorId, newValue: { allSessionsRevoked: r.count } });
+    return { message: r.count + ' session(s) fermée(s). Aucun compte ni donnée n\'a été modifié.', count: r.count };
+  }
 }

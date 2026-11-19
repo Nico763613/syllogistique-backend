@@ -44,6 +44,20 @@ export class UsersController {
     return this.usersService.resetPassword(id, dto.newPassword, actor.userId, actor.role);
   }
 
+  // Déconnecte un utilisateur à distance (compte, mot de passe et données conservés).
+  @Post(':id/revoke-sessions')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
+  revokeSessions(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.usersService.revokeSessions(id, actor.userId, actor.role);
+  }
+
+  // Déconnecte tous les utilisateurs de l'organisation, sauf l'administrateur qui agit (aucune donnée touchée).
+  @Post('revoke-all-sessions')
+  @Roles(RoleName.SUPER_ADMIN)
+  revokeAllSessions(@CurrentUser() actor: any) {
+    return this.usersService.revokeAllSessions(actor.organizationId, actor.userId);
+  }
+
   @Delete(':id')
   @Roles(RoleName.SUPER_ADMIN)
   remove(@Param('id') id: string, @CurrentUser() actor: any) {
