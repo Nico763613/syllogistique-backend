@@ -128,6 +128,18 @@
     position:sticky; top:0; z-index:5;
   }
   .topbar h2{margin:0; font-size:20px;}
+  /* Téléphone : l'en-tête reste dans l'écran (cloche et profil visibles), recherche sur sa propre ligne, chiffres sans débordement. */
+  @media(max-width:700px){
+    .topbar{flex-wrap:wrap; gap:6px 8px;}
+    .topbar > div:first-child{flex:1 1 0; min-width:0;}
+    .topbar h2{font-size:16px; line-height:1.25; min-width:0; flex:1 1 0; overflow-wrap:break-word;}
+    #space-label{display:none !important;}
+    #top-logo{height:26px !important; margin-right:6px !important;}
+    .topbar > div[style*="margin-left:auto"]{margin-right:0 !important;}
+    #gs-wrap{margin-right:0;}
+    .kpi-value{font-size:clamp(14px,4.4vw,20px); overflow-wrap:anywhere;}
+    .main table{display:block; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  }
   .user-chip{display:flex; align-items:center; gap:10px; font-size:14px; color:var(--muted);}
   .user-avatar{width:32px; height:32px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;}
   .drv-tabs{padding-bottom:env(safe-area-inset-bottom);}
