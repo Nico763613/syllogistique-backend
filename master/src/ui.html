@@ -269,7 +269,7 @@ const IC = {
 };
 const ic = (n, s = 20) => `<svg viewBox="0 0 24 24" width="${s}" height="${s}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n] || ''}</svg>`;
 function paintIcons(root) { (root || document).querySelectorAll('[data-ic]').forEach((e) => { if (!e.firstChild) e.innerHTML = ic(e.dataset.ic, Number(e.dataset.s) || 20); }); }
-const SIDE = [['home', 'Tableau de bord', 'home'], ['clients', 'Entreprises clientes', 'building'], ['licences', 'Licences & abonnements', 'key'], ['finance', 'Finance & facturation', 'card'], ['supervision', 'Supervision technique', 'monitor'], ['security', 'Sécurité & audit', 'shield'], ['backups', 'Sauvegardes & maintenance', 'db'], ['baraka', 'BARAKA Électronique', 'phone'], ['config', 'Configuration générale', 'cog']];
+const SIDE = [['home', 'Tableau de bord', 'home'], ['clients', 'Entreprises clientes', 'building'], ['licences', 'Licences & abonnements', 'key'], ['finance', 'Finance & facturation', 'card'], ['supervision', 'Supervision technique', 'monitor'], ['security', 'Sécurité & audit', 'shield'], ['backups', 'Sauvegardes & maintenance', 'db'], ['baraka', 'BRAKA Électronique', 'phone'], ['config', 'Configuration générale', 'cog']];
 const SIDE_OF = { home: 'home', clients: 'clients', client: 'clients', licences: 'licences', license: 'licences', extend: 'licences', devices: 'licences', finance: 'finance', supervision: 'supervision', reports: 'supervision', mails: 'supervision', global: 'supervision', security: 'security', audit: 'security', backups: 'backups', baraka: 'baraka', config: 'config', password: 'config', reset: 'config' };
 let CUR = 'home', OV = {}, ME = {};
 function paintSide() {
@@ -346,7 +346,7 @@ const SPACES = [
   ['licences', '3. Licences et abonnements', 'Suivi et gestion des licences', 'key', 'c-purple', '#7C4DDB'], ['finance', '4. Finance et facturation', 'Paiements et échéances', 'card', 'c-orange', '#F08A24'],
   ['supervision', '5. Supervision technique', 'État des services et incidents', 'monitor', 'c-cyan', '#1AA66B'], ['security', '6. Sécurité et audit', 'Contrôle des accès et journal', 'shield', 'c-red', '#D0393E'],
   ['backups', '7. Sauvegardes et maintenance', 'Gestion des sauvegardes', 'db', 'c-cyan', '#1496AB'], ['config', '8. Configuration générale', 'Paramètres de la plateforme', 'cog', 'c-indigo', '#2A3A9C'],
-  ['baraka', '9. BARAKA Électronique', 'Comptes, déblocage, mots de passe', 'phone', 'c-blue', '#0B1F3A'],
+  ['baraka', '9. BRAKA Électronique', 'Comptes, déblocage, mots de passe', 'phone', 'c-blue', '#0B1F3A'],
 ];
 async function showHome() {
   try {
@@ -375,7 +375,7 @@ const clientsBlock = () => `<div class="card"><h2>Clients</h2>
   <button class="gold" onclick="nav('client',null)">+ Nouveau client</button>
   <div style="margin-top:6px"><a class="btn ghost" href="/api/export/clients.csv">Exporter les clients (CSV)</a> <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div></div>`;
 
-/* ---------- BARAKA ÉLECTRONIQUE MOBILE (liaison) ---------- */
+/* ---------- BRAKA ÉLECTRONIQUE MOBILE (liaison) ---------- */
 const ROLE_FR = { pdg: 'PDG', revendeur: 'Revendeur', livreur: 'Livreur', client: 'Client', master: 'Administrateur' };
 /* Mise à jour automatique : quand une nouvelle version existe, l'écran le détecte tout seul */
 const BUILD = '__BUILD__';
@@ -408,19 +408,19 @@ async function actualiser() {
 }
 async function showBaraka() {
   stage('baraka');
-  v.innerHTML = `<div class="card">${bar('BARAKA ÉLECTRONIQUE MOBILE')}<p class="muted">Chargement… (si l'hébergement dormait, comptez jusqu'à une minute)</p></div>`;
+  v.innerHTML = `<div class="card">${bar('BRAKA ÉLECTRONIQUE MOBILE')}<p class="muted">Chargement… (si l'hébergement dormait, comptez jusqu'à une minute)</p></div>`;
   try {
     const [sm, us] = await Promise.all([api('/api/baraka/summary'), api('/api/baraka/users')]);
     const kp = (c, i, n, l) => kc(c, i, n, l, '');
-    v.innerHTML = `<div class="card">${bar('BARAKA ÉLECTRONIQUE MOBILE')}<p class="muted">Contrôle total de BARAKA : débloquer un compte, donner un nouveau mot de passe quand un utilisateur vous appelle.</p>
+    v.innerHTML = `<div class="card">${bar('BRAKA ÉLECTRONIQUE MOBILE')}<p class="muted">Contrôle total de BRAKA : débloquer un compte, donner un nouveau mot de passe quand un utilisateur vous appelle.</p>
       <div class="kp6">${kp('c-blue', 'users', sm.comptes, 'Comptes')}${kp('c-green', 'shield', sm.actifs, 'Actifs')}${kp('c-red', 'key', sm.verrouilles, 'Verrouillés')}${kp('c-orange', 'monitor', sm.en_ligne, 'En ligne (15 min)')}${kp('c-purple', 'phone', (sm.commandes && sm.commandes.total) || 0, 'Commandes')}${kp('c-cyan', 'users', sm.suspendus, 'Suspendus')}</div>
-      <p><a class="btn ghost" href="${esc('https://baraka-electronique-mobile.onrender.com/master')}" target="_blank" rel="noopener">Ouvrir l'espace Master de BARAKA</a> <button class="ghost" onclick="showBaraka()">Actualiser</button></p></div>
-      <div class="card"><h3>Comptes BARAKA</h3>${us.map((u) => `<div class="row" style="padding:10px 0;border-top:1px solid #e6ebf3">
+      <p><a class="btn ghost" href="${esc('https://baraka-electronique-mobile.onrender.com/master')}" target="_blank" rel="noopener">Ouvrir l'espace Master de BRAKA</a> <button class="ghost" onclick="showBaraka()">Actualiser</button></p></div>
+      <div class="card"><h3>Comptes BRAKA</h3>${us.map((u) => `<div class="row" style="padding:10px 0;border-top:1px solid #e6ebf3">
         <div><b>${esc(u.full_name)}</b> <span class="muted">· ${esc(ROLE_FR[u.role] || u.role)} · ${esc(u.login)}</span>
         ${u.status !== 'actif' ? '<div style="color:#D0393E"><b>Compte bloqué</b></div>' : u.verrouille ? '<div style="color:#D0393E"><b>Compte verrouillé (trop d\'essais)</b></div>' : '<div style="color:#1E9E5A"><b>Actif</b></div>'}</div>
         <div style="margin-top:6px">${u.status !== 'actif' || u.verrouille ? `<button class="gold" onclick="barakaUnlock('${u.id}')">Débloquer</button>` : (u.role === 'master' ? '' : `<button class="danger" onclick="barakaBlock('${u.id}','${esc(u.full_name).replace(/'/g, '')}')">Bloquer</button>`)}
         ${u.role === 'master' ? '' : `<button class="ghost" onclick="barakaReset('${u.id}','${esc(u.full_name).replace(/'/g, '')}')">Nouveau mot de passe</button>`}</div></div>`).join('')}</div>`;
-  } catch (e) { v.innerHTML = `<div class="card">${bar('BARAKA ÉLECTRONIQUE MOBILE')}<p style="color:#D0393E">${esc(e.message)}</p><button class="gold" onclick="showBaraka()">Réessayer</button></div>`; }
+  } catch (e) { v.innerHTML = `<div class="card">${bar('BRAKA ÉLECTRONIQUE MOBILE')}<p style="color:#D0393E">${esc(e.message)}</p><button class="gold" onclick="showBaraka()">Réessayer</button></div>`; }
 }
 async function barakaUnlock(id) { try { const r = await api(`/api/baraka/users/${id}/unlock`, {}); alert('Compte débloqué et réactivé : ' + r.nom); showBaraka(); } catch (e) { alert(e.message); } }
 async function barakaBlock(id, nom) {
@@ -431,7 +431,7 @@ async function barakaReset(id, nom) {
   if (!(await confirmBox(`Donner un nouveau mot de passe à ${nom} ? L'ancien ne marchera plus.`, 'Oui, réinitialiser'))) return;
   try {
     const r = await api(`/api/baraka/users/${id}/reset-password`, {});
-    const txt = `BARAKA ÉLECTRONIQUE MOBILE\nBonjour ${nom}, voici votre nouveau mot de passe provisoire (valable 24 h) :\nIdentifiant : ${r.login}\nMot de passe : ${r.temp_password}\nVous devrez en choisir un nouveau à la connexion.`;
+    const txt = `BRAKA ÉLECTRONIQUE MOBILE\nBonjour ${nom}, voici votre nouveau mot de passe provisoire (valable 24 h) :\nIdentifiant : ${r.login}\nMot de passe : ${r.temp_password}\nVous devrez en choisir un nouveau à la connexion.`;
     openModal(`<h2>Nouveau mot de passe</h2><p><b>${esc(nom)}</b> · identifiant <b>${esc(r.login)}</b></p><p style="font-size:1.6rem;letter-spacing:3px"><b>${esc(r.temp_password)}</b></p><p class="muted">Valable 24 h. L'utilisateur choisira le sien à la connexion.</p>
       <button class="gold" onclick="copyText(${JSON.stringify(txt).replace(/"/g, '&quot;')}, this)">Copier le message</button> <button class="ghost" onclick="closeModal();showBaraka()">Fermer</button>`);
   } catch (e) { alert(e.message); }
