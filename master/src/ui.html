@@ -377,6 +377,26 @@ const clientsBlock = () => `<div class="card"><h2>Clients</h2>
 
 /* ---------- BARAKA ÉLECTRONIQUE MOBILE (liaison) ---------- */
 const ROLE_FR = { pdg: 'PDG', revendeur: 'Revendeur', livreur: 'Livreur', client: 'Client', master: 'Administrateur' };
+/* Mise à jour automatique : quand une nouvelle version existe, l'écran le détecte tout seul */
+const BUILD = '__BUILD__';
+let UPD = false;
+async function checkVersion(auto) {
+  if (UPD || BUILD === '__BUILD__') return;
+  try {
+    const j = await (await fetch('/api/version', { cache: 'no-store' })).json();
+    if (!j.build || j.build === BUILD) return;
+    UPD = true;
+    if (auto) return actualiser();
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99;background:#0B1F3A;color:#fff;padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap';
+    d.innerHTML = '<span>Une nouvelle version est disponible.</span><button class="gold" style="margin:0" onclick="actualiser()">Mettre à jour maintenant</button>';
+    document.body.appendChild(d);
+  } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(true); });
+setInterval(() => checkVersion(false), 5 * 60 * 1000);
+setTimeout(() => checkVersion(false), 4000);
+
 /* Actualiser : charge la dernière version sans se déconnecter (la session reste ouverte) */
 async function actualiser() {
   const b = $('rfb'); if (b) b.style.opacity = '.5';
@@ -397,12 +417,16 @@ async function showBaraka() {
       <p><a class="btn ghost" href="${esc('https://baraka-electronique-mobile.onrender.com/master')}" target="_blank" rel="noopener">Ouvrir l'espace Master de BARAKA</a> <button class="ghost" onclick="showBaraka()">Actualiser</button></p></div>
       <div class="card"><h3>Comptes BARAKA</h3>${us.map((u) => `<div class="row" style="padding:10px 0;border-top:1px solid #e6ebf3">
         <div><b>${esc(u.full_name)}</b> <span class="muted">· ${esc(ROLE_FR[u.role] || u.role)} · ${esc(u.login)}</span>
-        ${u.verrouille ? '<div style="color:#D0393E"><b>Compte verrouillé</b></div>' : ''}${u.status !== 'actif' ? '<div class="muted">Suspendu</div>' : ''}</div>
-        <div style="margin-top:6px"><button class="${u.verrouille ? 'gold' : 'ghost'}" onclick="barakaUnlock('${u.id}')">Débloquer</button>
+        ${u.status !== 'actif' ? '<div style="color:#D0393E"><b>Compte bloqué</b></div>' : u.verrouille ? '<div style="color:#D0393E"><b>Compte verrouillé (trop d\'essais)</b></div>' : '<div style="color:#1E9E5A"><b>Actif</b></div>'}</div>
+        <div style="margin-top:6px">${u.status !== 'actif' || u.verrouille ? `<button class="gold" onclick="barakaUnlock('${u.id}')">Débloquer</button>` : (u.role === 'master' ? '' : `<button class="danger" onclick="barakaBlock('${u.id}','${esc(u.full_name).replace(/'/g, '')}')">Bloquer</button>`)}
         ${u.role === 'master' ? '' : `<button class="ghost" onclick="barakaReset('${u.id}','${esc(u.full_name).replace(/'/g, '')}')">Nouveau mot de passe</button>`}</div></div>`).join('')}</div>`;
   } catch (e) { v.innerHTML = `<div class="card">${bar('BARAKA ÉLECTRONIQUE MOBILE')}<p style="color:#D0393E">${esc(e.message)}</p><button class="gold" onclick="showBaraka()">Réessayer</button></div>`; }
 }
-async function barakaUnlock(id) { try { const r = await api(`/api/baraka/users/${id}/unlock`, {}); alert('Compte débloqué : ' + r.nom); showBaraka(); } catch (e) { alert(e.message); } }
+async function barakaUnlock(id) { try { const r = await api(`/api/baraka/users/${id}/unlock`, {}); alert('Compte débloqué et réactivé : ' + r.nom); showBaraka(); } catch (e) { alert(e.message); } }
+async function barakaBlock(id, nom) {
+  if (!(await confirmBox(`Bloquer ${nom} ? Son application cessera de fonctionner immédiatement. Vous pourrez le débloquer à tout moment.`, 'Oui, bloquer'))) return;
+  try { const r = await api(`/api/baraka/users/${id}/block`, {}); alert('Compte bloqué : ' + r.nom); showBaraka(); } catch (e) { alert(e.message); }
+}
 async function barakaReset(id, nom) {
   if (!(await confirmBox(`Donner un nouveau mot de passe à ${nom} ? L'ancien ne marchera plus.`, 'Oui, réinitialiser'))) return;
   try {

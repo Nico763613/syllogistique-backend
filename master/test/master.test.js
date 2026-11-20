@@ -241,7 +241,7 @@ test('liaison BARAKA : résumé, déblocage et mot de passe provisoire via la cl
     if (rq.headers['x-link-key'] !== 'cle-de-test') { rs.statusCode = 404; return rs.end('{"error":"Introuvable"}'); }
     if (rq.url.endsWith('/summary')) return rs.end('{"comptes":3,"verrouilles":1}');
     if (rq.url.endsWith('/users')) return rs.end('[{"id":"11111111-1111-1111-1111-111111111111","full_name":"Test","role":"livreur"}]');
-    if (rq.url.endsWith('/unlock')) return rs.end('{"ok":true,"nom":"Test"}');
+    if (rq.url.endsWith('/unlock') || rq.url.endsWith('/block')) return rs.end('{"ok":true,"nom":"Test"}');
     return rs.end('{"ok":true,"nom":"Test","login":"620","temp_password":"ABCD2345","expires_hours":24}');
   });
   await new Promise((r) => fake.listen(0, r));
@@ -251,10 +251,16 @@ test('liaison BARAKA : résumé, déblocage et mot de passe provisoire via la cl
   assert.equal((await call('GET', '/api/baraka/users', undefined, ck)).json.length, 1);
   const id = '11111111-1111-1111-1111-111111111111';
   assert.equal((await call('POST', `/api/baraka/users/${id}/unlock`, {}, ck)).json.ok, true);
+  assert.equal((await call('POST', `/api/baraka/users/${id}/block`, {}, ck)).json.ok, true);
   assert.equal((await call('POST', `/api/baraka/users/${id}/reset-password`, {}, ck)).json.temp_password, 'ABCD2345');
   assert.equal((await call('POST', '/api/baraka/users/pas-un-id/unlock', {}, ck)).status, 404, 'identifiant invalide refusé');
   assert.ok(seen.every((x) => x[2] === 'cle-de-test'));
-  const au = await call('GET', '/api/audit', undefined, ck); for (const k of ['BARAKA_DEBLOCAGE', 'BARAKA_NOUVEAU_MDP']) assert.ok(au.json.some((x) => x.action === k), k);
+  const au = await call('GET', '/api/audit', undefined, ck); for (const k of ['BARAKA_DEBLOCAGE', 'BARAKA_BLOCAGE', 'BARAKA_NOUVEAU_MDP']) assert.ok(au.json.some((x) => x.action === k), k);
   process.env.BARAKA_LINK_KEY = 'mauvaise'; assert.equal((await call('GET', '/api/baraka/summary', undefined, ck)).status, 502, 'clé refusée par BARAKA');
   fake.close();
+});
+
+test('version de l\'écran : publique, stable, et injectée dans la page', async () => {
+  const a = await (await fetch(base + '/api/version')).json(); assert.match(a.build, /^[0-9a-f]{10}$/);
+  const html = await (await fetch(base + '/')).text(); assert.ok(html.includes("const BUILD = '" + a.build + "'"), 'la page connaît sa version');
 });

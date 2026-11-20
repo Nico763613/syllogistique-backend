@@ -10,7 +10,10 @@ const { notify } = require('./notify');
 const backups = require('./backups');
 const { diagnose, signalType } = require('./diagnose');
 
-const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
+const UI_RAW = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
+// Identifiant de version de l'écran : permet à chaque téléphone de savoir qu'une mise à jour existe et de se mettre à jour seul.
+const BUILD = require('crypto').createHash('sha1').update(UI_RAW).digest('hex').slice(0, 10);
+const UI = UI_RAW.replace('__BUILD__', BUILD);
 const COOKIE = 'master_session';
 const IDLE_MIN = 15; // déconnexion automatique après 15 minutes d'inactivité
 const MASTER_URL = (process.env.RENDER_EXTERNAL_URL || 'https://syllogistique-master.onrender.com').replace(/\/$/, '');
@@ -175,6 +178,7 @@ function createApp(pool, cfg) {
       res.writeHead(200, { 'content-type': mm[1], 'cache-control': 'public, max-age=3600', 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'cross-origin' });
       return res.end(Buffer.from(mm[2], 'base64'));
     }
+    if (req.method === 'GET' && p === '/api/version') return send(res, 200, { build: BUILD }, { 'cache-control': 'no-store' });
     if (p.startsWith('/v1/')) return handleV1(req, res, p);
     if (!p.startsWith('/api/')) return send(res, 404, { error: 'Introuvable' });
 
@@ -278,10 +282,10 @@ function createApp(pool, cfg) {
       const sub = p.slice('/api/baraka'.length);
       if (req.method === 'GET' && sub === '/summary') return out(await bk('GET', '/summary'));
       if (req.method === 'GET' && sub === '/users') return out(await bk('GET', '/users'));
-      const m = /^\/users\/([0-9a-f-]{36})\/(unlock|reset-password)$/.exec(sub);
+      const m = /^\/users\/([0-9a-f-]{36})\/(unlock|block|reset-password)$/.exec(sub);
       if (req.method === 'POST' && m) {
         const r = await bk('POST', sub);
-        await audit(s.aid, m[2] === 'unlock' ? 'BARAKA_DEBLOCAGE' : 'BARAKA_NOUVEAU_MDP', r.err ? 'échec : ' + r.err : (r.j && r.j.nom) || m[1], req);
+        await audit(s.aid, m[2] === 'unlock' ? 'BARAKA_DEBLOCAGE' : m[2] === 'block' ? 'BARAKA_BLOCAGE' : 'BARAKA_NOUVEAU_MDP', r.err ? 'échec : ' + r.err : (r.j && r.j.nom) || m[1], req);
         return out(r);
       }
       return send(res, 404, { error: 'Introuvable' });
