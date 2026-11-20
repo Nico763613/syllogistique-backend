@@ -21,4 +21,12 @@ function diagnose(r) {
   for (const [re, category, cause, action] of RULES) if (re.test(text)) return { category, cause, action };
   return { category: 'À analyser', cause: "Cause non reconnue automatiquement.", action: "Lire le message et le contexte, puis contacter l'utilisateur si besoin." };
 }
-module.exports = { diagnose };
+// Nature du signalement, en mots simples, pour que la notification dise tout de suite de quoi il s'agit.
+function signalType(r) {
+  if (r.role === 'SYSTEM') return 'Erreur serveur';
+  const text = [r.message, r.screen, r.context].filter(Boolean).join(' ');
+  if (/mot de passe|motdepasse|mdp|password|identifiant|connexion impossible|connecter|bloqu[ée]e? (?:le )?compte|compte bloqu/i.test(text)) return 'Mot de passe';
+  if (/panne|t[ée]l[ée]phone|appareil|[ée]cran|tactile|mouill|cass[ée]|perdu|vol[ée]|batterie|ne s'allume|ne d[ée]marre/i.test(text)) return 'Panne de téléphone';
+  return 'Autre problème';
+}
+module.exports = { diagnose, signalType };

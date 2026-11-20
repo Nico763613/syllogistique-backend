@@ -8,7 +8,7 @@ const lic = require('./license');
 const { makePool, migrate } = require('./db');
 const { notify } = require('./notify');
 const backups = require('./backups');
-const { diagnose } = require('./diagnose');
+const { diagnose, signalType } = require('./diagnose');
 
 const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
 const COOKIE = 'master_session';
@@ -128,7 +128,7 @@ function createApp(pool, cfg) {
           const ins = await pool.query(`insert into master_reports(license_id, remote_id, user_name, role, screen, message, context, reported_at) values ($1,$2,$3,$4,$5,$6,$7,$8)
             on conflict (license_id, remote_id) do nothing returning id`,
           [l.id, rid, t(r.userName, 120), t(r.role, 40), t(r.screen, 160), t(r.message, 600), t(r.context, 900), r.createdAt && !isNaN(new Date(r.createdAt)) ? new Date(r.createdAt).toISOString() : new Date().toISOString()]);
-          if (ins.rowCount) alerts.push({ kind: r.role === 'SYSTEM' ? 'erreur' : 'signalement', text: t(r.message, 200) });
+          if (ins.rowCount) alerts.push({ kind: r.role === 'SYSTEM' ? 'erreur' : 'signalement', text: t(r.message, 200), type: signalType({ role: r.role, message: r.message, screen: r.screen, context: r.context }), who: t(r.userName, 80), role: t(r.role, 40) });
         }
       }
       if (Array.isArray(b.mails)) {
@@ -144,9 +144,14 @@ function createApp(pool, cfg) {
       }
       if (alerts.length) {
         const cn = (await pool.query('select name from master_clients where id=$1', [l.client_id])).rows[0];
-        const nb = (k) => alerts.filter((x) => x.kind === k).length;
-        const parts = [nb('erreur') && nb('erreur') + ' erreur(s) serveur', nb('signalement') && nb('signalement') + ' signalement(s)', nb('envoi') && nb('envoi') + ' envoi(s) d\'e-mail en échec'].filter(Boolean).join(', ');
-        notify('client-' + l.id, 'SYL MASTER — ' + (cn ? cn.name : 'client') + ' : ' + parts, alerts.slice(0, 5).map((x) => '- ' + x.kind + ' : ' + (x.text || '')).join('\n') + '\n\nOuvrez la console Master (Signalements / Envois) pour le détail.').catch(() => {});
+        const nom = cn ? cn.name : 'client';
+        // une notification par nature de problème : on voit tout de suite « Mot de passe » ou « Panne de téléphone », qui, et chez quel client
+        const groups = new Map();
+        for (const x of alerts) { const k = x.kind === 'envoi' ? 'E-mail en échec' : x.type; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+        for (const [type, list] of groups) {
+          const lignes = list.slice(0, 5).map((x) => '- ' + (x.who ? x.who + (x.role ? ' (' + x.role + ')' : '') + ' : ' : '') + (x.text || '')).join('\n');
+          notify('client-' + l.id + '-' + type, 'SYL MASTER — ' + type + ' — ' + nom + (list.length === 1 && list[0].who ? ' — ' + list[0].who : (list.length > 1 ? ' (' + list.length + ')' : '')), 'Client : ' + nom + '\nNature : ' + type + '\n' + lignes + '\n\nOuvrez la console Master (Signalements) pour le détail.').catch(() => {});
+        }
       }
       const dv = (await pool.query('select device_id, blocked, disconnect_requested from master_devices where license_id=$1', [l.id])).rows;
       const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
@@ -289,7 +294,7 @@ function createApp(pool, cfg) {
       const { rows } = await pool.query(`select r.id, r.user_name, r.role, r.screen, r.message, r.context, r.status, r.reported_at, c.id as client_id, c.name as client_name
         from master_reports r join master_licenses l on l.id=r.license_id join master_clients c on c.id=l.client_id
         where ($1::text is null or r.status=$1) and ($2::bigint is null or c.id=$2) and ($3::date is null or r.reported_at >= $3::date) and ($4::date is null or r.reported_at < $4::date + 1) order by r.reported_at desc limit 1000`, [['NEW', 'IN_PROGRESS', 'SOLVED'].includes(st) ? st : null, cl, dOk(url.searchParams.get('from')), dOk(url.searchParams.get('to'))]);
-      return send(res, 200, rows.map((r) => ({ ...r, diagnosis: diagnose(r) })));
+      return send(res, 200, rows.map((r) => ({ ...r, diagnosis: diagnose(r), type: signalType(r) })));
     }
     if (req.method === 'POST' && p === '/api/reports/status') {
       const b = body; if (!['NEW', 'IN_PROGRESS', 'SOLVED'].includes(b.status)) return send(res, 400, { error: 'Statut invalide.' });
