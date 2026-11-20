@@ -229,3 +229,32 @@ test('session glissante de 15 minutes', async () => {
   const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
   const r = await fetch(base + '/api/me', { headers: { cookie: ck } }); const sc = r.headers.get('set-cookie'); assert.match(sc, /Max-Age=900/);
 });
+test('liaison BARAKA : résumé, déblocage et mot de passe provisoire via la clé, rien sans configuration', async () => {
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  delete process.env.BARAKA_URL; delete process.env.BARAKA_LINK_KEY;
+  assert.equal((await call('GET', '/api/baraka/summary', undefined, ck)).status, 503, 'non configuré');
+  const seen = [];
+  const fake = require('http').createServer((rq, rs) => {
+    seen.push([rq.method, rq.url, rq.headers['x-link-key']]);
+    rs.setHeader('content-type', 'application/json');
+    if (rq.headers['x-link-key'] !== 'cle-de-test') { rs.statusCode = 404; return rs.end('{"error":"Introuvable"}'); }
+    if (rq.url.endsWith('/summary')) return rs.end('{"comptes":3,"verrouilles":1}');
+    if (rq.url.endsWith('/users')) return rs.end('[{"id":"11111111-1111-1111-1111-111111111111","full_name":"Test","role":"livreur"}]');
+    if (rq.url.endsWith('/unlock')) return rs.end('{"ok":true,"nom":"Test"}');
+    return rs.end('{"ok":true,"nom":"Test","login":"620","temp_password":"ABCD2345","expires_hours":24}');
+  });
+  await new Promise((r) => fake.listen(0, r));
+  process.env.BARAKA_URL = 'http://127.0.0.1:' + fake.address().port; process.env.BARAKA_LINK_KEY = 'cle-de-test';
+  assert.equal((await call('GET', '/api/baraka/summary', undefined, '')).status, 401, 'connexion obligatoire');
+  const sm = await call('GET', '/api/baraka/summary', undefined, ck); assert.equal(sm.status, 200); assert.equal(sm.json.comptes, 3);
+  assert.equal((await call('GET', '/api/baraka/users', undefined, ck)).json.length, 1);
+  const id = '11111111-1111-1111-1111-111111111111';
+  assert.equal((await call('POST', `/api/baraka/users/${id}/unlock`, {}, ck)).json.ok, true);
+  assert.equal((await call('POST', `/api/baraka/users/${id}/reset-password`, {}, ck)).json.temp_password, 'ABCD2345');
+  assert.equal((await call('POST', '/api/baraka/users/pas-un-id/unlock', {}, ck)).status, 404, 'identifiant invalide refusé');
+  assert.ok(seen.every((x) => x[2] === 'cle-de-test'));
+  const au = await call('GET', '/api/audit', undefined, ck); for (const k of ['BARAKA_DEBLOCAGE', 'BARAKA_NOUVEAU_MDP']) assert.ok(au.json.some((x) => x.action === k), k);
+  process.env.BARAKA_LINK_KEY = 'mauvaise'; assert.equal((await call('GET', '/api/baraka/summary', undefined, ck)).status, 502, 'clé refusée par BARAKA');
+  fake.close();
+});
