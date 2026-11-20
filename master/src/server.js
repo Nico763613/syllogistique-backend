@@ -256,6 +256,32 @@ function createApp(pool, cfg) {
       return send(res, 200, rows);
     }
 
+    // ---------- liaison BARAKA ÉLECTRONIQUE MOBILE (appels de serveur à serveur, clé secrète) ----------
+    if (p.startsWith('/api/baraka/')) {
+      const base = String(process.env.BARAKA_URL || '').replace(/\/$/, ''), key = process.env.BARAKA_LINK_KEY || '';
+      if (!base || !key) return send(res, 503, { error: 'La liaison BARAKA n\'est pas configurée (BARAKA_URL / BARAKA_LINK_KEY).' });
+      const bk = async (method, sub) => {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 55000); // réveil possible de l'hébergement gratuit
+        try {
+          const r = await fetch(base + '/api/link' + sub, { method, headers: { 'x-link-key': key, 'content-type': 'application/json' }, body: method === 'POST' ? '{}' : undefined, signal: ctl.signal });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) return { err: j.error || ('BARAKA a répondu ' + r.status) };
+          return { j };
+        } catch (e) { return { err: e.name === 'AbortError' ? 'BARAKA met trop de temps à répondre (réveil en cours). Réessayez dans une minute.' : 'BARAKA est injoignable pour le moment.' }; } finally { clearTimeout(t); }
+      };
+      const out = (r) => (r.err ? send(res, 502, { error: r.err }) : send(res, 200, r.j));
+      const sub = p.slice('/api/baraka'.length);
+      if (req.method === 'GET' && sub === '/summary') return out(await bk('GET', '/summary'));
+      if (req.method === 'GET' && sub === '/users') return out(await bk('GET', '/users'));
+      const m = /^\/users\/([0-9a-f-]{36})\/(unlock|reset-password)$/.exec(sub);
+      if (req.method === 'POST' && m) {
+        const r = await bk('POST', sub);
+        await audit(s.aid, m[2] === 'unlock' ? 'BARAKA_DEBLOCAGE' : 'BARAKA_NOUVEAU_MDP', r.err ? 'échec : ' + r.err : (r.j && r.j.nom) || m[1], req);
+        return out(r);
+      }
+      return send(res, 404, { error: 'Introuvable' });
+    }
+
     // ---------- supervision : signalements et vue d'ensemble ----------
     const dOk = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || '')) ? x : null);
     if (req.method === 'GET' && p === '/api/reports') {
