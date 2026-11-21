@@ -306,7 +306,9 @@ function createApp(pool, cfg) {
       const mois = new Date().toISOString().slice(0, 7);
       const sum = (f) => items.filter(f).reduce((a, x) => a + x.amount, 0);
       const cur = [...new Set(items.map((x) => x.currency))];
-      return send(res, 200, { items, devises: cur,
+      const ct = (await pool.query(`select l.id as license_id, c.name as cname, l.contract_months, l.contract_start::text as contract_start, l.expires_at, l.permanent, l.status
+          from master_licenses l join master_clients c on c.id=l.client_id where l.contract_months > 0 and l.status <> 'REVOKED' order by l.expires_at`)).rows;
+      return send(res, 200, { contrats: ct, items, devises: cur,
         totaux: { recu_mois: sum((x) => x.status === 'PAID' && String(x.paid_at).slice(0, 7) === mois), attendu: sum((x) => x.status === 'DUE'), en_retard: sum((x) => x.status === 'DUE' && x.jours < 0),
           nb_retard: items.filter((x) => x.status === 'DUE' && x.jours < 0).length, nb_tolerance: items.filter((x) => x.etat === 'tolerance').length, nb_hors_tolerance: items.filter((x) => x.etat === 'hors_tolerance').length },
         mixte: cur.length > 1 });
@@ -320,7 +322,11 @@ function createApp(pool, cfg) {
       if (!fin.CURRENCIES.includes(cur)) return send(res, 400, { error: 'Devise non prise en charge.' });
       if (!Number.isFinite(tol) || tol < 0 || tol > 180) return send(res, 400, { error: 'La période de tolérance doit être comprise entre 0 et 180 jours.' });
       if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.firstDue || '')) || isNaN(Date.parse(body.firstDue))) return send(res, 400, { error: 'Choisissez la date de la première échéance.' });
-      await pool.query("update master_licenses set pay_frequency=$2, pay_amount=$3, currency=$4, tolerance_days=$5 where id=$1 returning id", [l.id, freq, amount, cur, tol]);
+      const cm = Math.round(Number(body.contractMonths || 0)); const cs = body.contractStart ? String(body.contractStart) : fin.ymd(new Date());
+      if (!Number.isFinite(cm) || cm < 0 || cm > 60) return send(res, 400, { error: 'La durée du contrat doit être comprise entre 0 et 60 mois.' });
+      if (cm > 0 && (!/^\d{4}-\d{2}-\d{2}$/.test(cs) || isNaN(Date.parse(cs)))) return send(res, 400, { error: 'Date de début du contrat invalide.' });
+      await pool.query("update master_licenses set pay_frequency=$2, pay_amount=$3, currency=$4, tolerance_days=$5, contract_months=$6, contract_start=$7 where id=$1 returning id", [l.id, freq, amount, cur, tol, cm, cm > 0 ? cs : null]);
+      if (cm > 0 && !l.permanent) await pool.query('update master_licenses set expires_at=$2 where id=$1 returning id', [l.id, fin.addMonths(new Date(cs + 'T23:59:59Z'), cm).toISOString()]); // la fin de la licence = la fin du contrat
       await pool.query("delete from master_payments where license_id=$1 and status='DUE' returning id", [l.id]); // les paiements déjà confirmés ne sont jamais touchés
       for (const d of fin.dueDates(body.firstDue, freq)) await pool.query('insert into master_payments(license_id, due_date, amount) values ($1,$2,$3) returning id', [l.id, d, amount]);
       await audit(s.aid, 'ECHEANCIER_DEFINI', `${l.cname} · licence ${l.id} · ${freq} · ${amount} ${cur} · tolérance ${tol} j`, req);
@@ -335,7 +341,7 @@ function createApp(pool, cfg) {
       const pay = got.rows[0];
       const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [pay.license_id])).rows[0];
       let exp = l.expires_at;
-      if (!l.permanent && l.status !== 'REVOKED') { // renouvelle la période payée à partir de la fin actuelle (ou d'aujourd'hui si déjà expirée)
+      if (!l.permanent && l.status !== 'REVOKED' && !(l.contract_months > 0)) { // renouvelle (un contrat à durée fixe garde sa date de fin) la période payée à partir de la fin actuelle (ou d'aujourd'hui si déjà expirée)
         const base = l.expires_at && new Date(l.expires_at) > new Date() ? new Date(l.expires_at) : new Date();
         exp = fin.addMonths(base, fin.FREQ[l.pay_frequency] || 1).toISOString();
         await pool.query('update master_licenses set expires_at=$2 where id=$1 returning id', [l.id, exp]);
@@ -345,6 +351,33 @@ function createApp(pool, cfg) {
       if (left.n < 2) await pool.query('insert into master_payments(license_id, due_date, amount) values ($1,$2,$3) returning id', [l.id, fin.ymd(fin.addMonths(left.last || pay.due, fin.FREQ[l.pay_frequency] || 1)), l.pay_amount || pay.amount]);
       await audit(s.aid, 'PAIEMENT_CONFIRME', `${l.cname} · licence ${l.id} · échéance ${pay.due} · ${pay.amount} ${l.currency} · ${method}${ref ? ' · ' + ref : ''}${l.permanent ? '' : ' · nouvelle expiration ' + String(exp).slice(0, 10)}`, req);
       return send(res, 200, { ok: true, expiresAt: l.permanent ? null : exp });
+    }
+
+    if (req.method === 'GET' && p === '/api/charges') {
+      const { rows } = await pool.query("select id, name, provider, amount, currency, frequency, next_due::text as due, remind_days, active, last_paid_at, note from master_charges order by active desc, next_due, id");
+      return send(res, 200, rows.map((r) => ({ ...r, amount: Number(r.amount), jours: fin.daysTo(r.due), etat: !r.active ? 'inactif' : fin.daysTo(r.due) < 0 ? 'retard' : fin.daysTo(r.due) === 0 ? 'jour_j' : fin.daysTo(r.due) <= r.remind_days ? 'proche' : 'a_venir' })));
+    }
+    if (req.method === 'POST' && p === '/api/charges') {
+      const name = String(body.name || '').trim().slice(0, 80), provider = String(body.provider || '').trim().slice(0, 60), note = String(body.note || '').trim().slice(0, 200);
+      const amount = Math.max(0, Math.round(Number(body.amount || 0))), cur = String(body.currency || 'GNF').toUpperCase(), fr = String(body.frequency || 'MENSUEL'), rd = Math.round(Number(body.remindDays ?? 7));
+      if (!name) return send(res, 400, { error: "Donnez un nom à l'abonnement (ex. Render)." });
+      if (!fin.CURRENCIES.includes(cur) && cur !== 'USD') return send(res, 400, { error: 'Devise non prise en charge.' });
+      if (!fin.CH_FREQ[fr]) return send(res, 400, { error: 'Choisissez la fréquence du paiement.' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.nextDue || '')) || isNaN(Date.parse(body.nextDue))) return send(res, 400, { error: "Choisissez la date de la prochaine échéance." });
+      if (!Number.isFinite(rd) || rd < 1 || rd > 60) return send(res, 400, { error: "L'alerte doit se déclencher entre 1 et 60 jours avant l'échéance." });
+      const r = await pool.query('insert into master_charges(name, provider, amount, currency, frequency, next_due, remind_days, note) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id', [name, provider || null, amount, cur, fr, body.nextDue, rd, note || null]);
+      await audit(s.aid, 'CHARGE_AJOUTEE', `${name} · ${fr} · échéance ${body.nextDue} · alerte ${rd} j avant`, req);
+      return send(res, 200, { ok: true, id: r.rows[0].id });
+    }
+    if (req.method === 'POST' && (fm = /^\/api\/charges\/(\d+)\/(paid|delete)$/.exec(p))) {
+      const c = (await pool.query('select * from master_charges where id=$1', [Number(fm[1])])).rows[0];
+      if (!c) return send(res, 404, { error: 'Abonnement introuvable.' });
+      if (fm[2] === 'delete') { await pool.query('delete from master_charges where id=$1 returning id', [c.id]); await audit(s.aid, 'CHARGE_SUPPRIMEE', c.name, req); return send(res, 200, { ok: true }); }
+      // « Payé » : c'est vous qui avez réglé l'abonnement ; l'échéance avance d'une période (rien n'est payé automatiquement par ce tableau de bord)
+      const next = fin.ymd(fin.addMonths(new Date(String(c.next_due).slice(0, 10) + 'T12:00:00Z'), fin.CH_FREQ[c.frequency]));
+      await pool.query('update master_charges set next_due=$2, last_paid_at=now() where id=$1 returning id', [c.id, next]);
+      await audit(s.aid, 'CHARGE_PAYEE', `${c.name} · prochaine échéance ${next}`, req);
+      return send(res, 200, { ok: true, nextDue: next });
     }
 
     // ---------- supervision : signalements et vue d'ensemble ----------
@@ -581,7 +614,7 @@ if (require.main === module) {
     await migrate(pool); await bootstrapAdmin(pool, cfg);
     createApp(pool, cfg).listen(cfg.port, () => console.log('[master] en ligne sur le port ' + cfg.port));
     // Rappels d'échéances : contrôle toutes les heures (et 1 min après le démarrage, pour rattraper un hébergement endormi)
-    const rem = () => fin.runReminders(pool, notify).catch((e) => console.error('[master] rappels :', e.message));
+    const rem = () => Promise.all([fin.runReminders(pool, notify), fin.runChargeReminders(pool, notify)]).catch((e) => console.error('[master] rappels :', e.message));
     setTimeout(rem, 60 * 1000); setInterval(rem, 60 * 60 * 1000);
     // Surveillance de BRAKA toutes les 5 min : alerte téléphone (ntfy/e-mail) dès qu'une anomalie rouge apparaît ou que BRAKA ne répond plus
     const bUrl = String(process.env.BARAKA_URL || '').replace(/\/$/, ''), bKey = process.env.BARAKA_LINK_KEY || '';

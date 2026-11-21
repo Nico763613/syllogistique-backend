@@ -147,3 +147,31 @@ create table if not exists master_reminders (
   channels   text,
   primary key (payment_id, step)
 );
+
+-- Contrats : durée fixe (ex. 12 mois) dont le temps restant diminue ; 0 = abonnement sans durée de contrat (prolongé à chaque paiement confirmé)
+alter table master_licenses add column if not exists contract_months int not null default 0;
+alter table master_licenses add column if not exists contract_start date;
+
+-- Charges techniques de SYLLOGISTIQUE (Render, base de données, domaine…) avec alerte avant l'échéance
+create table if not exists master_charges (
+  id           bigserial primary key,
+  name         text not null,
+  provider     text,
+  amount       bigint not null default 0,
+  currency     text not null default 'GNF',
+  frequency    text not null default 'MENSUEL',
+  next_due     date not null,
+  remind_days  int not null default 7,
+  active       boolean not null default true,
+  last_paid_at timestamptz,
+  note         text,
+  created_at   timestamptz not null default now()
+);
+create table if not exists master_charge_reminders (
+  charge_id bigint not null references master_charges(id) on delete cascade,
+  due_date  date not null,
+  step      text not null,
+  sent_at   timestamptz not null default now(),
+  channels  text,
+  primary key (charge_id, due_date, step)
+);

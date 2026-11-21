@@ -484,9 +484,59 @@ function financeCard(sc) {
     <div class="card"><h2>Définir l'échéancier d'une licence</h2><p class="muted">Choisissez la fréquence de paiement (distincte de la durée de la licence), le montant de chaque échéance et la période de tolérance avant suspension. Les rappels J-30, J-15, J-7, J-1, J, J+1, J+7, J+15, J+30 et J+60 vous sont envoyés automatiquement sur votre canal d'alerte.</p>
     ${lics.length ? `<div style="overflow:auto"><table><tr><th>Entreprise</th><th>Licence</th><th></th></tr>${lics.map(({ c, l }) => `<tr><td><b>${esc(c.name)}</b></td><td>n°${l.id}</td><td><button class="ghost" onclick="billingForm(${l.id},'${esc(c.name).replace(/'/g, '')}')">Définir / modifier</button></td></tr>`).join('')}</table></div>` : '<p class="muted">Aucune licence.</p>'}</div>`;
 }
+function resteTxt(end) {
+  const e = new Date(end), n = new Date(); if (e <= n) return 'terminé';
+  let m = (e.getFullYear() - n.getFullYear()) * 12 + (e.getMonth() - n.getMonth()); const t = new Date(n); t.setMonth(t.getMonth() + m); if (t > e) { m--; t.setTime(n.getTime()); t.setMonth(t.getMonth() + m); }
+  const d = Math.floor((e - t) / 864e5); return (m ? m + ' mois' : '') + (m && d ? ' et ' : '') + (d || !m ? d + ' jour' + (d > 1 ? 's' : '') : '');
+}
+function contratsCard(sc) {
+  const ct = (sc && sc.contrats) || []; if (!ct.length) return '';
+  return `<div class="card"><h2>Contrats en cours</h2><p class="muted">Durée du contrat et temps restant, mis à jour chaque jour.</p>${ct.map((c) => {
+    const end = new Date(c.expires_at), start = new Date(c.contract_start + 'T00:00:00'), tot = end - start, pc = Math.min(100, Math.max(0, Math.round(((new Date() - start) / tot) * 100)));
+    const urgent = (end - new Date()) / 864e5 <= 30;
+    return `<div style="padding:10px 0;border-top:1px solid #e6ebf3"><b>${esc(c.cname)}</b> <span class="muted">· contrat de ${c.contract_months} mois · du ${fd(c.contract_start)} au ${fd(c.expires_at)}</span>
+      <div style="margin:6px 0;height:10px;background:#e6ebf3;border-radius:6px;overflow:hidden"><div style="width:${pc}%;height:100%;background:${urgent ? '#D0393E' : '#2F6FD6'}"></div></div>
+      <b style="color:${urgent ? '#D0393E' : '#16233A'}">Il reste ${resteTxt(c.expires_at)}</b> <span class="muted">(${pc} % écoulé)</span></div>`;
+  }).join('')}</div>`;
+}
+const CH_ETAT = { a_venir: ['À venir', '#5B6B82'], proche: ['Échéance proche : à payer', '#B8741A'], jour_j: ["Échéance aujourd'hui", '#D0393E'], retard: ['Échéance dépassée', '#D0393E'], inactif: ['Inactif', '#5B6B82'] };
+function chargesCard(ch) {
+  const money = (n, c) => (n ? Number(n).toLocaleString('fr-FR') + ' ' + c : 'montant non renseigné');
+  if (!ch) return '';
+  return `<div class="card"><h2>Mes abonnements techniques (Render, base de données, domaine…)</h2><p class="muted">Vous êtes prévenu sur votre téléphone ${ch[0] ? 'avant chaque échéance (7 jours par défaut, puis 1 jour avant, le jour même et en cas de retard)' : '7 jours avant chaque échéance'}. Le tableau de bord ne paie rien à votre place : vous réglez l'abonnement, puis vous touchez « Payé ».</p>
+    ${ch.length ? `<div style="overflow:auto"><table><tr><th>Abonnement</th><th>Échéance</th><th>Montant</th><th>État</th><th></th></tr>${ch.map((c) => `<tr><td><b>${esc(c.name)}</b><div class="muted">${esc(c.provider || '')} · ${esc(c.frequency.toLowerCase())}</div></td><td>${fd(c.due)}</td><td>${money(c.amount, c.currency)}</td>
+      <td><b style="color:${CH_ETAT[c.etat][1]}">${CH_ETAT[c.etat][0]}</b><div class="muted">${c.jours >= 0 ? 'dans ' + c.jours + ' j' : 'depuis ' + (-c.jours) + ' j'}</div></td>
+      <td><button class="gold" onclick="chargePaid(${c.id},'${esc(c.name).replace(/'/g, '')}')">Payé</button> <button class="ghost" onclick="chargeDel(${c.id},'${esc(c.name).replace(/'/g, '')}')">Retirer</button></td></tr>`).join('')}</table></div>` : '<p class="muted">Aucun abonnement suivi pour le moment.</p>'}
+    <p><button class="gold" onclick="chargeForm('')">Ajouter un abonnement</button> <button class="ghost" onclick="chargeForm('Render')">Ajouter Render</button></p></div>`;
+}
+function chargeForm(nom) {
+  const d = new Date(); d.setDate(d.getDate() + 30);
+  openModal(`<h2>Nouvel abonnement à suivre</h2>
+    <label>Nom</label><input id="cn" maxlength="80" value="${esc(nom)}" placeholder="ex. Render, Neon, nom de domaine">
+    <label>Fournisseur (facultatif)</label><input id="cp" maxlength="60" value="${esc(nom)}">
+    <label>Montant (facultatif)</label><input id="ca" type="number" min="0" inputmode="numeric" placeholder="le montant exact de votre facture">
+    <label>Devise</label><select id="cc"><option>USD</option><option>GNF</option><option>EUR</option><option>XOF</option></select>
+    <label>Fréquence</label><select id="cf"><option value="MENSUEL">Mensuel</option><option value="TRIMESTRIEL">Trimestriel</option><option value="SEMESTRIEL">Semestriel</option><option value="ANNUEL">Annuel</option></select>
+    <label>Prochaine échéance (date indiquée sur votre facture)</label><input id="cd" type="date" value="${d.toISOString().slice(0, 10)}">
+    <label>M'alerter combien de jours avant ?</label><input id="cr" type="number" min="1" max="60" value="7">
+    <p><button class="gold" onclick="chargeSave()">Enregistrer</button> <button class="ghost" onclick="closeModal()">Annuler</button></p>`);
+}
+async function chargeSave() {
+  try { await api('/api/charges', { name: $('cn').value, provider: $('cp').value, amount: $('ca').value, currency: $('cc').value, frequency: $('cf').value, nextDue: $('cd').value, remindDays: $('cr').value }); closeModal(); showFinance(); } catch (e) { alert(e.message); }
+}
+async function chargePaid(id, nom) {
+  if (!(await confirmBox(`Avez-vous bien payé ${nom} ? L'échéance passera à la période suivante.`, "Oui, c'est payé"))) return;
+  try { const r = await api(`/api/charges/${id}/paid`, {}); alert('Enregistré. Prochaine échéance : ' + fd(r.nextDue)); showFinance(); } catch (e) { alert(e.message); }
+}
+async function chargeDel(id, nom) {
+  if (!(await confirmBox(`Ne plus suivre ${nom} ?`, 'Retirer'))) return;
+  try { await api(`/api/charges/${id}/delete`, {}); showFinance(); } catch (e) { alert(e.message); }
+}
 function billingForm(id, nom) {
   const d = new Date(); d.setDate(d.getDate() + 30); const first = d.toISOString().slice(0, 10);
-  openModal(`<h2>Échéancier — ${esc(nom)}</h2><p class="muted">Remplacer l'échéancier supprime seulement les échéances non payées ; les paiements déjà confirmés restent.</p>
+  openModal(`<h2>Échéancier — ${esc(nom)}</h2><p class="muted">Un contrat de 12 mois dure 12 mois : le temps restant diminue chaque jour, quelle que soit la fréquence de paiement. Remplacer l'échéancier supprime seulement les échéances non payées.</p>
+    <label>Durée du contrat</label><select id="bm"><option value="12">12 mois (1 an)</option><option value="6">6 mois</option><option value="3">3 mois</option><option value="24">24 mois (2 ans)</option><option value="0">Sans durée de contrat (chaque paiement prolonge)</option></select>
+    <label>Début du contrat</label><input id="bs" type="date" value="${new Date().toISOString().slice(0, 10)}">
     <label>Fréquence de paiement</label><select id="bf"><option value="MENSUEL">Mensuel</option><option value="SEMESTRIEL">Semestriel</option><option value="ANNUEL">Annuel</option></select>
     <label>Montant de chaque échéance</label><input id="ba" type="number" min="1" inputmode="numeric" placeholder="ex. 500000">
     <label>Devise</label><select id="bc"><option>GNF</option><option>USD</option><option>EUR</option><option>XOF</option></select>
@@ -495,7 +545,7 @@ function billingForm(id, nom) {
     <p><button class="gold" onclick="billingSave(${id})">Enregistrer</button> <button class="ghost" onclick="closeModal()">Annuler</button></p>`);
 }
 async function billingSave(id) {
-  try { await api(`/api/licenses/${id}/billing`, { frequency: $('bf').value, amount: $('ba').value, currency: $('bc').value, firstDue: $('bd').value, toleranceDays: $('bt').value }); closeModal(); showFinance(); } catch (e) { alert(e.message); }
+  try { await api(`/api/licenses/${id}/billing`, { frequency: $('bf').value, amount: $('ba').value, currency: $('bc').value, firstDue: $('bd').value, toleranceDays: $('bt').value, contractMonths: $('bm').value, contractStart: $('bs').value }); closeModal(); showFinance(); } catch (e) { alert(e.message); }
 }
 function payConfirm(id) {
   openModal(`<h2>Confirmer le paiement</h2><p class="muted">À faire seulement quand l'argent est réellement reçu. La licence sera renouvelée de la période payée.</p>
@@ -508,12 +558,14 @@ async function payConfirmSave(id) {
 }
 async function showFinance() {
   try {
-    await loadAll(); stage('finance'); const sc = await api('/api/finance/schedule').catch(() => null); const L2 = lic(); const live = L2.filter((l) => !['REVOKED'].includes(l.effective));
+    await loadAll(); stage('finance'); const sc = await api('/api/finance/schedule').catch(() => null); const chg = await api('/api/charges').catch(() => null); const L2 = lic(); const live = L2.filter((l) => !['REVOKED'].includes(l.effective));
     const paid = live.filter((l) => l.paymentConfirmed).length, unp = live.filter((l) => !l.paymentConfirmed); const perm = live.filter((l) => l.permanent).length; const shop = live.filter((l) => (l.modules || '').includes('COMMERCIAL')).length;
     const rows = (arr) => arr.map(({ c, l }) => `<tr><td><b>${esc(c.name)}</b></td><td>n°${l.id}</td><td>${l.permanent ? 'Permanente' : fd(l.expiresAt)}</td><td>${pill(l.effective)}</td><td><a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></td></tr>`).join('');
     const unpRows = CL.flatMap((c) => c.licenses.filter((l) => !l.paymentConfirmed && l.effective !== 'REVOKED').map((l) => ({ c, l })));
     v.innerHTML = `<div class="card">${bar('Finance et facturation')}<p class="muted">Paiements, échéances et expirations de chaque licence. Les factures PDF et les dépenses arrivent dans une prochaine étape.</p>
       <div class="grid"><div class="kpi"><b>${paid}</b><span>Paiements confirmés</span></div><div class="kpi ${unp.length ? 'warn' : ''}"><b>${unp.length}</b><span>Paiements à confirmer</span></div><div class="kpi"><b>${perm}</b><span>Licences permanentes</span></div><div class="kpi"><b>${live.length - perm}</b><span>Licences à durée limitée</span></div><div class="kpi"><b>${shop}</b><span>Avec Caisse &amp; Ventes</span></div></div></div>
+      ${chargesCard(chg)}
+      ${contratsCard(sc)}
       ${financeCard(sc)}
       <div class="card"><h2>Paiements à confirmer</h2>${unpRows.length ? `<div style="overflow:auto"><table><tr><th>Client</th><th>Licence</th><th>Échéance</th><th>Statut</th><th></th></tr>${rows(unpRows)}</table></div>` : '<p class="muted">Aucun paiement en attente de confirmation.</p>'}</div>
       <div class="card"><h2>Échéances dans les 30 jours</h2>${expiring().length ? `<div style="overflow:auto"><table><tr><th>Client</th><th>Licence</th><th>Échéance</th><th>Statut</th><th></th></tr>${rows(expiring())}</table></div>` : '<p class="muted">Aucune échéance dans les 30 prochains jours.</p>'}
