@@ -1,6 +1,6 @@
 # SYLLOGISTIQUE MASTER — étape 1 : accès propriétaire
 
-Tableau de bord **privé** de Naby Moussa SYLLA. Il est indépendant des installations clientes (autre serveur, autre base).
+Tableau de bord **privé** du propriétaire. Il est indépendant des installations clientes (autre serveur, autre base).
 Cette étape contient : connexion par mot de passe + code à 2 étapes (obligatoire), codes de secours, verrouillage après erreurs, journal d'audit.
 Les clients, les licences et les appareils arrivent aux étapes 2 à 6.
 
