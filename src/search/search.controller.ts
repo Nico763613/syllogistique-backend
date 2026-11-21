@@ -5,6 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SearchService } from './search.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { resolveSite } from '../dashboards/dashboard-common';
 
 @ApiTags('search')
 @ApiBearerAuth()
@@ -17,6 +18,7 @@ export class SearchController {
   @Get()
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.LECTEUR, RoleName.DIRECTEUR_GENERAL, RoleName.RESPONSABLE_OPERATIONS)
   search(@Query('q') q: string, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
-    return this.searchService.search(q, siteId || actor.siteId);
+    // Le site demandé doit appartenir au périmètre de l'utilisateur (sauf Super Admin)
+    return this.searchService.search(q, resolveSite(actor, siteId));
   }
 }

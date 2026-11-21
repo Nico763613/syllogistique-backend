@@ -16,12 +16,12 @@ export class SitesController {
 
   @Get()
   findAll(@CurrentUser() actor: any) {
-    return this.sitesService.findAll(actor.organizationId);
+    return this.sitesService.findAll(actor.organizationId, actor);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() actor: any) {
-    return this.sitesService.findOne(id, actor.organizationId);
+    return this.sitesService.findOne(id, actor.organizationId, actor);
   }
 
   @Post()

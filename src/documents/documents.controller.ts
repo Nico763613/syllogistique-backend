@@ -19,7 +19,7 @@ export class DocumentsController {
   @Post()
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   create(@Body() dto: CreateDocumentDto, @CurrentUser() actor: any) {
-    return this.documentsService.create(dto, actor.userId);
+    return this.documentsService.create(dto, actor);
   }
 
   // ex: GET /documents?vehicleId=…  ou  GET /documents?expiringInDays=30
@@ -28,8 +28,9 @@ export class DocumentsController {
     @Query('vehicleId') vehicleId?: string,
     @Query('type') type?: string,
     @Query('expiringInDays') expiringInDays?: string,
+    @CurrentUser() actor?: any,
   ) {
-    return this.documentsService.findAll({
+    return this.documentsService.findAll(actor, {
       vehicleId,
       type,
       expiringInDays: expiringInDays !== undefined && expiringInDays !== '' ? Number(expiringInDays) : undefined,
@@ -39,6 +40,6 @@ export class DocumentsController {
   @Patch(':id')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   update(@Param('id') id: string, @Body() dto: UpdateDocumentDto, @CurrentUser() actor: any) {
-    return this.documentsService.update(id, dto, actor.userId);
+    return this.documentsService.update(id, dto, actor);
   }
 }

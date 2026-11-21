@@ -8,11 +8,16 @@ import { CreateSiteDto, UpdateSiteDto } from './dto/site.dto';
 export class SitesService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  findAll(organizationId: string) {
-    return this.prisma.site.findMany({ where: { organizationId }, orderBy: { name: 'asc' } });
+  // Hors Super Admin, un utilisateur ne voit que son propre site
+  findAll(organizationId: string, actor?: { role: string; siteId?: string }) {
+    const own = actor && actor.role !== 'SUPER_ADMIN' && actor.siteId ? { id: actor.siteId } : {};
+    return this.prisma.site.findMany({ where: { organizationId, ...own }, orderBy: { name: 'asc' } });
   }
 
-  async findOne(id: string, organizationId: string) {
+  async findOne(id: string, organizationId: string, actor?: { role: string; siteId?: string }) {
+    if (actor && actor.role !== 'SUPER_ADMIN' && actor.siteId && actor.siteId !== id) {
+      throw new NotFoundException('Site introuvable.');
+    }
     const site = await this.prisma.site.findFirst({ where: { id, organizationId } });
     if (!site) throw new NotFoundException('Site introuvable.');
     return site;
