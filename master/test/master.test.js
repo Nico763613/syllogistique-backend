@@ -17,7 +17,7 @@ async function call(method, path, body, ck) {
 
 test.before(async () => {
   pool = new Pool({});
-  await pool.query('drop table if exists master_devices, master_licenses, master_clients, master_recovery_codes, master_audit_log, master_admins cascade');
+  await pool.query('drop table if exists master_reminders, master_payments, master_devices, master_licenses, master_clients, master_recovery_codes, master_audit_log, master_admins cascade');
   await migrate(pool);
   assert.equal(await bootstrapAdmin(pool, cfg), true);
   assert.equal(await bootstrapAdmin(pool, cfg), false, 'ne recrée pas un second administrateur');
@@ -263,4 +263,43 @@ test('liaison BARAKA : résumé, déblocage et mot de passe provisoire via la cl
 test('version de l\'écran : publique, stable, et injectée dans la page', async () => {
   const a = await (await fetch(base + '/api/version')).json(); assert.match(a.build, /^[0-9a-f]{10}$/);
   const html = await (await fetch(base + '/')).text(); assert.ok(html.includes("const BUILD = '" + a.build + "'"), 'la page connaît sa version');
+});
+
+test('finance : échéancier, confirmation manuelle, renouvellement, rappels sans doublon', async () => {
+  const fin = require('../src/finance');
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  assert.equal((await call('GET', '/api/finance/schedule', undefined, '')).status, 401, 'rien sans connexion');
+  const cl = await call('POST', '/api/clients', { name: 'Entreprise Finance' }, ck);
+  const exp0 = new Date(Date.now() + 864e5 * 10).toISOString().slice(0, 10);
+  const lic = await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: exp0, maxDevices: 5 }, ck); assert.equal(lic.status, 200);
+  const id = lic.json.id || lic.json.licenseId || (await pool.query('select max(id) as id from master_licenses')).rows[0].id;
+  const due = fin.ymd(new Date(Date.now() + 864e5 * 5));
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'HEBDO', amount: 100, firstDue: due }, ck)).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'MENSUEL', amount: 0, firstDue: due }, ck)).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'MENSUEL', amount: 500000, currency: 'GNF', toleranceDays: 15, firstDue: due }, ck)).status, 200);
+  let sc = (await call('GET', '/api/finance/schedule', undefined, ck)).json;
+  assert.equal(sc.items.filter((x) => x.license_id == id).length, 12);
+  assert.equal(sc.totaux.attendu, 12 * 500000); assert.equal(sc.totaux.recu_mois, 0, 'rien n\'est reçu tant que le Master Admin n\'a pas confirmé');
+  // rappel : une seule fois par étape, et seulement s'il a été réellement envoyé
+  const sentLog = []; const fake = async (k, t) => { sentLog.push(k); return { sent: ['ntfy'] }; };
+  const r1 = await fin.runReminders(pool, fake); assert.equal(r1.sent, 1);
+  const r2 = await fin.runReminders(pool, fake); assert.equal(r2.sent, 0, 'pas de doublon');
+  const none = await fin.runReminders(pool, async () => ({ sent: [], skipped: 'no-channel' }), new Date(Date.now() + 864e5 * 20)); assert.equal(none.sent, 0, 'non envoyé = non enregistré');
+  // confirmation : méthode obligatoire, puis renouvellement de la période payée
+  const first = sc.items.find((x) => x.license_id == id);
+  assert.equal((await call('POST', `/api/payments/${first.id}/confirm`, {}, ck)).status, 400);
+  const c = await call('POST', `/api/payments/${first.id}/confirm`, { method: 'Orange Money', reference: 'OM123' }, ck); assert.equal(c.status, 200);
+  assert.equal(c.json.expiresAt.slice(0, 10), fin.ymd(fin.addMonths(new Date(exp0 + 'T23:59:59Z'), 1)));
+  assert.equal((await call('POST', `/api/payments/${first.id}/confirm`, { method: 'x' }, ck)).status, 404, 'déjà confirmée');
+  sc = (await call('GET', '/api/finance/schedule', undefined, ck)).json;
+  assert.equal(sc.totaux.recu_mois, 500000);
+  const log = (await call('GET', '/api/audit', undefined, ck)).json; assert.ok(log.some((x) => x.action === 'PAIEMENT_CONFIRME'));
+});
+test('finance : calcul des états et des étapes de rappel', () => {
+  const fin = require('../src/finance'); const now = new Date('2026-11-10T10:00:00Z');
+  assert.equal(fin.etat('2026-12-30', 15, now), 'a_venir'); assert.equal(fin.etat('2026-11-15', 15, now), 'proche'); assert.equal(fin.etat('2026-11-10', 15, now), 'jour_j');
+  assert.equal(fin.etat('2026-11-01', 15, now), 'tolerance'); assert.equal(fin.etat('2026-10-01', 15, now), 'hors_tolerance');
+  assert.equal(fin.stepFor(40), null); assert.equal(fin.stepFor(20)[1], 'J-30'); assert.equal(fin.stepFor(0)[1], 'J'); assert.equal(fin.stepFor(-3)[1], 'J+1'); assert.equal(fin.stepFor(-90)[1], 'J+60');
+  assert.deepEqual(fin.dueDates('2026-01-31', 'SEMESTRIEL'), ['2026-01-31', '2026-07-31', '2027-01-31', '2027-07-31']);
 });
