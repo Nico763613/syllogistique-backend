@@ -7,6 +7,7 @@ const auth = require('./auth');
 const lic = require('./license');
 const { makePool, migrate } = require('./db');
 const { notify } = require('./notify');
+const fin = require('./finance');
 const backups = require('./backups');
 const { diagnose, signalType } = require('./diagnose');
 
@@ -293,6 +294,59 @@ function createApp(pool, cfg) {
       return send(res, 404, { error: 'Introuvable' });
     }
 
+    // ---------- finance : échéancier et paiements (Phase 1) ----------
+    let fm;
+    if (req.method === 'GET' && p === '/api/finance/schedule') {
+      const { rows } = await pool.query(`select p.id, p.license_id, p.due_date::text as due, p.amount, p.status, p.paid_at, p.method, p.reference,
+          l.currency, l.pay_frequency, l.tolerance_days, c.id as client_id, c.name as cname,
+          (select string_agg(r.step, ',' order by r.sent_at) from master_reminders r where r.payment_id=p.id) as rappels
+        from master_payments p join master_licenses l on l.id=p.license_id join master_clients c on c.id=l.client_id
+        where p.status='DUE' or p.paid_at > now() - interval '90 days' order by p.due_date, p.id limit 500`);
+      const items = rows.map((r) => ({ ...r, amount: Number(r.amount), jours: fin.daysTo(r.due), etat: r.status === 'PAID' ? 'paye' : fin.etat(r.due, r.tolerance_days) }));
+      const mois = new Date().toISOString().slice(0, 7);
+      const sum = (f) => items.filter(f).reduce((a, x) => a + x.amount, 0);
+      const cur = [...new Set(items.map((x) => x.currency))];
+      return send(res, 200, { items, devises: cur,
+        totaux: { recu_mois: sum((x) => x.status === 'PAID' && String(x.paid_at).slice(0, 7) === mois), attendu: sum((x) => x.status === 'DUE'), en_retard: sum((x) => x.status === 'DUE' && x.jours < 0),
+          nb_retard: items.filter((x) => x.status === 'DUE' && x.jours < 0).length, nb_tolerance: items.filter((x) => x.etat === 'tolerance').length, nb_hors_tolerance: items.filter((x) => x.etat === 'hors_tolerance').length },
+        mixte: cur.length > 1 });
+    }
+    if (req.method === 'POST' && (fm = /^\/api\/licenses\/(\d+)\/billing$/.exec(p))) {
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [Number(fm[1])])).rows[0];
+      if (!l) return send(res, 404, { error: 'Licence introuvable.' });
+      const freq = String(body.frequency || ''); const amount = Math.round(Number(body.amount)); const cur = String(body.currency || 'GNF').toUpperCase(); const tol = Math.round(Number(body.toleranceDays ?? 15));
+      if (!fin.FREQ[freq]) return send(res, 400, { error: 'Choisissez la fréquence : mensuel, semestriel ou annuel.' });
+      if (!Number.isFinite(amount) || amount <= 0) return send(res, 400, { error: 'Saisissez le montant de chaque échéance.' });
+      if (!fin.CURRENCIES.includes(cur)) return send(res, 400, { error: 'Devise non prise en charge.' });
+      if (!Number.isFinite(tol) || tol < 0 || tol > 180) return send(res, 400, { error: 'La période de tolérance doit être comprise entre 0 et 180 jours.' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.firstDue || '')) || isNaN(Date.parse(body.firstDue))) return send(res, 400, { error: 'Choisissez la date de la première échéance.' });
+      await pool.query("update master_licenses set pay_frequency=$2, pay_amount=$3, currency=$4, tolerance_days=$5 where id=$1 returning id", [l.id, freq, amount, cur, tol]);
+      await pool.query("delete from master_payments where license_id=$1 and status='DUE' returning id", [l.id]); // les paiements déjà confirmés ne sont jamais touchés
+      for (const d of fin.dueDates(body.firstDue, freq)) await pool.query('insert into master_payments(license_id, due_date, amount) values ($1,$2,$3) returning id', [l.id, d, amount]);
+      await audit(s.aid, 'ECHEANCIER_DEFINI', `${l.cname} · licence ${l.id} · ${freq} · ${amount} ${cur} · tolérance ${tol} j`, req);
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && (fm = /^\/api\/payments\/(\d+)\/confirm$/.exec(p))) {
+      // Le paiement n'est considéré reçu que sur validation du Master Admin ; le renouvellement suit la confirmation, jamais une simple déclaration.
+      const method = String(body.method || '').slice(0, 40), ref = String(body.reference || '').slice(0, 80);
+      if (!method) return send(res, 400, { error: 'Indiquez comment le paiement a été reçu (espèces, virement, Orange Money…).' });
+      const got = await pool.query("update master_payments set status='PAID', paid_at=now(), method=$2, reference=$3, confirmed_by=$4 where id=$1 and status='DUE' returning license_id, due_date::text as due, amount", [Number(fm[1]), method, ref || null, s.aid]);
+      if (!got.rowCount) return send(res, 404, { error: 'Échéance introuvable ou déjà confirmée.' });
+      const pay = got.rows[0];
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [pay.license_id])).rows[0];
+      let exp = l.expires_at;
+      if (!l.permanent && l.status !== 'REVOKED') { // renouvelle la période payée à partir de la fin actuelle (ou d'aujourd'hui si déjà expirée)
+        const base = l.expires_at && new Date(l.expires_at) > new Date() ? new Date(l.expires_at) : new Date();
+        exp = fin.addMonths(base, fin.FREQ[l.pay_frequency] || 1).toISOString();
+        await pool.query('update master_licenses set expires_at=$2 where id=$1 returning id', [l.id, exp]);
+      }
+      await pool.query('update master_licenses set payment_confirmed=true where id=$1 returning id', [l.id]);
+      const left = (await pool.query("select count(*)::int as n, max(due_date)::text as last from master_payments where license_id=$1 and status='DUE'", [l.id])).rows[0];
+      if (left.n < 2) await pool.query('insert into master_payments(license_id, due_date, amount) values ($1,$2,$3) returning id', [l.id, fin.ymd(fin.addMonths(left.last || pay.due, fin.FREQ[l.pay_frequency] || 1)), l.pay_amount || pay.amount]);
+      await audit(s.aid, 'PAIEMENT_CONFIRME', `${l.cname} · licence ${l.id} · échéance ${pay.due} · ${pay.amount} ${l.currency} · ${method}${ref ? ' · ' + ref : ''}${l.permanent ? '' : ' · nouvelle expiration ' + String(exp).slice(0, 10)}`, req);
+      return send(res, 200, { ok: true, expiresAt: l.permanent ? null : exp });
+    }
+
     // ---------- supervision : signalements et vue d'ensemble ----------
     const dOk = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || '')) ? x : null);
     if (req.method === 'GET' && p === '/api/reports') {
@@ -526,6 +580,9 @@ if (require.main === module) {
     const cfg = configFromEnv(); const pool = makePool();
     await migrate(pool); await bootstrapAdmin(pool, cfg);
     createApp(pool, cfg).listen(cfg.port, () => console.log('[master] en ligne sur le port ' + cfg.port));
+    // Rappels d'échéances : contrôle toutes les heures (et 1 min après le démarrage, pour rattraper un hébergement endormi)
+    const rem = () => fin.runReminders(pool, notify).catch((e) => console.error('[master] rappels :', e.message));
+    setTimeout(rem, 60 * 1000); setInterval(rem, 60 * 60 * 1000);
     // Surveillance de BRAKA toutes les 5 min : alerte téléphone (ntfy/e-mail) dès qu'une anomalie rouge apparaît ou que BRAKA ne répond plus
     const bUrl = String(process.env.BARAKA_URL || '').replace(/\/$/, ''), bKey = process.env.BARAKA_LINK_KEY || '';
     if (bUrl && bKey) setInterval(async () => {

@@ -465,14 +465,56 @@ async function showLicences() {
     drawList();
   } catch (e) { showLogin(); }
 }
+const ETAT_FR = { a_venir: 'À venir', proche: 'Échéance proche', jour_j: "Échéance aujourd'hui", tolerance: 'En retard (tolérance)', hors_tolerance: 'Retard hors tolérance', paye: 'Payé' };
+const ETAT_COL = { a_venir: '#5B6B82', proche: '#B8741A', jour_j: '#B8741A', tolerance: '#D0393E', hors_tolerance: '#D0393E', paye: '#1E9E5A' };
+function financeCard(sc) {
+  const lics = CL.flatMap((c) => c.licenses.filter((l) => l.effective !== 'REVOKED').map((l) => ({ c, l })));
+  if (!sc) return '<div class="card"><h2>Échéancier</h2><p class="muted">Échéancier indisponible : mise à jour du serveur en cours, réessayez dans une minute.</p></div>';
+  const t = sc.totaux, mix = sc.mixte ? ' (devises différentes : totaux à lire par ligne)' : '', dv = sc.devises[0] || 'GNF';
+  const money = (n, c) => Number(n).toLocaleString('fr-FR') + ' ' + c;
+  const seen = new Set(), open = sc.items.filter((x) => x.status === 'DUE' && !seen.has(x.license_id) && seen.add(x.license_id)).slice(0, 40), done = sc.items.filter((x) => x.status === 'PAID').slice(-10).reverse();
+  const row = (x) => `<tr><td><b>${esc(x.cname)}</b><div class="muted">licence n°${x.license_id} · ${esc(x.pay_frequency.toLowerCase())}</div></td><td>${fd(x.due)}</td><td>${money(x.amount, x.currency)}</td>
+    <td><b style="color:${ETAT_COL[x.etat]}">${ETAT_FR[x.etat]}</b>${x.status === 'DUE' ? `<div class="muted">${x.jours >= 0 ? 'dans ' + x.jours + ' j' : 'depuis ' + (-x.jours) + ' j'}${x.rappels ? ' · rappels : ' + esc(x.rappels) : ''}</div>` : `<div class="muted">${esc(x.method || '')}${x.reference ? ' · ' + esc(x.reference) : ''}</div>`}</td>
+    <td>${x.status === 'DUE' ? `<button class="gold" onclick="payConfirm(${x.id})">Confirmer le paiement</button>` : ''}</td></tr>`;
+  return `<div class="card"><h2>Échéancier et paiements</h2><p class="muted">Prochaine échéance de chaque licence. Un paiement n'est jamais considéré reçu sur une simple déclaration : vous le confirmez ici, puis la licence est renouvelée de la période payée.${mix}</p>
+    <div class="grid"><div class="kpi"><b>${money(t.recu_mois, dv)}</b><span>Reçu ce mois</span></div><div class="kpi"><b>${money(t.attendu, dv)}</b><span>Attendu (échéances ouvertes)</span></div>
+    <div class="kpi ${t.nb_retard ? 'warn' : ''}"><b>${t.nb_retard}</b><span>Échéances en retard (${money(t.en_retard, dv)})</span></div><div class="kpi ${t.nb_hors_tolerance ? 'warn' : ''}"><b>${t.nb_hors_tolerance}</b><span>Hors tolérance : suspension à décider</span></div></div>
+    ${open.length ? `<div style="overflow:auto"><table><tr><th>Entreprise</th><th>Échéance</th><th>Montant</th><th>État</th><th></th></tr>${open.map(row).join('')}</table></div>` : '<p class="muted">Aucune échéance ouverte. Définissez l\'échéancier d\'une licence ci-dessous.</p>'}
+    ${done.length ? `<h3>Derniers paiements confirmés</h3><div style="overflow:auto"><table><tr><th>Entreprise</th><th>Échéance</th><th>Montant</th><th>État</th><th></th></tr>${done.map(row).join('')}</table></div>` : ''}</div>
+    <div class="card"><h2>Définir l'échéancier d'une licence</h2><p class="muted">Choisissez la fréquence de paiement (distincte de la durée de la licence), le montant de chaque échéance et la période de tolérance avant suspension. Les rappels J-30, J-15, J-7, J-1, J, J+1, J+7, J+15, J+30 et J+60 vous sont envoyés automatiquement sur votre canal d'alerte.</p>
+    ${lics.length ? `<div style="overflow:auto"><table><tr><th>Entreprise</th><th>Licence</th><th></th></tr>${lics.map(({ c, l }) => `<tr><td><b>${esc(c.name)}</b></td><td>n°${l.id}</td><td><button class="ghost" onclick="billingForm(${l.id},'${esc(c.name).replace(/'/g, '')}')">Définir / modifier</button></td></tr>`).join('')}</table></div>` : '<p class="muted">Aucune licence.</p>'}</div>`;
+}
+function billingForm(id, nom) {
+  const d = new Date(); d.setDate(d.getDate() + 30); const first = d.toISOString().slice(0, 10);
+  openModal(`<h2>Échéancier — ${esc(nom)}</h2><p class="muted">Remplacer l'échéancier supprime seulement les échéances non payées ; les paiements déjà confirmés restent.</p>
+    <label>Fréquence de paiement</label><select id="bf"><option value="MENSUEL">Mensuel</option><option value="SEMESTRIEL">Semestriel</option><option value="ANNUEL">Annuel</option></select>
+    <label>Montant de chaque échéance</label><input id="ba" type="number" min="1" inputmode="numeric" placeholder="ex. 500000">
+    <label>Devise</label><select id="bc"><option>GNF</option><option>USD</option><option>EUR</option><option>XOF</option></select>
+    <label>Date de la première échéance</label><input id="bd" type="date" value="${first}">
+    <label>Tolérance avant proposition de suspension (jours)</label><input id="bt" type="number" min="0" max="180" value="15">
+    <p><button class="gold" onclick="billingSave(${id})">Enregistrer</button> <button class="ghost" onclick="closeModal()">Annuler</button></p>`);
+}
+async function billingSave(id) {
+  try { await api(`/api/licenses/${id}/billing`, { frequency: $('bf').value, amount: $('ba').value, currency: $('bc').value, firstDue: $('bd').value, toleranceDays: $('bt').value }); closeModal(); showFinance(); } catch (e) { alert(e.message); }
+}
+function payConfirm(id) {
+  openModal(`<h2>Confirmer le paiement</h2><p class="muted">À faire seulement quand l'argent est réellement reçu. La licence sera renouvelée de la période payée.</p>
+    <label>Reçu par</label><select id="pm"><option>Espèces</option><option>Orange Money</option><option>MTN Money</option><option>Virement bancaire</option><option>Autre</option></select>
+    <label>Référence (facultatif)</label><input id="pr" maxlength="80" placeholder="n° de transaction, reçu…">
+    <p><button class="gold" onclick="payConfirmSave(${id})">Oui, le paiement est reçu</button> <button class="ghost" onclick="closeModal()">Annuler</button></p>`);
+}
+async function payConfirmSave(id) {
+  try { const r = await api(`/api/payments/${id}/confirm`, { method: $('pm').value, reference: $('pr').value }); closeModal(); alert('Paiement confirmé.' + (r.expiresAt ? ' Nouvelle expiration : ' + fd(r.expiresAt) : '')); showFinance(); } catch (e) { alert(e.message); }
+}
 async function showFinance() {
   try {
-    await loadAll(); stage('finance'); const L2 = lic(); const live = L2.filter((l) => !['REVOKED'].includes(l.effective));
+    await loadAll(); stage('finance'); const sc = await api('/api/finance/schedule').catch(() => null); const L2 = lic(); const live = L2.filter((l) => !['REVOKED'].includes(l.effective));
     const paid = live.filter((l) => l.paymentConfirmed).length, unp = live.filter((l) => !l.paymentConfirmed); const perm = live.filter((l) => l.permanent).length; const shop = live.filter((l) => (l.modules || '').includes('COMMERCIAL')).length;
     const rows = (arr) => arr.map(({ c, l }) => `<tr><td><b>${esc(c.name)}</b></td><td>n°${l.id}</td><td>${l.permanent ? 'Permanente' : fd(l.expiresAt)}</td><td>${pill(l.effective)}</td><td><a href="#" onclick="nav('extend',${l.id});return false">Prolonger</a></td></tr>`).join('');
     const unpRows = CL.flatMap((c) => c.licenses.filter((l) => !l.paymentConfirmed && l.effective !== 'REVOKED').map((l) => ({ c, l })));
-    v.innerHTML = `<div class="card">${bar('Finance et facturation')}<p class="muted">Statut de paiement et échéances de chaque licence. Les montants et les factures ne sont pas encore suivis dans le Master : seuls le paiement confirmé ou non, et les dates d'échéance, le sont.</p>
+    v.innerHTML = `<div class="card">${bar('Finance et facturation')}<p class="muted">Paiements, échéances et expirations de chaque licence. Les factures PDF et les dépenses arrivent dans une prochaine étape.</p>
       <div class="grid"><div class="kpi"><b>${paid}</b><span>Paiements confirmés</span></div><div class="kpi ${unp.length ? 'warn' : ''}"><b>${unp.length}</b><span>Paiements à confirmer</span></div><div class="kpi"><b>${perm}</b><span>Licences permanentes</span></div><div class="kpi"><b>${live.length - perm}</b><span>Licences à durée limitée</span></div><div class="kpi"><b>${shop}</b><span>Avec Caisse &amp; Ventes</span></div></div></div>
+      ${financeCard(sc)}
       <div class="card"><h2>Paiements à confirmer</h2>${unpRows.length ? `<div style="overflow:auto"><table><tr><th>Client</th><th>Licence</th><th>Échéance</th><th>Statut</th><th></th></tr>${rows(unpRows)}</table></div>` : '<p class="muted">Aucun paiement en attente de confirmation.</p>'}</div>
       <div class="card"><h2>Échéances dans les 30 jours</h2>${expiring().length ? `<div style="overflow:auto"><table><tr><th>Client</th><th>Licence</th><th>Échéance</th><th>Statut</th><th></th></tr>${rows(expiring())}</table></div>` : '<p class="muted">Aucune échéance dans les 30 prochains jours.</p>'}
       <a class="btn ghost" href="/api/export/licenses.csv">Exporter les licences (CSV)</a></div>`;

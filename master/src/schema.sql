@@ -119,3 +119,31 @@ create table if not exists master_mails (
 -- Classement des clients en dossiers et sous-dossiers (facultatif)
 alter table master_clients add column if not exists folder text;
 alter table master_clients add column if not exists subfolder text;
+
+-- Phase 1 : échéancier et paiements (ajouts uniquement ; la durée de la licence reste distincte de la fréquence de paiement)
+alter table master_licenses add column if not exists pay_frequency text not null default 'MENSUEL';
+alter table master_licenses add column if not exists pay_amount bigint not null default 0;
+alter table master_licenses add column if not exists currency text not null default 'GNF';
+alter table master_licenses add column if not exists tolerance_days int not null default 15;
+create table if not exists master_payments (
+  id           bigserial primary key,
+  license_id   bigint not null references master_licenses(id) on delete cascade,
+  due_date     date not null,
+  amount       bigint not null,
+  status       text not null default 'DUE',   -- DUE = attendu ; PAID = confirmé par le Master Admin
+  paid_at      timestamptz,
+  method       text,
+  reference    text,
+  confirmed_by bigint references master_admins(id),
+  created_at   timestamptz not null default now()
+);
+create index if not exists master_payments_due on master_payments (status, due_date);
+create index if not exists master_payments_lic on master_payments (license_id);
+-- Rappels réellement envoyés (un par échéance et par étape) : sert à ne jamais envoyer deux fois
+create table if not exists master_reminders (
+  payment_id bigint not null references master_payments(id) on delete cascade,
+  step       text not null,
+  sent_at    timestamptz not null default now(),
+  channels   text,
+  primary key (payment_id, step)
+);
