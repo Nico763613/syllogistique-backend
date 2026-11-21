@@ -407,14 +407,16 @@ async function actualiser() {
   location.reload();
 }
 async function showBaraka() {
-  stage('baraka');
+  stage('baraka'); barakaAuto();
   v.innerHTML = `<div class="card">${bar('BRAKA ÉLECTRONIQUE MOBILE')}<p class="muted">Chargement… (si l'hébergement dormait, comptez jusqu'à une minute)</p></div>`;
   try {
     const [sm, us] = await Promise.all([api('/api/baraka/summary'), api('/api/baraka/users')]);
+    const [hl, ac] = await Promise.all([api('/api/baraka/health').catch(() => null), api('/api/baraka/activity').catch(() => null)]);
     const kp = (c, i, n, l) => kc(c, i, n, l, '');
     v.innerHTML = `<div class="card">${bar('BRAKA ÉLECTRONIQUE MOBILE')}<p class="muted">Contrôle total de BRAKA : débloquer un compte, donner un nouveau mot de passe quand un utilisateur vous appelle.</p>
       <div class="kp6">${kp('c-blue', 'users', sm.comptes, 'Comptes')}${kp('c-green', 'shield', sm.actifs, 'Actifs')}${kp('c-red', 'key', sm.verrouilles, 'Verrouillés')}${kp('c-orange', 'monitor', sm.en_ligne, 'En ligne (15 min)')}${kp('c-purple', 'phone', (sm.commandes && sm.commandes.total) || 0, 'Commandes')}${kp('c-cyan', 'users', sm.suspendus, 'Suspendus')}</div>
       <p><a class="btn ghost" href="${esc('https://baraka-electronique-mobile.onrender.com/master')}" target="_blank" rel="noopener">Ouvrir l'espace Master de BRAKA</a> <button class="ghost" onclick="showBaraka()">Actualiser</button></p></div>
+      ${barakaSuivi(hl, ac)}
       <div class="card"><h3>Comptes BRAKA</h3>${us.map((u) => `<div class="row" style="padding:10px 0;border-top:1px solid #e6ebf3">
         <div><b>${esc(u.full_name)}</b> <span class="muted">· ${esc(ROLE_FR[u.role] || u.role)} · ${esc(u.login)}</span>
         ${u.status !== 'actif' ? '<div style="color:#D0393E"><b>Compte bloqué</b></div>' : u.verrouille ? '<div style="color:#D0393E"><b>Compte verrouillé (trop d\'essais)</b></div>' : '<div style="color:#1E9E5A"><b>Actif</b></div>'}</div>
@@ -422,6 +424,19 @@ async function showBaraka() {
         ${u.role === 'master' ? '' : `<button class="ghost" onclick="barakaReset('${u.id}','${esc(u.full_name).replace(/'/g, '')}')">Nouveau mot de passe</button>`}</div></div>`).join('')}</div>`;
   } catch (e) { v.innerHTML = `<div class="card">${bar('BRAKA ÉLECTRONIQUE MOBILE')}<p style="color:#D0393E">${esc(e.message)}</p><button class="gold" onclick="showBaraka()">Réessayer</button></div>`; }
 }
+const ST_FR = { recue: 'Reçue', en_preparation: 'En préparation', prete: 'Prête', livreur_affecte: 'Livreur affecté', en_livraison: 'En livraison', livree: 'Livrée', disponible_retrait: 'À retirer', retiree: 'Retirée', annulee: 'Annulée', litige: 'Litige' };
+function barakaSuivi(hl, ac) {
+  if (!hl && !ac) return '<div class="card"><h3>Suivi des achats</h3><p class="muted">Suivi indisponible : mettez BRAKA à jour (déploiement en cours).</p></div>';
+  const al = (hl && hl.alertes) || [];
+  const etat = hl ? `<p>${hl.ok ? '<b style="color:#1E9E5A">Tout fonctionne</b>' : '<b style="color:#D0393E">Attention : anomalie détectée</b>'} · base ${hl.serveur.base_ok ? 'OK' : 'EN PANNE'} (${hl.serveur.base_ms} ms) · mémoire ${hl.serveur.memoire_mo} Mo · version ${esc(hl.serveur.version)} · ${hl.livreurs_en_mission} livreur(s) en mission</p>` : '';
+  const alh = al.length ? al.map((a) => `<div style="padding:8px 0;border-top:1px solid #e6ebf3;color:${a.niveau === 'rouge' ? '#D0393E' : '#B8741A'}"><b>${a.niveau === 'rouge' ? 'URGENT' : 'À surveiller'}</b> — ${esc(a.message)}</div>`).join('') : '<p class="muted">Aucune alerte.</p>';
+  const j = ac && ac.aujourdhui;
+  const cmds = ac ? ac.commandes.slice(0, 30).map((o) => `<div class="row" style="padding:8px 0;border-top:1px solid #e6ebf3"><b>${esc(o.number)}</b> · ${esc(o.client)} · ${Number(o.total).toLocaleString('fr-FR')} GNF<div class="muted">${esc(ST_FR[o.status] || o.status)} · paiement : ${esc(o.paiement || '—')}${o.livreur ? ' · livreur : ' + esc(o.livreur) : ''}${o.city ? ' · ' + esc(o.city) : ''}</div></div>`).join('') : '';
+  return `<div class="card"><h3>État de BRAKA (rafraîchi toutes les 60 s)</h3>${etat}${alh}</div>
+    <div class="card"><h3>Achats des dernières 24 h</h3>${j ? `<p><b>${j.commandes}</b> commande(s) · <b>${Number(j.montant).toLocaleString('fr-FR')} GNF</b> · ${j.livrees} livrée(s)</p>` : ''}${cmds || '<p class="muted">Aucune commande.</p>'}</div>`;
+}
+let BK_TIMER = null;
+function barakaAuto() { clearInterval(BK_TIMER); BK_TIMER = setInterval(() => { if (document.visibilityState === 'visible' && document.querySelector('.card h3') && /État de BRAKA/.test(v.textContent)) showBaraka(); else if (!/État de BRAKA|BRAKA ÉLECTRONIQUE/.test(v.textContent)) clearInterval(BK_TIMER); }, 60000); }
 async function barakaUnlock(id) { try { const r = await api(`/api/baraka/users/${id}/unlock`, {}); alert('Compte débloqué et réactivé : ' + r.nom); showBaraka(); } catch (e) { alert(e.message); } }
 async function barakaBlock(id, nom) {
   if (!(await confirmBox(`Bloquer ${nom} ? Son application cessera de fonctionner immédiatement. Vous pourrez le débloquer à tout moment.`, 'Oui, bloquer'))) return;

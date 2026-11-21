@@ -282,6 +282,8 @@ function createApp(pool, cfg) {
       const sub = p.slice('/api/baraka'.length);
       if (req.method === 'GET' && sub === '/summary') return out(await bk('GET', '/summary'));
       if (req.method === 'GET' && sub === '/users') return out(await bk('GET', '/users'));
+      if (req.method === 'GET' && sub === '/activity') return out(await bk('GET', '/activity'));
+      if (req.method === 'GET' && sub === '/health') return out(await bk('GET', '/health'));
       const m = /^\/users\/([0-9a-f-]{36})\/(unlock|block|reset-password)$/.exec(sub);
       if (req.method === 'POST' && m) {
         const r = await bk('POST', sub);
@@ -524,6 +526,16 @@ if (require.main === module) {
     const cfg = configFromEnv(); const pool = makePool();
     await migrate(pool); await bootstrapAdmin(pool, cfg);
     createApp(pool, cfg).listen(cfg.port, () => console.log('[master] en ligne sur le port ' + cfg.port));
+    // Surveillance de BRAKA toutes les 5 min : alerte téléphone (ntfy/e-mail) dès qu'une anomalie rouge apparaît ou que BRAKA ne répond plus
+    const bUrl = String(process.env.BARAKA_URL || '').replace(/\/$/, ''), bKey = process.env.BARAKA_LINK_KEY || '';
+    if (bUrl && bKey) setInterval(async () => {
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 55000);
+        const r = await fetch(bUrl + '/api/link/health', { headers: { 'x-link-key': bKey }, signal: ctl.signal }).finally(() => clearTimeout(t));
+        const h = await r.json();
+        for (const a of (h.alertes || []).filter((x) => x.niveau === 'rouge')) notify('braka-' + a.type + '-' + (a.ref || ''), 'BRAKA — ' + a.type.replace(/_/g, ' '), a.message);
+      } catch (e) { notify('braka-injoignable', 'BRAKA — injoignable', "BRAKA ne répond pas (panne ou réveil de l'hébergement). Vérifiez l'état du service."); }
+    }, 5 * 60 * 1000);
     // Contrôle toutes les 6 h : alerte immédiate si la sauvegarde quotidienne n'a pas réussi depuis plus de 36 h (si le suivi est configuré)
     setInterval(async () => { try { const b = await backups.status(); if (b.configured && b.state === 'STALE') notify('backup', 'SYL MASTER — sauvegarde en retard', 'La dernière sauvegarde réussie date de ' + (b.hoursSinceSuccess == null ? 'plus de 15 jours' : b.hoursSinceSuccess + ' h') + '. Ouvrez Master > Sauvegardes.'); } catch (e) {} }, 6 * 3600e3).unref();
   })().catch((e) => { console.error('[master] arrêt :', e.message); process.exit(1); });
