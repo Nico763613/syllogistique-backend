@@ -16,7 +16,7 @@ export class SyncController {
 
   // Le client pousse son lot d'opérations enregistrées hors connexion
   @Post('push')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER, RoleName.CHAUFFEUR)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER)
   push(@Body() dto: SyncPushDto, @CurrentUser() actor: any) {
     return this.syncService.push(dto.operations, actor.userId, actor.organizationId, actor);
   }
@@ -26,7 +26,9 @@ export class SyncController {
     return this.syncService.pendingCount(deviceId);
   }
 
+  // Journal réservé aux responsables : il contient les données brutes envoyées par tous les appareils.
   @Get('log')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   log(@Query('deviceId') deviceId?: string) {
     return this.syncService.log(deviceId);
   }

@@ -21,7 +21,7 @@ export class QrcodesController {
   ) {
     const payload = `${type.toUpperCase()}:${id}`;
     const buffer = await QRCode.toBuffer(payload, {
-      width: size ? Number(size) : 300,
+      width: size ? Math.min(Math.max(Number(size) || 300, 64), 1024) : 300,
       margin: 1,
       color: { dark: '#163A5F', light: '#FFFFFF' },
     });

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
 import { RoleName } from '@prisma/client';
@@ -33,12 +33,14 @@ export class SalesController {
   }
 
   @Get('orders')
-  findAllOrders(@Query('siteId') siteId?: string, @Query('status') status?: string) {
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+    findAllOrders(@Query('siteId') siteId?: string, @Query('status') status?: string) {
     return this.salesService.findAllOrders({ siteId, status });
   }
 
   @Get('orders/:id')
-  findOrder(@Param('id') id: string) {
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+    findOrder(@Param('id') id: string) {
     return this.salesService.findOrder(id);
   }
 
@@ -51,7 +53,7 @@ export class SalesController {
   @Post('orders/:id/deliver')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)
   deliver(@Param('id') id: string, @Body() dto: DeliverSalesOrderDto, @CurrentUser() actor: any) {
-    return this.salesService.deliver(id, dto, actor.userId);
+    return this.salesService.deliver(id, dto, actor.userId, actor.role);
   }
 
   @Post('orders/:id/invoice')
@@ -61,18 +63,21 @@ export class SalesController {
   }
 
   @Get('invoices')
-  findAllInvoices(@Query('siteId') siteId?: string, @Query('status') status?: string) {
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+    findAllInvoices(@Query('siteId') siteId?: string, @Query('status') status?: string) {
     return this.salesService.findAllInvoices({ siteId, status });
   }
 
   @Get('invoices/:id')
-  findInvoice(@Param('id') id: string) {
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+    findInvoice(@Param('id') id: string) {
     return this.salesService.findInvoice(id);
   }
 
   // PDF prêt pour email / WhatsApp / impression + signature-tampon manuscrite
   @Get('invoices/:id/pdf')
-  async invoicePdf(@Param('id') id: string, @Res() res: Response) {
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+    async invoicePdf(@Param('id') id: string, @Res() res: Response) {
     const buffer = await this.salesDocuments.invoicePdf(id);
     res.set({
       'Content-Type': 'application/pdf',
@@ -83,7 +88,9 @@ export class SalesController {
 
   // Envoie la facture PDF par email (SMTP à configurer dans .env — sinon envoi simulé/loggé)
   @Post('invoices/:id/send-email')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE)
   async sendInvoiceEmail(@Param('id') id: string, @Body('to') to: string) {
+    if (!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(to ?? '').trim())) throw new BadRequestException('Adresse e-mail invalide.');
     const invoice = await this.salesService.findInvoice(id);
     const buffer = await this.salesDocuments.invoicePdf(id);
     return this.messaging.sendEmailWithAttachment({
@@ -98,7 +105,8 @@ export class SalesController {
 
   // Lien WhatsApp pré-rempli (à ouvrir depuis le téléphone — le PDF téléchargé est à joindre manuellement)
   @Get('invoices/:id/whatsapp-link')
-  async whatsappLink(@Param('id') id: string, @Query('phone') phone: string) {
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+    async whatsappLink(@Param('id') id: string, @Query('phone') phone: string) {
     const invoice = await this.salesService.findInvoice(id);
     const message = `Bonjour ${invoice.customer.name}, voici votre facture ${invoice.reference} d'un montant de ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF. — SYL LOGISTIQUE`;
     return { link: this.messaging.buildWhatsAppLink(phone, message) };

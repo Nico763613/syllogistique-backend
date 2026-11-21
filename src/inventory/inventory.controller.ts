@@ -58,7 +58,7 @@ export class InventoryController {
   @Post('movements/out')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
   stockOut(@Body() dto: StockOutDto, @CurrentUser() actor: any) {
-    return this.inventoryService.stockOut(dto, actor.userId);
+    return this.inventoryService.stockOut(dto, actor.userId, actor.role);
   }
 
   // Transfert d'un article vers un autre site / entrepôt
@@ -72,7 +72,7 @@ export class InventoryController {
   @Post('movements/:id/correct')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
   correctMovement(@Param('id') id: string, @Body() dto: CorrectStockMovementDto, @CurrentUser() actor: any) {
-    return this.inventoryService.correctMovement(id, dto, actor.userId);
+    return this.inventoryService.correctMovement(id, dto, actor.userId, actor.role);
   }
 
   // Journal des mouvements (fiche de stock) avec filtres : article, type (IN/OUT/ADJUSTMENT), période

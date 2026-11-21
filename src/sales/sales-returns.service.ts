@@ -87,6 +87,9 @@ export class SalesReturnsService {
       if (!ret) throw new NotFoundException('Retour introuvable.');
       this.checkSite(actor, ret.siteId);
       if (ret.status !== 'PENDING') throw new BadRequestException('Ce retour a déjà été traité.');
+      // Prise de verrou atomique : une validation simultanée ne peut plus rembourser / remettre en stock deux fois.
+      const claim = await tx.salesReturn.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'VALIDATED' } });
+      if (claim.count !== 1) throw new BadRequestException('Ce retour a déjà été traité.');
 
       const inv = ret.salesInvoice;
       const total = toNumber(inv.totalAmount);
@@ -164,7 +167,9 @@ export class SalesReturnsService {
     if (!ret) throw new NotFoundException('Retour introuvable.');
     this.checkSite(actor, ret.siteId);
     if (ret.status !== 'PENDING') throw new BadRequestException('Ce retour a déjà été traité.');
-    const updated = await this.prisma.salesReturn.update({ where: { id }, data: { status: 'REJECTED', validatedBy: actor.userId } });
+    const claim = await this.prisma.salesReturn.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED', validatedBy: actor.userId } });
+    if (claim.count !== 1) throw new BadRequestException('Ce retour a déjà été traité.');
+    const updated = await this.prisma.salesReturn.findUnique({ where: { id } });
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'SalesReturn', entityId: id, newValue: { event: 'REJECTED' }, reason: note });
     return updated;
   }

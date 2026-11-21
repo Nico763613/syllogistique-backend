@@ -50,6 +50,8 @@ export class UploadsController {
     if (!rows.length) throw new NotFoundException();
     res.setHeader('Content-Type', rows[0].mime);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
     res.send(Buffer.from(rows[0].data));
   }
 }

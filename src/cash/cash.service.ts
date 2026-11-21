@@ -98,10 +98,12 @@ export class CashService {
     const totals = await sessionTotals(this.prisma, id, toNumber(s.openingFloat));
     const counted = Math.round(dto.countedCash);
     const gap = counted - totals.expectedCash;
-    const updated = await this.prisma.cashSession.update({
-      where: { id },
+    const claimed = await this.prisma.cashSession.updateMany({
+      where: { id, closedAt: null },
       data: { closedAt: new Date(), countedCash: counted, expectedCash: totals.expectedCash, gapAmount: gap, note: dto.note },
     });
+    if (claimed.count !== 1) throw new BadRequestException('Cette caisse est déjà clôturée.');
+    const updated = await this.prisma.cashSession.findUnique({ where: { id } });
     await this.audit.log({
       userId: actor.userId, action: 'UPDATE', entity: 'CashSession', entityId: id,
       newValue: { event: 'CLOSE', counted, expected: totals.expectedCash, gap },

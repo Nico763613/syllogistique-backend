@@ -21,6 +21,17 @@ const ENTITY_MODELS: Record<string, keyof PrismaService> = {
   Driver: 'driver',
 };
 
+// Champs que le client hors ligne n'a JAMAIS le droit d'écrire : ils ne changent que par les flux métier
+// (stock via mouvements, facturation via factures, périmètre via le site de l'utilisateur).
+const PROTECTED_FIELDS: Record<string, string[]> = {
+  _all: ['organizationId', 'siteId'],
+  Trip: ['billedInvoiceId', 'createdById', 'reference'],
+  InventoryItem: ['currentQuantity'],
+  StockMovement: ['createdById'],
+  FuelTransaction: ['createdById'],
+  Vehicle: ['currentMileage'],
+};
+
 @Injectable()
 export class SyncService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
@@ -29,7 +40,7 @@ export class SyncService {
     operations: SyncOperationDto[],
     actorId: string,
     organizationId?: string,
-    actor?: { role?: string; department?: string | null },
+    actor?: { role?: string; department?: string | null; siteId?: string | null },
   ) {
     const results: Array<{
       entityId: string;
@@ -100,11 +111,16 @@ export class SyncService {
         } else {
           const model = this.prisma[modelKey] as any;
           if (op.operation === 'DELETE') {
-            await model.updateMany({ where: { id: op.entityId }, data: { deletedAt: new Date() } }).catch(() => {});
+            const scopeWhere = actor?.role !== 'SUPER_ADMIN' && actor?.siteId && op.entity !== 'Maintenance'
+              ? { id: op.entityId, siteId: actor.siteId } : { id: op.entityId };
+            await model.updateMany({ where: scopeWhere, data: { deletedAt: new Date() } }).catch(() => {});
             serverId = op.entityId;
           } else {
             // CREATE / UPDATE traités comme un upsert générique
             const { id: _id, createdAt: _c, updatedAt: _u, deletedAt: _d, ...safePayload } = op.payload as any;
+
+            // Liste noire de champs sensibles (voir PROTECTED_FIELDS) — jamais pris du client.
+            for (const f of [...PROTECTED_FIELDS._all, ...(PROTECTED_FIELDS[op.entity] || [])]) delete safePayload[f];
 
             // Le tarif carburant central fait foi : prix et total sont recalculés côté serveur.
             if (op.entity === 'FuelTransaction' && organizationId && Number(safePayload.quantityLiters) > 0) {
@@ -112,11 +128,41 @@ export class SyncService {
               safePayload.pricePerLiter = price;
               safePayload.totalCost = Number((Number(safePayload.quantityLiters) * price).toFixed(2));
             }
-            if (op.entity === 'StockMovement' && !safePayload.createdById) safePayload.createdById = actorId;
+            if (op.entity === 'StockMovement') safePayload.createdById = actorId;
 
             // Un mouvement de stock créé hors ligne doit mettre à jour le stock de l'article (une seule fois).
-            const existingRecord =
-              op.entity === 'StockMovement' ? await model.findUnique({ where: { id: op.entityId } }) : null;
+            const existingRecord = await model.findUnique({ where: { id: op.entityId } });
+
+            // Périmètre : un utilisateur rattaché à un site ne touche que les fiches de son site.
+            const scoped = actor?.role !== 'SUPER_ADMIN' && !!actor?.siteId;
+            if (existingRecord && scoped && existingRecord.siteId && existingRecord.siteId !== actor!.siteId) {
+              throw new ForbiddenException("Cette fiche n'appartient pas à votre site.");
+            }
+            if (existingRecord && scoped && op.entity === 'Maintenance') {
+              const v = await this.prisma.vehicle.findUnique({ where: { id: existingRecord.vehicleId } });
+              if (v && v.siteId !== actor!.siteId) throw new ForbiddenException("Cette fiche n'appartient pas à votre site.");
+            }
+            // Les mouvements de stock sont immuables : on ne les réécrit pas (correction = flux dédié).
+            if (op.entity === 'StockMovement' && existingRecord) {
+              throw new BadRequestException('Un mouvement de stock enregistré ne peut pas être modifié par synchronisation.');
+            }
+            // Un trajet déjà facturé ne se modifie plus.
+            if (op.entity === 'Trip' && existingRecord?.billedInvoiceId) {
+              throw new BadRequestException('Ce trajet est déjà facturé : modification refusée.');
+            }
+            // Création : le site est celui de l'utilisateur (jamais celui envoyé par le client).
+            if (!existingRecord && actor?.siteId && op.entity !== 'Maintenance') safePayload.siteId = actor.siteId;
+            if (!existingRecord && op.entity === 'FuelTransaction' && !safePayload.createdById) safePayload.createdById = actorId;
+            if (!existingRecord && op.entity === 'Trip' && !safePayload.createdById) safePayload.createdById = actorId;
+            // Sortie de stock hors ligne : jamais en dessous de zéro.
+            if (op.entity === 'StockMovement' && safePayload.movementType === 'OUT') {
+              const it = await this.prisma.inventoryItem.findUnique({ where: { id: safePayload.itemId } });
+              if (!it) throw new BadRequestException('Article introuvable.');
+              if (scoped && it.siteId !== actor!.siteId) throw new ForbiddenException("Cet article n'appartient pas à votre site.");
+              if (Number(it.currentQuantity) < Number(safePayload.quantity)) {
+                throw new BadRequestException(`Stock insuffisant pour « ${it.name} » (disponible : ${it.currentQuantity}).`);
+              }
+            }
 
             const created = await model.upsert({
               where: { id: op.entityId },
@@ -157,9 +203,10 @@ export class SyncService {
       } catch (err: any) {
         await this.prisma.syncQueueEntry.update({
           where: { id: queueEntry.id },
-          data: { status: 'FAILED', lastError: err.message, retryCount: { increment: 1 } },
+          data: { status: 'FAILED', lastError: String(err.message || 'Erreur').slice(0, 500), retryCount: { increment: 1 } },
         });
-        results.push({ entityId: op.entityId, entity: op.entity, status: 'FAILED', error: err.message });
+        const safeMsg = err?.getStatus ? err.message : 'Opération refusée ou invalide (données incorrectes).';
+        results.push({ entityId: op.entityId, entity: op.entity, status: 'FAILED', error: safeMsg });
       }
     }
 
@@ -171,7 +218,8 @@ export class SyncService {
     };
   }
 
-  async pendingCount(deviceId?: string) {
+  async pendingCount(deviceId?: string, isAdmin = true) {
+    if (!isAdmin && !deviceId) return 0;
     return this.prisma.syncQueueEntry.count({
       where: { status: { in: ['PENDING', 'FAILED'] }, ...(deviceId ? { deviceId } : {}) },
     });

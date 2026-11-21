@@ -164,7 +164,20 @@ export class DriverAppService {
     }
     const odometer = num(p.odometer);
     if (odometer === undefined || !Number.isInteger(odometer) || odometer < 0) throw new BadRequestException('Le kilométrage de départ est obligatoire.');
+    // Contrôles réglementaires avant départ : chauffeur actif et permis valide.
+    const drv = await this.prisma.driver.findUnique({ where: { id: driver.id } });
+    if (drv && drv.status !== 'ACTIVE') throw new BadRequestException('Votre fiche chauffeur est suspendue ou inactive : départ impossible. Contactez le gestionnaire de flotte.');
+    if (drv?.licenseExpiryDate && +new Date(drv.licenseExpiryDate) < Date.now() - 24 * 3600 * 1000) {
+      throw new BadRequestException('Votre permis de conduire est expiré : départ impossible. Faites renouveler votre permis puis prévenez le gestionnaire de flotte.');
+    }
     const vehicle = await this.assertVehicleUsable(vehicleId as string);
+    // Un véhicule ne peut pas être sur deux missions à la fois.
+    const busy = await this.prisma.trip.findFirst({ where: { vehicleId: vehicle.id, status: 'IN_PROGRESS', id: { not: op.tripId ?? '' } } });
+    if (busy) throw new BadRequestException(`Le véhicule ${vehicle.internalNumber} est déjà en mission. Attendez son arrivée.`);
+    // Faute de frappe probable sur le compteur : on bloque plutôt que de fausser tout le parc.
+    if (odometer - vehicle.currentMileage > 5000) {
+      throw new BadRequestException(`Kilométrage de départ (${odometer}) très supérieur au compteur enregistré (${vehicle.currentMileage}). Vérifiez votre saisie ou prévenez le gestionnaire de flotte.`);
+    }
     if (odometer < vehicle.currentMileage) throw new BadRequestException(`Kilométrage de départ (${odometer}) inférieur au compteur enregistré (${vehicle.currentMileage}).`);
     const other = await this.prisma.trip.findFirst({ where: { driverId: driver.id, status: 'IN_PROGRESS', id: { not: op.tripId ?? '' } } });
     if (other) throw new BadRequestException('Vous avez déjà une mission en cours. Terminez-la avant d’en démarrer une autre.');
@@ -225,6 +238,7 @@ export class DriverAppService {
     const odometer = num(p.odometer);
     if (odometer === undefined || !Number.isInteger(odometer)) throw new BadRequestException('Le kilométrage d’arrivée est obligatoire.');
     if (odometer < trip.startMileage) throw new BadRequestException(`Kilométrage d’arrivée (${odometer}) inférieur au départ (${trip.startMileage}).`);
+    if (odometer - trip.startMileage > 3000) throw new BadRequestException(`Distance de ${odometer - trip.startMileage} km sur une seule mission : vérifiez le compteur d’arrivée (faute de frappe probable).`);
     const at = when(p.occurredAt);
     const lat = geo(p.lat, -90, 90), lng = geo(p.lng, -180, 180);
     const condition = ['RAS', 'DOMMAGE_MINEUR', 'DOMMAGE_MAJEUR', 'PANNE'].includes(p.endCondition) ? (p.endCondition as string) : 'RAS';

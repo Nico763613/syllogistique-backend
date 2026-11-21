@@ -604,7 +604,7 @@ async function refreshSession() {
         localStorage.setItem('syllo_access_token', state.accessToken);
         localStorage.setItem('syllo_refresh_token', state.refreshToken);
         return true;
-      } catch (e) { return false; } finally { setTimeout(() => { refreshing = null; }, 0); }
+      } catch (e) { return 'network'; } finally { setTimeout(() => { refreshing = null; }, 0); }
     })();
   }
   return refreshing;
@@ -640,7 +640,9 @@ async function apiFetch(path, options) {
 }
 async function apiHandle(res, path, options, retried) {
   if (res.status === 401 && !retried && !path.startsWith('/auth/')) {
-    if (await refreshSession()) return api(path, options, true);
+    const rs = await refreshSession();
+    if (rs === 'network') throw new Error('Pas de connexion pour renouveler la session. Vos données sont conservées : réessayez dès que le réseau revient.');
+    if (rs) return api(path, options, true);
     logout();
     throw new Error('Session expirée : reconnectez-vous.');
   }
@@ -728,7 +730,11 @@ function startDemo() {
 }
 function logout() {
   if (state.demo) { state.demo = false; const b = document.getElementById('demo-banner'); if (b) b.remove(); }
+  // Révoque la session côté serveur (sans bloquer la déconnexion si le réseau est coupé)
+  try { if (state.refreshToken && state.apiUrl) fetch(state.apiUrl.replace(/\/$/, '') + '/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(state.accessToken ? { Authorization: 'Bearer ' + state.accessToken } : {}) }, body: JSON.stringify({ refreshToken: state.refreshToken }) }).catch(() => {}); } catch (e) {}
   ['syllo_access_token', 'syllo_refresh_token', 'syllo_user'].forEach((k) => localStorage.removeItem(k));
+  try { Object.keys(localStorage).filter((k) => k.startsWith('syllo_draft_')).forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+  state._pw = undefined; state.refreshToken = '';
   state.accessToken = ''; state.user = null; state.hist = []; state.view = null;
   const fab = document.getElementById('report-fab'); if (fab) fab.remove();
   document.getElementById('app').style.display = 'none';
@@ -1027,7 +1033,7 @@ function go(view, noPush) {
 const LIVE_VIEWS = ['compta', 'ops-validation', 'dashboard', 'trucks', 'service-vehicles', 'driver-board', 'driver-sheets', 'driver-expenses', 'driver-missions', 'driver-devices', 'vehicles', 'fuel', 'maintenance', 'reports-truck', 'reports-service'];
 const LIVE = { since: null, timer: null, busy: false };
 function liveCanRun() {
-  return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR';
+  return !!state.accessToken && !!state.user && document.visibilityState === 'visible' && navigator.onLine && !document.getElementById('driver-app')?.offsetParent && state.user.role !== 'CHAUFFEUR' && ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'RESPONSABLE_OPERATIONS', 'COMPTABLE'].includes(state.user.role);
 }
 async function liveTick() {
   if (LIVE.busy || !liveCanRun()) return;
@@ -1585,48 +1591,48 @@ function applyRoleNav() {
 async function renderView(view) {
   if (!window._silent) root().innerHTML = '<div class="empty">Chargement…</div>';
   try {
-    if (view === 'home') return renderHome();
-    if (view === 'espace') return renderWorkspace();
-    if (view === 'pointage') return renderPointage();
-    if (view === 'pilotage') return renderExecutive('dg');
-    if (view === 'espace-logi') return renderExecutive('logi');
-    if (view === 'dashboard') return renderDashboard();
-    if (view.startsWith('dash-')) return renderDeptDashboard(view.slice(5));
-    if (view === 'vehicles') return renderVehicles();
-    if (view === 'trucks') return renderVehicles('TRUCK');
-    if (view === 'service-vehicles') return renderVehicles('SERVICE_VEHICLE');
-    if (view === 'driver-devices') return renderDriverDevices();
-    if (view === 'driver-missions') return renderMissionHistory();
-    if (view === 'driver-board') return renderDriverBoard();
-    if (view === 'caisse') return renderCaisse();
-    if (view === 'ventes') return renderVentes();
-    if (view === 'compta') return renderCompta();
-    if (view === 'driver-expenses') return state.user.role === 'COMPTABLE' ? renderCompta() : renderDriverExpenses();
-    if (view === 'driver-sheets') return renderDriverSheets();
-    if (view === 'ops-validation') return renderOpsValidation();
-    if (view === 'drivers') return renderDrivers();
-    if (view === 'fuel') return renderFuel();
-    if (view === 'atelier') return renderAtelier();
-    if (view === 'maintenance') return renderMaintenance();
-    if (view === 'stock') return renderStock();
-    if (view === 'purchases') return renderPurchases();
-    if (view === 'needs') return renderNeeds();
-    if (view === 'daily') return renderDaily();
-    if (STAFF_CFG[view]) return renderStaff(view);
-    if (view === 'signalements') return renderProblemReports();
-    if (view === 'staff-managers') return renderManagers();
-    if (view === 'my-report') return renderMyReport();
-    if (view === 'enrol') return renderEnrol();
-    if (view === 'reports-drivers') return renderReportDrivers();
-    if (view === 'reports-stock') return state.user.role === 'MAGASINIER' ? renderDeptDashboard('stock') : renderStaff('staff-store', true);
-    if (view === 'reports-hse') return renderStaff('staff-hse', true);
-    if (view === 'reports-dg') return renderExecutive('dg');
-    if (view === 'reports-truck') return renderKindReports('TRUCK');
-    if (view === 'reports-service') return renderKindReports('SERVICE_VEHICLE');
-    if (view === 'sync') return renderSync();
-    if (view === 'settings') return renderSettings();
+    if (view === 'home') return await (renderHome());
+    if (view === 'espace') return await (renderWorkspace());
+    if (view === 'pointage') return await (renderPointage());
+    if (view === 'pilotage') return await (renderExecutive('dg'));
+    if (view === 'espace-logi') return await (renderExecutive('logi'));
+    if (view === 'dashboard') return await (renderDashboard());
+    if (view.startsWith('dash-')) return await (renderDeptDashboard(view.slice(5)));
+    if (view === 'vehicles') return await (renderVehicles());
+    if (view === 'trucks') return await (renderVehicles('TRUCK'));
+    if (view === 'service-vehicles') return await (renderVehicles('SERVICE_VEHICLE'));
+    if (view === 'driver-devices') return await (renderDriverDevices());
+    if (view === 'driver-missions') return await (renderMissionHistory());
+    if (view === 'driver-board') return await (renderDriverBoard());
+    if (view === 'caisse') return await (renderCaisse());
+    if (view === 'ventes') return await (renderVentes());
+    if (view === 'compta') return await (renderCompta());
+    if (view === 'driver-expenses') return await (state.user.role === 'COMPTABLE' ? renderCompta() : renderDriverExpenses());
+    if (view === 'driver-sheets') return await (renderDriverSheets());
+    if (view === 'ops-validation') return await (renderOpsValidation());
+    if (view === 'drivers') return await (renderDrivers());
+    if (view === 'fuel') return await (renderFuel());
+    if (view === 'atelier') return await (renderAtelier());
+    if (view === 'maintenance') return await (renderMaintenance());
+    if (view === 'stock') return await (renderStock());
+    if (view === 'purchases') return await (renderPurchases());
+    if (view === 'needs') return await (renderNeeds());
+    if (view === 'daily') return await (renderDaily());
+    if (STAFF_CFG[view]) return await (renderStaff(view));
+    if (view === 'signalements') return await (renderProblemReports());
+    if (view === 'staff-managers') return await (renderManagers());
+    if (view === 'my-report') return await (renderMyReport());
+    if (view === 'enrol') return await (renderEnrol());
+    if (view === 'reports-drivers') return await (renderReportDrivers());
+    if (view === 'reports-stock') return await (state.user.role === 'MAGASINIER' ? renderDeptDashboard('stock') : renderStaff('staff-store', true));
+    if (view === 'reports-hse') return await (renderStaff('staff-hse', true));
+    if (view === 'reports-dg') return await (renderExecutive('dg'));
+    if (view === 'reports-truck') return await (renderKindReports('TRUCK'));
+    if (view === 'reports-service') return await (renderKindReports('SERVICE_VEHICLE'));
+    if (view === 'sync') return await (renderSync());
+    if (view === 'settings') return await (renderSettings());
   } catch (e) {
-    root().innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`;
+    root().innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div><button class="btn" style="margin-top:10px" onclick="renderView('${esc(view)}')">Réessayer</button></div>`;
   }
 }
 
@@ -4740,7 +4746,7 @@ async function drvHistory(kind, id) {
 <script>
 /* ============ PERSONNALISATION (nom, logo, couleur de l'entreprise) ============ */
 const BRAND = (() => { try { return JSON.parse(localStorage.getItem('syllo_brand') || 'null') || { name: 'SYL LOGISTIQUE' }; } catch (e) { return { name: 'SYL LOGISTIQUE' }; } })();
-const brandSrc = (u) => (u && u.startsWith('/') ? (state.apiUrl || localStorage.getItem('syllo_api_url') || '').replace(/\/$/, '') + u : u);
+const brandSrc = (u) => (u && u.startsWith('/') ? (state.apiUrl || localStorage.getItem('syllo_api_url') || '').replace(/\/$/, '') + u : (/^https?:\/\//i.test(u || '') ? u : ''));
 function brandApply() {
   const n = BRAND.name || 'SYL LOGISTIQUE';
   document.title = n + ' — Gestion Logistique & Flotte';
@@ -5233,6 +5239,9 @@ function csPick() {
 function csMet() { const m = document.getElementById('cs-met').value; document.getElementById('cs-refbox').style.display = m === 'CASH' ? 'none' : ''; }
 async function csOpen() { const m = document.getElementById('cs-msg'); try { await api('/cash-sessions/open', { method: 'POST', body: { openingFloat: Math.round(Number(document.getElementById('cs-float').value) || 0) } }); renderCaisse(); } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; } }
 async function csPay() {
+  if (window._csBusy) return;
+  window._csBusy = true;
+  if (!window._csOp) window._csOp = (crypto.randomUUID ? crypto.randomUUID() : 'op-' + Date.now() + '-' + Math.random().toString(16).slice(2));
   const m = document.getElementById('cs-msg'), id = document.getElementById('cs-inv').value, amt = Number(document.getElementById('cs-amt').value), met = document.getElementById('cs-met').value, ref = (document.getElementById('cs-ref').value || '').trim();
   const inv = (window._csInv || []).find((x) => x.id === id);
   try {
@@ -5240,7 +5249,8 @@ async function csPay() {
     if (!(amt > 0)) throw new Error('Saisissez le montant reçu.');
     if (amt > inv.rest) throw new Error('Le montant dépasse le reste à payer (' + fmt(Math.round(inv.rest)) + ' GNF).');
     if (met !== 'CASH' && !ref) throw new Error('Indiquez le numéro de transaction.');
-    await api('/payments', { method: 'POST', body: { direction: 'IN', method: met, amount: amt, paymentDate: new Date().toISOString(), salesInvoiceId: id, ...(ref ? { reference: ref, externalRef: ref } : {}), ...(window._csCur ? { cashSessionId: window._csCur.id } : {}) } });
+    await api('/payments', { method: 'POST', body: { direction: 'IN', method: met, amount: amt, paymentDate: new Date().toISOString(), salesInvoiceId: id, clientOpId: window._csOp, ...(ref ? { reference: ref, externalRef: ref } : {}) } });
+    window._csOp = null;
     const left = inv.rest - amt, msg = `Bonjour ${inv.customer && inv.customer.name}, nous avons bien reçu votre règlement de ${fmt(Math.round(amt))} GNF pour la facture ${inv.reference}. ${left > 0 ? 'Reste à payer : ' + fmt(Math.round(left)) + ' GNF.' : 'Facture soldée.'} Merci. — SYL LOGISTIQUE`;
     const phone = String((inv.customer && inv.customer.phone) || '').replace(/\D/g, ''), full = phone.length === 9 ? '224' + phone : phone;
     csInvoice = '';

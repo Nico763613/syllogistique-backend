@@ -218,7 +218,7 @@ export class AuthService {
     if (dto.newPassword === dto.currentPassword) throw new BadRequestException('Le nouveau mot de passe doit être différent de l\'ancien.');
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: false } });
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: false, refreshTokenHash: null } });
 
     await this.audit.log({
       userId,
