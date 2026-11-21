@@ -42,4 +42,27 @@ async function runReminders(pool, notify, now = new Date()) {
   }
   return { checked: rows.length, sent };
 }
-module.exports = { FREQ, COUNT, CURRENCIES, STEPS, addMonths, daysTo, etat, stepFor, dueDates, ymd, runReminders };
+// ---- Charges techniques : alerte N jours avant l'échéance (7 par défaut), puis J-1, J, et relance en cas de retard ----
+const CH_FREQ = { MENSUEL: 1, TRIMESTRIEL: 3, SEMESTRIEL: 6, ANNUEL: 12 };
+function chargeStep(d, remind) {
+  const steps = [...new Set([Number(remind) || 7, 1, 0, -1, -3])].sort((a, b) => b - a);
+  let best = null; for (const x of steps) if (d <= x && (best === null || x < best)) best = x;
+  return best;
+}
+const stepLabel = (x) => (x > 0 ? 'J-' + x : x === 0 ? 'J' : 'J+' + -x);
+async function runChargeReminders(pool, notify, now = new Date()) {
+  const { rows } = await pool.query("select id, name, provider, amount, currency, next_due::text as due, remind_days from master_charges where active");
+  let sent = 0;
+  for (const c of rows) {
+    const d = daysTo(c.due, now); const st = chargeStep(d, c.remind_days); if (st === null) continue;
+    const key = stepLabel(st);
+    const have = await pool.query('select 1 from master_charge_reminders where charge_id=$1 and due_date=$2 and step=$3', [c.id, c.due, key]);
+    if (have.rowCount) continue;
+    const when = d > 0 ? `dans ${d} jour(s)` : d === 0 ? "aujourd'hui" : `dépassée de ${-d} jour(s)`;
+    const r = await notify('charge-' + c.id + '-' + c.due + '-' + key, `ABONNEMENT À RENOUVELER — ${c.name} — ${key}`,
+      `${c.name}${c.provider ? ' (' + c.provider + ')' : ''}\nÉchéance : ${c.due} (${when})\n${Number(c.amount) ? 'Montant : ' + Number(c.amount).toLocaleString('fr-FR') + ' ' + c.currency + '\n' : ''}Pensez à payer avant l'échéance pour éviter toute coupure du service.`);
+    if (r && r.sent && r.sent.length) { await pool.query('insert into master_charge_reminders(charge_id, due_date, step, channels) values ($1,$2,$3,$4) on conflict do nothing returning charge_id', [c.id, c.due, key, r.sent.join(',')]); sent++; }
+  }
+  return { checked: rows.length, sent };
+}
+module.exports = { CH_FREQ, chargeStep, runChargeReminders, FREQ, COUNT, CURRENCIES, STEPS, addMonths, daysTo, etat, stepFor, dueDates, ymd, runReminders };
