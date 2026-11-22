@@ -11,6 +11,7 @@ import { FleetDashboardService } from './fleet-dashboard.service';
 import { HseDashboardService } from './hse-dashboard.service';
 import { ExecutiveDashboardService } from './executive-dashboard.service';
 import { WorkspaceDashboardService } from './workspace-dashboard.service';
+import { DirectionDashboardService } from './direction-dashboard.service';
 import { DashboardQueryDto } from './dto/dashboard-query.dto';
 
 @ApiTags('dashboards')
@@ -18,7 +19,7 @@ import { DashboardQueryDto } from './dto/dashboard-query.dto';
 @UseGuards(RolesGuard)
 @Controller('dashboards')
 export class DashboardsController {
-  constructor(private commercial: CommercialDashboardService, private logistics: LogisticsDashboardService, private stock: StockDashboardService, private fleet: FleetDashboardService, private hse: HseDashboardService, private executive: ExecutiveDashboardService, private workspace: WorkspaceDashboardService) {}
+  constructor(private commercial: CommercialDashboardService, private logistics: LogisticsDashboardService, private stock: StockDashboardService, private fleet: FleetDashboardService, private hse: HseDashboardService, private executive: ExecutiveDashboardService, private workspace: WorkspaceDashboardService, private direction: DirectionDashboardService) {}
 
   // Tableau de bord Commercial & Caisse. Le caissier ne reçoit que les données de sa propre session.
   @Get('commercial')
@@ -59,6 +60,13 @@ export class DashboardsController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
   executiveDashboard(@Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {
     return this.executive.get(actor, siteId);
+  }
+
+  // Centre de pilotage de la Direction Générale : lecture seule, filtres jour / semaine / mois / année
+  @Get('direction')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.DIRECTEUR_GENERAL)
+  directionDashboard(@Query() q: DashboardQueryDto, @CurrentUser() actor: any) {
+    return this.direction.get(actor, q);
   }
 
   // Espace de travail personnel : gestionnaire de stock, agent HSE, mécanicien, pointeur
