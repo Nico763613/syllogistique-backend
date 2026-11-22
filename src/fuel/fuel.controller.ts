@@ -17,7 +17,7 @@ export class FuelController {
   constructor(private fuelService: FuelService) {}
 
   @Post()
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER, RoleName.CHAUFFEUR)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER)
   create(@Body() dto: CreateFuelTransactionDto, @CurrentUser() actor: any) {
     return this.fuelService.create(dto, actor.userId, actor.organizationId);
   }

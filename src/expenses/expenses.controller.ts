@@ -7,6 +7,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Departments } from '../common/decorators/departments.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { resolveSite } from '../dashboards/dashboard-common';
 
 @ApiTags('expenses')
 @ApiBearerAuth()
@@ -19,7 +20,7 @@ export class ExpensesController {
   @Post('expenses')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   create(@Body() dto: CreateExpenseDto, @CurrentUser() actor: any) {
-    return this.expensesService.create(dto, actor.userId);
+    return this.expensesService.create(dto, actor);
   }
 
   @Get('expenses')
@@ -28,14 +29,15 @@ export class ExpensesController {
     @Query('category') category?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @CurrentUser() actor?: any,
   ) {
-    return this.expensesService.findAll({ vehicleId, category, from, to });
+    return this.expensesService.findAll({ vehicleId, category, from, to }, actor);
   }
 
   // GET /costs/summary?siteId=…&from=2026-10-01&to=2026-10-31
   @Get('costs/summary')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.LECTEUR)
   costSummary(@Query('siteId') siteId: string, @Query('from') from: string, @Query('to') to: string, @CurrentUser() actor: any) {
-    return this.expensesService.costSummary(siteId || actor.siteId, from, to);
+    return this.expensesService.costSummary(resolveSite(actor, siteId), from, to);
   }
 }

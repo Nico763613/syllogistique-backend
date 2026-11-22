@@ -22,7 +22,8 @@ export class PaymentsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      let cashSessionId = dto.cashSessionId;
+      // La session de caisse n'est JAMAIS prise du client : c'est la caisse ouverte de l'utilisateur, ou rien.
+      let cashSessionId: string | undefined;
       let siteId: string | undefined;
 
       if (dto.salesInvoiceId) {
@@ -31,6 +32,7 @@ export class PaymentsService {
         if (invoice.status === 'CANCELLED' || invoice.status === 'DRAFT') {
           throw new BadRequestException("Cette facture n'est pas encaissable.");
         }
+        if (dto.direction !== 'IN') throw new BadRequestException("Une facture client s'encaisse (sens : entrée).");
         if (actor && actor.role !== 'SUPER_ADMIN' && actor.siteId && invoice.siteId !== actor.siteId) {
           throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
         }
@@ -41,17 +43,21 @@ export class PaymentsService {
           const session = await tx.cashSession.findFirst({ where: { cashierId: actorId, closedAt: null } });
           if (!session) throw new BadRequestException("Ouvrez votre caisse avant d'encaisser.");
           cashSessionId = session.id;
-        } else if (!cashSessionId) {
+        } else {
           const mine = await tx.cashSession.findFirst({ where: { cashierId: actorId, closedAt: null } });
           cashSessionId = mine?.id;
         }
 
+        // Mise à jour ATOMIQUE : deux encaissements simultanés ne peuvent plus dépasser le total.
+        const total = Number(invoice.totalAmount);
+        const claimed = await tx.salesInvoice.updateMany({
+          where: { id: invoice.id, amountPaid: { lte: total + 0.01 - dto.amount }, status: { notIn: ['CANCELLED', 'DRAFT'] } },
+          data: { amountPaid: { increment: dto.amount } },
+        });
+        if (claimed.count !== 1) throw new BadRequestException('Le montant payé dépasse le total de la facture (ou la facture vient d\'être modifiée).');
         const newPaid = Number(invoice.amountPaid) + dto.amount;
-        if (newPaid > Number(invoice.totalAmount) + 0.01) {
-          throw new BadRequestException('Le montant payé dépasse le total de la facture.');
-        }
-        const status = newPaid >= Number(invoice.totalAmount) ? 'PAID' : 'PARTIALLY_PAID';
-        await tx.salesInvoice.update({ where: { id: invoice.id }, data: { amountPaid: newPaid, status } });
+        const status = newPaid >= total - 0.01 ? 'PAID' : 'PARTIALLY_PAID';
+        await tx.salesInvoice.update({ where: { id: invoice.id }, data: { status } });
 
         // Ventes échelonnées : le règlement solde les échéances de la plus ancienne à la plus récente
         let left = dto.amount;
@@ -68,12 +74,17 @@ export class PaymentsService {
       if (dto.purchaseInvoiceId) {
         const invoice = await tx.purchaseInvoice.findUnique({ where: { id: dto.purchaseInvoiceId } });
         if (!invoice) throw new NotFoundException('Facture fournisseur introuvable.');
+        if (dto.direction !== 'OUT') throw new BadRequestException("Une facture fournisseur se règle (sens : sortie).");
+        if (invoice.status === 'CANCELLED') throw new BadRequestException("Cette facture n'est pas payable.");
+        const total = Number(invoice.totalAmount);
+        const claimed = await tx.purchaseInvoice.updateMany({
+          where: { id: invoice.id, amountPaid: { lte: total + 0.01 - dto.amount } },
+          data: { amountPaid: { increment: dto.amount } },
+        });
+        if (claimed.count !== 1) throw new BadRequestException('Le montant payé dépasse le total de la facture (ou la facture vient d\'être modifiée).');
         const newPaid = Number(invoice.amountPaid) + dto.amount;
-        if (newPaid > Number(invoice.totalAmount) + 0.01) {
-          throw new BadRequestException('Le montant payé dépasse le total de la facture.');
-        }
-        const status = newPaid >= Number(invoice.totalAmount) ? 'PAID' : 'PARTIALLY_PAID';
-        await tx.purchaseInvoice.update({ where: { id: invoice.id }, data: { amountPaid: newPaid, status } });
+        const status = newPaid >= total - 0.01 ? 'PAID' : 'PARTIALLY_PAID';
+        await tx.purchaseInvoice.update({ where: { id: invoice.id }, data: { status } });
       }
 
       const payment = await tx.payment.create({

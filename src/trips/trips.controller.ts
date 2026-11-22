@@ -17,14 +17,16 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 export class TripsController {
   constructor(private tripsService: TripsService) {}
 
+  // Le chauffeur n'ouvre ni ne clôture ses missions par ici : tout passe par l'application chauffeur (/driver/sync)
+  // qui applique les contrôles (permis, véhicule, fiche envoyée, kilométrage).
   @Post()
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.CHAUFFEUR)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   create(@Body() dto: CreateTripDto, @CurrentUser() actor: any) {
     return this.tripsService.create(dto, actor.userId);
   }
 
   @Patch(':id/close')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.CHAUFFEUR)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   close(@Param('id') id: string, @Body() dto: CloseTripDto, @CurrentUser() actor: any) {
     return this.tripsService.close(id, dto, actor.userId);
   }

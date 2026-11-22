@@ -17,7 +17,7 @@ async function call(method, path, body, ck) {
 
 test.before(async () => {
   pool = new Pool({});
-  await pool.query('drop table if exists master_devices, master_licenses, master_clients, master_recovery_codes, master_audit_log, master_admins cascade');
+  await pool.query('drop table if exists master_charge_reminders, master_charges, master_reminders, master_payments, master_devices, master_licenses, master_clients, master_recovery_codes, master_audit_log, master_admins cascade');
   await migrate(pool);
   assert.equal(await bootstrapAdmin(pool, cfg), true);
   assert.equal(await bootstrapAdmin(pool, cfg), false, 'ne recrée pas un second administrateur');
@@ -228,4 +228,113 @@ test('session glissante de 15 minutes', async () => {
   const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
   const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
   const r = await fetch(base + '/api/me', { headers: { cookie: ck } }); const sc = r.headers.get('set-cookie'); assert.match(sc, /Max-Age=900/);
+});
+test('liaison BARAKA : résumé, déblocage et mot de passe provisoire via la clé, rien sans configuration', async () => {
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  delete process.env.BARAKA_URL; delete process.env.BARAKA_LINK_KEY;
+  assert.equal((await call('GET', '/api/baraka/summary', undefined, ck)).status, 503, 'non configuré');
+  const seen = [];
+  const fake = require('http').createServer((rq, rs) => {
+    seen.push([rq.method, rq.url, rq.headers['x-link-key']]);
+    rs.setHeader('content-type', 'application/json');
+    if (rq.headers['x-link-key'] !== 'cle-de-test') { rs.statusCode = 404; return rs.end('{"error":"Introuvable"}'); }
+    if (rq.url.endsWith('/summary')) return rs.end('{"comptes":3,"verrouilles":1}');
+    if (rq.url.endsWith('/users')) return rs.end('[{"id":"11111111-1111-1111-1111-111111111111","full_name":"Test","role":"livreur"}]');
+    if (rq.url.endsWith('/unlock') || rq.url.endsWith('/block')) return rs.end('{"ok":true,"nom":"Test"}');
+    return rs.end('{"ok":true,"nom":"Test","login":"620","temp_password":"ABCD2345","expires_hours":24}');
+  });
+  await new Promise((r) => fake.listen(0, r));
+  process.env.BARAKA_URL = 'http://127.0.0.1:' + fake.address().port; process.env.BARAKA_LINK_KEY = 'cle-de-test';
+  assert.equal((await call('GET', '/api/baraka/summary', undefined, '')).status, 401, 'connexion obligatoire');
+  const sm = await call('GET', '/api/baraka/summary', undefined, ck); assert.equal(sm.status, 200); assert.equal(sm.json.comptes, 3);
+  assert.equal((await call('GET', '/api/baraka/users', undefined, ck)).json.length, 1);
+  const id = '11111111-1111-1111-1111-111111111111';
+  assert.equal((await call('POST', `/api/baraka/users/${id}/unlock`, {}, ck)).json.ok, true);
+  assert.equal((await call('POST', `/api/baraka/users/${id}/block`, {}, ck)).json.ok, true);
+  assert.equal((await call('POST', `/api/baraka/users/${id}/reset-password`, {}, ck)).json.temp_password, 'ABCD2345');
+  assert.equal((await call('POST', '/api/baraka/users/pas-un-id/unlock', {}, ck)).status, 404, 'identifiant invalide refusé');
+  assert.ok(seen.every((x) => x[2] === 'cle-de-test'));
+  const au = await call('GET', '/api/audit', undefined, ck); for (const k of ['BARAKA_DEBLOCAGE', 'BARAKA_BLOCAGE', 'BARAKA_NOUVEAU_MDP']) assert.ok(au.json.some((x) => x.action === k), k);
+  process.env.BARAKA_LINK_KEY = 'mauvaise'; assert.equal((await call('GET', '/api/baraka/summary', undefined, ck)).status, 502, 'clé refusée par BARAKA');
+  fake.close();
+});
+
+test('version de l\'écran : publique, stable, et injectée dans la page', async () => {
+  const a = await (await fetch(base + '/api/version')).json(); assert.match(a.build, /^[0-9a-f]{10}$/);
+  const html = await (await fetch(base + '/')).text(); assert.ok(html.includes("const BUILD = '" + a.build + "'"), 'la page connaît sa version');
+});
+
+test('finance : échéancier, confirmation manuelle, renouvellement, rappels sans doublon', async () => {
+  const fin = require('../src/finance');
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  assert.equal((await call('GET', '/api/finance/schedule', undefined, '')).status, 401, 'rien sans connexion');
+  const cl = await call('POST', '/api/clients', { name: 'Entreprise Finance' }, ck);
+  const exp0 = new Date(Date.now() + 864e5 * 10).toISOString().slice(0, 10);
+  const lic = await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: exp0, maxDevices: 5 }, ck); assert.equal(lic.status, 200);
+  const id = lic.json.id || lic.json.licenseId || (await pool.query('select max(id) as id from master_licenses')).rows[0].id;
+  const due = fin.ymd(new Date(Date.now() + 864e5 * 5));
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'HEBDO', amount: 100, firstDue: due }, ck)).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'MENSUEL', amount: 0, firstDue: due }, ck)).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'MENSUEL', amount: 500000, currency: 'GNF', toleranceDays: 15, firstDue: due }, ck)).status, 200);
+  let sc = (await call('GET', '/api/finance/schedule', undefined, ck)).json;
+  assert.equal(sc.items.filter((x) => x.license_id == id).length, 12);
+  assert.equal(sc.totaux.attendu, 12 * 500000); assert.equal(sc.totaux.recu_mois, 0, 'rien n\'est reçu tant que le Master Admin n\'a pas confirmé');
+  // rappel : une seule fois par étape, et seulement s'il a été réellement envoyé
+  const sentLog = []; const fake = async (k, t) => { sentLog.push(k); return { sent: ['ntfy'] }; };
+  const r1 = await fin.runReminders(pool, fake); assert.equal(r1.sent, 1);
+  const r2 = await fin.runReminders(pool, fake); assert.equal(r2.sent, 0, 'pas de doublon');
+  const none = await fin.runReminders(pool, async () => ({ sent: [], skipped: 'no-channel' }), new Date(Date.now() + 864e5 * 20)); assert.equal(none.sent, 0, 'non envoyé = non enregistré');
+  // confirmation : méthode obligatoire, puis renouvellement de la période payée
+  const first = sc.items.find((x) => x.license_id == id);
+  assert.equal((await call('POST', `/api/payments/${first.id}/confirm`, {}, ck)).status, 400);
+  const c = await call('POST', `/api/payments/${first.id}/confirm`, { method: 'Orange Money', reference: 'OM123' }, ck); assert.equal(c.status, 200);
+  assert.equal(c.json.expiresAt.slice(0, 10), fin.ymd(fin.addMonths(new Date(exp0 + 'T23:59:59Z'), 1)));
+  assert.equal((await call('POST', `/api/payments/${first.id}/confirm`, { method: 'x' }, ck)).status, 404, 'déjà confirmée');
+  sc = (await call('GET', '/api/finance/schedule', undefined, ck)).json;
+  assert.equal(sc.totaux.recu_mois, 500000);
+  const log = (await call('GET', '/api/audit', undefined, ck)).json; assert.ok(log.some((x) => x.action === 'PAIEMENT_CONFIRME'));
+});
+test('finance : calcul des états et des étapes de rappel', () => {
+  const fin = require('../src/finance'); const now = new Date('2026-11-10T10:00:00Z');
+  assert.equal(fin.etat('2026-12-30', 15, now), 'a_venir'); assert.equal(fin.etat('2026-11-15', 15, now), 'proche'); assert.equal(fin.etat('2026-11-10', 15, now), 'jour_j');
+  assert.equal(fin.etat('2026-11-01', 15, now), 'tolerance'); assert.equal(fin.etat('2026-10-01', 15, now), 'hors_tolerance');
+  assert.equal(fin.stepFor(40), null); assert.equal(fin.stepFor(20)[1], 'J-30'); assert.equal(fin.stepFor(0)[1], 'J'); assert.equal(fin.stepFor(-3)[1], 'J+1'); assert.equal(fin.stepFor(-90)[1], 'J+60');
+  assert.deepEqual(fin.dueDates('2026-01-31', 'SEMESTRIEL'), ['2026-01-31', '2026-07-31', '2027-01-31', '2027-07-31']);
+});
+
+test('contrat à durée fixe : la fin de licence reste celle du contrat, même après des paiements mensuels', async () => {
+  const fin = require('../src/finance');
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  const cl = await call('POST', '/api/clients', { name: 'Contrat 12 mois' }, ck);
+  await call('POST', `/api/clients/${cl.json.id}/licenses`, { expiresAt: '2027-01-15', maxDevices: 3 }, ck);
+  const id = (await pool.query('select max(id) as id from master_licenses')).rows[0].id;
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'MENSUEL', amount: 1000, firstDue: fin.ymd(new Date()), contractMonths: 99 }, ck)).status, 400);
+  assert.equal((await call('POST', `/api/licenses/${id}/billing`, { frequency: 'MENSUEL', amount: 1000, firstDue: fin.ymd(new Date()), contractMonths: 12, contractStart: '2026-11-01' }, ck)).status, 200);
+  let row = (await pool.query('select contract_months, expires_at::text as e from master_licenses where id=$1', [id])).rows[0];
+  assert.equal(row.contract_months, 12); assert.match(row.e, /^2027-11-01/);
+  const pay = (await pool.query("select id from master_payments where license_id=$1 order by due_date limit 1", [id])).rows[0];
+  assert.equal((await call('POST', `/api/payments/${pay.id}/confirm`, { method: 'Espèces' }, ck)).status, 200);
+  row = (await pool.query('select expires_at::text as e from master_licenses where id=$1', [id])).rows[0];
+  assert.match(row.e, /^2027-11-01/, 'un paiement mensuel ne prolonge pas un contrat de 12 mois');
+  const sc = (await call('GET', '/api/finance/schedule', undefined, ck)).json;
+  assert.ok(sc.contrats.some((c) => c.license_id == id && c.contract_months === 12));
+});
+test('charges techniques : alerte 7 jours avant, une seule fois, avance après paiement', async () => {
+  const fin = require('../src/finance');
+  const a = (await pool.query("select id from master_admins where email='owner@test.com'")).rows[0];
+  const ck = 'master_session=' + auth.signSession({ aid: a.id, stage: 'ok', exp: Date.now() + 600000 }, cfg.sessionSecret);
+  assert.equal((await call('POST', '/api/charges', { name: '' }, ck)).status, 400);
+  const due = fin.ymd(new Date(Date.now() + 864e5 * 6));
+  const r = await call('POST', '/api/charges', { name: 'Render', provider: 'Render', amount: 7000, currency: 'USD', frequency: 'MENSUEL', nextDue: due, remindDays: 7 }, ck); assert.equal(r.status, 200);
+  const logs = []; const fake = async (k, t) => { logs.push(t); return { sent: ['ntfy'] }; };
+  assert.equal((await fin.runChargeReminders(pool, fake)).sent, 1); assert.match(logs[0], /ABONNEMENT À RENOUVELER — Render — J-7/);
+  assert.equal((await fin.runChargeReminders(pool, fake)).sent, 0, 'pas de doublon');
+  assert.equal((await fin.runChargeReminders(pool, async () => ({ sent: [] }), new Date(Date.now() + 864e5 * 5))).sent, 0, 'non envoyé = non enregistré');
+  assert.equal((await fin.runChargeReminders(pool, fake, new Date(Date.now() + 864e5 * 5.5))).sent, 1, "J-1 : nouvelle étape, nouvelle alerte");
+  const p = await call('POST', `/api/charges/${r.json.id}/paid`, {}, ck); assert.equal(p.status, 200); assert.equal(p.json.nextDue, fin.ymd(fin.addMonths(new Date(due + 'T12:00:00Z'), 1)));
+  const l = (await call('GET', '/api/charges', undefined, ck)).json; assert.equal(l.find((c) => c.id === r.json.id).etat, 'a_venir');
+  assert.equal(fin.chargeStep(10, 7), null); assert.equal(fin.chargeStep(7, 7), 7); assert.equal(fin.chargeStep(0, 7), 0); assert.equal(fin.chargeStep(-2, 7), -1);
 });

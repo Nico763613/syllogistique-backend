@@ -126,6 +126,8 @@ export class InventoryCountsService {
       const count = await tx.inventoryCount.findUnique({ where: { id }, include: { lines: true } });
       if (!count) throw new NotFoundException('Inventaire introuvable.');
       if (count.status !== 'OPEN') throw new BadRequestException('Cet inventaire est déjà clos.');
+      const claim = await tx.inventoryCount.updateMany({ where: { id, status: 'OPEN' }, data: { status: 'VALIDATED' } });
+      if (claim.count !== 1) throw new BadRequestException('Cet inventaire est déjà clos.');
 
       let linesAdjusted = 0;
       let totalVarianceValue = 0;
@@ -190,7 +192,8 @@ export class InventoryCountsService {
     const count = await this.prisma.inventoryCount.findUnique({ where: { id } });
     if (!count) throw new NotFoundException('Inventaire introuvable.');
     if (count.status !== 'OPEN') throw new BadRequestException('Cet inventaire est déjà clos.');
-    await this.prisma.inventoryCount.update({ where: { id }, data: { status: 'CANCELLED' } });
+    const claim = await this.prisma.inventoryCount.updateMany({ where: { id, status: 'OPEN' }, data: { status: 'CANCELLED' } });
+    if (claim.count !== 1) throw new BadRequestException('Cet inventaire est déjà clos.');
     await this.audit.log({
       userId: actorId,
       action: 'UPDATE',

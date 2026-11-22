@@ -134,12 +134,13 @@ export class InventoryService {
   }
 
   // Sortie de stock : bloquée si quantité > stock disponible (sauf autorisation spéciale)
-  async stockOut(dto: StockOutDto, actorId: string) {
+  async stockOut(dto: StockOutDto, actorId: string, actorRole?: string) {
+    const forceNegative = !!dto.allowNegative && (actorRole === 'SUPER_ADMIN' || actorRole === 'ADMIN_LOGISTIQUE');
     const result = await this.prisma.$transaction(async (tx) => {
       const item = await tx.inventoryItem.findUnique({ where: { id: dto.itemId } });
       if (!item) throw new NotFoundException('Article introuvable.');
 
-      if (!dto.allowNegative && Number(item.currentQuantity) < dto.quantity) {
+      if (!forceNegative && Number(item.currentQuantity) < dto.quantity) {
         throw new BadRequestException(
           `Stock insuffisant. Disponible : ${item.currentQuantity} ${item.unit}, demandé : ${dto.quantity}.`,
         );
@@ -201,7 +202,8 @@ export class InventoryService {
 
   // Correction d'une erreur de saisie (quantité d'une entrée ou d'une sortie) : le stock est
   // recalculé automatiquement, l'ancienne et la nouvelle valeur sont journalisées avec le motif.
-  async correctMovement(id: string, dto: CorrectStockMovementDto, actorId: string) {
+  async correctMovement(id: string, dto: CorrectStockMovementDto, actorId: string, actorRole?: string) {
+    const forceNegative = !!dto.allowNegative && (actorRole === 'SUPER_ADMIN' || actorRole === 'ADMIN_LOGISTIQUE');
     const result = await this.prisma.$transaction(async (tx) => {
       const movement = await tx.stockMovement.findUnique({ where: { id } });
       if (!movement) throw new NotFoundException('Mouvement introuvable.');
@@ -214,7 +216,7 @@ export class InventoryService {
       const oldQuantity = Number(movement.quantity);
       const delta = (dto.quantity - oldQuantity) * (movement.movementType === 'IN' ? 1 : -1);
       const newStock = Number(item.currentQuantity) + delta;
-      if (!dto.allowNegative && newStock < 0) {
+      if (!forceNegative && newStock < 0) {
         throw new BadRequestException(
           `Correction impossible : le stock deviendrait négatif (${newStock} ${item.unit}).`,
         );

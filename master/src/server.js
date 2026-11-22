@@ -7,10 +7,14 @@ const auth = require('./auth');
 const lic = require('./license');
 const { makePool, migrate } = require('./db');
 const { notify } = require('./notify');
+const fin = require('./finance');
 const backups = require('./backups');
-const { diagnose } = require('./diagnose');
+const { diagnose, signalType } = require('./diagnose');
 
-const UI = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
+const UI_RAW = fs.readFileSync(path.join(__dirname, 'ui.html'), 'utf8');
+// Identifiant de version de l'écran : permet à chaque téléphone de savoir qu'une mise à jour existe et de se mettre à jour seul.
+const BUILD = require('crypto').createHash('sha1').update(UI_RAW).digest('hex').slice(0, 10);
+const UI = UI_RAW.replace('__BUILD__', BUILD);
 const COOKIE = 'master_session';
 const IDLE_MIN = 15; // déconnexion automatique après 15 minutes d'inactivité
 const MASTER_URL = (process.env.RENDER_EXTERNAL_URL || 'https://syllogistique-master.onrender.com').replace(/\/$/, '');
@@ -128,7 +132,7 @@ function createApp(pool, cfg) {
           const ins = await pool.query(`insert into master_reports(license_id, remote_id, user_name, role, screen, message, context, reported_at) values ($1,$2,$3,$4,$5,$6,$7,$8)
             on conflict (license_id, remote_id) do nothing returning id`,
           [l.id, rid, t(r.userName, 120), t(r.role, 40), t(r.screen, 160), t(r.message, 600), t(r.context, 900), r.createdAt && !isNaN(new Date(r.createdAt)) ? new Date(r.createdAt).toISOString() : new Date().toISOString()]);
-          if (ins.rowCount) alerts.push({ kind: r.role === 'SYSTEM' ? 'erreur' : 'signalement', text: t(r.message, 200) });
+          if (ins.rowCount) alerts.push({ kind: r.role === 'SYSTEM' ? 'erreur' : 'signalement', text: t(r.message, 200), type: signalType({ role: r.role, message: r.message, screen: r.screen, context: r.context }), who: t(r.userName, 80), role: t(r.role, 40) });
         }
       }
       if (Array.isArray(b.mails)) {
@@ -144,9 +148,14 @@ function createApp(pool, cfg) {
       }
       if (alerts.length) {
         const cn = (await pool.query('select name from master_clients where id=$1', [l.client_id])).rows[0];
-        const nb = (k) => alerts.filter((x) => x.kind === k).length;
-        const parts = [nb('erreur') && nb('erreur') + ' erreur(s) serveur', nb('signalement') && nb('signalement') + ' signalement(s)', nb('envoi') && nb('envoi') + ' envoi(s) d\'e-mail en échec'].filter(Boolean).join(', ');
-        notify('client-' + l.id, 'SYL MASTER — ' + (cn ? cn.name : 'client') + ' : ' + parts, alerts.slice(0, 5).map((x) => '- ' + x.kind + ' : ' + (x.text || '')).join('\n') + '\n\nOuvrez la console Master (Signalements / Envois) pour le détail.').catch(() => {});
+        const nom = cn ? cn.name : 'client';
+        // une notification par nature de problème : on voit tout de suite « Mot de passe » ou « Panne de téléphone », qui, et chez quel client
+        const groups = new Map();
+        for (const x of alerts) { const k = x.kind === 'envoi' ? 'E-mail en échec' : x.type; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(x); }
+        for (const [type, list] of groups) {
+          const lignes = list.slice(0, 5).map((x) => '- ' + (x.who ? x.who + (x.role ? ' (' + x.role + ')' : '') + ' : ' : '') + (x.text || '')).join('\n');
+          notify('client-' + l.id + '-' + type, 'SYL MASTER — ' + type + ' — ' + nom + (list.length === 1 && list[0].who ? ' — ' + list[0].who : (list.length > 1 ? ' (' + list.length + ')' : '')), 'Client : ' + nom + '\nNature : ' + type + '\n' + lignes + '\n\nOuvrez la console Master (Signalements) pour le détail.').catch(() => {});
+        }
       }
       const dv = (await pool.query('select device_id, blocked, disconnect_requested from master_devices where license_id=$1', [l.id])).rows;
       const c = (await pool.query('select * from master_clients where id=$1', [l.client_id])).rows[0];
@@ -170,6 +179,7 @@ function createApp(pool, cfg) {
       res.writeHead(200, { 'content-type': mm[1], 'cache-control': 'public, max-age=3600', 'x-content-type-options': 'nosniff', 'cross-origin-resource-policy': 'cross-origin' });
       return res.end(Buffer.from(mm[2], 'base64'));
     }
+    if (req.method === 'GET' && p === '/api/version') return send(res, 200, { build: BUILD }, { 'cache-control': 'no-store' });
     if (p.startsWith('/v1/')) return handleV1(req, res, p);
     if (!p.startsWith('/api/')) return send(res, 404, { error: 'Introuvable' });
 
@@ -256,6 +266,120 @@ function createApp(pool, cfg) {
       return send(res, 200, rows);
     }
 
+    // ---------- liaison BRAKA ÉLECTRONIQUE MOBILE (appels de serveur à serveur, clé secrète) ----------
+    if (p.startsWith('/api/baraka/')) {
+      const base = String(process.env.BARAKA_URL || '').replace(/\/$/, ''), key = process.env.BARAKA_LINK_KEY || '';
+      if (!base || !key) return send(res, 503, { error: 'La liaison BRAKA n\'est pas configurée (BARAKA_URL / BARAKA_LINK_KEY).' });
+      const bk = async (method, sub) => {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 55000); // réveil possible de l'hébergement gratuit
+        try {
+          const r = await fetch(base + '/api/link' + sub, { method, headers: { 'x-link-key': key, 'content-type': 'application/json' }, body: method === 'POST' ? '{}' : undefined, signal: ctl.signal });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) return { err: j.error || ('BRAKA a répondu ' + r.status) };
+          return { j };
+        } catch (e) { return { err: e.name === 'AbortError' ? 'BRAKA met trop de temps à répondre (réveil en cours). Réessayez dans une minute.' : 'BRAKA est injoignable pour le moment.' }; } finally { clearTimeout(t); }
+      };
+      const out = (r) => (r.err ? send(res, 502, { error: r.err }) : send(res, 200, r.j));
+      const sub = p.slice('/api/baraka'.length);
+      if (req.method === 'GET' && sub === '/summary') return out(await bk('GET', '/summary'));
+      if (req.method === 'GET' && sub === '/users') return out(await bk('GET', '/users'));
+      if (req.method === 'GET' && sub === '/activity') return out(await bk('GET', '/activity'));
+      if (req.method === 'GET' && sub === '/health') return out(await bk('GET', '/health'));
+      const m = /^\/users\/([0-9a-f-]{36})\/(unlock|block|reset-password)$/.exec(sub);
+      if (req.method === 'POST' && m) {
+        const r = await bk('POST', sub);
+        await audit(s.aid, m[2] === 'unlock' ? 'BARAKA_DEBLOCAGE' : m[2] === 'block' ? 'BARAKA_BLOCAGE' : 'BARAKA_NOUVEAU_MDP', r.err ? 'échec : ' + r.err : (r.j && r.j.nom) || m[1], req);
+        return out(r);
+      }
+      return send(res, 404, { error: 'Introuvable' });
+    }
+
+    // ---------- finance : échéancier et paiements (Phase 1) ----------
+    let fm;
+    if (req.method === 'GET' && p === '/api/finance/schedule') {
+      const { rows } = await pool.query(`select p.id, p.license_id, p.due_date::text as due, p.amount, p.status, p.paid_at, p.method, p.reference,
+          l.currency, l.pay_frequency, l.tolerance_days, c.id as client_id, c.name as cname,
+          (select string_agg(r.step, ',' order by r.sent_at) from master_reminders r where r.payment_id=p.id) as rappels
+        from master_payments p join master_licenses l on l.id=p.license_id join master_clients c on c.id=l.client_id
+        where p.status='DUE' or p.paid_at > now() - interval '90 days' order by p.due_date, p.id limit 500`);
+      const items = rows.map((r) => ({ ...r, amount: Number(r.amount), jours: fin.daysTo(r.due), etat: r.status === 'PAID' ? 'paye' : fin.etat(r.due, r.tolerance_days) }));
+      const mois = new Date().toISOString().slice(0, 7);
+      const sum = (f) => items.filter(f).reduce((a, x) => a + x.amount, 0);
+      const cur = [...new Set(items.map((x) => x.currency))];
+      const ct = (await pool.query(`select l.id as license_id, c.name as cname, l.contract_months, l.contract_start::text as contract_start, l.expires_at, l.permanent, l.status
+          from master_licenses l join master_clients c on c.id=l.client_id where l.contract_months > 0 and l.status <> 'REVOKED' order by l.expires_at`)).rows;
+      return send(res, 200, { contrats: ct, items, devises: cur,
+        totaux: { recu_mois: sum((x) => x.status === 'PAID' && String(x.paid_at).slice(0, 7) === mois), attendu: sum((x) => x.status === 'DUE'), en_retard: sum((x) => x.status === 'DUE' && x.jours < 0),
+          nb_retard: items.filter((x) => x.status === 'DUE' && x.jours < 0).length, nb_tolerance: items.filter((x) => x.etat === 'tolerance').length, nb_hors_tolerance: items.filter((x) => x.etat === 'hors_tolerance').length },
+        mixte: cur.length > 1 });
+    }
+    if (req.method === 'POST' && (fm = /^\/api\/licenses\/(\d+)\/billing$/.exec(p))) {
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [Number(fm[1])])).rows[0];
+      if (!l) return send(res, 404, { error: 'Licence introuvable.' });
+      const freq = String(body.frequency || ''); const amount = Math.round(Number(body.amount)); const cur = String(body.currency || 'GNF').toUpperCase(); const tol = Math.round(Number(body.toleranceDays ?? 15));
+      if (!fin.FREQ[freq]) return send(res, 400, { error: 'Choisissez la fréquence : mensuel, semestriel ou annuel.' });
+      if (!Number.isFinite(amount) || amount <= 0) return send(res, 400, { error: 'Saisissez le montant de chaque échéance.' });
+      if (!fin.CURRENCIES.includes(cur)) return send(res, 400, { error: 'Devise non prise en charge.' });
+      if (!Number.isFinite(tol) || tol < 0 || tol > 180) return send(res, 400, { error: 'La période de tolérance doit être comprise entre 0 et 180 jours.' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.firstDue || '')) || isNaN(Date.parse(body.firstDue))) return send(res, 400, { error: 'Choisissez la date de la première échéance.' });
+      const cm = Math.round(Number(body.contractMonths || 0)); const cs = body.contractStart ? String(body.contractStart) : fin.ymd(new Date());
+      if (!Number.isFinite(cm) || cm < 0 || cm > 60) return send(res, 400, { error: 'La durée du contrat doit être comprise entre 0 et 60 mois.' });
+      if (cm > 0 && (!/^\d{4}-\d{2}-\d{2}$/.test(cs) || isNaN(Date.parse(cs)))) return send(res, 400, { error: 'Date de début du contrat invalide.' });
+      await pool.query("update master_licenses set pay_frequency=$2, pay_amount=$3, currency=$4, tolerance_days=$5, contract_months=$6, contract_start=$7 where id=$1 returning id", [l.id, freq, amount, cur, tol, cm, cm > 0 ? cs : null]);
+      if (cm > 0 && !l.permanent) await pool.query('update master_licenses set expires_at=$2 where id=$1 returning id', [l.id, fin.addMonths(new Date(cs + 'T23:59:59Z'), cm).toISOString()]); // la fin de la licence = la fin du contrat
+      await pool.query("delete from master_payments where license_id=$1 and status='DUE' returning id", [l.id]); // les paiements déjà confirmés ne sont jamais touchés
+      for (const d of fin.dueDates(body.firstDue, freq)) await pool.query('insert into master_payments(license_id, due_date, amount) values ($1,$2,$3) returning id', [l.id, d, amount]);
+      await audit(s.aid, 'ECHEANCIER_DEFINI', `${l.cname} · licence ${l.id} · ${freq} · ${amount} ${cur} · tolérance ${tol} j`, req);
+      return send(res, 200, { ok: true });
+    }
+    if (req.method === 'POST' && (fm = /^\/api\/payments\/(\d+)\/confirm$/.exec(p))) {
+      // Le paiement n'est considéré reçu que sur validation du Master Admin ; le renouvellement suit la confirmation, jamais une simple déclaration.
+      const method = String(body.method || '').slice(0, 40), ref = String(body.reference || '').slice(0, 80);
+      if (!method) return send(res, 400, { error: 'Indiquez comment le paiement a été reçu (espèces, virement, Orange Money…).' });
+      const got = await pool.query("update master_payments set status='PAID', paid_at=now(), method=$2, reference=$3, confirmed_by=$4 where id=$1 and status='DUE' returning license_id, due_date::text as due, amount", [Number(fm[1]), method, ref || null, s.aid]);
+      if (!got.rowCount) return send(res, 404, { error: 'Échéance introuvable ou déjà confirmée.' });
+      const pay = got.rows[0];
+      const l = (await pool.query('select l.*, c.name as cname from master_licenses l join master_clients c on c.id=l.client_id where l.id=$1', [pay.license_id])).rows[0];
+      let exp = l.expires_at;
+      if (!l.permanent && l.status !== 'REVOKED' && !(l.contract_months > 0)) { // renouvelle (un contrat à durée fixe garde sa date de fin) la période payée à partir de la fin actuelle (ou d'aujourd'hui si déjà expirée)
+        const base = l.expires_at && new Date(l.expires_at) > new Date() ? new Date(l.expires_at) : new Date();
+        exp = fin.addMonths(base, fin.FREQ[l.pay_frequency] || 1).toISOString();
+        await pool.query('update master_licenses set expires_at=$2 where id=$1 returning id', [l.id, exp]);
+      }
+      await pool.query('update master_licenses set payment_confirmed=true where id=$1 returning id', [l.id]);
+      const left = (await pool.query("select count(*)::int as n, max(due_date)::text as last from master_payments where license_id=$1 and status='DUE'", [l.id])).rows[0];
+      if (left.n < 2) await pool.query('insert into master_payments(license_id, due_date, amount) values ($1,$2,$3) returning id', [l.id, fin.ymd(fin.addMonths(left.last || pay.due, fin.FREQ[l.pay_frequency] || 1)), l.pay_amount || pay.amount]);
+      await audit(s.aid, 'PAIEMENT_CONFIRME', `${l.cname} · licence ${l.id} · échéance ${pay.due} · ${pay.amount} ${l.currency} · ${method}${ref ? ' · ' + ref : ''}${l.permanent ? '' : ' · nouvelle expiration ' + String(exp).slice(0, 10)}`, req);
+      return send(res, 200, { ok: true, expiresAt: l.permanent ? null : exp });
+    }
+
+    if (req.method === 'GET' && p === '/api/charges') {
+      const { rows } = await pool.query("select id, name, provider, amount, currency, frequency, next_due::text as due, remind_days, active, last_paid_at, note from master_charges order by active desc, next_due, id");
+      return send(res, 200, rows.map((r) => ({ ...r, amount: Number(r.amount), jours: fin.daysTo(r.due), etat: !r.active ? 'inactif' : fin.daysTo(r.due) < 0 ? 'retard' : fin.daysTo(r.due) === 0 ? 'jour_j' : fin.daysTo(r.due) <= r.remind_days ? 'proche' : 'a_venir' })));
+    }
+    if (req.method === 'POST' && p === '/api/charges') {
+      const name = String(body.name || '').trim().slice(0, 80), provider = String(body.provider || '').trim().slice(0, 60), note = String(body.note || '').trim().slice(0, 200);
+      const amount = Math.max(0, Math.round(Number(body.amount || 0))), cur = String(body.currency || 'GNF').toUpperCase(), fr = String(body.frequency || 'MENSUEL'), rd = Math.round(Number(body.remindDays ?? 7));
+      if (!name) return send(res, 400, { error: "Donnez un nom à l'abonnement (ex. Render)." });
+      if (!fin.CURRENCIES.includes(cur) && cur !== 'USD') return send(res, 400, { error: 'Devise non prise en charge.' });
+      if (!fin.CH_FREQ[fr]) return send(res, 400, { error: 'Choisissez la fréquence du paiement.' });
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(body.nextDue || '')) || isNaN(Date.parse(body.nextDue))) return send(res, 400, { error: "Choisissez la date de la prochaine échéance." });
+      if (!Number.isFinite(rd) || rd < 1 || rd > 60) return send(res, 400, { error: "L'alerte doit se déclencher entre 1 et 60 jours avant l'échéance." });
+      const r = await pool.query('insert into master_charges(name, provider, amount, currency, frequency, next_due, remind_days, note) values ($1,$2,$3,$4,$5,$6,$7,$8) returning id', [name, provider || null, amount, cur, fr, body.nextDue, rd, note || null]);
+      await audit(s.aid, 'CHARGE_AJOUTEE', `${name} · ${fr} · échéance ${body.nextDue} · alerte ${rd} j avant`, req);
+      return send(res, 200, { ok: true, id: r.rows[0].id });
+    }
+    if (req.method === 'POST' && (fm = /^\/api\/charges\/(\d+)\/(paid|delete)$/.exec(p))) {
+      const c = (await pool.query('select * from master_charges where id=$1', [Number(fm[1])])).rows[0];
+      if (!c) return send(res, 404, { error: 'Abonnement introuvable.' });
+      if (fm[2] === 'delete') { await pool.query('delete from master_charges where id=$1 returning id', [c.id]); await audit(s.aid, 'CHARGE_SUPPRIMEE', c.name, req); return send(res, 200, { ok: true }); }
+      // « Payé » : c'est vous qui avez réglé l'abonnement ; l'échéance avance d'une période (rien n'est payé automatiquement par ce tableau de bord)
+      const next = fin.ymd(fin.addMonths(new Date(String(c.next_due).slice(0, 10) + 'T12:00:00Z'), fin.CH_FREQ[c.frequency]));
+      await pool.query('update master_charges set next_due=$2, last_paid_at=now() where id=$1 returning id', [c.id, next]);
+      await audit(s.aid, 'CHARGE_PAYEE', `${c.name} · prochaine échéance ${next}`, req);
+      return send(res, 200, { ok: true, nextDue: next });
+    }
+
     // ---------- supervision : signalements et vue d'ensemble ----------
     const dOk = (x) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || '')) ? x : null);
     if (req.method === 'GET' && p === '/api/reports') {
@@ -263,7 +387,7 @@ function createApp(pool, cfg) {
       const { rows } = await pool.query(`select r.id, r.user_name, r.role, r.screen, r.message, r.context, r.status, r.reported_at, c.id as client_id, c.name as client_name
         from master_reports r join master_licenses l on l.id=r.license_id join master_clients c on c.id=l.client_id
         where ($1::text is null or r.status=$1) and ($2::bigint is null or c.id=$2) and ($3::date is null or r.reported_at >= $3::date) and ($4::date is null or r.reported_at < $4::date + 1) order by r.reported_at desc limit 1000`, [['NEW', 'IN_PROGRESS', 'SOLVED'].includes(st) ? st : null, cl, dOk(url.searchParams.get('from')), dOk(url.searchParams.get('to'))]);
-      return send(res, 200, rows.map((r) => ({ ...r, diagnosis: diagnose(r) })));
+      return send(res, 200, rows.map((r) => ({ ...r, diagnosis: diagnose(r), type: signalType(r) })));
     }
     if (req.method === 'POST' && p === '/api/reports/status') {
       const b = body; if (!['NEW', 'IN_PROGRESS', 'SOLVED'].includes(b.status)) return send(res, 400, { error: 'Statut invalide.' });
@@ -489,6 +613,19 @@ if (require.main === module) {
     const cfg = configFromEnv(); const pool = makePool();
     await migrate(pool); await bootstrapAdmin(pool, cfg);
     createApp(pool, cfg).listen(cfg.port, () => console.log('[master] en ligne sur le port ' + cfg.port));
+    // Rappels d'échéances : contrôle toutes les heures (et 1 min après le démarrage, pour rattraper un hébergement endormi)
+    const rem = () => Promise.all([fin.runReminders(pool, notify), fin.runChargeReminders(pool, notify)]).catch((e) => console.error('[master] rappels :', e.message));
+    setTimeout(rem, 60 * 1000); setInterval(rem, 60 * 60 * 1000);
+    // Surveillance de BRAKA toutes les 5 min : alerte téléphone (ntfy/e-mail) dès qu'une anomalie rouge apparaît ou que BRAKA ne répond plus
+    const bUrl = String(process.env.BARAKA_URL || '').replace(/\/$/, ''), bKey = process.env.BARAKA_LINK_KEY || '';
+    if (bUrl && bKey) setInterval(async () => {
+      try {
+        const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 55000);
+        const r = await fetch(bUrl + '/api/link/health', { headers: { 'x-link-key': bKey }, signal: ctl.signal }).finally(() => clearTimeout(t));
+        const h = await r.json();
+        for (const a of (h.alertes || []).filter((x) => x.niveau === 'rouge')) notify('braka-' + a.type + '-' + (a.ref || ''), 'BRAKA — ' + a.type.replace(/_/g, ' '), a.message);
+      } catch (e) { notify('braka-injoignable', 'BRAKA — injoignable', "BRAKA ne répond pas (panne ou réveil de l'hébergement). Vérifiez l'état du service."); }
+    }, 5 * 60 * 1000);
     // Contrôle toutes les 6 h : alerte immédiate si la sauvegarde quotidienne n'a pas réussi depuis plus de 36 h (si le suivi est configuré)
     setInterval(async () => { try { const b = await backups.status(); if (b.configured && b.state === 'STALE') notify('backup', 'SYL MASTER — sauvegarde en retard', 'La dernière sauvegarde réussie date de ' + (b.hoursSinceSuccess == null ? 'plus de 15 jours' : b.hoursSinceSuccess + ' h') + '. Ouvrez Master > Sauvegardes.'); } catch (e) {} }, 6 * 3600e3).unref();
   })().catch((e) => { console.error('[master] arrêt :', e.message); process.exit(1); });

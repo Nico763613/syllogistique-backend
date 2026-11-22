@@ -83,7 +83,10 @@ export class PurchasesService {
         quantityAccepted: number; quantityRejected: number; rejectReason?: string;
       }> = [];
 
+      const seenLines = new Set<string>();
       for (const recv of dto.lines) {
+        if (seenLines.has(recv.lineId)) throw new BadRequestException('Une même ligne ne peut pas figurer deux fois dans la réception.');
+        seenLines.add(recv.lineId);
         const line = order.lines.find((l) => l.id === recv.lineId);
         if (!line) throw new BadRequestException(`Ligne inconnue : ${recv.lineId}`);
 
@@ -113,10 +116,11 @@ export class PurchasesService {
         });
         if (accepted <= 0) continue; // tout refusé : aucune entrée de stock
 
-        await tx.purchaseOrderLine.update({
-          where: { id: line.id },
+        const claimed = await tx.purchaseOrderLine.updateMany({
+          where: { id: line.id, quantityReceived: { lte: Number(line.quantityOrdered) - accepted + 0.0005 } },
           data: { quantityReceived: { increment: accepted } },
         });
+        if (claimed.count !== 1) throw new BadRequestException('Cette ligne vient d\'être réceptionnée par une autre opération.');
 
         // Entrée de stock automatique + mise à jour du prix d'achat de référence
         await tx.stockMovement.create({

@@ -1,0 +1,68 @@
+'use strict';
+// Échéancier : calculs de dates, état d'une échéance et rappels automatiques (J-30 … J+60).
+const FREQ = { MENSUEL: 1, SEMESTRIEL: 6, ANNUEL: 12 };
+const COUNT = { MENSUEL: 12, SEMESTRIEL: 4, ANNUEL: 2 }; // nombre d'échéances générées d'avance
+const CURRENCIES = ['GNF', 'USD', 'EUR', 'XOF'];
+// Étapes de rappel : nombre de jours AVANT l'échéance (positif) ou APRÈS (négatif)
+const STEPS = [[30, 'J-30', 'Notification préventive'], [15, 'J-15', 'Premier rappel'], [7, 'J-7', 'Rappel de paiement'], [1, 'J-1', 'Dernier rappel avant échéance'],
+  [0, 'J', "Jour d'échéance : vérifier le paiement"], [-1, 'J+1', 'Retard de paiement'], [-7, 'J+7', 'Relance'], [-15, 'J+15', 'Alerte : retard important'],
+  [-30, 'J+30', 'Suivi renforcé'], [-60, 'J+60', 'Décision de suspension à prendre']];
+
+const ymd = (d) => new Date(d).toISOString().slice(0, 10);
+function addMonths(date, n) { const d = new Date(date); const day = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + n); const last = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); d.setUTCDate(Math.min(day, last)); return d; }
+const daysTo = (due, now = new Date()) => Math.round((Date.parse(ymd(due)) - Date.parse(ymd(now))) / 864e5); // >0 : à venir, <0 : en retard
+function etat(due, tolerance, now) {
+  const d = daysTo(due, now);
+  if (d > 30) return 'a_venir'; if (d >= 0) return d === 0 ? 'jour_j' : 'proche';
+  return -d <= tolerance ? 'tolerance' : 'hors_tolerance';
+}
+// Pour d > 0 : l'étape atteinte est la plus petite valeur positive >= d ; pour d <= 0 : la plus négative >= d
+function stepFor(d) {
+  let best = null;
+  for (const s of STEPS) { const ok = s[0] > 0 ? d <= s[0] : d <= s[0]; if (ok && (!best || s[0] < best[0])) best = s; }
+  return best;
+}
+
+function dueDates(first, frequency) { const n = COUNT[frequency], m = FREQ[frequency]; return Array.from({ length: n }, (_, i) => ymd(addMonths(first, i * m))); }
+
+// Contrôle les échéances ouvertes et notifie le Master Admin. Un rappel n'est enregistré que s'il a vraiment été envoyé.
+async function runReminders(pool, notify, now = new Date()) {
+  const { rows } = await pool.query(`select p.id, p.due_date::text as due, p.amount, l.currency, c.name as cname, l.id as lid
+    from master_payments p join master_licenses l on l.id=p.license_id join master_clients c on c.id=l.client_id
+    where p.status='DUE' and l.status not in ('REVOKED') and p.due_date < current_date + 31`);
+  let sent = 0;
+  for (const p of rows) {
+    const d = daysTo(p.due, now); const st = stepFor(d); if (!st) continue;
+    const have = await pool.query('select 1 from master_reminders where payment_id=$1 and step=$2', [p.id, st[1]]);
+    if (have.rowCount) continue;
+    const when = d > 0 ? `dans ${d} jour(s)` : d === 0 ? "aujourd'hui" : `en retard de ${-d} jour(s)`;
+    const r = await notify('pay-' + p.id + '-' + st[1], `SYL MASTER — ${st[1]} — ${p.cname}`,
+      `${st[2]}.\nEntreprise : ${p.cname}\nÉchéance : ${p.due} (${when})\nMontant : ${Number(p.amount).toLocaleString('fr-FR')} ${p.currency}\nAction : ouvrez Finance et confirmez le paiement dès réception.`);
+    if (r && r.sent && r.sent.length) { await pool.query('insert into master_reminders(payment_id, step, channels) values ($1,$2,$3) on conflict do nothing returning payment_id', [p.id, st[1], r.sent.join(',')]); sent++; }
+  }
+  return { checked: rows.length, sent };
+}
+// ---- Charges techniques : alerte N jours avant l'échéance (7 par défaut), puis J-1, J, et relance en cas de retard ----
+const CH_FREQ = { MENSUEL: 1, TRIMESTRIEL: 3, SEMESTRIEL: 6, ANNUEL: 12 };
+function chargeStep(d, remind) {
+  const steps = [...new Set([Number(remind) || 7, 1, 0, -1, -3])].sort((a, b) => b - a);
+  let best = null; for (const x of steps) if (d <= x && (best === null || x < best)) best = x;
+  return best;
+}
+const stepLabel = (x) => (x > 0 ? 'J-' + x : x === 0 ? 'J' : 'J+' + -x);
+async function runChargeReminders(pool, notify, now = new Date()) {
+  const { rows } = await pool.query("select id, name, provider, amount, currency, next_due::text as due, remind_days from master_charges where active");
+  let sent = 0;
+  for (const c of rows) {
+    const d = daysTo(c.due, now); const st = chargeStep(d, c.remind_days); if (st === null) continue;
+    const key = stepLabel(st);
+    const have = await pool.query('select 1 from master_charge_reminders where charge_id=$1 and due_date=$2 and step=$3', [c.id, c.due, key]);
+    if (have.rowCount) continue;
+    const when = d > 0 ? `dans ${d} jour(s)` : d === 0 ? "aujourd'hui" : `dépassée de ${-d} jour(s)`;
+    const r = await notify('charge-' + c.id + '-' + c.due + '-' + key, `ABONNEMENT À RENOUVELER — ${c.name} — ${key}`,
+      `${c.name}${c.provider ? ' (' + c.provider + ')' : ''}\nÉchéance : ${c.due} (${when})\n${Number(c.amount) ? 'Montant : ' + Number(c.amount).toLocaleString('fr-FR') + ' ' + c.currency + '\n' : ''}Pensez à payer avant l'échéance pour éviter toute coupure du service.`);
+    if (r && r.sent && r.sent.length) { await pool.query('insert into master_charge_reminders(charge_id, due_date, step, channels) values ($1,$2,$3,$4) on conflict do nothing returning charge_id', [c.id, c.due, key, r.sent.join(',')]); sent++; }
+  }
+  return { checked: rows.length, sent };
+}
+module.exports = { CH_FREQ, chargeStep, runChargeReminders, FREQ, COUNT, CURRENCIES, STEPS, addMonths, daysTo, etat, stepFor, dueDates, ymd, runReminders };

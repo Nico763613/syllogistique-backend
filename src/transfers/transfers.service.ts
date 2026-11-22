@@ -77,6 +77,8 @@ export class TransfersService {
       if (!transfer) throw new NotFoundException('Transfert introuvable.');
       this.assertSite(actor, transfer.toSiteId);
       if (transfer.status !== 'IN_TRANSIT') throw new BadRequestException("Ce transfert n'est pas en transit.");
+      const claim = await tx.stockTransfer.updateMany({ where: { id, status: 'IN_TRANSIT' }, data: { status: 'RECEIVED' } });
+      if (claim.count !== 1) throw new BadRequestException("Ce transfert n'est plus en transit.");
 
       for (const l of transfer.lines) {
         let target = await tx.inventoryItem.findFirst({ where: { siteId: transfer.toSiteId, sku: l.item.sku, deletedAt: null } });
@@ -116,6 +118,8 @@ export class TransfersService {
       if (!transfer) throw new NotFoundException('Transfert introuvable.');
       this.assertSite(actor, transfer.fromSiteId);
       if (transfer.status !== 'IN_TRANSIT') throw new BadRequestException("Seul un transfert en transit peut être annulé.");
+      const claim = await tx.stockTransfer.updateMany({ where: { id, status: 'IN_TRANSIT' }, data: { status: 'CANCELLED' } });
+      if (claim.count !== 1) throw new BadRequestException("Ce transfert n'est plus en transit.");
       for (const l of transfer.lines) {
         await tx.inventoryItem.update({ where: { id: l.itemId }, data: { currentQuantity: { increment: Number(l.quantity) } } });
         await tx.stockMovement.create({

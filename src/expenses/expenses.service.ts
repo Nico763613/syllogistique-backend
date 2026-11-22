@@ -2,16 +2,25 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateExpenseDto } from './dto/expense.dto';
+import { Actor } from '../common/actor';
 
 // Gestion des coûts (§30) : dépenses diverses + synthèse des coûts par véhicule.
 @Injectable()
 export class ExpensesService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  async create(dto: CreateExpenseDto, actorId: string) {
+  async create(dto: CreateExpenseDto, actor: Actor) {
+    const actorId = actor.userId;
+    // Hors Super Admin, une dépense doit être rattachée à un véhicule du site de l'utilisateur
+    if (!dto.vehicleId && actor.role !== 'SUPER_ADMIN') {
+      throw new BadRequestException('Indiquez le véhicule concerné par cette dépense.');
+    }
     if (dto.vehicleId) {
       const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
       if (!vehicle) throw new BadRequestException('Véhicule inexistant.');
+      if (actor.role !== 'SUPER_ADMIN' && actor.siteId && vehicle.siteId !== actor.siteId) {
+        throw new BadRequestException('Véhicule inexistant.');
+      }
     }
     const expense = await this.prisma.expense.create({
       data: {
@@ -26,9 +35,11 @@ export class ExpensesService {
     return expense;
   }
 
-  findAll(params: { vehicleId?: string; category?: string; from?: string; to?: string }) {
+  findAll(params: { vehicleId?: string; category?: string; from?: string; to?: string }, actor: Actor) {
+    const scoped = actor.role !== 'SUPER_ADMIN' && actor.siteId;
     return this.prisma.expense.findMany({
       where: {
+        ...(scoped ? { vehicle: { siteId: actor.siteId } } : {}),
         ...(params.vehicleId ? { vehicleId: params.vehicleId } : {}),
         ...(params.category ? { category: params.category } : {}),
         ...(params.from || params.to
@@ -46,7 +57,8 @@ export class ExpensesService {
   }
 
   // Coût total par véhicule, coût/km et coût/mission sur une période (carburant + maintenance + pièces sorties + autres dépenses)
-  async costSummary(siteId: string, from: string, to: string) {
+  async costSummary(siteId: string | undefined, from: string, to: string) {
+    if (!siteId) throw new BadRequestException('Précisez le site (paramètre siteId).');
     const fromDate = new Date(from);
     const toDate = new Date(to);
     if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime()) || fromDate > toDate) {

@@ -79,10 +79,16 @@ export class TripsService {
     const trip = await this.prisma.trip.findUnique({ where: { id } });
     if (!trip) throw new NotFoundException('Mission introuvable.');
 
+    if (trip.status === 'COMPLETED' || trip.status === 'CANCELLED') {
+      throw new BadRequestException('Cette mission est déjà clôturée ou annulée : utilisez la correction avec motif.');
+    }
     if (dto.endMileage < trip.startMileage) {
       throw new BadRequestException(
         'Le kilométrage d\'arrivée ne peut pas être inférieur au kilométrage de départ.',
       );
+    }
+    if (dto.endMileage - trip.startMileage > 3000) {
+      throw new BadRequestException('Distance de plus de 3 000 km sur une seule mission : vérifiez le compteur (faute de frappe probable).');
     }
 
     const distance = dto.endMileage - trip.startMileage;
@@ -92,9 +98,10 @@ export class TripsService {
       data: { endTime: new Date(dto.endTime), endMileage: dto.endMileage, distance, observations: dto.observations, status: 'COMPLETED', endCondition: dto.endCondition },
     });
 
+    const veh = await this.prisma.vehicle.findUnique({ where: { id: trip.vehicleId } });
     await this.prisma.vehicle.update({
       where: { id: trip.vehicleId },
-      data: { currentMileage: dto.endMileage, status: dto.endCondition === 'PANNE' || dto.endCondition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' },
+      data: { currentMileage: Math.max(dto.endMileage, veh?.currentMileage ?? 0), status: dto.endCondition === 'PANNE' || dto.endCondition === 'DOMMAGE_MAJEUR' ? 'MAINTENANCE' : 'AVAILABLE' },
     });
 
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Trip', entityId: id, newValue: dto });

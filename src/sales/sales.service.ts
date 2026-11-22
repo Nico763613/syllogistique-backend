@@ -97,10 +97,20 @@ export class SalesService {
 
   // ---- Livraison : sortie de stock automatique, bloquée si stock insuffisant ----
 
-  async deliver(orderId: string, dto: DeliverSalesOrderDto, actorId: string) {
+  async deliver(orderId: string, dto: DeliverSalesOrderDto, actorId: string, actorRole?: string) {
+    // Livrer sans stock suffisant est réservé à la direction (et tracé) ; jamais décidé par le client seul.
+    const forceNegative = !!dto.allowNegative && (actorRole === 'SUPER_ADMIN' || actorRole === 'ADMIN_LOGISTIQUE');
+    const seen = new Set<string>();
+    for (const d of dto.lines) {
+      if (seen.has(d.lineId)) throw new BadRequestException('Une même ligne ne peut pas figurer deux fois dans la livraison.');
+      seen.add(d.lineId);
+    }
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.salesOrder.findUnique({ where: { id: orderId }, include: { lines: true } });
       if (!order) throw new NotFoundException('Commande introuvable.');
+      if (order.status === 'CANCELLED' || order.status === 'QUOTE') {
+        throw new BadRequestException("Cette commande n'est pas livrable (devis, brouillon ou annulée).");
+      }
 
       for (const del of dto.lines) {
         const line = order.lines.find((l) => l.id === del.lineId);
@@ -115,16 +125,18 @@ export class SalesService {
 
         const item = await tx.inventoryItem.findUnique({ where: { id: line.itemId } });
         if (!item) throw new NotFoundException('Article introuvable.');
-        if (!dto.allowNegative && Number(item.currentQuantity) < del.quantityDelivered) {
+        if (!forceNegative && Number(item.currentQuantity) < del.quantityDelivered) {
           throw new BadRequestException(
             `Stock insuffisant pour ${item.name} : disponible ${item.currentQuantity} ${item.unit}, demandé ${del.quantityDelivered}.`,
           );
         }
 
-        await tx.salesOrderLine.update({
-          where: { id: line.id },
+        // Garde atomique : deux livraisons simultanées ne peuvent pas dépasser la quantité commandée.
+        const claimed = await tx.salesOrderLine.updateMany({
+          where: { id: line.id, quantityDelivered: { lte: Number(line.quantityOrdered) - del.quantityDelivered } },
           data: { quantityDelivered: { increment: del.quantityDelivered } },
         });
+        if (claimed.count !== 1) throw new BadRequestException('Cette ligne vient d\'être livrée par une autre opération.');
 
         await tx.stockMovement.create({
           data: {

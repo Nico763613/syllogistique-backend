@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { SiteScopeInterceptor } from './common/interceptors/site-scope.interceptor';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -93,6 +94,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     // Authentification JWT obligatoire sur toutes les routes, sauf @Public()
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Cloisonnement par site de tout paramètre ?siteId= (voir SiteScopeInterceptor)
+    { provide: APP_INTERCEPTOR, useClass: SiteScopeInterceptor },
   ],
 })
 export class AppModule {}

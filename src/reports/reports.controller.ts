@@ -12,6 +12,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @ApiTags('reports')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
+// Rapports : réservés au personnel de bureau (ni chauffeurs, ni mécaniciens, ni pointeurs, ni caissiers).
+@Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.RESPONSABLE_OPERATIONS, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR, RoleName.MAGASINIER)
 @Controller('reports')
 export class ReportsController {
   constructor(
@@ -168,6 +170,10 @@ export class ReportsController {
     @Body('from') from: string,
     @Body('to_date') to_date: string,
   ) {
+    const list = String(to ?? '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
+    if (!list.length || list.length > 10 || list.some((x) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))) {
+      throw new BadRequestException('Adresse(s) e-mail invalide(s) (10 destinataires au maximum).');
+    }
     const buffer = await this.exportService.periodReportPdf(siteId, from, to_date);
     return this.messaging.sendEmailWithAttachment({
       to,
