@@ -36,6 +36,18 @@ export class VehiclesController {
     return this.vehiclesService.fleetAvailability(siteId, vehicleType);
   }
 
+  // Vue d'ensemble de la flotte (lecture seule) : mission en cours, immobilisation, entretien, activité du mois
+  @Get('fleet-overview')
+  fleetOverview(@CurrentUser() actor: any, @Query('siteId') siteId?: string, @Query('vehicleType') vehicleType?: VehicleType) {
+    return this.vehiclesService.fleetOverview(actor, siteId, vehicleType);
+  }
+
+  // Dossier d'un véhicule (lecture seule) : missions, carburant, entretien, incidents, totaux
+  @Get(':id/dossier')
+  dossier(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.vehiclesService.dossier(id, actor);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.vehiclesService.findOne(id);

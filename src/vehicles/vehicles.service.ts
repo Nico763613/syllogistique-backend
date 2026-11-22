@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { VehicleType } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -60,6 +60,79 @@ export class VehiclesService {
       }
       return { ...v, insurance: { status, expiryDate: last?.expiryDate ?? null, reference: last && last.fileUrl !== '—' ? last.fileUrl : null, daysLeft } };
     });
+  }
+
+  // Périmètre : un utilisateur rattaché à un site reste sur son site (le Super Admin choisit)
+  private scopeSite(actor: any, siteId?: string): string | undefined {
+    return actor && actor.role !== 'SUPER_ADMIN' && actor.siteId ? actor.siteId : siteId || undefined;
+  }
+
+  async fleetOverview(actor: any, siteId?: string, vehicleType?: VehicleType) {
+    const site = this.scopeSite(actor, siteId);
+    const base: any[] = await this.findAll({ siteId: site, vehicleType });
+    const ids = base.map((v) => v.id);
+    if (!ids.length) return [];
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const [live, downs, maint, tripsM, fuelM] = await Promise.all([
+      this.prisma.trip.findMany({ where: { vehicleId: { in: ids }, status: 'IN_PROGRESS' }, orderBy: { startTime: 'desc' }, select: { vehicleId: true, reference: true, destination: true, startTime: true, driver: { select: { firstName: true, lastName: true } } } }),
+      this.prisma.vehicleDowntime.findMany({ where: { vehicleId: { in: ids }, endedAt: null }, orderBy: { startedAt: 'desc' }, select: { vehicleId: true, category: true, reason: true, startedAt: true } }),
+      this.prisma.maintenance.findMany({ where: { vehicleId: { in: ids } }, orderBy: { maintenanceDate: 'desc' }, take: 3000, select: { vehicleId: true, maintenanceDate: true, nextDate: true, nextMileage: true } }),
+      this.prisma.trip.groupBy({ by: ['vehicleId'], where: { vehicleId: { in: ids }, tripDate: { gte: monthStart }, status: 'COMPLETED' }, _count: true, _sum: { distance: true } }),
+      this.prisma.fuelTransaction.groupBy({ by: ['vehicleId'], where: { vehicleId: { in: ids }, transactionDate: { gte: monthStart } }, _sum: { quantityLiters: true, totalCost: true } }),
+    ]);
+    const first = <T extends { vehicleId: string }>(rows: T[]) => { const m = new Map<string, T>(); for (const r of rows) if (!m.has(r.vehicleId)) m.set(r.vehicleId, r); return m; };
+    const liveM = first(live), downM = first(downs), maintM = first(maint);
+    const tM = new Map(tripsM.map((t) => [t.vehicleId, t])), fM = new Map(fuelM.map((f) => [f.vehicleId, f]));
+    return base.map((v) => {
+      const lm = maintM.get(v.id), t = tM.get(v.id), f = fM.get(v.id), l = liveM.get(v.id), d = downM.get(v.id);
+      return {
+        ...v,
+        currentTrip: l ? { reference: l.reference, destination: l.destination, since: l.startTime, driver: l.driver ? `${l.driver.firstName} ${l.driver.lastName}` : null } : null,
+        openDowntime: d ? { category: d.category, reason: d.reason, since: d.startedAt } : null,
+        lastMaintenanceAt: lm ? lm.maintenanceDate : null,
+        nextMaintenanceDate: lm ? lm.nextDate : null,
+        nextMaintenanceMileage: lm ? lm.nextMileage : null,
+        month: { trips: t ? (t._count as number) : 0, km: t ? t._sum.distance ?? 0 : 0, liters: f ? Number(f._sum.quantityLiters ?? 0) : 0, fuelCost: f ? Number(f._sum.totalCost ?? 0) : 0 },
+      };
+    });
+  }
+
+  async dossier(id: string, actor: any) {
+    const v = await this.prisma.vehicle.findFirst({
+      where: { id, deletedAt: null },
+      include: { assignedDriver: { select: { id: true, firstName: true, lastName: true, phone: true, licenseNumber: true } }, documents: { select: { id: true, type: true, expiryDate: true } } },
+    });
+    if (!v) throw new NotFoundException('Véhicule introuvable.');
+    if (actor && actor.role !== 'SUPER_ADMIN' && actor.siteId && v.siteId !== actor.siteId) throw new ForbiddenException("Ce véhicule n'est pas dans votre périmètre.");
+    const [trips, fuel, maint, downs, incidents, tripTot, fuelTot, maintTot] = await Promise.all([
+      this.prisma.trip.findMany({ where: { vehicleId: id }, orderBy: { tripDate: 'desc' }, take: 15, select: { id: true, reference: true, tripDate: true, status: true, destination: true, distance: true, driver: { select: { firstName: true, lastName: true } } } }),
+      this.prisma.fuelTransaction.findMany({ where: { vehicleId: id }, orderBy: { transactionDate: 'desc' }, take: 15, select: { id: true, transactionDate: true, quantityLiters: true, totalCost: true, station: true, source: true, mileage: true, receiptImageUrl: true, driver: { select: { firstName: true, lastName: true } } } }),
+      this.prisma.maintenance.findMany({ where: { vehicleId: id }, orderBy: { maintenanceDate: 'desc' }, take: 15, select: { id: true, maintenanceDate: true, kind: true, status: true, description: true, cost: true, mileage: true, invoiceUrl: true, maintenanceType: { select: { label: true } }, supplier: { select: { name: true } } } }),
+      this.prisma.vehicleDowntime.findMany({ where: { vehicleId: id }, orderBy: { startedAt: 'desc' }, take: 15, select: { id: true, category: true, reason: true, severity: true, startedAt: true, endedAt: true, actualCost: true, estimatedCost: true } }),
+      this.prisma.hseIncident.findMany({ where: { vehicleId: id }, orderBy: { occurredAt: 'desc' }, take: 10, select: { id: true, occurredAt: true, type: true, severity: true, status: true, description: true } }),
+      this.prisma.trip.aggregate({ where: { vehicleId: id, status: 'COMPLETED' }, _count: true, _sum: { distance: true } }),
+      this.prisma.fuelTransaction.aggregate({ where: { vehicleId: id }, _sum: { quantityLiters: true, totalCost: true } }),
+      this.prisma.maintenance.aggregate({ where: { vehicleId: id }, _sum: { cost: true }, _count: true }),
+    ]);
+    const n = (x: any) => Number(x ?? 0);
+    return {
+      vehicle: v,
+      trips,
+      fuel: fuel.map((f) => ({ ...f, quantityLiters: n(f.quantityLiters), totalCost: n(f.totalCost) })),
+      maintenance: maint.map((m) => ({ ...m, cost: n(m.cost) })),
+      downtimes: downs.map((d) => ({ ...d, actualCost: d.actualCost == null ? null : n(d.actualCost), estimatedCost: d.estimatedCost == null ? null : n(d.estimatedCost) })),
+      incidents,
+      totals: {
+        completedTrips: tripTot._count as number,
+        km: tripTot._sum.distance ?? 0,
+        liters: n(fuelTot._sum.quantityLiters),
+        fuelCost: n(fuelTot._sum.totalCost),
+        maintenanceCost: n(maintTot._sum.cost),
+        interventions: maintTot._count as number,
+      },
+    };
   }
 
   async findOne(id: string) {
