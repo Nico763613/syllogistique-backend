@@ -459,6 +459,7 @@
       <div class="nav-item active" data-view="dashboard" onclick="go('dashboard')">
         <span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span> Tableau de bord
       </div>
+      <div id="dg-menu"></div>
 
       <div class="nav-item" data-view="home" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_HSE,MAGASINIER,DIRECTEUR_GENERAL,COMPTABLE,RESPONSABLE_OPERATIONS,LECTEUR" onclick="go('home')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span> Accueil</div>
       <div class="nav-item" data-view="espace" data-roles="MAGASINIER,AGENT_HSE,GESTIONNAIRE_HSE,MECANICIEN,POINTEUR" onclick="go('espace')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg></span> Mon espace de travail</div>
@@ -713,6 +714,7 @@ function demoData() {
 async function demoApi(path, options) {
   await new Promise((r) => setTimeout(r, 120));
   if (options && options.method && options.method !== 'GET') throw new Error('Mode démonstration : lecture seule, aucune donnée n\'est enregistrée.');
+  if (path.startsWith('/dashboards/direction')) return demoDirection(path);
   if (path.startsWith('/dashboards/executive')) return demoData();
   return [];
 }
@@ -720,7 +722,7 @@ function startDemo() {
   state.demo = true; state.accessToken = 'demo'; state.refreshToken = '';
   state.user = { id: 'demo', role: 'DIRECTEUR_GENERAL', firstName: 'Démonstration', lastName: 'Direction Générale', email: 'demo@syllogistique' };
   state.siteId = '';
-  enterApp(); go('pilotage');
+  enterApp(); go('dashboard');
   if (!document.getElementById('demo-banner')) {
     const b = document.createElement('div'); b.id = 'demo-banner';
     b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#1F3A5F;color:#fff;font-size:13px;text-align:center;padding:8px 12px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap';
@@ -868,7 +870,7 @@ function enterApp() {
   spaceApply(); refreshAvatars(); loadMyPhoto(); buildBottomNav();
   loadSiteSwitch();
   applyRoleNav();
-  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'caisse', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'home', DIRECTEUR_GENERAL: 'home', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', RESPONSABLE_OPERATIONS: 'home', LECTEUR: 'home' }[state.user.role];
+  const home = { RESPONSABLE_COMMERCIAL: 'dash-commercial', CAISSIER: 'caisse', GESTIONNAIRE_HSE: 'home', AGENT_HSE: 'espace', MECANICIEN: 'espace', POINTEUR: 'espace', SUPER_ADMIN: 'dashboard', DIRECTEUR_GENERAL: 'dashboard', ADMIN_LOGISTIQUE: 'home', MAGASINIER: 'home', COMPTABLE: 'home', RESPONSABLE_OPERATIONS: 'home', LECTEUR: 'home' }[state.user.role];
   go(home || 'dashboard');
   updateSyncPill();
   window.addEventListener('online', updateSyncPill);
@@ -1596,7 +1598,7 @@ async function renderView(view) {
     if (view === 'pointage') return await (renderPointage());
     if (view === 'pilotage') return await (renderExecutive('dg'));
     if (view === 'espace-logi') return await (renderExecutive('logi'));
-    if (view === 'dashboard') return await (renderDashboard());
+    if (view === 'dashboard') return await (DG_ROLES.includes(state.user.role) ? renderDirection() : renderDashboard());
     if (view.startsWith('dash-')) return await (renderDeptDashboard(view.slice(5)));
     if (view === 'vehicles') return await (renderVehicles());
     if (view === 'trucks') return await (renderVehicles('TRUCK'));
@@ -3328,8 +3330,8 @@ function renderHome() {
 function bottomEntries(role) {
   const terrain = { AGENT_HSE: 1, MECANICIEN: 1, POINTEUR: 1 };
   if (terrain[role]) return [['🏠', 'Mon espace', 'espace'], ['📝', 'Mon rapport', 'my-report'], ...(role === 'POINTEUR' ? [['🕒', 'Pointage', 'pointage']] : []), ['👤', 'Profil', '#profil']];
-  if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'pilotage'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
-  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'pilotage'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], RESPONSABLE_COMMERCIAL: ['🛒', 'Ventes', 'ventes'], CAISSIER: ['💵', 'Caisse', 'caisse'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
+  if (role === 'DIRECTEUR_GENERAL') return [['🏠', 'Accueil', 'home'], ['📈', 'Tableau de bord', 'dashboard'], ['🔔', 'Alertes', '#alertes'], ['👤', 'Profil', '#profil']];
+  const main = { SUPER_ADMIN: ['🎯', 'Direction', 'dashboard'], ADMIN_LOGISTIQUE: ['🚚', 'Logistique', 'espace-logi'], GESTIONNAIRE_HSE: ['🦺', 'HSE', 'espace'], MAGASINIER: ['📦', 'Stock', 'espace'], COMPTABLE: ['🧾', 'Compta', 'compta'], RESPONSABLE_COMMERCIAL: ['🛒', 'Ventes', 'ventes'], CAISSIER: ['💵', 'Caisse', 'caisse'], RESPONSABLE_OPERATIONS: ['✅', 'Validation', 'ops-validation'], LECTEUR: ['🚚', 'Logistique', 'dash-fleet'] }[role];
   const hasRep = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'LECTEUR'].includes(role);
   return [['🏠', 'Accueil', 'home'], ...(main ? [main] : []), ...(hasRep ? [['📊', 'Rapports', reportsHome(role)]] : []), ['👤', 'Profil', '#profil']];
 }
@@ -3340,7 +3342,7 @@ function buildBottomNav() {
 }
 function bottomGo(v) {
   if (v === '#profil') return toggleUserMenu({ stopPropagation() {} });
-  if (v === '#alertes') { go('pilotage'); setTimeout(() => { const a = document.getElementById('ex-alertes'); if (a) a.scrollIntoView({ behavior: 'smooth' }); }, 700); return; }
+  if (v === '#alertes') { dgAlertsGo(); return; }
   go(v);
 }
 function updateBottomNav(view) { document.querySelectorAll('#bottom-nav button').forEach((b) => b.classList.toggle('on', b.dataset.v === view)); }
@@ -3530,6 +3532,203 @@ async function renderExecutive(mode) {
   root().innerHTML = body;
 }
 
+
+/* ---------------- DIRECTION GÉNÉRALE : tableau de bord et menu modernisés (Phase 1) ----------------
+   Lecture seule. Données réelles (/dashboards/direction). Les anciens écrans restent accessibles. */
+const DG_ROLES = ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'];
+const DG_PER = { key: 'month' };
+const DG_MENU = [
+  { t: 'Tableau de bord', s: 'Vue générale', ic: 'home', sa: { v: 'dashboard', vs: ['dashboard'] }, dg: { v: 'dashboard', vs: ['dashboard'] } },
+  { t: 'Flotte automobile', s: 'Camions & Véhicules', ic: 'truck', sa: { v: 'trucks', vs: ['trucks', 'service-vehicles', 'vehicles'] }, dg: { v: 'reports-truck', vs: ['reports-truck', 'reports-service'] } },
+  { t: 'Carburant', s: 'Suivi & Statistiques', ic: 'fuel', sa: { v: 'fuel', vs: ['fuel'] } },
+  { t: 'Maintenance', s: 'Entretien & Réparations', ic: 'wrench', sa: { v: 'maintenance', vs: ['maintenance'] } },
+  { t: 'Dépenses opérationnelles', s: 'Tous les coûts', ic: 'banknote', sa: { v: 'driver-expenses', vs: ['driver-expenses'] }, dg: { v: 'compta', vs: ['compta'] } },
+  { t: 'Rapports des départements', s: 'Réception & Validation', ic: 'clipboard', sa: { v: 'reports-truck', vs: ['reports-hse', 'reports-stock', 'reports-drivers', 'reports-dg', 'ops-validation', 'driver-sheets', 'driver-missions'] } },
+  { t: 'Personnel', s: 'Gestion des accès', ic: 'users', sa: { v: 'staff-managers', vs: ['staff-managers', 'staff-store', 'staff-mech', 'staff-hse', 'drivers', 'enrol', 'pointage', 'driver-devices', 'driver-board'] } },
+  { t: 'Analyses & Statistiques', s: 'Bilans et graphiques', ic: 'chart', sa: { v: 'pilotage', vs: ['pilotage', 'dash-fleet', 'dash-stock', 'dash-logistics', 'dash-hse'] }, dg: { v: 'pilotage', vs: ['pilotage'] } },
+  { t: 'Alertes & Notifications', s: 'Incidents & rappels', ic: 'bell', badge: true, sa: { act: 'dgAlertsGo()', vs: [] }, dg: { act: 'dgAlertsGo()', vs: [] } },
+  { t: 'Journal d’activité', s: 'Historique', ic: 'clock', sa: { act: 'openHistory()', vs: [] } },
+];
+function dgMenuBuild() {
+  const box = document.getElementById('dg-menu'); if (!box) return;
+  const role = state.user && state.user.role, on = DG_ROLES.includes(role);
+  const first = document.querySelector('#sidebar > .nav-item[data-view="dashboard"]');
+  if (first) first.style.display = on ? 'none' : '';
+  if (!on) { box.innerHTML = ''; return; }
+  const k = role === 'SUPER_ADMIN' ? 'sa' : 'dg';
+  box.innerHTML = DG_MENU.filter((m) => m[k]).map((m) => {
+    const x = m[k];
+    return `<div class="nav-item dg-nav" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL" data-view="${x.v || ''}" data-views="${x.vs.join(',')}" onclick="${x.act || `go('${x.v}')`}"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-${m.ic}"/></svg></span><span class="dg-nt"><b>${m.t}</b><small>${m.s}</small></span>${m.badge ? '<i class="dg-nb" id="dg-nb"></i>' : ''}</div>`;
+  }).join('');
+  // Le Super Admin garde tous ses modules : les anciens groupes sont repliés (un clic les rouvre)
+  if (role === 'SUPER_ADMIN' && typeof navFoldSet === 'function') {
+    let m = {}; try { m = JSON.parse(localStorage.getItem('syl_folds') || '{}'); } catch (e) {}
+    document.querySelectorAll('#sidebar .nav-section-label.fold').forEach((l) => { try { if (!(navFoldKey(l) in m)) navFoldSet(l, true, false); } catch (e) {} });
+  }
+  dgMenuActive(state.view);
+}
+function dgMenuActive(view) {
+  document.querySelectorAll('#sidebar .dg-nav').forEach((el) => { const vs = (el.dataset.views || '').split(',').filter(Boolean); if (vs.length) el.classList.toggle('active', vs.includes(view)); });
+}
+{ const _a = applyRoleNav; applyRoleNav = function () { const r = _a.apply(this, arguments); try { dgMenuBuild(); } catch (e) {} return r; }; }
+{ const _g2 = go; go = function (v) { const r = _g2.apply(this, arguments); try { dgMenuActive(v); } catch (e) {} return r; }; }
+function dgAlertsGo() {
+  const after = () => setTimeout(() => { const a = document.getElementById('dg-alertes'); if (a) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 350);
+  if (state.view === 'dashboard') return after();
+  go('dashboard'); setTimeout(after, 600);
+}
+
+function dgStyle() {
+  if (document.getElementById('dg-style')) return;
+  const st = document.createElement('style'); st.id = 'dg-style';
+  st.textContent = `
+  .dg-nav{align-items:center;padding:9px 16px 9px 17px}.dg-nt{display:block;line-height:1.2;min-width:0}.dg-nt b{display:block;font-size:13.5px;font-weight:600}.dg-nt small{display:block;font-size:11px;opacity:.72;font-weight:400;margin-top:1px}
+  .dg-nav.active .dg-nt small{opacity:.85}.dg-nb{margin-left:auto;background:#D64545;color:#fff;font-style:normal;font-size:11px;font-weight:700;border-radius:10px;min-width:20px;height:20px;line-height:20px;text-align:center;padding:0 6px;display:none}
+  body.side-min .dg-nt,body.side-min .dg-nb{display:none}
+  .dg-hero{position:relative;overflow:hidden;border-radius:12px;background:linear-gradient(100deg,#0F2747 0%,#1F3A5F 55%,#27528A 100%);color:#fff;padding:22px 26px;margin-bottom:14px;min-height:150px;display:flex;align-items:center;box-shadow:0 6px 18px rgba(15,39,71,.18)}
+  .dg-hero:before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:4px;background:var(--gold,#C9A24D);border-radius:0 3px 3px 0}
+  .dg-hero-img{position:absolute;right:0;top:0;bottom:0;width:52%;background:url(dg-camion.jpg) center 50%/cover no-repeat;-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 55%);mask-image:linear-gradient(90deg,transparent 0,#000 55%)}
+  .dg-hero-txt{position:relative;z-index:1;max-width:60%}.dg-hero h2{margin:0 0 4px;font-size:28px;letter-spacing:.2px}.dg-hero .sub{font-size:16px;opacity:.95}.dg-hero .slogan{margin-top:10px;font-size:14px;font-style:italic;opacity:.85}
+  .dg-hero .upd{position:absolute;z-index:2;left:26px;bottom:8px;font-size:11px;opacity:.7}
+  .dg-bar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}.dg-chips{display:flex;gap:6px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px}
+  .dg-chips button{border:0;background:transparent;color:var(--navy);font-size:13px;font-weight:600;padding:7px 14px;border-radius:7px;cursor:pointer}.dg-chips button.on{background:var(--navy);color:#fff}
+  .dg-range{font-size:12px;color:var(--muted)}
+  .dg-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+  .dg-kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px}
+  .dg-kpi .top{display:flex;gap:12px;align-items:center}.dg-ico{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}.dg-ico .ic{width:22px;height:22px}
+  .dg-kpi .lb{font-size:13px;color:#4A5A70;line-height:1.2}.dg-kpi .vl{font-size:28px;font-weight:700;color:var(--navy);line-height:1.1}.dg-kpi .vl small{font-size:12px;font-weight:600;margin-left:6px}
+  .dg-prog{height:5px;background:#E6ECF4;border-radius:3px;overflow:hidden}.dg-prog i{display:block;height:100%;border-radius:3px}.dg-kpi .ft{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+  .dg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}.dg-card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;min-width:0}
+  .dg-card>h3{margin:0;padding:11px 14px;background:var(--navy);color:#fff;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:8px}.dg-card>h3 .ic{width:18px;height:18px}.dg-card>h3 span{font-size:12px;font-weight:500;opacity:.85}.dg-card>h3 a{color:#fff;font-size:12px;cursor:pointer;text-decoration:none;opacity:.9}
+  .dg-body{padding:14px}.dg-big{font-size:26px;font-weight:700;color:var(--navy);line-height:1.1}.dg-var{display:inline-block;font-size:12px;font-weight:700;border-radius:12px;padding:2px 9px;margin-left:8px;vertical-align:middle}
+  .dg-var.up{background:#E3F4EA;color:#1E7A46}.dg-var.dn{background:#FDE9E7;color:#B33A32}.dg-var.nu{background:#EEF2F7;color:#4A5A70}
+  .dg-two{display:flex;gap:18px;margin-bottom:8px}.dg-two div{min-width:0}.dg-two b{font-size:24px;color:var(--navy);display:block;line-height:1.1}.dg-two span{font-size:12px;color:var(--muted)}
+  .dg-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:#4A5A70;margin-top:4px}.dg-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px}
+  .dg-donut{display:flex;gap:16px;align-items:center;flex-wrap:wrap}.dg-donut svg{width:140px;height:140px;flex:none}.dg-dl{flex:1;min-width:140px}.dg-dl div{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)}.dg-dl div:last-child{border:0}.dg-dl i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:7px}
+  .dg-chart svg{width:100%;height:auto;display:block}.dg-al{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}.dg-al:last-child{border:0}.dg-al b{display:block;color:var(--navy)}.dg-al span{color:var(--muted);font-size:12px}.dg-dot{width:10px;height:10px;border-radius:50%;margin-top:4px;flex:none}
+  .dg-rep{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}.dg-rep:last-child{border:0}.dg-rep .tx{flex:1;min-width:0}.dg-rep b{display:block;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dg-rep span.s{font-size:12px;color:var(--muted)}
+  .dg-st{font-size:11px;font-weight:700;border-radius:10px;padding:3px 10px;flex:none}.dg-st.NEW{background:#E4EEFB;color:#1F5FA8}.dg-st.READ{background:#E9EDF3;color:#4A5A70}.dg-st.VALIDATED{background:#E3F4EA;color:#1E7A46}.dg-st.REJECTED{background:#FDE9E7;color:#B33A32}
+  .dg-empty{color:var(--muted);font-size:13px;padding:14px 0;text-align:center}.dg-more{display:block;margin-top:8px;font-size:13px;font-weight:600;color:var(--navy-soft,#2F6FB5);cursor:pointer;text-align:right}
+  @media(max-width:1180px){.dg-kpis{grid-template-columns:repeat(3,1fr)}.dg-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:760px){.dg-hero{padding:16px 16px 26px;min-height:120px}.dg-hero h2{font-size:22px}.dg-hero .sub{font-size:14px}.dg-hero-txt{max-width:100%}.dg-hero-img{width:100%;opacity:.28;-webkit-mask-image:none;mask-image:none}.dg-hero .upd{left:16px}
+    .dg-kpis{grid-template-columns:repeat(2,1fr);gap:10px}.dg-kpi{padding:12px}.dg-kpi .vl{font-size:24px}.dg-grid{grid-template-columns:1fr}.dg-chips{width:100%}.dg-chips button{flex:1;padding:8px 4px}}`;
+  document.head.appendChild(st);
+}
+const dgM = (n) => { n = Math.round(Number(n) || 0); const a = Math.abs(n); const f = (x, d) => x.toFixed(d).replace('.', ',').replace(/,0+$/, ''); return a >= 1e9 ? f(n / 1e9, 2) + ' Md' : a >= 1e6 ? f(n / 1e6, a >= 1e7 ? 1 : 2) + ' M' : a >= 1e4 ? f(n / 1e3, 0) + ' k' : fmt(n); };
+const dgVar = (v) => v == null ? '' : `<span class="dg-var ${v > 0 ? 'up' : v < 0 ? 'dn' : 'nu'}">${v > 0 ? '↑ +' : v < 0 ? '↓ ' : ''}${String(v).replace('.', ',')} %</span>`;
+// Pour les dépenses, une hausse est défavorable : on inverse la couleur
+const dgVarCost = (v) => v == null ? '' : `<span class="dg-var ${v > 0 ? 'dn' : v < 0 ? 'up' : 'nu'}">${v > 0 ? '↑ +' : v < 0 ? '↓ ' : ''}${String(v).replace('.', ',')} %</span>`;
+const DG_MONTHS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function dgLbl(k, g) {
+  if (g === 'hour') return k.slice(11, 13) + 'h';
+  if (g === 'day' || g === 'week') return k.slice(8, 10) + '/' + k.slice(5, 7);
+  if (g === 'month') return DG_MONTHS[Number(k.slice(5, 7)) - 1];
+  return k.slice(0, 4);
+}
+function dgPick(n, max) { const step = Math.max(1, Math.ceil(n / max)); return (i) => i % step === 0; }
+function dgLine(keys, g, series) {
+  const W = 360, H = 190, L = 34, R = 10, T = 10, B = 24, n = keys.length;
+  const max = Math.max(1, ...series.flatMap((s) => s.v)), top = (() => { const p = Math.pow(10, Math.floor(Math.log10(max))); return Math.ceil(max / p * 2) / 2 * p || 1; })();
+  const x = (i) => L + (n <= 1 ? (W - L - R) / 2 : (i * (W - L - R)) / (n - 1)), y = (v) => T + (H - T - B) * (1 - v / top);
+  let o = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution">`;
+  for (let i = 0; i <= 4; i++) { const v = (top * i) / 4, yy = y(v); o += `<line x1="${L}" x2="${W - R}" y1="${yy}" y2="${yy}" stroke="#E6ECF4"/><text x="${L - 5}" y="${yy + 3}" font-size="9" fill="#6B7A90" text-anchor="end">${dgM(v)}</text>`; }
+  const pick = dgPick(n, 7); keys.forEach((k, i) => { if (pick(i)) o += `<text x="${x(i)}" y="${H - 7}" font-size="9" fill="#6B7A90" text-anchor="middle">${dgLbl(k, g)}</text>`; });
+  series.forEach((s) => {
+    const pts = s.v.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    o += `<polyline points="${pts}" fill="none" stroke="${s.c}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if (n <= 14) s.v.forEach((v, i) => { o += `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="2.6" fill="${s.c}"><title>${s.n} : ${fmt(v)}</title></circle>`; });
+  });
+  return o + '</svg>';
+}
+function dgBars(keys, g, vals, col) {
+  const W = 300, H = 150, L = 6, R = 6, T = 18, B = 22, n = keys.length, max = Math.max(1, ...vals), bw = Math.min(34, ((W - L - R) / n) * 0.62), showV = n <= 8, pick = dgPick(n, 8);
+  let o = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Évolution"><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#D5DDE8"/>`;
+  vals.forEach((v, i) => {
+    const cx = L + ((i + 0.5) * (W - L - R)) / n, h = Math.max(v ? 2 : 0, ((H - T - B) * v) / max);
+    o += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${(H - B - h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="3" fill="${col}"><title>${dgLbl(keys[i], g)} : ${fmt(v)}</title></rect>`;
+    if (showV && v) o += `<text x="${cx.toFixed(1)}" y="${(H - B - h - 4).toFixed(1)}" font-size="9.5" fill="#1F3A5F" text-anchor="middle" font-weight="600">${dgM(v)}</text>`;
+    if (pick(i)) o += `<text x="${cx.toFixed(1)}" y="${H - 7}" font-size="9.5" fill="#6B7A90" text-anchor="middle">${dgLbl(keys[i], g)}</text>`;
+  });
+  return o + '</svg>';
+}
+function dgDonut(parts, total) {
+  const R = 52, C = 2 * Math.PI * R; let off = 0, o = `<svg viewBox="0 0 140 140" role="img" aria-label="Répartition des dépenses"><circle cx="70" cy="70" r="${R}" fill="none" stroke="#E6ECF4" stroke-width="22"/>`;
+  parts.forEach((p) => { if (!p.v || !total) return; const len = (p.v / total) * C; o += `<circle cx="70" cy="70" r="${R}" fill="none" stroke="${p.c}" stroke-width="22" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="${(-off).toFixed(2)}" transform="rotate(-90 70 70)"><title>${p.n} : ${fmt(p.v)} GNF</title></circle>`; off += len; });
+  return o + `<text x="70" y="68" text-anchor="middle" font-size="17" font-weight="700" fill="#1F3A5F">${dgM(total)}</text><text x="70" y="84" text-anchor="middle" font-size="10" fill="#6B7A90">GNF</text></svg>`;
+}
+function dgSetPeriod(k) { DG_PER.key = k; renderDirection(); }
+const DG_ST = { NEW: 'Nouveau', READ: 'Lu', VALIDATED: 'Validé', REJECTED: 'Rejeté' };
+const DG_PER_LBL = { day: "Aujourd'hui", week: 'Cette semaine', month: 'Ce mois', year: 'Cette année' };
+async function renderDirection() {
+  dgStyle();
+  const k = DG_PER.key;
+  const d = await api('/dashboards/direction?period=' + k + (state.siteId ? '&siteId=' + encodeURIComponent(state.siteId) : ''));
+  if (state.view !== 'dashboard') return;
+  const g = d.period.granularity, keys = d.missions.series.map((x) => x.key), f = d.fleet, ex = d.expenses, u = state.user;
+  const sa = u.role === 'SUPER_ADMIN', pl = DG_PER_LBL[k] || '';
+  const range = new Date(d.period.from).toLocaleDateString('fr-FR') + (k === 'day' ? '' : ' – ' + new Date(d.period.to).toLocaleDateString('fr-FR'));
+  const kpi = (col, ic, label, val, extra, pct, foot) => `<div class="dg-kpi"><div class="top"><div class="dg-ico" style="background:${col}"><svg class="ic" aria-hidden="true"><use href="#i-${ic}"/></svg></div><div><div class="lb">${label}</div><div class="vl">${val}${extra || ''}</div></div></div>${pct == null ? '' : `<div class="dg-prog"><i style="width:${Math.min(100, pct)}%;background:${col}"></i></div>`}${foot ? `<div class="ft">${foot}</div>` : ''}</div>`;
+  const kpis = `<div class="dg-kpis">
+    ${kpi('#2F6FB5', 'truck', 'Total camions', fmt(f.trucks.total), '', f.trucks.total ? (f.trucks.onMission / f.trucks.total) * 100 : null, `<span>${f.trucks.onMission} en mission</span>`)}
+    ${kpi('#1F8A8A', 'car', 'Véhicules de service', fmt(f.serviceVehicles.total), '', f.serviceVehicles.total ? (f.serviceVehicles.onMission / f.serviceVehicles.total) * 100 : null, `<span>${f.serviceVehicles.onMission} en mission</span>`)}
+    ${kpi('#2E8B57', 'check-circle', 'Véhicules disponibles', fmt(f.available), f.availabilityPct == null ? '' : `<small style="color:#1E7A46">${f.availabilityPct} %</small>`, f.availabilityPct, `<span>sur ${fmt(f.total)} véhicules</span>`)}
+    ${kpi('#D08A1E', 'wrench', 'En maintenance', fmt(f.maintenance), f.maintenancePct == null ? '' : `<small style="color:#A86A0C">${f.maintenancePct} %</small>`, f.maintenancePct, `<span>${f.trucks.immobilized + f.serviceVehicles.immobilized} immobilisé(s)</span>`)}
+    ${kpi('#5B5FC7', 'users', 'Personnel actif', fmt(d.people.activeAccounts), '', null, `<span>dont ${fmt(d.people.drivers)} chauffeur(s)</span>`)}</div>`;
+  const noData = '<div class="dg-empty">Aucune donnée sur la période.</div>';
+  const m = d.missions, hasM = m.total > 0;
+  const cMiss = `<div class="dg-card"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-target"/></svg> Missions</span><span>${pl}</span></h3><div class="dg-body">
+    <div class="dg-two"><div><b>${fmt(m.inProgress)}</b><span>Missions en cours</span></div><div><b>${fmt(m.completed)}</b><span>Missions terminées</span>${dgVar(m.variation)}</div></div>
+    ${hasM ? `<div class="dg-chart">${dgLine(keys, g, [{ n: 'Missions', c: '#2F6FB5', v: m.series.map((x) => x.total) }, { n: 'Terminées', c: '#2E8B57', v: m.series.map((x) => x.completed) }])}</div><div class="dg-leg"><span><i style="background:#2F6FB5"></i>Missions</span><span><i style="background:#2E8B57"></i>Terminées</span></div>` : noData}</div></div>`;
+  const parts = [{ n: 'Carburant', c: '#2F6FB5', v: ex.fuel }, { n: 'Maintenance', c: '#D08A1E', v: ex.maintenance }, { n: 'Autres dépenses', c: '#2E8B57', v: ex.other }];
+  const pc = (v) => (ex.total ? String(Math.round((v / ex.total) * 1000) / 10).replace('.', ',') + ' %' : '—');
+  const cExp = `<div class="dg-card"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Dépenses globales</span><span>${pl}</span></h3><div class="dg-body">
+    <div class="dg-big">${fmt(ex.total)} GNF${dgVarCost(ex.variation)}</div>
+    ${ex.total ? `<div class="dg-donut" style="margin-top:10px">${dgDonut(parts, ex.total)}<div class="dg-dl">${parts.map((p) => `<div><span><i style="background:${p.c}"></i>${p.n}</span><b>${pc(p.v)}</b></div>`).join('')}</div></div>` : noData}</div></div>`;
+  const sev = { CRITICAL: '#D64545', WARNING: '#D08A1E', INFO: '#2F6FB5' };
+  const al = d.alerts;
+  const cAl = `<div class="dg-card" id="dg-alertes"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes importantes</span>${al.unread ? `<span style="background:#D64545;border-radius:10px;padding:1px 9px;font-weight:700;opacity:1">${al.unread}</span>` : ''}</h3><div class="dg-body">
+    ${al.items.length ? al.items.map((a) => `<div class="dg-al"><div class="dg-dot" style="background:${sev[a.severity] || sev.INFO}"></div><div><b>${esc(a.title)}</b><span>${esc(a.message)}</span></div></div>`).join('') : '<div class="dg-empty">Aucune alerte non lue. Tout est sous contrôle.</div>'}
+    <a class="dg-more" onclick="bellToggle()">Voir toutes les alertes →</a></div></div>`;
+  const fu = d.fuel, mt = d.maintenance;
+  const cFuel = `<div class="dg-card"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg> Consommation de carburant</span><span>${pl}</span></h3><div class="dg-body">
+    <div class="dg-big">${fmt(fu.liters)} L${dgVarCost(fu.variation)}</div><div class="dg-range">${fmt(fu.cost)} GNF · camions ${fmt(fu.litersTrucks)} L · véhicules de service ${fmt(fu.litersService)} L</div>
+    ${fu.liters ? `<div class="dg-chart" style="margin-top:8px">${dgBars(keys, g, fu.series.map((x) => x.value), '#4F8FD6')}</div>` : noData}</div></div>`;
+  const cMaint = `<div class="dg-card"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Maintenance</span><span>${pl}</span></h3><div class="dg-body">
+    <div class="dg-big">${fmt(mt.cost)} GNF${dgVarCost(mt.variation)}</div><div class="dg-range">${fmt(mt.interventions)} intervention(s) sur la période</div>
+    ${mt.cost ? `<div class="dg-chart" style="margin-top:8px">${dgBars(keys, g, mt.series.map((x) => x.value), '#3FA06B')}</div>` : noData}</div></div>`;
+  const rp = d.reports;
+  const cRep = `<div class="dg-card"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Rapports récents</span>${sa ? '<a onclick="go(\'ops-validation\')">Voir tout →</a>' : ''}</h3><div class="dg-body">
+    ${rp.recent.length ? rp.recent.map((r) => `<div class="dg-rep"><div class="tx"><b>Rapport — ${esc(roleLabel(r.role))}</b><span class="s">Par ${esc(r.author)} · ${esc(String(r.date).split('-').reverse().join('/'))}</span></div><span class="dg-st ${r.status}">${DG_ST[r.status] || r.status}</span></div>`).join('') : '<div class="dg-empty">Aucun rapport reçu pour le moment.</div>'}
+    ${rp.newInPeriod ? `<div class="dg-range" style="margin-top:6px">${rp.newInPeriod} rapport(s) non traité(s) sur la période</div>` : ''}</div></div>`;
+  const chips = [['day', 'Jour'], ['week', 'Semaine'], ['month', 'Mois'], ['year', 'Année']].map(([v, l]) => `<button class="${k === v ? 'on' : ''}" onclick="dgSetPeriod('${v}')">${l}</button>`).join('');
+  root().innerHTML = `<div class="dg-hero"><div class="dg-hero-img"></div><div class="dg-hero-txt"><h2>Direction Générale</h2><div class="sub">Centre de pilotage de votre entreprise</div><div class="slogan">« Performances, sécurité et efficacité »</div></div><div class="upd">Mis à jour : ${drvDt(d.asOf)}</div></div>
+    <div class="dg-bar"><div class="dg-chips">${chips}</div><div class="dg-range">${range}</div></div>
+    ${kpis}<div class="dg-grid">${cMiss}${cExp}${cAl}</div><div class="dg-grid">${cFuel}${cMaint}${cRep}</div>`;
+  const nb = document.getElementById('dg-nb'); if (nb) { nb.textContent = al.unread > 99 ? '99+' : al.unread; nb.style.display = al.unread ? 'inline-block' : 'none'; }
+}
+// Données fictives du mode démonstration (aucune donnée réelle)
+function demoDirection(path) {
+  const k = (/period=(\w+)/.exec(path) || [])[1] || 'month', now = new Date(), pad = (x) => String(x).padStart(2, '0');
+  const g = { day: 'hour', week: 'day', month: 'day', year: 'month' }[k], n = { day: 12, week: 7, month: 30, year: 12 }[k];
+  const keys = Array.from({ length: n }, (_, i) => { const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())); if (g === 'hour') return t.toISOString().slice(0, 10) + 'T' + pad(7 + i) + ':00'; if (g === 'day') { t.setUTCDate(t.getUTCDate() - (n - 1 - i)); return t.toISOString().slice(0, 10); } return now.getUTCFullYear() + '-' + pad(i + 1); });
+  const wave = (b, a) => keys.map((_, i) => Math.round(b + a * Math.sin(i / 2.2) + (i % 3) * a * 0.15));
+  const tot = wave(14, 6), done = tot.map((v, i) => Math.max(0, v - 2 - (i % 2)));
+  const fl = wave(1900, 600), ml = wave(900000, 350000), mc = wave(2400000, 800000);
+  const sum = (a) => a.reduce((x, y) => x + y, 0), fuelCost = sum(fl) * 12500, maintCost = sum(ml), other = Math.round(sum(mc) / 2);
+  const h = (x) => new Date(Date.now() - x * 3600e3).toISOString();
+  return {
+    asOf: now.toISOString(), period: { key: k, from: keys[0].slice(0, 10) + 'T00:00:00.000Z', to: now.toISOString(), granularity: g },
+    fleet: { trucks: { total: 50, available: 36, onMission: 12, maintenance: 8, immobilized: 1, outOfService: 0 }, serviceVehicles: { total: 12, available: 9, onMission: 2, maintenance: 1, immobilized: 0, outOfService: 0 }, total: 62, available: 45, maintenance: 9, availabilityPct: 73, maintenancePct: 15 },
+    people: { activeAccounts: 85, drivers: 38 },
+    missions: { completed: sum(done), inProgress: 12, total: sum(tot), previousCompleted: Math.round(sum(done) * 0.92), variation: 8.7, series: keys.map((key, i) => ({ key, total: tot[i], completed: done[i] })) },
+    expenses: { total: fuelCost + maintCost + other, previousTotal: 0, variation: 8, fuel: fuelCost, maintenance: maintCost, other, otherByCategory: [] },
+    fuel: { liters: sum(fl), litersTrucks: Math.round(sum(fl) * 0.86), litersService: Math.round(sum(fl) * 0.14), cost: fuelCost, previousCost: 0, variation: 6, series: keys.map((key, i) => ({ key, value: fl[i] })) },
+    maintenance: { cost: maintCost, interventions: 14, previousCost: 0, variation: 12, series: keys.map((key, i) => ({ key, value: ml[i] })) },
+    reports: { newInPeriod: 2, recent: [{ id: '1', role: 'GESTIONNAIRE_HSE', author: 'Agent fictif A', date: now.toISOString().slice(0, 10), status: 'READ' }, { id: '2', role: 'MAGASINIER', author: 'Agent fictif B', date: now.toISOString().slice(0, 10), status: 'NEW' }, { id: '3', role: 'MECANICIEN', author: 'Agent fictif C', date: now.toISOString().slice(0, 10), status: 'VALIDATED' }, { id: '4', role: 'POINTEUR', author: 'Agent fictif D', date: now.toISOString().slice(0, 10), status: 'READ' }] },
+    alerts: { unread: 3, items: [{ id: 'a', severity: 'WARNING', title: 'Maintenance à prévoir', message: 'Camion DEMO-003 : prochaine révision dans 500 km', at: h(2) }, { id: 'b', severity: 'WARNING', title: 'Niveau carburant bas', message: 'Véhicule de service DEMO-01 : 12 %', at: h(5) }, { id: 'c', severity: 'INFO', title: 'Rapport en attente', message: 'Rapport maintenance DEMO-002', at: h(26) }] },
+    today: now.toISOString().slice(0, 10),
+  };
+}
 
 /* ---------------- MON ESPACE : gestionnaire de stock, agent HSE, mécanicien, pointeur ---------------- */
 async function renderWorkspace() {

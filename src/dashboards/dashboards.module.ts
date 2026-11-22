@@ -7,10 +7,11 @@ import { FleetDashboardService } from './fleet-dashboard.service';
 import { HseDashboardService } from './hse-dashboard.service';
 import { ExecutiveDashboardService } from './executive-dashboard.service';
 import { WorkspaceDashboardService } from './workspace-dashboard.service';
+import { DirectionDashboardService } from './direction-dashboard.service';
 
 // PrismaService est fourni par AuditModule (@Global)
 @Module({
   controllers: [DashboardsController],
-  providers: [CommercialDashboardService, LogisticsDashboardService, StockDashboardService, FleetDashboardService, HseDashboardService, ExecutiveDashboardService, WorkspaceDashboardService],
+  providers: [CommercialDashboardService, LogisticsDashboardService, StockDashboardService, FleetDashboardService, HseDashboardService, ExecutiveDashboardService, WorkspaceDashboardService, DirectionDashboardService],
 })
 export class DashboardsModule {}
