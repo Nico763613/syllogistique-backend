@@ -714,6 +714,8 @@ function demoData() {
 async function demoApi(path, options) {
   await new Promise((r) => setTimeout(r, 120));
   if (options && options.method && options.method !== 'GET') throw new Error('Mode démonstration : lecture seule, aucune donnée n\'est enregistrée.');
+  if (path.startsWith('/vehicles/fleet-overview')) return demoFleet(/vehicleType=SERVICE/.test(path) ? 'SERVICE_VEHICLE' : 'TRUCK');
+  if (/^\/vehicles\/[^/?]+\/dossier/.test(path)) return demoDossier(decodeURIComponent(path.split('/')[2]));
   if (path.startsWith('/dashboards/direction')) return demoDirection(path);
   if (path.startsWith('/dashboards/executive')) return demoData();
   return [];
@@ -920,7 +922,7 @@ const titles = {
   ventes: 'Ventes',
   compta: 'Comptabilité',
   atelier: 'Atelier',
-  home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
+  home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'fleet-trucks': 'Flotte — Camions', 'fleet-service': 'Flotte — Véhicules de service', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'ops-validation': 'Validation des fiches', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
@@ -1601,6 +1603,8 @@ async function renderView(view) {
     if (view === 'dashboard') return await (DG_ROLES.includes(state.user.role) ? renderDirection() : renderDashboard());
     if (view.startsWith('dash-')) return await (renderDeptDashboard(view.slice(5)));
     if (view === 'vehicles') return await (renderVehicles());
+    if (view === 'fleet-trucks') return await (renderFleet('TRUCK'));
+    if (view === 'fleet-service') return await (renderFleet('SERVICE_VEHICLE'));
     if (view === 'trucks') return await (renderVehicles('TRUCK'));
     if (view === 'service-vehicles') return await (renderVehicles('SERVICE_VEHICLE'));
     if (view === 'driver-devices') return await (renderDriverDevices());
@@ -3539,7 +3543,7 @@ const DG_ROLES = ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'];
 const DG_PER = { key: 'month' };
 const DG_MENU = [
   { t: 'Tableau de bord', s: 'Vue générale', ic: 'home', sa: { v: 'dashboard', vs: ['dashboard'] }, dg: { v: 'dashboard', vs: ['dashboard'] } },
-  { t: 'Flotte automobile', s: 'Camions & Véhicules', ic: 'truck', sa: { v: 'trucks', vs: ['trucks', 'service-vehicles', 'vehicles'] }, dg: { v: 'reports-truck', vs: ['reports-truck', 'reports-service'] } },
+  { t: 'Flotte automobile', s: 'Camions & Véhicules', ic: 'truck', sa: { v: 'fleet-trucks', vs: ['fleet-trucks', 'fleet-service', 'trucks', 'service-vehicles', 'vehicles'] }, dg: { v: 'fleet-trucks', vs: ['fleet-trucks', 'fleet-service', 'reports-truck', 'reports-service'] } },
   { t: 'Carburant', s: 'Suivi & Statistiques', ic: 'fuel', sa: { v: 'fuel', vs: ['fuel'] } },
   { t: 'Maintenance', s: 'Entretien & Réparations', ic: 'wrench', sa: { v: 'maintenance', vs: ['maintenance'] } },
   { t: 'Dépenses opérationnelles', s: 'Tous les coûts', ic: 'banknote', sa: { v: 'driver-expenses', vs: ['driver-expenses'] }, dg: { v: 'compta', vs: ['compta'] } },
@@ -3728,6 +3732,154 @@ function demoDirection(path) {
     alerts: { unread: 3, items: [{ id: 'a', severity: 'WARNING', title: 'Maintenance à prévoir', message: 'Camion DEMO-003 : prochaine révision dans 500 km', at: h(2) }, { id: 'b', severity: 'WARNING', title: 'Niveau carburant bas', message: 'Véhicule de service DEMO-01 : 12 %', at: h(5) }, { id: 'c', severity: 'INFO', title: 'Rapport en attente', message: 'Rapport maintenance DEMO-002', at: h(26) }] },
     today: now.toISOString().slice(0, 10),
   };
+}
+
+/* ---------------- FLOTTE AUTOMOBILE (Phase 2) : espaces Camions et Véhicules de service, dossier véhicule ----------------
+   Lecture seule. L'ajout / la modification restent dans le module d'origine (écrans « trucks » et « service-vehicles »). */
+const FL_EDIT_ROLES = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE'];
+const FL_ST = { AVAILABLE: 'Disponible', ON_MISSION: 'En mission', MAINTENANCE: 'En maintenance', IMMOBILIZED: 'Immobilisé', OUT_OF_SERVICE: 'Hors service' };
+const FL_DT = { PANNE: 'Panne', ACCIDENT: 'Accident', ENTRETIEN: 'Entretien', ADMINISTRATIF: 'Administratif', AUTRE: 'Autre' };
+const FL_TS = { PLANNED: 'Planifiée', IN_PROGRESS: 'En cours', COMPLETED: 'Terminée', CANCELLED: 'Annulée' };
+const FL_SEV = { LOW: 'Faible', MEDIUM: 'Moyen', HIGH: 'Élevé', CRITICAL: 'Critique' };
+const FL_HT = { ACCIDENT: 'Accident', NEAR_MISS: 'Presque-accident', DAMAGE: 'Dégât', ENVIRONMENT: 'Environnement', FIRE: 'Incendie', OTHER: 'Autre' };
+const flD = (d) => (d ? new Date(d).toLocaleDateString('fr-FR') : '—');
+function flStyle() {
+  if (document.getElementById('fl-style')) return;
+  const st = document.createElement('style'); st.id = 'fl-style';
+  st.textContent = `
+  .fl-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.fl-tabs .tab{border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:600;font-size:14px;padding:9px 16px;border-radius:10px;cursor:pointer}
+  .fl-tabs .tab.on{background:var(--navy);color:#fff;border-color:var(--navy)}.fl-tabs .sp{flex:1}
+  .fl-filters{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}.fl-filters input,.fl-filters select{max-width:300px;margin:0}
+  .fl-watch{background:#FFF8E6;border:1px solid #F0DDA8;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#7A5A00}.fl-watch b{color:#5E4400}.fl-watch div{padding:2px 0}
+  .fl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+  .fl-card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:14px;cursor:pointer;display:flex;flex-direction:column;gap:8px;border-left:4px solid #9AA9BD}
+  .fl-card:hover{box-shadow:0 6px 18px rgba(15,39,71,.14)}.fl-card.AVAILABLE{border-left-color:#2E8B57}.fl-card.ON_MISSION{border-left-color:#2F6FB5}.fl-card.MAINTENANCE{border-left-color:#D08A1E}.fl-card.IMMOBILIZED,.fl-card.OUT_OF_SERVICE{border-left-color:#D64545}
+  .fl-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.fl-top b{font-size:17px;color:var(--navy)}.fl-top small{display:block;color:var(--muted);font-size:12px}
+  .fl-row{display:flex;justify-content:space-between;gap:10px;font-size:13px;border-top:1px solid #EEF2F7;padding-top:6px}.fl-row span{color:var(--muted)}.fl-row b{color:#1F2D44;text-align:right;font-weight:600}
+  .fl-alert{background:#FDECEA;color:#9B2C25;border-radius:8px;padding:6px 10px;font-size:12px}
+  .fl-ov{position:fixed;inset:0;background:rgba(10,20,40,.55);z-index:1000;overflow:auto;padding:16px}.fl-dos{max-width:980px;margin:16px auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+  .fl-dh{background:linear-gradient(100deg,#0F2747,#1F3A5F);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.fl-dh h3{margin:0;font-size:20px}.fl-dh small{opacity:.85}
+  .fl-dh button{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:7px 14px;cursor:pointer;font-weight:600}
+  .fl-db{padding:16px 20px}.fl-id{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin-bottom:14px}.fl-id div{font-size:13px}.fl-id span{display:block;color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.3px}.fl-id b{color:var(--navy)}
+  .fl-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}.fl-tot div{background:#F4F7FB;border-radius:10px;padding:10px 12px}.fl-tot b{display:block;font-size:18px;color:var(--navy)}.fl-tot span{font-size:12px;color:var(--muted)}
+  .fl-sub{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.fl-sub button{border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:600;font-size:13px;padding:7px 13px;border-radius:8px;cursor:pointer}.fl-sub button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .fl-tb{overflow:auto}.fl-tb table{width:100%;border-collapse:collapse;font-size:13px}.fl-tb th{background:#F4F7FB;color:var(--navy);text-align:left;padding:8px 10px;white-space:nowrap}.fl-tb td{padding:8px 10px;border-top:1px solid #EEF2F7;vertical-align:top}
+  @media(max-width:700px){.fl-ov{padding:0}.fl-dos{margin:0;border-radius:0;min-height:100%}.fl-grid{grid-template-columns:1fr}.fl-filters input,.fl-filters select{max-width:none;flex:1 1 100%}}`;
+  document.head.appendChild(st);
+}
+function flMaint(v) {
+  const today = Date.now();
+  if (v.nextMaintenanceDate) { const days = Math.floor((new Date(v.nextMaintenanceDate) - today) / 864e5); if (days < 0) return { lvl: 'bad', txt: 'Entretien en retard (' + flD(v.nextMaintenanceDate) + ')' }; if (days <= 30) return { lvl: 'warn', txt: 'Entretien dans ' + days + ' j (' + flD(v.nextMaintenanceDate) + ')' }; }
+  if (v.nextMaintenanceMileage && v.currentMileage >= v.nextMaintenanceMileage - 500) return { lvl: v.currentMileage >= v.nextMaintenanceMileage ? 'bad' : 'warn', txt: v.currentMileage >= v.nextMaintenanceMileage ? 'Entretien dépassé (' + fmt(v.nextMaintenanceMileage) + ' km)' : 'Entretien à ' + fmt(v.nextMaintenanceMileage) + ' km' };
+  return null;
+}
+function flInsurance(v) {
+  const i = v.insurance; if (!i || i.status === 'NONE') return { lvl: 'bad', txt: 'Aucune assurance' };
+  if (i.status === 'EXPIRED') return { lvl: 'bad', txt: 'Assurance expirée le ' + flD(i.expiryDate) };
+  if (i.status === 'EXPIRING') return { lvl: 'warn', txt: 'Assurance : expire dans ' + i.daysLeft + ' j' };
+  return { lvl: 'ok', txt: 'Assurance valide' + (i.expiryDate ? ' → ' + flD(i.expiryDate) : '') };
+}
+async function renderFleet(kind) {
+  flStyle();
+  window._flKind = kind;
+  const trucks = kind === 'TRUCK', label = trucks ? 'Camions' : 'Véhicules de service';
+  const [list, other] = await Promise.all([
+    api('/vehicles/fleet-overview?vehicleType=' + kind + (state.siteId ? '&siteId=' + encodeURIComponent(state.siteId) : '')),
+    api('/vehicles/fleet-overview?vehicleType=' + (trucks ? 'SERVICE_VEHICLE' : 'TRUCK') + (state.siteId ? '&siteId=' + encodeURIComponent(state.siteId) : '')).catch(() => []),
+  ]);
+  if (!/^fleet-/.test(state.view)) return;
+  window._flList = list;
+  const nT = trucks ? list.length : other.length, nS = trucks ? other.length : list.length;
+  const c = (s) => list.filter((v) => v.status === s).length, av = c('AVAILABLE'), mi = c('ON_MISSION'), ma = c('MAINTENANCE'), im = c('IMMOBILIZED') + c('OUT_OF_SERVICE');
+  const pct = list.length ? Math.round((av / list.length) * 100) : null;
+  const kpi = (col, ic, lb, v, foot) => `<div class="dg-kpi"><div class="top"><div class="dg-ico" style="background:${col}"><svg class="ic" aria-hidden="true"><use href="#i-${ic}"/></svg></div><div><div class="lb">${lb}</div><div class="vl">${v}</div></div></div>${foot ? `<div class="ft">${foot}</div>` : ''}</div>`;
+  dgStyle();
+  const watch = [];
+  list.forEach((v) => {
+    const n = esc(v.internalNumber);
+    if (trucks) { const i = flInsurance(v); if (i.lvl !== 'ok') watch.push(`${n} — ${i.txt}`); }
+    if (v.registrationType === 'IT' && v.itExpiryDate) { const d = Math.floor((new Date(v.itExpiryDate) - Date.now()) / 864e5); if (d <= 30) watch.push(`${n} — plaque IT ${d < 0 ? 'expirée' : 'expire dans ' + d + ' j'} (${flD(v.itExpiryDate)})`); }
+    const m = flMaint(v); if (m && m.lvl !== 'ok') watch.push(`${n} — ${m.txt}`);
+    if (v.openDowntime) watch.push(`${n} — immobilisé : ${esc(FL_DT[v.openDowntime.category] || v.openDowntime.category)} (${esc(v.openDowntime.reason)}) depuis le ${flD(v.openDowntime.since)}`);
+  });
+  const canEdit = FL_EDIT_ROLES.includes(state.user.role);
+  root().innerHTML = `<div class="fl-tabs"><button class="tab ${trucks ? 'on' : ''}" onclick="go('fleet-trucks')">Camions (${nT})</button><button class="tab ${trucks ? '' : 'on'}" onclick="go('fleet-service')">Véhicules de service (${nS})</button><span class="sp"></span>${canEdit ? `<button class="btn gold" onclick="go('${trucks ? 'trucks' : 'service-vehicles'}')">Gérer : ajouter / modifier</button>` : ''}</div>
+    <div class="dg-kpis">${kpi('#2F6FB5', trucks ? 'truck' : 'car', 'Total ' + label.toLowerCase(), fmt(list.length), '')}${kpi('#2E8B57', 'check-circle', 'Disponibles', fmt(av), pct == null ? '' : `<span>${pct} % de la flotte</span>`)}${kpi('#4F8FD6', 'target', 'En mission', fmt(mi), '')}${kpi('#D08A1E', 'wrench', 'En maintenance', fmt(ma), '')}${kpi('#D64545', 'alert', 'Immobilisés / hors service', fmt(im), '')}</div>
+    ${watch.length ? `<div class="fl-watch"><b>À surveiller (${watch.length})</b>${watch.slice(0, 8).map((w) => `<div>${w}</div>`).join('')}${watch.length > 8 ? `<div>… et ${watch.length - 8} autre(s)</div>` : ''}</div>` : ''}
+    <div class="fl-filters"><input id="fl-q" placeholder="Rechercher : n° interne, plaque, chauffeur…" oninput="flDraw()"><select id="fl-s" onchange="flDraw()"><option value="">Tous les états</option>${Object.entries(FL_ST).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+    <div id="fl-list" class="fl-grid"></div>`;
+  flDraw();
+}
+function flDraw() {
+  const box = document.getElementById('fl-list'); if (!box) return;
+  const q = ((document.getElementById('fl-q') || {}).value || '').toLowerCase().trim(), s = (document.getElementById('fl-s') || {}).value || '', trucks = window._flKind === 'TRUCK';
+  const rows = (window._flList || []).filter((v) => (!s || v.status === s) && (!q || [v.internalNumber, v.registrationNumber, v.brand, v.model, v.assignedDriver && v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName].filter(Boolean).join(' ').toLowerCase().includes(q)));
+  box.innerHTML = rows.map((v) => {
+    const m = flMaint(v), ins = trucks ? flInsurance(v) : null, t = v.currentTrip;
+    const row = (a, b) => `<div class="fl-row"><span>${a}</span><b>${b}</b></div>`;
+    return `<div class="fl-card ${esc(v.status)}" onclick="flOpen('${esc(v.id)}')">
+      <div class="fl-top"><div><b>${esc(v.internalNumber)}</b><small>${esc(v.registrationNumber)}${v.registrationType === 'IT' ? ' · plaque IT' : ''} · ${esc([v.brand, v.model].filter(Boolean).join(' ') || '—')}</small></div>${statusBadge(v.status)}</div>
+      ${v.openDowntime ? `<div class="fl-alert">${esc(FL_DT[v.openDowntime.category] || v.openDowntime.category)} : ${esc(v.openDowntime.reason)} (depuis le ${flD(v.openDowntime.since)})</div>` : ''}
+      ${row('Kilométrage', fmt(v.currentMileage) + ' km')}
+      ${row('Affectation', v.assignedDriver ? esc(v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName) : 'Non affecté')}
+      ${row('Mission en cours', t ? esc((t.destination || 'En route') + (t.driver ? ' · ' + t.driver : '')) : 'Aucune')}
+      ${row('Ce mois', `${v.month.trips} mission(s) · ${fmt(v.month.km)} km · ${fmt(Math.round(v.month.liters))} L`)}
+      ${m ? `<div class="fl-row"><span>Entretien</span><b><span class="badge ${m.lvl === 'bad' ? 'bad' : 'warn'}">${esc(m.txt)}</span></b></div>` : ''}
+      ${ins && ins.lvl !== 'ok' ? `<div class="fl-row"><span>Assurance</span><b><span class="badge ${ins.lvl === 'bad' ? 'bad' : 'warn'}">${esc(ins.txt)}</span></b></div>` : ''}
+    </div>`;
+  }).join('') || '<div class="empty" style="grid-column:1/-1">Aucun véhicule ne correspond.</div>';
+}
+async function flOpen(id) {
+  flStyle();
+  const old = document.getElementById('fl-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'fl-ov'; ov.className = 'fl-ov';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  ov.innerHTML = '<div class="fl-dos"><div class="fl-dh"><h3>Chargement…</h3><button onclick="document.getElementById(\'fl-ov\').remove()">Fermer</button></div></div>';
+  document.body.appendChild(ov);
+  try {
+    const d = await api('/vehicles/' + encodeURIComponent(id) + '/dossier');
+    window._flDos = d; flShow('trips');
+  } catch (e) { ov.querySelector('.fl-dos').innerHTML = `<div class="fl-dh"><h3>Dossier indisponible</h3><button onclick="document.getElementById('fl-ov').remove()">Fermer</button></div><div class="fl-db"><div class="msg err">${esc(e.message)}</div></div>`; }
+}
+function flShow(tab) {
+  const d = window._flDos, ov = document.getElementById('fl-ov'); if (!d || !ov) return;
+  const v = d.vehicle, t = d.totals, cur = (window._flList || []).find((x) => x.id === v.id) || {}, trucks = v.vehicleType === 'TRUCK';
+  const ins = trucks ? flInsurance({ insurance: cur.insurance }) : null;
+  const id = (a, b) => `<div><span>${a}</span><b>${b}</b></div>`;
+  const tot = (a, b) => `<div><b>${a}</b><span>${b}</span></div>`;
+  const tb = (heads, rows) => `<div class="fl-tb"><table><tr>${heads.map((h) => `<th>${h}</th>`).join('')}</tr>${rows.length ? rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${heads.length}" class="empty">Aucun enregistrement.</td></tr>`}</table></div>`;
+  const tabs = { trips: 'Missions', fuel: 'Carburant', maint: 'Maintenance', inc: 'Incidents' };
+  let body = '';
+  if (tab === 'trips') body = tb(['Date', 'Référence', 'Chauffeur', 'Destination', 'Distance', 'État'], d.trips.map((x) => [flD(x.tripDate), esc(x.reference || '—'), x.driver ? esc(x.driver.firstName + ' ' + x.driver.lastName) : '—', esc(x.destination || '—'), x.distance != null ? fmt(x.distance) + ' km' : '—', esc(FL_TS[x.status] || x.status)]));
+  if (tab === 'fuel') body = tb(['Date', 'Litres', 'Montant', 'Lieu', 'Km', 'Responsable'], d.fuel.map((x) => [flD(x.transactionDate), fmt(x.quantityLiters) + ' L', fmt(x.totalCost) + ' GNF', esc((x.source === 'TANK' ? 'Dépôt' : 'Station') + (x.station ? ' · ' + x.station : '')), fmt(x.mileage), x.driver ? esc(x.driver.firstName + ' ' + x.driver.lastName) : '—']));
+  if (tab === 'maint') body = tb(['Date', 'Type', 'Description', 'Garage', 'Coût', 'État'], d.maintenance.map((x) => [flD(x.maintenanceDate), esc((x.maintenanceType && x.maintenanceType.label) || '—') + (x.kind === 'PREVENTIVE' ? '<br><small>Préventif</small>' : ''), esc(x.description || '—'), esc((x.supplier && x.supplier.name) || '—'), fmt(x.cost) + ' GNF', esc({ PLANNED: 'Planifié', IN_PROGRESS: 'En cours', COMPLETED: 'Terminé', OVERDUE: 'En retard' }[x.status] || x.status)]));
+  if (tab === 'inc') body = '<h4 style="margin:0 0 6px;color:var(--navy)">Pannes et immobilisations</h4>' + tb(['Début', 'Fin', 'Nature', 'Motif', 'Coût'], d.downtimes.map((x) => [flD(x.startedAt), x.endedAt ? flD(x.endedAt) : '<span class="badge bad">En cours</span>', esc(FL_DT[x.category] || x.category), esc(x.reason) + (x.severity ? '<br><small>Gravité : ' + esc(FL_SEV[x.severity] || x.severity) + '</small>' : ''), (x.actualCost != null ? fmt(x.actualCost) : x.estimatedCost != null ? fmt(x.estimatedCost) + ' (est.)' : '—') + ' GNF'])) + '<h4 style="margin:14px 0 6px;color:var(--navy)">Incidents HSE liés au véhicule</h4>' + tb(['Date', 'Type', 'Gravité', 'État', 'Description'], d.incidents.map((x) => [flD(x.occurredAt), esc(FL_HT[x.type] || x.type), esc(FL_SEV[x.severity] || x.severity), esc({ OPEN: 'Ouvert', INVESTIGATING: 'En analyse', CLOSED: 'Clos' }[x.status] || x.status), esc(x.description)]));
+  ov.querySelector('.fl-dos').innerHTML = `<div class="fl-dh"><div><h3>${esc(v.internalNumber)} · ${esc(v.registrationNumber)}</h3><small>${esc([v.brand, v.model, v.year].filter(Boolean).join(' ') || (trucks ? 'Camion' : 'Véhicule de service'))}</small></div><div style="display:flex;gap:8px;align-items:center">${statusBadge(v.status)}<button onclick="document.getElementById('fl-ov').remove()">Fermer</button></div></div>
+    <div class="fl-db"><div class="fl-id">${id('Identification', esc(v.internalNumber))}${id('Immatriculation', esc(v.registrationNumber) + (v.registrationType === 'IT' ? ' (IT' + (v.itExpiryDate ? ' → ' + flD(v.itExpiryDate) : '') + ')' : ''))}${id('Type', trucks ? esc((v.truckType ? ttLabel(v.truckType) : 'Camion') + (v.wheels ? ' · ' + v.wheels + ' roues' : '') + (v.capacity ? ' · ' + v.capacity + ' t' : '')) : 'Véhicule de service')}${id('Kilométrage', fmt(v.currentMileage) + ' km')}${id('Disponibilité', v.status === 'AVAILABLE' ? 'Disponible' : esc(FL_ST[v.status] || v.status))}${id('Affectation', v.assignedDriver ? esc(v.assignedDriver.firstName + ' ' + v.assignedDriver.lastName) + (v.assignedDriver.phone ? '<br><small>' + esc(v.assignedDriver.phone) + '</small>' : '') : 'Non affecté')}${ins ? id('Assurance', esc(ins.txt)) : ''}${id('Observations', esc(v.observations || '—'))}</div>
+    <div class="fl-tot">${tot(fmt(t.completedTrips), 'Missions terminées')}${tot(fmt(t.km) + ' km', 'Distance parcourue')}${tot(fmt(Math.round(t.liters)) + ' L', 'Carburant consommé')}${tot(fmt(t.fuelCost) + ' GNF', 'Coût carburant')}${tot(fmt(t.maintenanceCost) + ' GNF', 'Coût maintenance (' + t.interventions + ')')}</div>
+    <div class="fl-sub">${Object.entries(tabs).map(([k, l]) => `<button class="${k === tab ? 'on' : ''}" onclick="flShow('${k}')">${l}</button>`).join('')}</div>${body}</div>`;
+}
+// Données fictives (mode démonstration uniquement)
+function demoFleet(kind) {
+  const trucks = kind === 'TRUCK', n = trucks ? 8 : 3, st = ['AVAILABLE', 'ON_MISSION', 'AVAILABLE', 'MAINTENANCE', 'ON_MISSION', 'AVAILABLE', 'IMMOBILIZED', 'AVAILABLE'], now = Date.now();
+  return Array.from({ length: n }, (_, i) => {
+    const s = st[i % st.length], pad = String(i + 1).padStart(3, '0');
+    return { id: 'demo-' + kind + i, vehicleType: kind, internalNumber: (trucks ? 'CAM-' : 'VS-') + pad, registrationNumber: 'DEMO ' + (1000 + i * 37) + ' X', brand: trucks ? 'Sinotruk' : 'Toyota', model: trucks ? 'HOWO' : 'Hilux', year: 2020 + (i % 4), capacity: trucks ? '30' : null, wheels: trucks ? 10 : null, truckType: trucks ? 'BENNE' : null, currentMileage: 48000 + i * 7300, status: s, registrationType: i === 4 ? 'IT' : 'NORMALE', itExpiryDate: i === 4 ? new Date(now + 12 * 864e5).toISOString() : null, observations: null,
+      assignedDriver: s === 'MAINTENANCE' ? null : { id: 'd' + i, firstName: 'Chauffeur', lastName: 'Fictif ' + (i + 1), phone: '620 00 00 0' + i },
+      insurance: { status: i === 2 ? 'EXPIRING' : i === 6 ? 'EXPIRED' : 'VALID', expiryDate: new Date(now + (i === 6 ? -9 : i === 2 ? 14 : 200) * 864e5).toISOString(), daysLeft: i === 2 ? 14 : 200 },
+      currentTrip: s === 'ON_MISSION' ? { reference: 'TRP-DEMO-' + pad, destination: 'Kankan', since: new Date(now - 6 * 36e5).toISOString(), driver: 'Chauffeur Fictif ' + (i + 1) } : null,
+      openDowntime: s === 'IMMOBILIZED' ? { category: 'PANNE', reason: 'Boîte de vitesses', since: new Date(now - 3 * 864e5).toISOString() } : null,
+      lastMaintenanceAt: new Date(now - 40 * 864e5).toISOString(), nextMaintenanceDate: i === 3 ? new Date(now - 4 * 864e5).toISOString() : new Date(now + 60 * 864e5).toISOString(), nextMaintenanceMileage: 60000 + i * 7300,
+      month: { trips: 4 + i, km: 1200 + i * 310, liters: 520 + i * 90, fuelCost: 6500000 } };
+  });
+}
+function demoDossier(id) {
+  const kind = id.includes('SERVICE') ? 'SERVICE_VEHICLE' : 'TRUCK', v = demoFleet(kind).find((x) => x.id === id) || demoFleet(kind)[0], d = (x) => new Date(Date.now() - x * 864e5).toISOString();
+  return { vehicle: v, trips: [1, 3, 6, 9].map((x, i) => ({ id: 't' + i, reference: 'TRP-DEMO-' + x, tripDate: d(x), status: 'COMPLETED', destination: ['Kankan', 'Labé', 'Mamou', 'Kindia'][i], distance: 300 + i * 40, driver: { firstName: 'Chauffeur', lastName: 'Fictif' } })),
+    fuel: [2, 7, 12].map((x, i) => ({ id: 'f' + i, transactionDate: d(x), quantityLiters: 180 + i * 20, totalCost: 2250000 + i * 250000, station: 'Station fictive', source: i === 1 ? 'TANK' : 'STATION', mileage: v.currentMileage - x * 90, driver: { firstName: 'Chauffeur', lastName: 'Fictif' } })),
+    maintenance: [{ id: 'm1', maintenanceDate: d(40), kind: 'PREVENTIVE', status: 'COMPLETED', description: 'Vidange et filtres', cost: 1800000, mileage: v.currentMileage - 3000, maintenanceType: { label: 'Vidange' }, supplier: { name: 'Garage fictif' } }],
+    downtimes: v.openDowntime ? [{ id: 'x1', category: 'PANNE', reason: v.openDowntime.reason, severity: 'HIGH', startedAt: v.openDowntime.since, endedAt: null, actualCost: null, estimatedCost: 4500000 }] : [], incidents: [],
+    totals: { completedTrips: 42, km: 15800, liters: 5200, fuelCost: 65000000, maintenanceCost: 6400000, interventions: 5 } };
 }
 
 /* ---------------- MON ESPACE : gestionnaire de stock, agent HSE, mécanicien, pointeur ---------------- */
@@ -4971,7 +5123,7 @@ function spaceName() {
   const r = state.user && state.user.role, v = state.view || '';
   if (r === 'CHAUFFEUR') return 'SYL DRIVER';
   if (r === 'DIRECTEUR_GENERAL' || v === 'dashboard' || /^dash-/.test(v)) return 'SYL DASHBOARD';
-  if (r === 'GESTIONNAIRE_FLOTTE' || ['vehicles', 'trucks', 'service-vehicles', 'drivers', 'fuel', 'maintenance', 'atelier', 'driver-devices', 'driver-sheets', 'driver-board', 'driver-missions'].includes(v)) return 'SYL FLEET';
+  if (r === 'GESTIONNAIRE_FLOTTE' || ['vehicles', 'trucks', 'service-vehicles', 'fleet-trucks', 'fleet-service', 'drivers', 'fuel', 'maintenance', 'atelier', 'driver-devices', 'driver-sheets', 'driver-board', 'driver-missions'].includes(v)) return 'SYL FLEET';
   return 'SYL LOGISTIQUE';
 }
 /* ---- Identité visuelle par espace (logos par département) : s'affiche seulement pour les rôles qui ont un espace dédié ---- */
