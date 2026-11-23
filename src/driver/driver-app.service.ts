@@ -80,7 +80,7 @@ export class DriverAppService {
       driver: { id: driver.id, name: `${driver.firstName} ${driver.lastName}`, phone: driver.phone, siteId: driver.siteId, license: { number: driver.licenseNumber, category: driver.licenseCategory, expiry: driver.licenseExpiryDate, photoUrl: driver.licensePhotoUrl }, activity: driver.activity ?? vehicleRow?.vehicleType ?? null },
       device: { id: device.id, model: device.model, activatedAt: device.activatedAt },
       vehicle: vehicleRow
-        ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, truckType: vehicleRow.truckType, wheels: vehicleRow.wheels, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null }
+        ? { id: vehicleRow.id, plate: vehicleRow.registrationNumber, number: vehicleRow.internalNumber, brand: vehicleRow.brand, model: vehicleRow.model, type: vehicleRow.vehicleType, truckType: vehicleRow.truckType, wheels: vehicleRow.wheels, registrationType: vehicleRow.registrationType, itExpiryDate: vehicleRow.itExpiryDate, label: [vehicleRow.brand, vehicleRow.model].filter(Boolean).join(' '), status: vehicleRow.status, mileage: vehicleRow.currentMileage, capacity: vehicleRow.capacity, equipment: vehicleRow.observations, immobilized: !!downtime || BLOCKED_VEHICLE.includes(vehicleRow.status), downtimeReason: downtime?.reason ?? null, downtimeStage: downtime?.stage ?? null, downtimeExpectedEnd: downtime?.expectedEndAt ?? null }
         : null,
       activeTrip: active ? fmtTrip(active) : null,
       trips: trips.map(fmtTrip),
@@ -330,16 +330,19 @@ export class DriverAppService {
       id = open.id; // déjà immobilisé : on ne duplique pas, on alerte quand même l'atelier
     } else {
       const d = await this.prisma.vehicleDowntime.create({
-        data: { vehicleId, siteId: vehicle.siteId, category: 'PANNE', reason: description, startedAt: at, createdById: userId, severity, photoUrls: urls(p.photoUrls), latitude: lat, longitude: lng, tripId: trip?.id, clientOpId: op.clientOpId },
+        data: { vehicleId, siteId: vehicle.siteId, category: 'PANNE', reason: description, startedAt: at, createdById: userId, severity, photoUrls: urls(p.photoUrls), latitude: lat, longitude: lng, tripId: trip?.id, clientOpId: op.clientOpId, stageLog: [{ stage: 'DECLAREE', at: at.toISOString(), by: userId, role: 'CHAUFFEUR', note: description.slice(0, 200) }] },
       });
       id = d.id;
       await this.prisma.vehicle.update({ where: { id: vehicleId }, data: { status: 'IMMOBILIZED' } });
     }
     if (trip) await this.prisma.tripLog.create({ data: { tripId: trip.id, driverId: driver.id, eventType: 'BREAKDOWN', latitude: lat, longitude: lng, mileage: vehicle.currentMileage, syncedOffline: !!p.offline, occurredAt: at } }).catch(() => undefined);
-    await this.notify({
-      role: 'GESTIONNAIRE_FLOTTE', siteId: vehicle.siteId, severity: severity === 'HIGH' || severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING', entity: 'VehicleDowntime', entityId: id,
-      title: `Panne déclarée — ${vehicle.internalNumber}`, message: `${description.slice(0, 160)}${lat !== undefined && lng !== undefined ? ` (GPS ${lat.toFixed(5)}, ${lng.toFixed(5)})` : ''}.`,
-    });
+    // Le Responsable logistique et le gestionnaire de flotte qualifient la panne (priorité, délai) : étape suivante du circuit
+    for (const role of ['GESTIONNAIRE_FLOTTE', 'ADMIN_LOGISTIQUE']) {
+      await this.notify({
+        role, siteId: vehicle.siteId, severity: severity === 'HIGH' || severity === 'CRITICAL' ? 'CRITICAL' : 'WARNING', entity: 'VehicleDowntime', entityId: id,
+        title: `Panne déclarée — ${vehicle.internalNumber}`, message: `${description.slice(0, 160)}${lat !== undefined && lng !== undefined ? ` (GPS ${lat.toFixed(5)}, ${lng.toFixed(5)})` : ''}. À qualifier : priorité et délai de remise en service.`,
+      });
+    }
     await this.audit.log({ userId, action: 'CREATE', entity: 'VehicleDowntime', entityId: id, newValue: { severity, vehicleId, tripId: trip?.id } });
     return { downtimeId: id, vehicleStatus: 'IMMOBILIZED' };
   }
