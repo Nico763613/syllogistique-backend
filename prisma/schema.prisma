@@ -1083,6 +1083,17 @@ model VehicleDowntime {
   longitude      Float?
   tripId         String?   @map("trip_id")
   clientOpId     String?   @unique @map("client_op_id")
+  // Circuit panne → réparation → remise en service
+  stage          String    @default("DECLAREE") // DECLAREE | QUALIFIEE | EN_REPARATION | EN_ATTENTE_PIECES | REMISE_EN_SERVICE
+  priority       String    @default("NORMALE") // NORMALE | URGENTE
+  qualifiedAt    DateTime? @map("qualified_at")
+  qualifiedById  String?   @map("qualified_by")
+  mechanicId     String?   @map("mechanic_id") // premier mécanicien arrivé
+  repairStartedAt DateTime? @map("repair_started_at")
+  expectedEndAt  DateTime? @map("expected_end_at") // délai de remise en service prévu
+  needRequestId  String?   @map("need_request_id") // état des besoins (pièces) lié
+  partsRequestedAt DateTime? @map("parts_requested_at")
+  stageLog       Json      @default("[]") @map("stage_log") // historique : étape, date, auteur, note
 
   vehicle        Vehicle   @relation(fields: [vehicleId], references: [id])
 

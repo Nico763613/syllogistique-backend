@@ -73,6 +73,18 @@ const AUTO_SCHEMA: string[] = [
   )`,
   'CREATE INDEX IF NOT EXISTS "vehicle_downtimes_vehicle_id_idx" ON "vehicle_downtimes"("vehicle_id")',
   'CREATE INDEX IF NOT EXISTS "vehicle_downtimes_site_id_started_at_idx" ON "vehicle_downtimes"("site_id", "started_at")',
+  // Circuit panne → réparation → remise en service (colonnes additives, aucune donnée existante modifiée hors étape des pannes déjà closes)
+  `ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "stage" TEXT NOT NULL DEFAULT 'DECLAREE'`,
+  `ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "priority" TEXT NOT NULL DEFAULT 'NORMALE'`,
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "qualified_at" TIMESTAMP(3)',
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "qualified_by" TEXT',
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "mechanic_id" TEXT',
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "repair_started_at" TIMESTAMP(3)',
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "expected_end_at" TIMESTAMP(3)',
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "need_request_id" TEXT',
+  'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "parts_requested_at" TIMESTAMP(3)',
+  `ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "stage_log" JSONB NOT NULL DEFAULT '[]'`,
+  `UPDATE "vehicle_downtimes" SET "stage" = 'REMISE_EN_SERVICE' WHERE "ended_at" IS NOT NULL AND "stage" = 'DECLAREE'`,
 ];
 
 // Tableaux de bord par département : instructions lues dans prisma/dashboards-upgrade.sql (blocs séparés par « --# »).

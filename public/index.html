@@ -1875,15 +1875,84 @@ async function editFleetTarget(current) {
   if (v === null || !(Number(v) > 0)) return;
   try { await api('/settings/FLEET_TARGET', { method: 'PUT', body: { value: String(Math.round(Number(v))) } }); renderView(state.view); } catch (e) { alert(e.message); }
 }
+/* ---------- Circuit panne → réparation → remise en service ---------- */
+const DT_STAGE = { DECLAREE: ['bad', 'Déclarée'], QUALIFIEE: ['warn', 'Qualifiée'], EN_REPARATION: ['info', 'En réparation'], EN_ATTENTE_PIECES: ['warn', 'En attente de pièces'], REMISE_EN_SERVICE: ['ok', 'Remise en service'] };
+function dtStageHtml(i) {
+  const [c, l] = DT_STAGE[i.stage] || ['info', i.stage || '—'];
+  return `<span class="badge ${c}">${l}</span>${i.priority === 'URGENTE' ? ' <span class="badge bad">Urgent</span>' : ''}${i.late ? ' <span class="badge bad">En retard</span>' : ''}`;
+}
+function dtInfoHtml(i) {
+  const dd = (x) => new Date(x).toLocaleDateString('fr-FR');
+  const meta = [i.expectedEndAt ? 'Remise en service prévue le ' + dd(i.expectedEndAt) : '', i.mechanicName ? 'Mécanicien : ' + esc(i.mechanicName) : '', i.need ? 'Pièces : ' + esc(i.need.reference) : ''].filter(Boolean).join(' · ');
+  return (meta ? `<div style="margin-top:4px;font-size:13px;color:var(--muted)">${meta}</div>` : '') + (i.next ? `<div style="margin-top:4px;font-size:13px"><b>Prochaine étape — ${esc(i.next.who)} :</b> ${esc(i.next.text)}</div>` : '');
+}
+function dtButtons(i) {
+  if (i.endedAt) return '';
+  const role = (state.user && state.user.role) || '';
+  const FLEET = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE'];
+  const b = (fn, label, gold) => `<button class="btn small ${gold ? 'gold' : ''}" onclick="${fn}('${esc(i.id)}')">${label}</button>`;
+  const out = [];
+  if (i.stage === 'DECLAREE' && FLEET.includes(role)) out.push(b('dtQualify', 'Qualifier', true));
+  if (role === 'MECANICIEN' || role === 'SUPER_ADMIN') {
+    if (!i.mechanicId && ['DECLAREE', 'QUALIFIEE'].includes(i.stage)) out.push(b('dtTake', 'Prendre en charge', true));
+    if (i.stage === 'EN_REPARATION' && (i.mineToRepair || role === 'SUPER_ADMIN')) { out.push(b('dtParts', 'Demander des pièces')); out.push(b('atResolve', 'Réparation terminée', true)); }
+  }
+  if (i.stage === 'EN_ATTENTE_PIECES' && ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'MAGASINIER', 'MECANICIEN'].includes(role)) out.push(b('dtPartsIn', 'Pièces reçues', true));
+  return out.join(' ');
+}
+function dtOverlay(id, title, bodyHtml, okLabel, okFn) {
+  const ov = document.createElement('div'); ov.id = 'dt-ov'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,25,45,.55);z-index:90;display:flex;align-items:center;justify-content:center;padding:14px';
+  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;max-height:92vh;overflow:auto;margin:0"><h3>${title}</h3>${bodyHtml}<div id="dt-ov-msg"></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn gold" style="flex:1;min-height:48px" onclick="${okFn}('${esc(id)}')">${okLabel}</button><button class="btn" style="min-height:48px" onclick="document.getElementById('dt-ov').remove()">Annuler</button></div></div>`;
+  document.body.appendChild(ov);
+}
+function dtQualify(id) {
+  dtOverlay(id, 'Qualifier la panne', `<label>Priorité</label><select id="dt-q-prio"><option value="NORMALE">Normale (remise en service sous 3 jours)</option><option value="URGENTE">Urgente (sous 24 h)</option></select>
+    <label>Remise en service prévue avant le (facultatif — sinon délai par défaut)</label><input id="dt-q-end" type="date">
+    <label>Consigne à l'atelier (facultatif)</label><textarea id="dt-q-note" rows="2" placeholder="Ex. priorité aux freins, véhicule attendu lundi"></textarea>`, 'Qualifier et prévenir l\'atelier', 'dtQualifySend');
+}
+async function dtQualifySend(id) {
+  const m = document.getElementById('dt-ov-msg');
+  try {
+    const end = document.getElementById('dt-q-end').value, note = document.getElementById('dt-q-note').value.trim();
+    await api('/downtimes/' + id + '/qualify', { method: 'POST', body: { priority: document.getElementById('dt-q-prio').value, ...(end ? { expectedEndAt: new Date(end + 'T18:00:00').toISOString() } : {}), ...(note ? { note } : {}) } });
+    document.getElementById('dt-ov').remove(); renderView(state.view);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function dtTake(id) {
+  try { await api('/downtimes/' + id + '/take', { method: 'POST', body: {} }); } catch (e) { alert(e.message); }
+  renderView(state.view);
+}
+function dtParts(id) {
+  dtOverlay(id, 'Demander des pièces', `<div class="desc">Une ligne par pièce, avec la quantité en premier. Ex. « 2 plaquettes de frein avant ». La demande part aux Achats et le véhicule reste immobilisé jusqu'à réception.</div>
+    <label>Pièces nécessaires</label><textarea id="dt-p-lines" rows="4" placeholder="2 plaquettes de frein avant&#10;1 filtre à huile"></textarea>
+    <label>Précision (facultatif)</label><input id="dt-p-note" type="text">`, 'Envoyer aux Achats', 'dtPartsSend');
+}
+async function dtPartsSend(id) {
+  const m = document.getElementById('dt-ov-msg');
+  try {
+    const lines = document.getElementById('dt-p-lines').value.split('\n').map((x) => x.trim()).filter(Boolean).map((x) => {
+      const mm = x.match(/^(\d+(?:[.,]\d+)?)\s*[x×]?\s+(.+)$/i);
+      return mm ? { quantity: Number(mm[1].replace(',', '.')), designation: mm[2].trim() } : { quantity: 1, designation: x };
+    });
+    if (!lines.length) throw new Error('Indiquez au moins une pièce.');
+    const note = document.getElementById('dt-p-note').value.trim();
+    await api('/downtimes/' + id + '/parts', { method: 'POST', body: { lines, ...(note ? { note } : {}) } });
+    document.getElementById('dt-ov').remove(); renderView(state.view);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function dtPartsIn(id) {
+  try { await api('/downtimes/' + id + '/parts-received', { method: 'POST', body: {} }); } catch (e) { alert(e.message); }
+  renderView(state.view);
+}
 async function loadDowntimes() {
   const box = document.getElementById('dt-list');
   if (!box) return;
   try {
     const r = await api('/downtimes?siteId=' + state.siteId);
     box.innerHTML = r.items.length ? `<div class="desc">${r.summary.open} en cours • ${fmt(r.summary.totalDays)} jour(s) cumulés • coût : <b>${fmt(r.summary.totalCost)} GNF</b></div>
-      <table><thead><tr><th>Véhicule</th><th>Type</th><th>Motif</th><th>Depuis</th><th>Jours</th><th>Coût</th><th></th></tr></thead><tbody>${r.items.map(i => `
-      <tr><td>${esc(i.vehicle)}</td><td>${esc(i.category)}</td><td>${esc(i.reason)}</td><td>${new Date(i.startedAt).toLocaleDateString('fr-FR')}</td><td class="mono">${i.days}</td><td class="mono">${fmt(i.actualCost ?? i.estimatedCost)}</td>
-      <td>${i.endedAt ? '<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Remis en service' : `<button class="btn small" onclick="resolveDowntime('${esc(i.id)}')">Remettre en service</button>`}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune immobilisation enregistrée.</div>';
+      <table><thead><tr><th>Véhicule</th><th>Type</th><th>Motif</th><th>Étape</th><th>Depuis</th><th>Jours</th><th>Coût</th><th></th></tr></thead><tbody>${r.items.map(i => `
+      <tr><td>${esc(i.vehicle)}</td><td>${esc(i.category)}</td><td>${esc(i.reason)}${dtInfoHtml(i)}</td><td>${dtStageHtml(i)}</td><td>${new Date(i.startedAt).toLocaleDateString('fr-FR')}</td><td class="mono">${i.days}</td><td class="mono">${fmt(i.actualCost ?? i.estimatedCost)}</td>
+      <td>${i.endedAt ? '<svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Remis en service' : `${dtButtons(i)} <button class="btn small" onclick="resolveDowntime('${esc(i.id)}')">Remettre en service</button>`}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucune immobilisation enregistrée.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function reportDowntime() {
@@ -4436,7 +4505,7 @@ function drvRender() {
   const me = drvView();
   if (!me) { root.innerHTML = `<div class="drv-card drv-center">${DRV.error ? `<div class="drv-warn">${esc(DRV.error)}</div>` : 'Chargement…'}<button class="drv-btn ghost" onclick="drvLoad()">Actualiser</button></div>`; return; }
   const v = me.vehicle;
-  const banner = (DRV.error ? `<div class="drv-warn">${esc(DRV.error)}</div>` : '') + (v && v.immobilized ? `<div class="drv-warn"><svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg> Véhicule immobilisé${v.downtimeReason ? ' : ' + esc(v.downtimeReason) : ''}. Départ impossible tant que l'atelier n'a pas validé la levée de réserve.</div>` : '');
+  const banner = (DRV.error ? `<div class="drv-warn">${esc(DRV.error)}</div>` : '') + (v && v.immobilized ? `<div class="drv-warn"><svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg> Véhicule immobilisé${v.downtimeReason ? ' : ' + esc(v.downtimeReason) : ''}. ${v.downtimeStage && DT_STAGE[v.downtimeStage] ? ' Étape : ' + DT_STAGE[v.downtimeStage][1] + (v.downtimeExpectedEnd ? ', remise en service prévue le ' + new Date(v.downtimeExpectedEnd).toLocaleDateString('fr-FR') : '') + '.' : ''} Départ impossible tant que l'atelier n'a pas validé la levée de réserve.</div>` : '');
   if (DRV.tab === 'missions') { root.innerHTML = banner + drvHomeHtml(me); setTimeout(drvHomeFill, 0); }
   else if (DRV.tab === 'sheet') { root.innerHTML = banner + '<div class="drv-card drv-center">Chargement de la fiche…</div>'; drvSheetLoad(); }
   else if (DRV.tab === 'fuel') { root.innerHTML = banner + '<div class="drv-card drv-center">Chargement…</div>'; drvModuleLoad('fuel', banner); }
@@ -5894,7 +5963,7 @@ async function renderAtelier() {
   const st = { PLANNED: ['warn', 'Planifié'], IN_PROGRESS: ['warn', 'En cours'], OVERDUE: ['bad', 'En retard'], COMPLETED: ['ok', 'Terminé'] };
   let body = '';
   if (atTab === 'repair') {
-    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Véhicules à réparer <span class="badge ${open.length ? 'bad' : 'ok'}">${open.length}</span></h3><div class="desc">Pannes déclarées par les chauffeurs et véhicules immobilisés. Une fois la réparation faite, cliquez « Réparation terminée » : le véhicule est remis en service.</div>${open.map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b><br><small>${esc(i.category)} · depuis le ${d(i.startedAt)} (${i.days} j)</small><div style="margin-top:4px">${esc(i.reason)}</div></span><button class="btn small gold" onclick="atResolve('${esc(i.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Réparation terminée</button></div>`).join('') || '<div class="empty">Aucun véhicule à réparer.</div>'}<button class="btn" style="margin-top:10px" onclick="go('maintenance')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouvelle intervention (entretien)</button></div>`;
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Véhicules à réparer <span class="badge ${open.length ? 'bad' : 'ok'}">${open.length}</span></h3><div class="desc">Pannes déclarées par les chauffeurs et véhicules immobilisés. Prenez la réparation en charge (le premier arrivé), demandez les pièces si besoin, puis cliquez « Réparation terminée » : le véhicule est remis en service.</div>${open.map((i) => `<div class="drv-row" style="align-items:flex-start;flex-wrap:wrap"><span style="flex:1;min-width:200px"><b>${esc(i.vehicle)}</b> ${dtStageHtml(i)}<br><small>${esc(i.category)} · depuis le ${d(i.startedAt)} (${i.days} j)</small><div style="margin-top:4px">${esc(i.reason)}</div>${dtInfoHtml(i)}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${dtButtons(i)}</span></div>`).join('') || '<div class="empty">Aucun véhicule à réparer.</div>'}<button class="btn" style="margin-top:10px" onclick="go('maintenance')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouvelle intervention (entretien)</button></div>`;
   } else if (atTab === 'progress') {
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Interventions en cours et à faire</h3>${mProg.map((m) => { const [c, l] = st[m.status] || ['warn', m.status]; return `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || m.description || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ${c}">${l}</span></div>`; }).join('') || '<div class="empty">Aucune intervention en cours.</div>'}</div>`;
   } else if (atTab === 'done') {

@@ -58,6 +58,48 @@ export class RoleAlertsService {
         title: 'Départ non déclaré', message: `${t.vehicle.internalNumber} (${t.driver.firstName} ${t.driver.lastName}) : départ prévu à ${t.startTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}, mission non démarrée.`,
       });
     }
+    created.n += await this.downtimeDelays(now, since);
+    return created.n;
+  }
+
+  // Retards du circuit panne → réparation → remise en service
+  private async downtimeDelays(now: Date, since: Date): Promise<number> {
+    const created = { n: 0 };
+    const HOUR = 3_600_000;
+    const open = await this.prisma.vehicleDowntime.findMany({
+      where: { endedAt: null },
+      include: { vehicle: { select: { internalNumber: true } } },
+    });
+    const h = (ms: number) => (ms >= 24 * HOUR ? `${Math.floor(ms / (24 * HOUR))} j` : `${Math.floor(ms / HOUR)} h`);
+    for (const d of open) {
+      const v = d.vehicle.internalNumber;
+      const ageMs = +now - +d.startedAt;
+      // Panne non qualifiée par la logistique depuis plus de 2 h
+      if (d.stage === 'DECLAREE' && ageMs > 2 * HOUR) {
+        for (const role of ['GESTIONNAIRE_FLOTTE', 'ADMIN_LOGISTIQUE']) {
+          await this.emit(created, since, { role, siteId: d.siteId, severity: ageMs > 8 * HOUR ? 'CRITICAL' : 'WARNING', entity: 'DowntimeUnqualified', entityId: d.id, title: 'Panne non qualifiée', message: `${v} : panne déclarée il y a ${h(ageMs)}, priorité et délai de remise en service à définir.` });
+        }
+      }
+      // Panne qualifiée mais aucun mécanicien ne l'a prise en charge
+      if (d.stage === 'QUALIFIEE' && !d.mechanicId && d.qualifiedAt && +now - +d.qualifiedAt > (d.priority === 'URGENTE' ? 1 : 4) * HOUR) {
+        const waited = +now - +d.qualifiedAt;
+        for (const role of ['MECANICIEN', 'GESTIONNAIRE_FLOTTE']) {
+          await this.emit(created, since, { role, siteId: d.siteId, severity: d.priority === 'URGENTE' ? 'CRITICAL' : 'WARNING', entity: 'DowntimeUntaken', entityId: d.id, title: 'Réparation non prise en charge', message: `${v} : qualifiée il y a ${h(waited)}, aucun mécanicien ne l'a prise en charge.` });
+        }
+      }
+      // Pièces attendues depuis plus de 48 h
+      if (d.stage === 'EN_ATTENTE_PIECES' && d.partsRequestedAt && +now - +d.partsRequestedAt > 48 * HOUR) {
+        for (const role of ['ADMIN_LOGISTIQUE', 'MAGASINIER']) {
+          await this.emit(created, since, { role, siteId: d.siteId, severity: 'WARNING', entity: 'DowntimePartsLate', entityId: d.id, title: 'Pièces en retard', message: `${v} : pièces demandées il y a ${h(+now - +d.partsRequestedAt)}, véhicule toujours immobilisé.` });
+        }
+      }
+      // Délai de remise en service dépassé
+      if (d.expectedEndAt && +d.expectedEndAt < +now) {
+        for (const role of ['GESTIONNAIRE_FLOTTE', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS']) {
+          await this.emit(created, since, { role, siteId: d.siteId, severity: 'CRITICAL', entity: 'DowntimeOverdue', entityId: d.id, title: 'Remise en service en retard', message: `${v} : remise en service prévue le ${d.expectedEndAt.toLocaleDateString('fr-FR')}, dépassée de ${h(+now - +d.expectedEndAt)}.` });
+        }
+      }
+    }
     return created.n;
   }
 
