@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { PartsReceivedDto, PartsRequestDto, QualifyDowntimeDto, ReportDowntimeDto, ResolveDowntimeDto } from './dto/downtime.dto';
@@ -35,8 +36,8 @@ export class DowntimesService {
     }
   }
 
-  private logEntry(dt: { stageLog: unknown }, stage: string, actor: Actor, note?: string) {
-    const prev = Array.isArray(dt.stageLog) ? (dt.stageLog as unknown[]) : [];
+  private logEntry(dt: { stageLog: unknown }, stage: string, actor: Actor, note?: string): Prisma.InputJsonValue {
+    const prev = Array.isArray(dt.stageLog) ? (dt.stageLog as Prisma.InputJsonValue[]) : [];
     return [...prev, { stage, at: new Date().toISOString(), by: actor.userId, role: actor.role ?? null, note: note?.trim() || null }];
   }
 
