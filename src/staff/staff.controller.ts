@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -7,8 +7,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { StaffService } from './staff.service';
 import { CreateStaffDto, InviteStaffDto, StaffReportDto } from './staff.dto';
 
-const OFFICE = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE];
-const READERS = [RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_HSE, RoleName.LECTEUR];
+const OFFICE = [RoleName.SUPER_ADMIN, RoleName.DIRECTEUR_GENERAL, RoleName.ADMIN_LOGISTIQUE];
+const READERS = [RoleName.SUPER_ADMIN, RoleName.DIRECTEUR_GENERAL, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_HSE, RoleName.LECTEUR];
 const STAFF = [RoleName.AGENT_HSE, RoleName.GESTIONNAIRE_HSE, RoleName.MAGASINIER, RoleName.MECANICIEN, RoleName.POINTEUR];
 const toList = (r?: string) => (r ? r.split(',').map((x) => x.trim()).filter(Boolean) : undefined);
 
@@ -29,6 +29,18 @@ export class StaffController {
   @Roles(...READERS)
   list(@Query('role') role?: string, @Query('siteId') siteId?: string, @CurrentUser() actor?: any) {
     return this.service.list(toList(role), siteId, actor.role);
+  }
+
+  @Patch(':id')
+  @Roles(...OFFICE, RoleName.GESTIONNAIRE_HSE)
+  update(@Param('id') id: string, @Body() dto: { firstName?: string; lastName?: string; phone?: string }, @CurrentUser() actor: any) {
+    return this.service.update(id, dto ?? {}, actor, actor.role);
+  }
+
+  @Post(':id/status')
+  @Roles(...OFFICE, RoleName.GESTIONNAIRE_HSE)
+  setStatus(@Param('id') id: string, @Body() dto: { status: string }, @CurrentUser() actor: any) {
+    return this.service.setStatus(id, dto?.status, actor, actor.role);
   }
 
   @Post('invite')

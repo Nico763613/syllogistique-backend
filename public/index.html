@@ -472,6 +472,7 @@
       <div class="nav-item" data-view="dash-fleet" data-roles="GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('dash-fleet')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span> Charroi &amp; Flotte</div>
       <div class="nav-item" data-view="trucks" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('trucks')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg></span> Flotte</div>
       <div class="nav-item" data-view="drivers" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('drivers')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span> Équipes terrain</div>
+      <div class="nav-item" data-view="personnel" data-roles="ADMIN_LOGISTIQUE" onclick="go('personnel')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span> Gestion du personnel</div>
       <div class="nav-item" data-view="driver-sheets" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('driver-sheets')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg></span> Fiches de bord</div>
       <div class="nav-item" data-view="fuel" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,GESTIONNAIRE_FLOTTE,LECTEUR" onclick="go('fuel')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg></span> Carburant &amp; Maintenance</div>
       <div class="nav-item" data-view="ops-validation" data-roles="SUPER_ADMIN,RESPONSABLE_OPERATIONS" onclick="go('ops-validation')"><span class="nav-icon"><svg class="ic ic-ok" aria-hidden="true"><use href="#i-check-circle"/></svg></span> Validation des fiches</div>
@@ -957,7 +958,7 @@ const titles = {
   ventes: 'Ventes',
   compta: 'Comptabilité',
   atelier: 'Atelier',
-  home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'fleet-trucks': 'Flotte — Camions', 'fleet-service': 'Flotte — Véhicules de service', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
+  personnel: 'Gestion du personnel', home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'fleet-trucks': 'Flotte — Camions', 'fleet-service': 'Flotte — Véhicules de service', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'ops-validation': 'Validation des fiches', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
@@ -1662,6 +1663,7 @@ async function renderView(view) {
     if (STAFF_CFG[view]) return await (renderStaff(view));
     if (view === 'signalements') return await (renderProblemReports());
     if (view === 'staff-managers') return await (renderManagers());
+    if (view === 'personnel') return await (renderPersonnel());
     if (view === 'my-report') return await (renderMyReport());
     if (view === 'enrol') return await (renderEnrol());
     if (view === 'reports-drivers') return await (renderReportDrivers());
@@ -3757,6 +3759,7 @@ const DG_MENU = [
   { t: 'Rapports des départements', s: 'Réception & Validation', ic: 'clipboard', sa: { v: 'reports-truck', vs: ['reports-hse', 'reports-stock', 'reports-drivers', 'reports-dg', 'ops-validation', 'driver-sheets', 'driver-missions'] } },
   { t: 'Personnel', s: 'Gestion des accès', ic: 'users', sa: { v: 'staff-managers', vs: ['staff-managers', 'staff-store', 'staff-mech', 'staff-hse', 'drivers', 'enrol', 'pointage', 'driver-devices', 'driver-board'] } },
   { t: 'Analyses & Statistiques', s: 'Bilans et graphiques', ic: 'chart', sa: { v: 'pilotage', vs: ['pilotage', 'dash-fleet', 'dash-stock', 'dash-logistics', 'dash-hse'] }, dg: { v: 'pilotage', vs: ['pilotage'] } },
+  { t: 'Gestion du personnel', s: 'Comptes & accès', ic: 'users', dg: { v: 'personnel', vs: ['personnel'] } },
   { t: 'Alertes & Notifications', s: 'Incidents & rappels', ic: 'bell', badge: true, sa: { act: 'dgAlertsGo()', vs: [] }, dg: { act: 'dgAlertsGo()', vs: [] } },
   { t: 'Journal d’activité', s: 'Historique', ic: 'clock', sa: { act: 'openHistory()', vs: [] } },
 ];
@@ -4356,6 +4359,72 @@ async function mgLoad() {
       <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td>
       <td><button class="btn small gold" onclick="stInvite('${esc(u.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien par WhatsApp</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucun responsable enregistré.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+/* ---------------- GESTION DU PERSONNEL (hiérarchie : chacun gère uniquement son domaine, contrôlé aussi côté serveur) ---------------- */
+const PERS_CFG = {
+  ADMIN_LOGISTIQUE: { title: 'GESTION DU PERSONNEL LOGISTIQUE', desc: "Enregistrez vos collaborateurs, activez ou désactivez leur compte et envoyez-leur une invitation individuelle par WhatsApp. Les chauffeurs (permis, véhicule, appareil) se gèrent dans « Équipes terrain ».", roles: { MAGASINIER: 'Gestionnaire de stock', MECANICIEN: 'Mécanicien', POINTEUR: 'Pointeur' } },
+  DIRECTEUR_GENERAL: { title: 'GESTION DES RESPONSABLES', desc: "Créez les comptes de vos responsables, puis envoyez à chacun son invitation individuelle par WhatsApp. Chacun arrive directement dans son propre espace.", roles: { ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité', GESTIONNAIRE_HSE: 'Responsable HSE' } },
+};
+const PERS_ST = { ACTIVE: ['Actif', 'ok'], SUSPENDED: ['Suspendu', 'warn'], DISABLED: ['Désactivé', 'bad'] };
+async function renderPersonnel() {
+  const cfg = PERS_CFG[state.user.role];
+  if (!cfg) { root().innerHTML = '<div class="panel"><div class="msg err">Cet espace n\'est pas disponible pour votre fonction.</div></div>'; return; }
+  root().innerHTML = `
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> ${cfg.title}</h3><div class="desc">${esc(cfg.desc)}</div>
+      <div id="pe-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"></div></div>
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau collaborateur</h3>
+      <h4 style="margin:6px 0 4px">Identité</h4><div class="grid-2"><div><label>Prénom</label><input id="pe-first" autocomplete="off"></div><div><label>Nom</label><input id="pe-last" autocomplete="off"></div></div>
+      <h4 style="margin:10px 0 4px">Contact</h4><div><label>Téléphone (WhatsApp)</label><input id="pe-phone" type="tel" placeholder="6xx xx xx xx"></div>
+      <h4 style="margin:10px 0 4px">Fonction</h4><div><select id="pe-role">${Object.entries(cfg.roles).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
+      <button class="btn gold" style="margin-top:12px" onclick="peSave()">Enregistrer et préparer l'invitation WhatsApp</button><div id="pe-msg"></div></div>
+    <div class="panel"><h3>Personnel enregistré</h3><div id="pe-list"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`;
+  peLoad();
+}
+async function peLoad() {
+  const cfg = PERS_CFG[state.user.role], box = document.getElementById('pe-list'); if (!cfg || !box) return;
+  try {
+    const list = await api('/staff?role=' + Object.keys(cfg.roles).join(',')); window._peList = list;
+    const act = list.filter((u) => u.status === 'ACTIVE').length, off = list.filter((u) => u.status !== 'ACTIVE').length, wait = list.filter((u) => u.neverConnected && u.status === 'ACTIVE').length;
+    const tile = (n, l, c) => `<div style="flex:1;min-width:100px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+    document.getElementById('pe-sum').innerHTML = tile(act, 'Comptes actifs', '#3F8F6B') + tile(wait, 'Invitations en attente', '#C9A24D') + tile(off, 'Suspendus / désactivés', '#B33A32');
+    box.innerHTML = list.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Fonction</th><th>Téléphone</th><th>Compte</th><th>Invitation</th><th></th></tr>${list.map((u) => { const st = PERS_ST[u.status] || [u.status, 'warn'];
+      return `<tr><td><b>${esc(u.firstName + ' ' + u.lastName)}</b></td><td>${esc(cfg.roles[u.role] || u.role)}</td><td>${esc(u.phone || '—')}</td><td><span class="badge ${st[1]}">${st[0]}</span></td>
+      <td>${u.neverConnected ? '<span class="badge warn">En attente</span>' : '<span class="badge ok">Acceptée</span>'}</td>
+      <td style="white-space:nowrap"><button class="btn small" onclick="peEdit('${esc(u.id)}')">Modifier</button> ${u.status === 'ACTIVE' ? `<button class="btn small" onclick="peStatus('${esc(u.id)}','DISABLED')">Désactiver</button> <button class="btn small gold" onclick="stInvite('${esc(u.id)}')">Invitation WhatsApp</button>` : `<button class="btn small primary" onclick="peStatus('${esc(u.id)}','ACTIVE')">Réactiver</button>`}</td></tr>`; }).join('')}</table></div>` : '<div class="empty">Aucun collaborateur enregistré pour le moment.</div>';
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function peSave() {
+  const m = document.getElementById('pe-msg'), g = (id) => document.getElementById(id).value.trim();
+  if (!g('pe-first') || !g('pe-last')) { m.innerHTML = '<div class="msg err">Prénom et nom obligatoires.</div>'; return; }
+  if (g('pe-phone').replace(/\D/g, '').length < 8) { m.innerHTML = '<div class="msg err">Numéro de téléphone obligatoire : l\'invitation est envoyée par WhatsApp.</div>'; return; }
+  try {
+    const r = await api('/staff', { method: 'POST', body: { firstName: g('pe-first'), lastName: g('pe-last'), phone: g('pe-phone'), role: g('pe-role'), siteId: state.siteId } });
+    m.innerHTML = '<div class="msg ok">Compte enregistré.</div>';
+    ['pe-first', 'pe-last', 'pe-phone'].forEach((id) => { document.getElementById(id).value = ''; });
+    await stInvite(r.id); peLoad();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function peStatus(id, status) {
+  const u = (window._peList || []).find((x) => x.id === id); if (!u) return;
+  if (status !== 'ACTIVE' && !confirm('Désactiver le compte de ' + u.firstName + ' ' + u.lastName + ' ? Il sera déconnecté aussitôt ; ses données sont conservées et vous pourrez le réactiver.')) return;
+  try { await api('/staff/' + encodeURIComponent(id) + '/status', { method: 'POST', body: { status } }); } catch (e) { alert(e.message); }
+  peLoad();
+}
+function peEdit(id) {
+  const u = (window._peList || []).find((x) => x.id === id); if (!u) return;
+  const old = document.getElementById('pe-overlay'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'pe-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,39,71,.55);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:12px';
+  ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+  ov.innerHTML = `<div class="panel" style="max-width:480px;width:100%;margin:20px auto"><h3>Modifier le collaborateur</h3>
+    <label>Prénom</label><input id="pe-ef" value="${esc(u.firstName)}"><label>Nom</label><input id="pe-el" value="${esc(u.lastName)}"><label>Téléphone (WhatsApp)</label><input id="pe-ep" type="tel" value="${esc(u.phone || '')}">
+    <div id="pe-emsg"></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn gold" onclick="peEditSave('${esc(id)}')">Enregistrer</button><button class="btn" onclick="document.getElementById('pe-overlay').remove()">Annuler</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function peEditSave(id) {
+  const m = document.getElementById('pe-emsg'), g = (x) => document.getElementById(x).value.trim();
+  try { await api('/staff/' + encodeURIComponent(id), { method: 'PATCH', body: { firstName: g('pe-ef'), lastName: g('pe-el'), phone: g('pe-ep') } }); document.getElementById('pe-overlay').remove(); peLoad(); }
+  catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function mgSave() {
   const m = document.getElementById('st-msg'), g = (id) => document.getElementById(id).value.trim();

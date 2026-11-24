@@ -1,3 +1,4 @@
+import { canManageRole, hierarchyMessage } from '../common/hierarchy';
 import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
@@ -14,6 +15,10 @@ export class UsersService {
     if (actorRole === 'SUPER_ADMIN') return;
     if (targetRole === 'SUPER_ADMIN' || requestedRole === 'SUPER_ADMIN') {
       throw new ForbiddenException('Seul l\'Administrateur Général peut gérer un compte Administrateur Général.');
+    }
+    // Hiérarchie : chacun ne gère que les rôles de son domaine (voir common/hierarchy.ts)
+    for (const r of [targetRole, requestedRole]) {
+      if (r && !canManageRole(actorRole, r)) throw new ForbiddenException(hierarchyMessage(actorRole));
     }
   }
 
