@@ -437,6 +437,7 @@
     <button class="btn gold" style="width:100%" onclick="login()">Se connecter</button>
     <div id="login-msg"></div>
     <button type="button" class="btn-ghost" style="width:100%; margin-top:8px; text-align:center;" onclick="startDemo()">Essayer la démonstration (données fictives)</button>
+    <button type="button" class="btn-ghost" style="width:100%; margin-top:8px; text-align:center;" onclick="startDemo('ADMIN_LOGISTIQUE')">Démonstration Responsable logistique</button>
     <button type="button" class="btn-ghost" style="width:100%; margin-top:12px; text-align:center;" onclick="openDriverSignup()">Je suis chauffeur : demander mon inscription</button>
     <button id="install-btn-login" class="btn-ghost" style="display:none; width:100%; margin-top:12px; text-align:center;" onclick="installApp()"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Installer sur cet appareil</button>
     <div class="powered">Powered by Syllogistique</div>
@@ -798,11 +799,12 @@ async function demoApi(path, options) {
   if (path.startsWith('/dashboards/executive')) return demoData();
   return [];
 }
-function startDemo() {
+function startDemo(role) {
+  const logi = role === 'ADMIN_LOGISTIQUE';
   state.demo = true; state.accessToken = 'demo'; state.refreshToken = '';
-  state.user = { id: 'demo', role: 'DIRECTEUR_GENERAL', firstName: 'Démonstration', lastName: 'Direction Générale', email: 'demo@syllogistique' };
+  state.user = { id: 'demo', role: logi ? 'ADMIN_LOGISTIQUE' : 'DIRECTEUR_GENERAL', firstName: 'Démonstration', lastName: logi ? 'Responsable logistique' : 'Direction Générale', email: 'demo@syllogistique' };
   state.siteId = '';
-  enterApp(); go('dashboard');
+  enterApp(); go(logi ? 'espace-logi' : 'dashboard');
   if (!document.getElementById('demo-banner')) {
     const b = document.createElement('div'); b.id = 'demo-banner';
     b.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#1F3A5F;color:#fff;font-size:13px;text-align:center;padding:8px 12px;display:flex;gap:12px;justify-content:center;align-items:center;flex-wrap:wrap';
