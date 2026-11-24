@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
 import { issueInvitation, inviteLink } from '../auth/invitations';
+import { canManageRole, hierarchyMessage, MANAGEABLE_BY } from '../common/hierarchy';
 import { CreateStaffDto, StaffReportDto, STAFF_ROLES, MANAGER_ROLES, ALL_STAFF_ROLES } from './staff.dto';
 
 const ESPACE: Record<string, string> = { AGENT_HSE: 'hse', GESTIONNAIRE_HSE: 'hse', MAGASINIER: 'stock', MECANICIEN: 'atelier', POINTEUR: 'pointage', DIRECTEUR_GENERAL: 'dg', ADMIN_LOGISTIQUE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', COMPTABLE: 'comptabilite', RESPONSABLE_COMMERCIAL: 'commercial', CAISSIER: 'caisse' };
@@ -20,8 +21,7 @@ export class StaffService {
   private last9(phone: string) { return phone.replace(/\D/g, '').slice(-9); }
 
   async create(dto: CreateStaffDto, actor: Actor, organizationId: string, actorRole?: string) {
-    if (isManager(dto.role) && actorRole !== 'SUPER_ADMIN') throw new ForbiddenException("Seul l'administrateur principal peut enregistrer le Directeur Général ou le Responsable logistique.");
-    if (actorRole === 'GESTIONNAIRE_HSE' && dto.role !== 'AGENT_HSE') throw new ForbiddenException('Le responsable HSE enregistre uniquement des agents HSE.');
+    if (!canManageRole(actorRole, dto.role)) throw new ForbiddenException(hierarchyMessage(actorRole));
     const digits = this.last9(dto.phone);
     if (digits.length < 8) throw new BadRequestException('Numéro de téléphone invalide.');
     const all = await this.prisma.user.findMany({ where: { phone: { not: null }, deletedAt: null }, select: { phone: true } });
@@ -38,8 +38,8 @@ export class StaffService {
   }
 
   async list(roles: string[] | undefined, siteId?: string, actorRole?: string) {
-    const allowed: readonly string[] = actorRole === 'SUPER_ADMIN' ? ALL_STAFF_ROLES : STAFF_ROLES;
-    const names = (roles && roles.length ? roles : [...STAFF_ROLES]).filter((r) => allowed.includes(r));
+    const allowed: readonly string[] = actorRole === 'SUPER_ADMIN' ? ALL_STAFF_ROLES : MANAGEABLE_BY[actorRole ?? ''] ?? STAFF_ROLES;
+    const names = (roles && roles.length ? roles : allowed.filter((r) => (ALL_STAFF_ROLES as readonly string[]).includes(r))).filter((r) => allowed.includes(r));
     const users = await this.prisma.user.findMany({
       where: { deletedAt: null, role: { name: { in: names as any } }, ...(siteId ? { siteId } : {}) },
       include: { role: true }, orderBy: { lastName: 'asc' },
@@ -53,13 +53,47 @@ export class StaffService {
     }));
   }
 
+  private async managed(id: string, actorRole?: string) {
+    const u = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
+    if (!u || u.deletedAt || !(ALL_STAFF_ROLES as readonly string[]).includes(u.role.name)) throw new NotFoundException('Personnel introuvable.');
+    if (!canManageRole(actorRole, u.role.name)) throw new ForbiddenException(hierarchyMessage(actorRole));
+    return u;
+  }
+
+  // Modification des informations d'un collaborateur (nom, prénom, téléphone)
+  async update(id: string, dto: { firstName?: string; lastName?: string; phone?: string }, actor: Actor, actorRole?: string) {
+    const u = await this.managed(id, actorRole);
+    const data: any = {};
+    if (dto.firstName !== undefined) { if (!dto.firstName.trim()) throw new BadRequestException('Prénom obligatoire.'); data.firstName = dto.firstName.trim(); }
+    if (dto.lastName !== undefined) { if (!dto.lastName.trim()) throw new BadRequestException('Nom obligatoire.'); data.lastName = dto.lastName.trim(); }
+    if (dto.phone !== undefined) {
+      const digits = this.last9(dto.phone);
+      if (digits.length < 8) throw new BadRequestException('Numéro de téléphone invalide.');
+      const all = await this.prisma.user.findMany({ where: { phone: { not: null }, deletedAt: null, id: { not: id } }, select: { phone: true } });
+      if (all.some((x) => this.last9(x.phone ?? '') === digits)) throw new BadRequestException('Un compte existe déjà avec ce numéro de téléphone.');
+      data.phone = dto.phone.trim();
+    }
+    await this.prisma.user.update({ where: { id }, data });
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: id, oldValue: { firstName: u.firstName, lastName: u.lastName, phone: u.phone }, newValue: data });
+    return { id };
+  }
+
+  // Activation / désactivation d'un compte : un compte désactivé est déconnecté aussitôt, ses données restent intactes
+  async setStatus(id: string, status: string, actor: Actor, actorRole?: string) {
+    if (!['ACTIVE', 'SUSPENDED', 'DISABLED'].includes(status)) throw new BadRequestException('Statut invalide.');
+    const u = await this.managed(id, actorRole);
+    if (u.id === actor.userId) throw new BadRequestException('Vous ne pouvez pas modifier votre propre compte ici.');
+    await this.prisma.user.update({ where: { id }, data: { status: status as any, ...(status !== 'ACTIVE' ? { refreshTokenHash: null } : {}) } });
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: id, oldValue: { status: u.status }, newValue: { status } });
+    return { id, status };
+  }
+
   // Message WhatsApp : lien, identifiant (téléphone), mot de passe provisoire (tant qu'il n'a pas créé le sien)
   async invite(userId: string, appUrl: string, actor: Actor, actorRole?: string) {
     if (!/^https:\/\//.test(appUrl)) throw new BadRequestException("Lien de l'application invalide.");
     const u = await this.prisma.user.findUnique({ where: { id: userId }, include: { role: true } });
     if (!u || !(ALL_STAFF_ROLES as readonly string[]).includes(u.role.name)) throw new NotFoundException('Personnel introuvable.');
-    if (isManager(u.role.name) && actorRole !== 'SUPER_ADMIN') throw new ForbiddenException("Seul l'administrateur principal peut envoyer ce lien.");
-    if (actorRole === 'GESTIONNAIRE_HSE' && u.role.name !== 'AGENT_HSE') throw new ForbiddenException('Le responsable HSE envoie le lien uniquement aux agents HSE.');
+    if (!canManageRole(actorRole, u.role.name)) throw new ForbiddenException(hierarchyMessage(actorRole));
     const digits = (u.phone ?? '').replace(/\D/g, '');
     if (digits.length < 8) throw new BadRequestException('Renseignez le numéro de téléphone.');
     // Aucun mot de passe n'est transmis : lien individuel, à usage unique, valable 72 h, où le collaborateur crée le sien.
