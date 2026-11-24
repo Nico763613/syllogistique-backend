@@ -662,6 +662,41 @@ function togglePassword() {
   i.type = show ? 'text' : 'password';
   document.getElementById('pw-toggle').innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-' + (show ? 'eye-off' : 'eye') + '"/></svg>';
 }
+/* ---------- Invitation WhatsApp : le collaborateur crée lui-même son mot de passe (lien individuel, 72 h, usage unique) ---------- */
+function inviteClose() { const o = document.getElementById('inv-ov'); if (o) o.remove(); try { const u = new URL(location.href); u.searchParams.delete('invite'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) {} }
+async function inviteBoot() {
+  let t = ''; try { t = new URLSearchParams(location.search).get('invite') || ''; } catch (e) {}
+  if (!t) return;
+  const ov = document.createElement('div'); ov.id = 'inv-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:3000;background:linear-gradient(160deg,#0F2747,#1B3C6B);overflow:auto;padding:16px;display:flex;align-items:flex-start;justify-content:center';
+  ov.innerHTML = '<div class="panel" style="max-width:420px;width:100%;margin:24px auto"><div id="inv-body"><div class="empty">Vérification de votre invitation…</div></div></div>';
+  document.body.appendChild(ov);
+  const b = document.getElementById('inv-body');
+  try {
+    state.apiUrl = (state.apiUrl || localStorage.getItem('syllo_api_url') || DEFAULT_API_URL);
+    const info = await api('/auth/invite/info', { method: 'POST', body: { token: t } });
+    b.innerHTML = `<h3 style="margin:0 0 6px;color:var(--navy)">Bienvenue ${esc(info.firstName)}</h3><div style="font-size:13px;color:var(--muted);margin-bottom:10px">Créez votre mot de passe personnel. Ce lien est à usage unique.</div>
+      <label>Nouveau mot de passe (8 caractères minimum)</label><input id="inv-pw1" type="password" autocomplete="new-password" />
+      <label>Confirmez le mot de passe</label><input id="inv-pw2" type="password" autocomplete="new-password" />
+      <button class="btn gold" style="width:100%;margin-top:10px" onclick="inviteSubmit()">Créer mon mot de passe</button><div id="inv-msg"></div>`;
+  } catch (e) {
+    b.innerHTML = `<div class="msg err">${esc((e && e.message) || "Lien d'invitation invalide ou expiré.")}</div><button class="btn" style="width:100%;margin-top:10px" onclick="inviteClose()">Aller à la connexion</button>`;
+  }
+}
+async function inviteSubmit() {
+  const t = new URLSearchParams(location.search).get('invite') || '', m = document.getElementById('inv-msg');
+  const p1 = document.getElementById('inv-pw1').value, p2 = document.getElementById('inv-pw2').value;
+  if (p1.length < 8) { m.innerHTML = '<div class="msg err">Le mot de passe doit contenir au moins 8 caractères.</div>'; return; }
+  if (p1 !== p2) { m.innerHTML = '<div class="msg err">Les deux mots de passe ne sont pas identiques.</div>'; return; }
+  try {
+    const r = await api('/auth/invite/accept', { method: 'POST', body: { token: t, password: p1 } });
+    inviteClose();
+    const em = document.getElementById('login-email'); if (em && r.login) em.value = r.login;
+    const lm = document.getElementById('login-msg'); if (lm) lm.innerHTML = '<div class="msg ok">Mot de passe créé. Connectez-vous avec votre numéro de téléphone et ce mot de passe.</div>';
+    const pw = document.getElementById('login-password'); if (pw) pw.focus();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc((e && e.message) || 'Erreur')}</div>`; }
+}
+setTimeout(inviteBoot, 60);
 async function login() {
   const msg = document.getElementById('login-msg');
   msg.innerHTML = '';

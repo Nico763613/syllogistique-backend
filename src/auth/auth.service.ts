@@ -6,6 +6,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { LoginDto, ChangePasswordDto } from './dto/auth.dto';
+import { findInvitation, consumeInvitation } from './invitations';
 
 @Injectable()
 export class AuthService {
@@ -83,6 +84,27 @@ export class AuthService {
   private static fails = new Map<string, { n: number; until: number }>();
   private static readonly MAX_FAILS = 10;
   private static readonly LOCK_MS = 10 * 60 * 1000;
+
+  // Invitation WhatsApp : le collaborateur crée lui-même son mot de passe (aucun mot de passe n'est jamais transmis).
+  async inviteInfo(token: string) {
+    const inv = await findInvitation(this.prisma, token);
+    if (!inv) throw new BadRequestException("Lien d'invitation invalide ou expiré. Demandez-en un nouveau à votre responsable.");
+    const u = await this.prisma.user.findUnique({ where: { id: inv.userId }, include: { role: true } });
+    if (!u || u.status !== 'ACTIVE' || u.deletedAt) throw new BadRequestException("Compte indisponible. Contactez votre responsable.");
+    return { firstName: u.firstName, role: u.role.name };
+  }
+
+  async acceptInvite(token: string, password: string) {
+    if (!password || password.length < 8) throw new BadRequestException('Le mot de passe doit contenir au moins 8 caractères.');
+    const inv = await findInvitation(this.prisma, token);
+    if (!inv) throw new BadRequestException("Lien d'invitation invalide ou expiré. Demandez-en un nouveau à votre responsable.");
+    const u = await this.prisma.user.findUnique({ where: { id: inv.userId } });
+    if (!u || u.status !== 'ACTIVE' || u.deletedAt) throw new BadRequestException('Compte indisponible. Contactez votre responsable.');
+    await this.prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(password, 10), mustChangePassword: false, refreshTokenHash: null } });
+    await consumeInvitation(this.prisma, inv.id);
+    await this.audit.log({ userId: u.id, action: 'UPDATE', entity: 'User', entityId: u.id, newValue: { invitation: 'acceptée' } });
+    return { ok: true, login: u.phone || u.email };
+  }
 
   async login(dto: LoginDto, meta?: { deviceId?: string; ipAddress?: string }) {
     const lockKey = dto.email.trim().toLowerCase().replace(/^\+?224/, '').slice(0, 120);
