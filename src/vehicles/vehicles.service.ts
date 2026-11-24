@@ -3,6 +3,7 @@ import { VehicleType } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateVehicleDto, UpdateVehicleDto } from './dto/vehicle.dto';
+import { assignmentHistory, recordAssignment, releaseOtherVehicles } from './assignments';
 
 @Injectable()
 export class VehiclesService {
@@ -26,6 +27,10 @@ export class VehiclesService {
     if (existing) throw new ConflictException('Cette plaque est déjà enregistrée sur ce site.');
 
     const vehicle = await this.prisma.vehicle.create({ data: dto });
+    if (dto.assignedDriverId) {
+      await releaseOtherVehicles(this.prisma, dto.assignedDriverId, vehicle.id, actorId);
+      await recordAssignment(this.prisma, { vehicleId: vehicle.id, newDriverId: dto.assignedDriverId, by: actorId, source: 'MANUEL' });
+    }
     await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'Vehicle', entityId: vehicle.id, newValue: dto });
     return vehicle;
   }
@@ -117,8 +122,10 @@ export class VehiclesService {
       this.prisma.maintenance.aggregate({ where: { vehicleId: id }, _sum: { cost: true }, _count: true }),
     ]);
     const n = (x: any) => Number(x ?? 0);
+    const assignments = await assignmentHistory(this.prisma, id).catch(() => []);
     return {
       vehicle: v,
+      assignments,
       trips,
       fuel: fuel.map((f) => ({ ...f, quantityLiters: n(f.quantityLiters), totalCost: n(f.totalCost) })),
       maintenance: maint.map((m) => ({ ...m, cost: n(m.cost) })),
@@ -156,6 +163,10 @@ export class VehiclesService {
     await this.checkDriverKind(dto.assignedDriverId, before.vehicleType);
 
     const vehicle = await this.prisma.vehicle.update({ where: { id }, data: dto });
+    if (dto.assignedDriverId !== undefined && (dto.assignedDriverId || null) !== before.assignedDriverId) {
+      if (dto.assignedDriverId) await releaseOtherVehicles(this.prisma, dto.assignedDriverId, id, actorId);
+      await recordAssignment(this.prisma, { vehicleId: id, newDriverId: dto.assignedDriverId || null, by: actorId, source: 'MANUEL' });
+    }
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Vehicle', entityId: id, oldValue: before, newValue: dto });
     return vehicle;
   }
@@ -176,5 +187,9 @@ export class VehiclesService {
       available,
       availabilityRate: total > 0 ? Math.round((available / total) * 100) : 0,
     };
+  }
+
+  assignments(id: string) {
+    return assignmentHistory(this.prisma, id);
   }
 }

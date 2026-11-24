@@ -43,6 +43,11 @@ export class VehiclesController {
   }
 
   // Dossier d'un véhicule (lecture seule) : missions, carburant, entretien, incidents, totaux
+  @Get(':id/assignments')
+  assignments(@Param('id') id: string) {
+    return this.vehiclesService.assignments(id);
+  }
+
   @Get(':id/dossier')
   dossier(@Param('id') id: string, @CurrentUser() actor: any) {
     return this.vehiclesService.dossier(id, actor);
