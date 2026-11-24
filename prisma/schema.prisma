@@ -309,6 +309,7 @@ model Vehicle {
   documents          Document[]
   stockMovements     StockMovement[]
   downtimes          VehicleDowntime[]
+  maintenancePlans   MaintenancePlan[]
 
 
   currentHours       Decimal?    @map("current_hours") @db.Decimal(10, 1) // compteur horaire (engins / camions de site)
@@ -449,6 +450,7 @@ model MaintenanceType {
   label String
 
   maintenances Maintenance[]
+  plans        MaintenancePlan[]
 
   @@map("maintenance_types")
 }
@@ -481,6 +483,31 @@ model Maintenance {
   nextHours         Decimal? @map("next_hours") @db.Decimal(10, 1)
   @@index([vehicleId])
   @@map("maintenance")
+}
+
+// Plan d'entretien préventif par véhicule : seuils (km / jours), dernier entretien, entretien planifié en cours
+model MaintenancePlan {
+  id                   String   @id @default(uuid())
+  vehicleId            String   @map("vehicle_id")
+  maintenanceTypeId    String   @map("maintenance_type_id")
+  intervalKm           Int?     @map("interval_km") // tous les X km
+  intervalDays         Int?     @map("interval_days") // tous les Y jours
+  alertKm              Int      @default(500) @map("alert_km") // alerte X km avant l'échéance
+  alertDays            Int      @default(15) @map("alert_days") // alerte Y jours avant l'échéance
+  lastDoneKm           Int?     @map("last_done_km")
+  lastDoneAt           DateTime? @map("last_done_at")
+  plannedMaintenanceId String?  @map("planned_maintenance_id") // entretien planifié en attente de réalisation
+  active               Boolean  @default(true)
+  createdById          String?  @map("created_by")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
+
+  vehicle              Vehicle         @relation(fields: [vehicleId], references: [id])
+  maintenanceType      MaintenanceType @relation(fields: [maintenanceTypeId], references: [id])
+
+  @@unique([vehicleId, maintenanceTypeId])
+  @@index([vehicleId])
+  @@map("maintenance_plans")
 }
 
 enum MaintenanceStatus {

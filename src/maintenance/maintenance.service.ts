@@ -2,14 +2,18 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateMaintenanceDto } from './dto/maintenance.dto';
+import { MaintenancePlansService } from './maintenance-plans.service';
 
 @Injectable()
 export class MaintenanceService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private plans: MaintenancePlansService) {}
 
   async create(dto: CreateMaintenanceDto, actorId: string) {
     const type = await this.prisma.maintenanceType.findUnique({ where: { code: dto.maintenanceTypeCode } });
     if (!type) throw new BadRequestException('Type de maintenance inconnu.');
+
+    // Un plan d'entretien préventif existe pour ce véhicule et ce type : il repart de zéro et fournit la prochaine échéance
+    const planNext = await this.plans.onDirectMaintenance(dto.vehicleId, type.id, dto.mileage, new Date(dto.maintenanceDate));
 
     const record = await this.prisma.maintenance.create({
       data: {
@@ -24,8 +28,8 @@ export class MaintenanceService {
         partsCost: Math.round(dto.partsCost ?? 0),
         laborCost: Math.round(dto.laborCost ?? 0),
         nextHours: dto.nextHours,
-        nextDate: dto.nextDate ? new Date(dto.nextDate) : undefined,
-        nextMileage: dto.nextMileage,
+        nextDate: dto.nextDate ? new Date(dto.nextDate) : planNext?.nextDate,
+        nextMileage: dto.nextMileage ?? planNext?.nextMileage,
         invoiceNumber: dto.invoiceNumber,
         invoiceUrl: dto.invoiceUrl,
         status: 'COMPLETED',

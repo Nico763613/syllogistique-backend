@@ -85,6 +85,25 @@ const AUTO_SCHEMA: string[] = [
   'ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "parts_requested_at" TIMESTAMP(3)',
   `ALTER TABLE "vehicle_downtimes" ADD COLUMN IF NOT EXISTS "stage_log" JSONB NOT NULL DEFAULT '[]'`,
   `UPDATE "vehicle_downtimes" SET "stage" = 'REMISE_EN_SERVICE' WHERE "ended_at" IS NOT NULL AND "stage" = 'DECLAREE'`,
+  // Plans d'entretien préventif par véhicule
+  `CREATE TABLE IF NOT EXISTS "maintenance_plans" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "vehicle_id" TEXT NOT NULL REFERENCES "vehicles"("id"),
+    "maintenance_type_id" TEXT NOT NULL REFERENCES "maintenance_types"("id"),
+    "interval_km" INTEGER,
+    "interval_days" INTEGER,
+    "alert_km" INTEGER NOT NULL DEFAULT 500,
+    "alert_days" INTEGER NOT NULL DEFAULT 15,
+    "last_done_km" INTEGER,
+    "last_done_at" TIMESTAMP(3),
+    "planned_maintenance_id" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "created_by" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`,
+  'CREATE UNIQUE INDEX IF NOT EXISTS "maintenance_plans_vehicle_id_maintenance_type_id_key" ON "maintenance_plans"("vehicle_id", "maintenance_type_id")',
+  'CREATE INDEX IF NOT EXISTS "maintenance_plans_vehicle_id_idx" ON "maintenance_plans"("vehicle_id")',
 ];
 
 // Tableaux de bord par département : instructions lues dans prisma/dashboards-upgrade.sql (blocs séparés par « --# »).
