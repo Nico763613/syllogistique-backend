@@ -61,6 +61,9 @@ async function bootstrap() {
   // Application web SYLLOGISTIQUE (PWA) servie sur /app/ — même adresse que l'API, donc sans CORS.
   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/app/', index: 'index.html', dotfiles: 'deny' });
 
+  // L'adresse racine mène à l'application (évite le « Cannot GET / » quand on ouvre le lien sans /app/).
+  app.getHttpAdapter().get('/', (_req: any, res: any) => res.redirect('/app/'));
+
   // Site de vente SYLLOGISTIQUE (page d'accueil, paiement Orange Money, espace abonné) servi sur /site/.
   app.useStaticAssets(join(__dirname, '..', 'public', 'site'), { prefix: '/site/', index: 'index.html', dotfiles: 'deny' });
 
