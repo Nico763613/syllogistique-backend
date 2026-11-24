@@ -797,6 +797,12 @@ async function demoApi(path, options) {
   if (/^\/vehicles\/[^/?]+\/dossier/.test(path)) return demoDossier(decodeURIComponent(path.split('/')[2]));
   if (path.startsWith('/dashboards/direction')) return demoDirection(path);
   if (path.startsWith('/dashboards/executive')) return demoData();
+  if (path.startsWith('/staff?role=')) return [
+    { id: 'd1', firstName: 'Mamadou', lastName: 'Diallo (fictif)', phone: '620 00 00 01', role: 'CHAUFFEUR', status: 'ACTIVE', neverConnected: false },
+    { id: 'd2', firstName: 'Aïssatou', lastName: 'Barry (fictif)', phone: '620 00 00 02', role: 'MAGASINIER', status: 'ACTIVE', neverConnected: false },
+    { id: 'd3', firstName: 'Ibrahima', lastName: 'Camara (fictif)', phone: '620 00 00 03', role: 'CHAUFFEUR', status: 'ACTIVE', neverConnected: true },
+    { id: 'd4', firstName: 'Fatoumata', lastName: 'Sow (fictif)', phone: '620 00 00 04', role: 'GESTIONNAIRE_FLOTTE', status: 'DISABLED', neverConnected: false },
+  ];
   return [];
 }
 function startDemo(role) {
