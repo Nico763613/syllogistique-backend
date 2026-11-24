@@ -15,8 +15,8 @@ export class NotificationsController {
   constructor(private notificationsService: NotificationsService, private roleAlerts: RoleAlertsService) {}
 
   @Get()
-  findAll(@CurrentUser() actor: any, @Query('unreadOnly') unreadOnly?: string) {
-    return this.notificationsService.findAll(unreadOnly === 'true', actor);
+  findAll(@CurrentUser() actor: any, @Query('unreadOnly') unreadOnly?: string, @Query('all') all?: string, @Query('limit') limit?: string) {
+    return this.notificationsService.findAll(unreadOnly === 'true', actor, { all: all === 'true', limit: limit ? Number(limit) : undefined });
   }
 
   // Déclenche manuellement les alertes par département (sinon : chaque jour à 06:30)
@@ -29,6 +29,16 @@ export class NotificationsController {
   @Patch(':id/read')
   markRead(@Param('id') id: string, @CurrentUser() actor: any) {
     return this.notificationsService.markRead(id, actor);
+  }
+
+  @Patch(':id/unread')
+  markUnread(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.notificationsService.markUnread(id, actor);
+  }
+
+  @Patch(':id/handle')
+  handle(@Param('id') id: string, @CurrentUser() actor: any, @Query('undo') undo?: string) {
+    return this.notificationsService.markHandled(id, undo !== 'true', actor);
   }
 
   @Post('run-checks')
