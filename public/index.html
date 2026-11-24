@@ -3734,7 +3734,7 @@ function dgMenuBuild() {
   const k = role === 'SUPER_ADMIN' ? 'sa' : 'dg';
   box.innerHTML = DG_MENU.filter((m) => m[k]).map((m) => {
     const x = m[k];
-    return `<div class="nav-item dg-nav" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL" data-view="${x.v || ''}" data-views="${x.vs.join(',')}" onclick="${x.act || `go('${x.v}')`}"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-${m.ic}"/></svg></span><span class="dg-nt"><b>${m.t}</b><small>${m.s}</small></span>${m.badge ? '<i class="dg-nb" id="dg-nb"></i>' : ''}</div>`;
+    return `<div class="nav-item dg-nav" data-roles="SUPER_ADMIN,DIRECTEUR_GENERAL" data-view="${x.v || ''}" data-views="${x.vs.join(',')}" onclick="dgMenuClose();${x.act || `go('${x.v}')`}"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-${m.ic}"/></svg></span><span class="dg-nt"><b>${m.t}</b><small>${m.s}</small></span>${m.badge ? '<i class="dg-nb" id="dg-nb"></i>' : ''}</div>`;
   }).join('');
   // Le Super Admin garde tous ses modules : les anciens groupes sont repliés (un clic les rouvre)
   if (role === 'SUPER_ADMIN' && typeof navFoldSet === 'function') {
@@ -3748,11 +3748,66 @@ function dgMenuActive(view) {
 }
 { const _a = applyRoleNav; applyRoleNav = function () { const r = _a.apply(this, arguments); try { dgMenuBuild(); } catch (e) {} return r; }; }
 { const _g2 = go; go = function (v) { const r = _g2.apply(this, arguments); try { dgMenuActive(v); } catch (e) {} return r; }; }
-function dgAlertsGo() {
-  const after = () => setTimeout(() => { const a = document.getElementById('dg-alertes'); if (a) a.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 350);
-  if (state.view === 'dashboard') return after();
-  go('dashboard'); setTimeout(after, 600);
+function dgMenuClose() { try { document.getElementById('sidebar').classList.remove('open'); const sc = document.getElementById('side-scrim'); if (sc) sc.classList.remove('on'); } catch (e) {} }
+function dgAlertsGo() { dgMenuClose(); alertsCenterOpen(); }
+
+/* ---------- Centre d'alertes : une seule fenêtre, rapide, qui ne bloque jamais le menu ---------- */
+const AL = { list: [], filter: 'ALL', busy: false, err: '' };
+const AL_VIEW = { Vehicle: 'fleet-trucks', VehicleDowntime: 'maintenance', Trip: 'driver-missions', TripNotStarted: 'driver-missions', TripDelay: 'driver-missions', NeedRequest: 'needs', PurchaseOrder: 'purchases', FuelTransaction: 'fuel', InventoryCount: 'stock', StockMovement: 'stock', InventoryItem: 'stock', Driver: 'drivers' };
+const AL_SEV = { CRITICAL: ['Critique', '#D64545', 0], WARNING: ['À surveiller', '#D08A1E', 1], INFO: ['Information', '#2F6FB5', 2] };
+function alAgo(d) { const m = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000)); if (m < 1) return "à l'instant"; if (m < 60) return 'il y a ' + m + ' min'; const h = Math.round(m / 60); if (h < 24) return 'il y a ' + h + ' h'; const j = Math.round(h / 24); return j === 1 ? 'hier' : 'il y a ' + j + ' j'; }
+function alertsCenterClose() { const o = document.getElementById('al-overlay'); if (o) o.remove(); document.removeEventListener('keydown', alEsc); }
+function alEsc(e) { if (e.key === 'Escape') alertsCenterClose(); }
+function alertsCenterOpen() {
+  alertsCenterClose();
+  const ov = document.createElement('div'); ov.id = 'al-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(15,39,71,.55);z-index:1000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:12px;-webkit-overflow-scrolling:touch';
+  ov.addEventListener('click', (e) => { if (e.target === ov) alertsCenterClose(); });
+  ov.innerHTML = '<div class="panel" style="max-width:760px;width:100%;margin:10px auto"><div id="al-body"><div class="empty">Chargement des alertes…</div></div></div>';
+  document.body.appendChild(ov);
+  document.addEventListener('keydown', alEsc);
+  alertsCenterLoad();
 }
+async function alertsCenterLoad() {
+  if (AL.busy) return; AL.busy = true; AL.err = '';
+  try { AL.list = await api('/notifications?unreadOnly=true'); } catch (e) { AL.err = (e && e.message) || 'Connexion impossible'; }
+  AL.busy = false; alertsCenterRender();
+  if (!AL.err) { BELL.list = AL.list.slice(); try { bellRender(); } catch (e) {} }
+}
+function alertsCenterRender() {
+  const b = document.getElementById('al-body'); if (!b) return;
+  const head = (n) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><h3 style="margin:0"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes & Notifications${n ? ' <span style="background:#D64545;color:#fff;border-radius:10px;padding:1px 9px;font-size:12px">' + n + '</span>' : ''}</h3><button class="btn" onclick="alertsCenterClose()">Fermer</button></div>`;
+  if (AL.err) { b.innerHTML = head(0) + `<div class="msg err">Impossible de charger les alertes (${esc(AL.err)}). Le service se réveille peut-être : patientez quelques secondes.</div><button class="btn primary" onclick="alertsCenterLoad()">Réessayer</button>`; return; }
+  const cnt = (k) => AL.list.filter((n) => n.severity === k).length;
+  const chips = [['ALL', 'Toutes', AL.list.length], ['CRITICAL', 'Critiques', cnt('CRITICAL')], ['WARNING', 'À surveiller', cnt('WARNING')], ['INFO', 'Infos', cnt('INFO')]]
+    .map((c) => `<button class="btn small${AL.filter === c[0] ? ' primary' : ''}" onclick="AL.filter='${c[0]}';alertsCenterRender()">${c[1]} (${c[2]})</button>`).join(' ');
+  const rows = AL.list.filter((n) => AL.filter === 'ALL' || n.severity === AL.filter)
+    .sort((a, c) => (AL_SEV[a.severity] || AL_SEV.INFO)[2] - (AL_SEV[c.severity] || AL_SEV.INFO)[2] || new Date(c.createdAt) - new Date(a.createdAt));
+  const item = (n) => { const sv = AL_SEV[n.severity] || AL_SEV.INFO; const go_ = AL_VIEW[n.entity];
+    return `<div id="al-${esc(n.id)}" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)"><div style="width:10px;height:10px;border-radius:50%;background:${sv[1]};margin-top:5px;flex:none"></div><div style="flex:1;min-width:0"><b style="color:var(--navy)">${esc(n.title)}</b><div style="font-size:13px">${esc(n.message)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${sv[0]} · ${alAgo(n.createdAt)}</div><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${go_ ? `<button class="btn small primary" onclick="alertsOpenView('${go_}')">Voir / traiter →</button>` : ''}<button class="btn small" onclick="alertsRead('${esc(n.id)}')">Marquer comme lu</button></div></div></div>`; };
+  b.innerHTML = head(AL.list.length) + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>` + (AL.list.length > 1 ? '<div style="text-align:right"><button class="btn small" onclick="alertsReadAll()">Tout marquer comme lu</button></div>' : '')
+    + (rows.length ? rows.map(item).join('') : '<div class="empty" style="padding:24px 0">Aucune alerte dans cette catégorie. Tout est sous contrôle.</div>');
+}
+function alertsOpenView(v) { alertsCenterClose(); try { go(v); } catch (e) {} }
+async function alertsRead(id) {
+  AL.list = AL.list.filter((n) => n.id !== id); BELL.list = BELL.list.filter((n) => n.id !== id); alertsCenterRender(); try { bellRender(); } catch (e) {}
+  try { await api('/notifications/' + id + '/read', { method: 'PATCH' }); } catch (e) { alertsCenterLoad(); }
+}
+async function alertsReadAll() {
+  const ids = AL.list.filter((n) => AL.filter === 'ALL' || n.severity === AL.filter).map((n) => n.id);
+  AL.list = AL.list.filter((n) => !ids.includes(n.id)); BELL.list = BELL.list.filter((n) => !ids.includes(n.id)); alertsCenterRender(); try { bellRender(); } catch (e) {}
+  await Promise.all(ids.map((id) => api('/notifications/' + id + '/read', { method: 'PATCH' }).catch(() => null)));
+  bellTick();
+}
+// Le badge du menu suit la cloche en continu (plus seulement à l'ouverture du tableau de bord)
+{ const _br = bellRender; bellRender = function () { const r = _br.apply(this, arguments); try { const nb = document.getElementById('dg-nb'), n = BELL.list.length; if (nb) { nb.textContent = n > 99 ? '99+' : n; nb.style.display = n ? 'inline-block' : 'none'; } } catch (e) {} return r; }; }
+// Menu mobile : un appui sur n'importe quel élément le referme ; un appui à côté aussi ; touche Échap
+document.addEventListener('click', (e) => {
+  const sb = document.getElementById('sidebar'); if (!sb || !sb.classList.contains('open')) return;
+  if (e.target.closest && e.target.closest('#sidebar .nav-item:not(.fold)') ) { setTimeout(dgMenuClose, 0); return; }
+  if (!sb.contains(e.target) && !(e.target.closest && e.target.closest('.menu-toggle'))) dgMenuClose();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dgMenuClose(); });
 
 function dgStyle() {
   if (document.getElementById('dg-style')) return;
@@ -3864,7 +3919,7 @@ async function renderDirection() {
   const al = d.alerts;
   const cAl = `<div class="dg-card" id="dg-alertes"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes importantes</span>${al.unread ? `<span style="background:#D64545;border-radius:10px;padding:1px 9px;font-weight:700;opacity:1">${al.unread}</span>` : ''}</h3><div class="dg-body">
     ${al.items.length ? al.items.map((a) => `<div class="dg-al"><div class="dg-dot" style="background:${sev[a.severity] || sev.INFO}"></div><div><b>${esc(a.title)}</b><span>${esc(a.message)}</span></div></div>`).join('') : '<div class="dg-empty">Aucune alerte non lue. Tout est sous contrôle.</div>'}
-    <a class="dg-more" onclick="bellToggle()">Voir toutes les alertes →</a></div></div>`;
+    <a class="dg-more" onclick="alertsCenterOpen()">Voir toutes les alertes →</a></div></div>`;
   const fu = d.fuel, mt = d.maintenance;
   const cFuel = `<div class="dg-card"><h3><span style="display:flex;gap:8px;align-items:center;font-size:14px;opacity:1;font-weight:600"><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg> Consommation de carburant</span><span>${pl}</span></h3><div class="dg-body">
     <div class="dg-big">${fmt(fu.liters)} L${dgVarCost(fu.variation)}</div><div class="dg-range">${fmt(fu.cost)} GNF · camions ${fmt(fu.litersTrucks)} L · véhicules de service ${fmt(fu.litersService)} L</div>
