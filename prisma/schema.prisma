@@ -716,6 +716,9 @@ model Document {
   fileUrl      String   @map("file_url")
   expiryDate   DateTime? @map("expiry_date")
   createdAt    DateTime @default(now()) @map("created_at")
+  replacedAt   DateTime? @map("replaced_at")
+  replacedById String?   @map("replaced_by_id")
+  note         String?
 
   vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
 

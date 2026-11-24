@@ -86,20 +86,33 @@ export class NotificationsService {
       return !!existing;
     };
 
+    // Échéances par étape : 30 jours, 7 jours, expiré. Une seule alerte par étape et par échéance
+    // (la date figure dans le message : un renouvellement relance naturellement le cycle).
+    const stageOf = (expiry: Date) => {
+      const days = Math.ceil((+expiry - +now) / 86400000);
+      if (days < 0) return { key: 'EXPIRE', title: 'expiré', sev: 'CRITICAL' as const, days };
+      if (days <= 7) return { key: 'J7', title: 'expire dans 7 jours ou moins', sev: 'CRITICAL' as const, days };
+      if (days <= 30) return { key: 'J30', title: 'expire dans 30 jours ou moins', sev: 'WARNING' as const, days };
+      return null;
+    };
+    const stageAlert = async (entity: string, entityId: string, what: string, expiry: Date, who: string) => {
+      const st = stageOf(expiry);
+      if (!st) return;
+      const title = `${what} ${st.title}`;
+      const message = `${who} — ${what.toLowerCase()} ${st.days < 0 ? 'expiré' : 'expire'} le ${expiry.toLocaleDateString('fr-FR')}.`;
+      const roles = st.sev === 'CRITICAL' ? ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'SUPER_ADMIN'] : ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE'];
+      for (const roleName of roles) {
+        const dup = await this.prisma.notification.findFirst({ where: { entity, entityId, title, message, roleName } });
+        if (dup) continue;
+        created.push(await this.prisma.notification.create({ data: { title, message, severity: st.sev, entity, entityId, siteId, roleName } }));
+      }
+    };
+
     const drivers = await this.prisma.driver.findMany({
-      where: { siteId, licenseExpiryDate: { lte: in30Days, gte: now }, deletedAt: null },
+      where: { siteId, licenseExpiryDate: { not: null, lte: in30Days }, deletedAt: null },
     });
     for (const d of drivers) {
-      if (await alreadyNotified('Driver', d.id)) continue;
-      created.push(
-        await this.create(
-          'Permis bientôt expiré',
-          `Le permis de ${d.firstName} ${d.lastName} expire le ${d.licenseExpiryDate?.toLocaleDateString('fr-FR')}.`,
-          'WARNING',
-          'Driver',
-          d.id,
-        ),
-      );
+      await stageAlert('Driver', d.id, 'Permis de conduire', d.licenseExpiryDate!, `${d.firstName} ${d.lastName}`);
     }
 
     // Plaques IT (Immatriculation Temporaire) : validité courte, alerte à 15 jours puis si expirée
@@ -191,22 +204,12 @@ export class NotificationsService {
     const docAlertDays = await readSetting('DOCUMENT_ALERT_DAYS', 30);
     const docLimit = new Date(now.getTime() + docAlertDays * 86400000);
     const docs = await this.prisma.document.findMany({
-      where: { vehicle: { siteId, deletedAt: null }, expiryDate: { not: null, lte: docLimit } },
+      where: { replacedAt: null, vehicle: { siteId, deletedAt: null }, expiryDate: { not: null, lte: docLimit } },
       include: { vehicle: { select: { internalNumber: true } } },
     });
     for (const d of docs) {
-      if (await alreadyNotified('Document', d.id)) continue;
-      const expired = d.expiryDate! < now;
       const label = d.type.replace(/_/g, ' ').toLowerCase();
-      created.push(
-        await this.create(
-          expired ? 'Document expiré' : 'Document bientôt expiré',
-          `${d.vehicle.internalNumber} — ${label} ${expired ? 'expiré' : 'expire'} le ${d.expiryDate!.toLocaleDateString('fr-FR')}.`,
-          expired ? 'CRITICAL' : 'WARNING',
-          'Document',
-          d.id,
-        ),
-      );
+      await stageAlert('Document', d.id, label.charAt(0).toUpperCase() + label.slice(1), d.expiryDate!, d.vehicle.internalNumber);
     }
 
     // --- Carburant anormalement élevé / kilométrage incohérent (ravitaillements des dernières 24h) ---

@@ -5,6 +5,9 @@ import { join } from 'path';
 
 // Mises à niveau du schéma, idempotentes (sans effet si déjà appliquées). Gardées en phase avec prisma/schema.prisma.
 const AUTO_SCHEMA: string[] = [
+  'ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "replaced_at" TIMESTAMP(3)',
+  'ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "replaced_by_id" TEXT',
+  'ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "note" TEXT',
   'ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "department" TEXT',
   `CREATE TABLE IF NOT EXISTS "inventory_counts" (
     "id" TEXT NOT NULL PRIMARY KEY,

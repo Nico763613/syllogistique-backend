@@ -23,3 +23,9 @@ export class UpdateDocumentDto {
   @IsOptional() @IsString() fileUrl?: string;
   @IsOptional() @IsDateString() expiryDate?: string;
 }
+
+export class RenewDocumentDto {
+  @IsDateString() expiryDate: string; // nouvelle échéance
+  @IsOptional() @IsString() fileUrl?: string; // nouvelle référence / fichier (sinon on garde l'ancienne)
+  @IsOptional() @IsString() note?: string;
+}

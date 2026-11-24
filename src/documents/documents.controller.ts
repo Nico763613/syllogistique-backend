@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@ne
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { DocumentsService } from './documents.service';
-import { CreateDocumentDto, UpdateDocumentDto } from './dto/document.dto';
+import { CreateDocumentDto, RenewDocumentDto, UpdateDocumentDto } from './dto/document.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Departments } from '../common/decorators/departments.decorator';
@@ -28,13 +28,26 @@ export class DocumentsController {
     @Query('vehicleId') vehicleId?: string,
     @Query('type') type?: string,
     @Query('expiringInDays') expiringInDays?: string,
+    @Query('history') history?: string,
     @CurrentUser() actor?: any,
   ) {
     return this.documentsService.findAll(actor, {
       vehicleId,
       type,
+      history: history === 'true',
       expiringInDays: expiringInDays !== undefined && expiringInDays !== '' ? Number(expiringInDays) : undefined,
     });
+  }
+
+  @Get('compliance')
+  compliance(@CurrentUser() actor: any) {
+    return this.documentsService.compliance(actor);
+  }
+
+  @Post(':id/renew')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
+  renew(@Param('id') id: string, @Body() dto: RenewDocumentDto, @CurrentUser() actor: any) {
+    return this.documentsService.renew(id, dto, actor);
   }
 
   @Patch(':id')
