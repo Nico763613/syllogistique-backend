@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -30,7 +30,7 @@ export function planState(
 // le mécanicien déclare « Entretien effectué » → le plan repart de zéro (prochaine échéance recalculée).
 // Retards (échéance dépassée, entretien planifié non réalisé) alertés ; tout est audité.
 @Injectable()
-export class MaintenancePlansService {
+export class MaintenancePlansService implements OnApplicationBootstrap {
   private readonly logger = new Logger(MaintenancePlansService.name);
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
@@ -57,6 +57,11 @@ export class MaintenancePlansService {
   }
 
   // Toutes les 6 h : échéances proches / dépassées et entretiens planifiés non réalisés
+  // Rattrapage au réveil du service (hébergement qui s'endort) : les alertes sont sans doublon sur 24 h.
+  onApplicationBootstrap() {
+    setTimeout(() => this.runChecks().catch((e) => this.logger.error(`Rattrapage entretien en échec : ${(e as Error).message}`)), 120_000);
+  }
+
   @Cron('15 */6 * * *')
   async scheduledChecks() {
     try {
