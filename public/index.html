@@ -1875,6 +1875,97 @@ async function editFleetTarget(current) {
   if (v === null || !(Number(v) > 0)) return;
   try { await api('/settings/FLEET_TARGET', { method: 'PUT', body: { value: String(Math.round(Number(v))) } }); renderView(state.view); } catch (e) { alert(e.message); }
 }
+/* ---------- Entretien préventif : plans par véhicule → alerte → planification → entretien effectué ---------- */
+const MP_LEVEL = { OVERDUE: ['bad', 'En retard'], SOON: ['warn', 'Bientôt dû'], OK: ['ok', 'À jour'] };
+const MP_FLEET = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE'];
+async function mpLoad() {
+  const box = document.getElementById('mp-body'); if (!box) return;
+  try {
+    const r = await api('/maintenance-plans?siteId=' + encodeURIComponent(state.siteId || ''));
+    const role = (state.user && state.user.role) || '', fleet = MP_FLEET.includes(role);
+    const dd = (x) => new Date(x).toLocaleDateString('fr-FR');
+    const tile = (n, l, c) => `<div style="flex:1;min-width:100px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;text-align:center"><div style="font-size:18px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
+    const seuil = (i) => [i.intervalKm ? 'tous les ' + fmt(i.intervalKm) + ' km' : '', i.intervalDays ? 'tous les ' + i.intervalDays + ' j' : ''].filter(Boolean).join(' · ');
+    const reste = (i) => [i.kmLeft != null ? (i.kmLeft <= 0 ? 'dépassé de ' + fmt(-i.kmLeft) + ' km' : fmt(i.kmLeft) + ' km') : '', i.daysLeft != null ? (i.daysLeft < 0 ? 'dépassé de ' + (-i.daysLeft) + ' j' : i.daysLeft + ' j') : ''].filter(Boolean).join(' · ') || '—';
+    const btns = (i) => {
+      const out = [];
+      if (fleet && i.active && i.level !== 'OK' && !i.planned) out.push(`<button class="btn small gold" onclick="mpSchedule('${esc(i.id)}')">Planifier</button>`);
+      if (i.planned && (fleet || role === 'MECANICIEN')) out.push(`<button class="btn small gold" onclick="mpComplete('${esc(i.planned.id)}')">Entretien effectué</button>`);
+      if (fleet) out.push(`<button class="btn small" onclick="mpEdit('${esc(i.id)}')">Modifier</button>`);
+      return out.join(' ');
+    };
+    const head = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">${tile(r.summary.overdue, 'En retard', r.summary.overdue ? 'var(--bad,#b3261e)' : 'var(--navy)')}${tile(r.summary.soon, 'Bientôt dus', 'var(--navy)')}${tile(r.summary.toPlan, 'À planifier', 'var(--navy)')}${tile(r.summary.planned, 'Planifiés', 'var(--navy)')}</div>${fleet ? '<button class="btn small gold" style="margin:0 0 8px" onclick="mpNew()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau plan d\'entretien</button>' : ''}`;
+    box.innerHTML = head + (r.items.length ? `<div style="overflow:auto"><table><tr><th>Véhicule</th><th>Entretien</th><th>Seuil</th><th>Dernier</th><th>Reste</th><th>État</th><th></th></tr>${r.items.map((i) => {
+      const [c, l] = MP_LEVEL[i.level] || ['info', i.level];
+      return `<tr style="${i.active ? '' : 'opacity:.5'}"><td><b>${esc(i.vehicle)}</b><br><small>${fmt(i.currentMileage)} km</small></td><td>${esc(i.type)}</td><td>${seuil(i)}</td><td>${i.lastDoneAt ? dd(i.lastDoneAt) : '—'}${i.lastDoneKm != null ? '<br><small>' + fmt(i.lastDoneKm) + ' km</small>' : ''}</td><td>${reste(i)}</td><td><span class="badge ${c}">${i.active ? l : 'Désactivé'}</span>${i.planned ? '<br><small>Planifié le ' + dd(i.planned.maintenanceDate) + '</small>' : ''}${i.next ? `<div style="font-size:12px;margin-top:3px"><b>${esc(i.next.who)} :</b> ${esc(i.next.text)}</div>` : ''}</td><td style="white-space:nowrap">${btns(i)}</td></tr>`;
+    }).join('')}</table></div>` : '<div class="empty">Aucun plan d\'entretien. Créez-en un pour être prévenu avant chaque échéance.</div>');
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function mpNew() {
+  try {
+    const [types, vehicles] = await Promise.all([api('/maintenance/types'), api('/vehicles?siteId=' + encodeURIComponent(state.siteId || ''))]);
+    dtOverlay('', 'Nouveau plan d\'entretien', `<label>Véhicule</label><select id="mp-veh">${vehicles.map((v) => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</select>
+      <label>Type d'entretien</label><select id="mp-type">${types.map((t) => `<option value="${esc(t.code)}">${esc(t.label)}</option>`).join('')}</select>
+      <div class="grid-2"><div><label>Tous les … km</label><input id="mp-km" type="number" inputmode="numeric" placeholder="ex. 10000"></div><div><label>Tous les … jours</label><input id="mp-days" type="number" inputmode="numeric" placeholder="ex. 180"></div>
+      <div><label>Alerter … km avant</label><input id="mp-akm" type="number" inputmode="numeric" value="500"></div><div><label>Alerter … jours avant</label><input id="mp-adays" type="number" inputmode="numeric" value="15"></div>
+      <div><label>Dernier entretien à (km) — facultatif</label><input id="mp-lkm" type="number" inputmode="numeric"></div><div><label>Dernier entretien le — facultatif</label><input id="mp-ldate" type="date"></div></div>
+      <div class="desc">Indiquez au moins un seuil (km ou jours). Sans dernier entretien connu, le kilométrage actuel et aujourd'hui servent de point de départ.</div>`, 'Créer le plan', 'mpNewSend');
+  } catch (e) { alert(e.message); }
+}
+async function mpNewSend() {
+  const m = document.getElementById('dt-ov-msg'), n = (id) => { const v = document.getElementById(id).value; return v === '' ? undefined : Number(v); };
+  try {
+    const ld = document.getElementById('mp-ldate').value;
+    await api('/maintenance-plans', { method: 'POST', body: { vehicleId: document.getElementById('mp-veh').value, maintenanceTypeCode: document.getElementById('mp-type').value, intervalKm: n('mp-km'), intervalDays: n('mp-days'), alertKm: n('mp-akm'), alertDays: n('mp-adays'), lastDoneKm: n('mp-lkm'), ...(ld ? { lastDoneAt: new Date(ld + 'T08:00:00').toISOString() } : {}) } });
+    document.getElementById('dt-ov').remove(); mpLoad();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function mpEdit(id) {
+  try {
+    const r = await api('/maintenance-plans?siteId=' + encodeURIComponent(state.siteId || '')), p = r.items.find((x) => x.id === id); if (!p) return;
+    dtOverlay(id, 'Modifier — ' + esc(p.vehicle) + ' · ' + esc(p.type), `<div class="grid-2"><div><label>Tous les … km</label><input id="mp-km" type="number" inputmode="numeric" value="${p.intervalKm || ''}"></div><div><label>Tous les … jours</label><input id="mp-days" type="number" inputmode="numeric" value="${p.intervalDays || ''}"></div>
+      <div><label>Alerter … km avant</label><input id="mp-akm" type="number" inputmode="numeric" value="${p.alertKm}"></div><div><label>Alerter … jours avant</label><input id="mp-adays" type="number" inputmode="numeric" value="${p.alertDays}"></div></div>
+      <label><input id="mp-active" type="checkbox" ${p.active ? 'checked' : ''} style="width:auto"> Plan actif (décochez pour suspendre les alertes)</label>`, 'Enregistrer', 'mpEditSend');
+  } catch (e) { alert(e.message); }
+}
+async function mpEditSend(id) {
+  const m = document.getElementById('dt-ov-msg'), n = (k) => { const v = document.getElementById(k).value; return v === '' ? undefined : Number(v); };
+  try {
+    await api('/maintenance-plans/' + id, { method: 'PATCH', body: { intervalKm: n('mp-km'), intervalDays: n('mp-days'), alertKm: n('mp-akm'), alertDays: n('mp-adays'), active: document.getElementById('mp-active').checked } });
+    document.getElementById('dt-ov').remove(); mpLoad();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function mpSchedule(id) {
+  const t = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  dtOverlay(id, 'Planifier l\'entretien', `<label>Date prévue</label><input id="mp-sdate" type="date" value="${t}"><label>Consigne à l'atelier (facultatif)</label><textarea id="mp-snote" rows="2" placeholder="Ex. prévoir 2 filtres, véhicule disponible à 8 h"></textarea>`, 'Planifier et prévenir l\'atelier', 'mpScheduleSend');
+}
+async function mpScheduleSend(id) {
+  const m = document.getElementById('dt-ov-msg');
+  try {
+    const d = document.getElementById('mp-sdate').value, note = document.getElementById('mp-snote').value.trim();
+    if (!d) throw new Error('Choisissez une date.');
+    await api('/maintenance-plans/' + id + '/schedule', { method: 'POST', body: { maintenanceDate: new Date(d + 'T08:00:00').toISOString(), ...(note ? { note } : {}) } });
+    document.getElementById('dt-ov').remove(); renderView(state.view);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function mpComplete(maintenanceId) {
+  DRV_PHOTOS.length = 0;
+  dtOverlay(maintenanceId, 'Entretien effectué', `<label>Kilométrage actuel (facultatif)</label><input id="mp-ckm" type="number" inputmode="numeric">
+    <div class="grid-2"><div><label>Pièces (GNF)</label><input id="mp-cparts" type="number" inputmode="numeric" value="0"></div><div><label>Main-d'œuvre (GNF)</label><input id="mp-clabor" type="number" inputmode="numeric" value="0"></div></div>
+    <label>Travaux réalisés (facultatif)</label><textarea id="mp-cnote" rows="2"></textarea>${drvPhotoField('Photo de la facture — obligatoire si un coût est indiqué', false)}`, 'Déclarer effectué', 'mpCompleteSend');
+}
+async function mpCompleteSend(id) {
+  const m = document.getElementById('dt-ov-msg'), n = (k) => { const v = document.getElementById(k).value; return v === '' ? undefined : Number(v); };
+  try {
+    const parts = n('mp-cparts') || 0, labor = n('mp-clabor') || 0, note = document.getElementById('mp-cnote').value.trim();
+    if (parts + labor > 0 && !DRV_PHOTOS.length) throw new Error('La photo de la facture est obligatoire quand un coût est indiqué.');
+    m.innerHTML = '<div class="desc">Envoi en cours…</div>';
+    const invoiceUrl = DRV_PHOTOS.length ? await drvUpload(DRV_PHOTOS[0], 'maintenance_invoice') : undefined;
+    await api('/maintenance-plans/complete/' + id, { method: 'POST', body: { mileage: n('mp-ckm'), partsCost: parts, laborCost: labor, ...(note ? { description: note } : {}), ...(invoiceUrl ? { invoiceUrl } : {}) } });
+    document.getElementById('dt-ov').remove(); renderView(state.view);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+
 /* ---------- Circuit panne → réparation → remise en service ---------- */
 const DT_STAGE = { DECLAREE: ['bad', 'Déclarée'], QUALIFIEE: ['warn', 'Qualifiée'], EN_REPARATION: ['info', 'En réparation'], EN_ATTENTE_PIECES: ['warn', 'En attente de pièces'], REMISE_EN_SERVICE: ['ok', 'Remise en service'] };
 function dtStageHtml(i) {
@@ -2343,6 +2434,9 @@ async function renderMaintenance() {
 
   root().innerHTML = `
     <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Alertes d'échéance</h3>${alertRows}</div>
+    <div class="panel" id="mp-panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Plans d'entretien préventif</h3>
+      <div class="desc">Fixez pour chaque véhicule un seuil (vidange tous les X km, révision tous les Y jours…). L'application calcule l'échéance, prévient la logistique avant la date, puis l'atelier une fois l'entretien planifié.</div>
+      <div id="mp-body"><div class="empty">Chargement…</div></div></div>
     <div class="panel" id="mr-panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Coûts de maintenance &amp; prochaines échéances</h3>
       <div class="desc">Calculé automatiquement à partir des interventions enregistrées. Coût = montant saisi, sinon pièces + main-d'œuvre.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0"><select id="mr-kind" onchange="mrLoad()" style="max-width:220px"><option value="TRUCK"${window._mrKind === 'SERVICE_VEHICLE' ? '' : ' selected'}>Camions</option><option value="SERVICE_VEHICLE"${window._mrKind === 'SERVICE_VEHICLE' ? ' selected' : ''}>Véhicules de service</option></select><select id="mr-per" onchange="mrLoad()" style="max-width:200px"><option value="3">3 derniers mois</option><option value="6" selected>6 derniers mois</option><option value="12">12 derniers mois</option></select><button class="btn small" style="margin:0" onclick="mrCsv()"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Exporter (Excel/CSV)</button></div>
@@ -3128,7 +3222,7 @@ function mrCsv() {
   const csv = [head, ...rows].map((a) => a.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(';')).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' })); a.download = 'recap-maintenance-' + r.kind.toLowerCase() + '.csv'; a.click();
 }
-{ const _rm = renderMaintenance; renderMaintenance = async function () { const r = await _rm(); mrLoad(); return r; }; }
+{ const _rm = renderMaintenance; renderMaintenance = async function () { const r = await _rm(); mrLoad(); mpLoad(); return r; }; }
 const KR_TABS = [['trips', 'Trajets'], ['fuel', 'Carburant'], ['maint', 'Maintenance'], ['pannes', 'Pannes']];
 async function krLoad() {
   const box = document.getElementById('kr-list'); if (!box) return;
@@ -5965,7 +6059,7 @@ async function renderAtelier() {
   if (atTab === 'repair') {
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Véhicules à réparer <span class="badge ${open.length ? 'bad' : 'ok'}">${open.length}</span></h3><div class="desc">Pannes déclarées par les chauffeurs et véhicules immobilisés. Prenez la réparation en charge (le premier arrivé), demandez les pièces si besoin, puis cliquez « Réparation terminée » : le véhicule est remis en service.</div>${open.map((i) => `<div class="drv-row" style="align-items:flex-start;flex-wrap:wrap"><span style="flex:1;min-width:200px"><b>${esc(i.vehicle)}</b> ${dtStageHtml(i)}<br><small>${esc(i.category)} · depuis le ${d(i.startedAt)} (${i.days} j)</small><div style="margin-top:4px">${esc(i.reason)}</div>${dtInfoHtml(i)}</span><span style="display:flex;gap:6px;flex-wrap:wrap">${dtButtons(i)}</span></div>`).join('') || '<div class="empty">Aucun véhicule à réparer.</div>'}<button class="btn" style="margin-top:10px" onclick="go('maintenance')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouvelle intervention (entretien)</button></div>`;
   } else if (atTab === 'progress') {
-    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Interventions en cours et à faire</h3>${mProg.map((m) => { const [c, l] = st[m.status] || ['warn', m.status]; return `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || m.description || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ${c}">${l}</span></div>`; }).join('') || '<div class="empty">Aucune intervention en cours.</div>'}</div>`;
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Interventions en cours et à faire</h3>${mProg.map((m) => { const [c, l] = st[m.status] || ['warn', m.status]; return `<div class="drv-row" style="align-items:flex-start;flex-wrap:wrap"><span style="flex:1;min-width:180px"><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || m.description || '—')}<br><small>${d(m.maintenanceDate)}${m.kind === 'PREVENTIVE' ? ' · préventif' : ''}</small>${m.description && m.kind === 'PREVENTIVE' ? '<div style="font-size:13px;color:var(--muted)">' + esc(m.description) + '</div>' : ''}</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="badge ${c}">${l}</span>${['PLANNED', 'IN_PROGRESS'].includes(m.status) ? `<button class="btn small gold" onclick="mpComplete('${esc(m.id)}')">Entretien effectué</button>` : ''}</span></div>`; }).join('') || '<div class="empty">Aucune intervention en cours.</div>'}</div>`;
   } else if (atTab === 'done') {
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Réparations terminées</h3>${closed.slice(0, 30).map((i) => `<div class="drv-row" style="align-items:flex-start"><span><b>${esc(i.vehicle)}</b> · ${esc(i.category)}<br><small>${d(i.startedAt)} → ${d(i.endedAt)} (${i.days} j)</small>${i.resolutionNote ? '<div style="font-size:14px">' + esc(i.resolutionNote) + '</div>' : ''}</span><span style="text-align:right">${i.actualCost != null ? '<b>' + fmt(i.actualCost) + ' GNF</b>' : ''}${i.invoiceUrl ? '<br><a href="' + esc((state.apiUrl || '').replace(/\/$/, '') + i.invoiceUrl) + '" target="_blank" rel="noopener" style="font-size:12px"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Facture</a>' : ''}</span></div>`).join('') || '<div class="empty">Aucune réparation terminée.</div>'}</div>
       ${mDone.length ? `<div class="panel"><h3>Entretiens réalisés</h3>${mDone.map((m) => `<div class="drv-row"><span><b>${esc(m.vehicle.internalNumber)}</b> · ${esc((m.maintenanceType && m.maintenanceType.label) || '—')}<br><small>${d(m.maintenanceDate)}</small></span><span class="badge ok">Terminé</span></div>`).join('')}</div>` : ''}`;
