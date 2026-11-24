@@ -107,7 +107,7 @@ export class VehiclesService {
   async dossier(id: string, actor: any) {
     const v = await this.prisma.vehicle.findFirst({
       where: { id, deletedAt: null },
-      include: { assignedDriver: { select: { id: true, firstName: true, lastName: true, phone: true, licenseNumber: true } }, documents: { select: { id: true, type: true, expiryDate: true } } },
+      include: { assignedDriver: { select: { id: true, firstName: true, lastName: true, phone: true, licenseNumber: true } }, documents: { where: { replacedAt: null }, select: { id: true, type: true, expiryDate: true } } },
     });
     if (!v) throw new NotFoundException('Véhicule introuvable.');
     if (actor && actor.role !== 'SUPER_ADMIN' && actor.siteId && v.siteId !== actor.siteId) throw new ForbiddenException("Ce véhicule n'est pas dans votre périmètre.");

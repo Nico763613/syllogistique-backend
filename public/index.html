@@ -1481,7 +1481,7 @@ const ACTION_FALLBACK = {
   new_quote: 'L\'écran de devis arrive dans une prochaine version.',
   sales_return: 'L\'écran de retour client arrive dans une prochaine version.',
   maintenance: 'Utilisez le menu Maintenance.',
-  documents: 'Utilisez la fiche du véhicule (Camions & Véhicules).',
+  documents: 'Utilisez l\'onglet « Documents » de la fiche du véhicule (Camions, Véhicules de service).',
   inventory: 'Utilisez le menu Stocks.',
   locations: 'L\'écran des emplacements arrive dans une prochaine version.',
   reorder: 'Utilisez le menu Achats (réapprovisionnement).',
@@ -4020,11 +4020,16 @@ function flShow(tab) {
   const id = (a, b) => `<div><span>${a}</span><b>${b}</b></div>`;
   const tot = (a, b) => `<div><b>${a}</b><span>${b}</span></div>`;
   const tb = (heads, rows) => `<div class="fl-tb"><table><tr>${heads.map((h) => `<th>${h}</th>`).join('')}</tr>${rows.length ? rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${heads.length}" class="empty">Aucun enregistrement.</td></tr>`}</table></div>`;
-  const tabs = { trips: 'Missions', fuel: 'Carburant', maint: 'Maintenance', inc: 'Incidents', aff: 'Chauffeurs' };
+  const tabs = { trips: 'Missions', fuel: 'Carburant', maint: 'Maintenance', inc: 'Incidents', docs: 'Documents', aff: 'Chauffeurs' };
   let body = '';
   if (tab === 'trips') body = tb(['Date', 'Référence', 'Chauffeur', 'Destination', 'Distance', 'État'], d.trips.map((x) => [flD(x.tripDate), esc(x.reference || '—'), x.driver ? esc(x.driver.firstName + ' ' + x.driver.lastName) : '—', esc(x.destination || '—'), x.distance != null ? fmt(x.distance) + ' km' : '—', esc(FL_TS[x.status] || x.status)]));
   if (tab === 'fuel') body = tb(['Date', 'Litres', 'Montant', 'Lieu', 'Km', 'Responsable'], d.fuel.map((x) => [flD(x.transactionDate), fmt(x.quantityLiters) + ' L', fmt(x.totalCost) + ' GNF', esc((x.source === 'TANK' ? 'Dépôt' : 'Station') + (x.station ? ' · ' + x.station : '')), fmt(x.mileage), x.driver ? esc(x.driver.firstName + ' ' + x.driver.lastName) : '—']));
   if (tab === 'maint') body = tb(['Date', 'Type', 'Description', 'Garage', 'Coût', 'État'], d.maintenance.map((x) => [flD(x.maintenanceDate), esc((x.maintenanceType && x.maintenanceType.label) || '—') + (x.kind === 'PREVENTIVE' ? '<br><small>Préventif</small>' : ''), esc(x.description || '—'), esc((x.supplier && x.supplier.name) || '—'), fmt(x.cost) + ' GNF', esc({ PLANNED: 'Planifié', IN_PROGRESS: 'En cours', COMPLETED: 'Terminé', OVERDUE: 'En retard' }[x.status] || x.status)]));
+  if (tab === 'docs') {
+    const nm = { ASSURANCE: 'Assurance', VISITE_TECHNIQUE: 'Visite technique', CARTE_GRISE: 'Carte grise', CONTRAT: 'Contrat', AUTRE: 'Autre' }, canRenew = MP_FLEET.includes((state.user && state.user.role) || '');
+    const st = (x) => { if (!x.expiryDate) return '<span class="badge info">Sans échéance</span>'; const j = Math.ceil((new Date(x.expiryDate) - Date.now()) / 864e5); return j < 0 ? `<span class="badge bad">Expiré (${-j} j)</span>` : j <= 7 ? `<span class="badge bad">Urgent : ${j} j</span>` : j <= 30 ? `<span class="badge warn">Expire dans ${j} j</span>` : '<span class="badge ok">Valide</span>'; };
+    body = tb(['Document', 'Échéance', 'État', ''], (v.documents || []).filter((x) => !x.replacedAt).map((x) => [esc(nm[x.type] || x.type), x.expiryDate ? flD(x.expiryDate) : '—', st(x), x.expiryDate && canRenew ? `<button class="btn small" onclick="document.getElementById('fl-ov').remove(); renewVehicleDoc('${x.id}')">Renouveler</button>` : '']));
+  }
   if (tab === 'aff') body = tb(['Du', 'Au', 'Chauffeur', 'Motif'], (d.assignments || []).map((x) => [flD(x.startedAt), x.endedAt ? flD(x.endedAt) : '<b>En cours</b>', esc(x.driverName || '—'), esc(x.reason || (x.source === 'MANUEL' ? 'Affectation par la logistique' : x.source))]));
   if (tab === 'inc') body = '<h4 style="margin:0 0 6px;color:var(--navy)">Pannes et immobilisations</h4>' + tb(['Début', 'Fin', 'Nature', 'Motif', 'Coût'], d.downtimes.map((x) => [flD(x.startedAt), x.endedAt ? flD(x.endedAt) : '<span class="badge bad">En cours</span>', esc(FL_DT[x.category] || x.category), esc(x.reason) + (x.severity ? '<br><small>Gravité : ' + esc(FL_SEV[x.severity] || x.severity) + '</small>' : ''), (x.actualCost != null ? fmt(x.actualCost) : x.estimatedCost != null ? fmt(x.estimatedCost) + ' (est.)' : '—') + ' GNF'])) + '<h4 style="margin:14px 0 6px;color:var(--navy)">Incidents HSE liés au véhicule</h4>' + tb(['Date', 'Type', 'Gravité', 'État', 'Description'], d.incidents.map((x) => [flD(x.occurredAt), esc(FL_HT[x.type] || x.type), esc(FL_SEV[x.severity] || x.severity), esc({ OPEN: 'Ouvert', INVESTIGATING: 'En analyse', CLOSED: 'Clos' }[x.status] || x.status), esc(x.description)]));
   ov.querySelector('.fl-dos').innerHTML = `<div class="fl-dh"><div><h3>${esc(v.internalNumber)} · ${esc(v.registrationNumber)}</h3><small>${esc([v.brand, v.model, v.year].filter(Boolean).join(' ') || (trucks ? 'Camion' : 'Véhicule de service'))}</small></div><div style="display:flex;gap:8px;align-items:center">${statusBadge(v.status)}<button onclick="document.getElementById('fl-ov').remove()">Fermer</button></div></div>
