@@ -2,7 +2,7 @@
 // Met en cache uniquement l'interface (HTML/manifest/icônes), pas les données de l'API.
 // Les données restent toujours à jour car chaque appel /api reste en direct (network).
 
-const CACHE_NAME = 'syllogistique-shell-v125';
+const CACHE_NAME = 'syllogistique-shell-v126';
 const SHELL_FILES = [
   './index.html',
   './manifest.json',
@@ -15,6 +15,7 @@ const SHELL_FILES = [
   './logos/hse-sm.webp',
   './logos/stock-sm.webp',
   './logos/dg-sm.webp',
+  './logos/atelier-sm.webp',
   './logos/comptabilite-sm.webp',
 
   './icon-512.png',

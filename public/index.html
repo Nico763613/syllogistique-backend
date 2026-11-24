@@ -71,8 +71,8 @@
   body.side-min .space-card b,body.side-min .space-card small{display:none}body.side-min .space-card{justify-content:center;margin:0 6px 10px;padding:6px}
   #space-ico{display:none;height:30px;width:30px;border-radius:7px;margin-right:8px;flex:none;object-fit:cover;border:1px solid var(--line,#E3E8F0)}
   .home-space{display:flex;align-items:center;gap:12px}.home-space img{width:64px;height:64px;border-radius:12px;flex:none;object-fit:cover;border:1px solid var(--line,#E3E8F0);background:#fff}
-  .lg-space{display:flex;align-items:center;gap:10px;margin-top:12px;color:#fff;font-size:13px}.lg-space img{width:56px;height:56px;border-radius:10px;background:#fff;object-fit:cover}
-  .lg-mobile-space{display:none;align-items:center;gap:10px;margin:0 0 12px;color:var(--navy);font-size:13px;font-weight:600}.lg-mobile-space img{width:48px;height:48px;border-radius:10px;border:1px solid #E3E8F0;object-fit:cover}
+  .lg-space{display:flex;align-items:center;gap:10px;margin-top:12px;color:#fff;font-size:13px}.lg-space img{width:96px;height:96px;border-radius:16px;background:#fff;object-fit:cover}
+  .lg-mobile-space{display:none;align-items:center;gap:10px;margin:0 0 12px;color:var(--navy);font-size:13px;font-weight:600}.lg-mobile-space img{width:72px;height:72px;border-radius:14px;border:1px solid #E3E8F0;object-fit:cover}
   @media (max-width:760px){.lg-mobile-space.on{display:flex}}
   .brand-block{padding:0 20px 18px; border-bottom:1px solid rgba(255,255,255,.12); margin-bottom:10px;}
   .brand{font-size:20px; font-weight:800;  color:#fff;}
@@ -5366,12 +5366,13 @@ const SPACES = {
   operations: { n: 'Responsable des Opérations', s: 'Optimiser • Coordonner • Performer' },
   hse: { n: 'Responsable HSE', s: 'Prévenir • Protéger • Agir' },
   stock: { n: 'Gestionnaire de Stock', s: 'Gérer • Contrôler • Optimiser' },
+  atelier: { n: 'Mécanicien', s: 'Diagnostiquer • Réparer • Remettre en service' },
   dg: { n: 'Direction Générale', s: 'Diriger • Décider • Développer' },
   comptabilite: { n: 'Espace Comptabilité', s: 'Enregistrer • Contrôler • Rapporter' },
 };
-const ROLE_SPACE = { CHAUFFEUR: 'chauffeurs', ADMIN_LOGISTIQUE: 'logistique', GESTIONNAIRE_FLOTTE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', GESTIONNAIRE_HSE: 'hse', AGENT_HSE: 'hse', MAGASINIER: 'stock', DIRECTEUR_GENERAL: 'dg', COMPTABLE: 'comptabilite' };
-// Les logos des autres départements restent des ressources d'identité (documents, application mobile) : l'application affiche le logo de l'entreprise cliente. Seul l'espace Chauffeur garde son emblème.
-const SPACE_VISIBLE = { chauffeurs: true };
+const ROLE_SPACE = { CHAUFFEUR: 'chauffeurs', ADMIN_LOGISTIQUE: 'logistique', GESTIONNAIRE_FLOTTE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', GESTIONNAIRE_HSE: 'hse', AGENT_HSE: 'hse', MAGASINIER: 'stock', MECANICIEN: 'atelier', DIRECTEUR_GENERAL: 'dg', COMPTABLE: 'comptabilite' };
+// Les six identités visuelles (Chauffeur, DG, Responsable logistique, Responsable des opérations, Stock, Mécanicien) s'affichent selon le rôle enregistré ; elles cèdent la place au logo de l'entreprise cliente si celle-ci en a défini un. Pour ajouter un département : ajouter son entrée dans SPACES, ROLE_SPACE, SPACE_VISIBLE et ICON_SPACES, ses images dans logos/ et icons/ et son manifest-<espace>.json.
+const SPACE_VISIBLE = { chauffeurs: true, dg: true, logistique: true, operations: true, stock: true, atelier: true };
 // Icône d'installation (écran d'accueil du téléphone) = logo du département, choisi avant même la connexion.
 const ICON_ROLE = Object.assign({}, ROLE_SPACE, { RESPONSABLE_COMMERCIAL: 'commercial', CAISSIER: 'caisse', MECANICIEN: 'atelier', POINTEUR: 'pointage' });
 const ICON_SPACES = ['chauffeurs', 'logistique', 'operations', 'hse', 'stock', 'dg', 'comptabilite', 'commercial', 'caisse', 'atelier', 'pointage', 'achats'];
@@ -5399,7 +5400,8 @@ function spaceHome() {
   return `<div class="home-space"><img src="logos/${sp.k}-sm.webp" alt="${esc(sp.n)}"><div><b style="color:var(--navy);font-size:15px">${esc(sp.n)}</b><div class="desc" style="margin:2px 0 0">${esc(sp.s)}</div></div></div>`;
 }
 function spaceLoginApply() {
-  let k = null; try { k = localStorage.getItem('syllo_last_space'); } catch (e) {}
+  let k = null; try { k = (state.user && ROLE_SPACE[state.user.role]) || localStorage.getItem('syllo_last_space') || localStorage.getItem('syllo_icon_space'); } catch (e) {}
+  if (k && !SPACE_VISIBLE[k]) k = null;
   const sp = spaceBrandOn() && k && SPACES[k]; const on = !!sp;
   const lg = document.querySelector('.lg-logo'); const ml = document.querySelector('.lg-mobile-logo');
   const put = (host, cls, after) => { if (!host) return; let el = host.parentNode.querySelector('.' + cls); if (!on) { if (el) el.remove(); return; } if (!el) { el = document.createElement('div'); el.className = cls + (cls === 'lg-mobile-space' ? ' on' : ''); host.insertAdjacentElement('afterend', el); } el.innerHTML = `<img src="logos/${k}-sm.webp" alt=""><span>${esc(sp.n)}</span>`; };
