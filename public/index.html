@@ -811,6 +811,7 @@ function startDemo() {
   }
 }
 function logout() {
+  state.home = null; state.hist = [];
   if (state.demo) { state.demo = false; const b = document.getElementById('demo-banner'); if (b) b.remove(); }
   // Révoque la session côté serveur (sans bloquer la déconnexion si le réseau est coupé)
   try { if (state.refreshToken && state.apiUrl) fetch(state.apiUrl.replace(/\/$/, '') + '/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(state.accessToken ? { Authorization: 'Bearer ' + state.accessToken } : {}) }, body: JSON.stringify({ refreshToken: state.refreshToken }) }).catch(() => {}); } catch (e) {}
@@ -1087,18 +1088,21 @@ document.addEventListener('input', () => { clearTimeout(DRAFT.t); DRAFT.t = setT
 document.addEventListener('change', () => { clearTimeout(DRAFT.t); DRAFT.t = setTimeout(draftSave, 300); }, true);
 
 state.hist = []; state.ign = 0;
-function goBackBtn() { const b = document.getElementById('back-btn'); if (b) b.style.display = state.hist.length ? '' : 'none'; }
+// La flèche ← est visible dès qu'on n'est plus sur l'écran d'accueil : elle ramène au tableau de bord au lieu de laisser sortir de l'application.
+function canGoBack() { return state.hist.length > 0 || !!(state.home && state.view && state.view !== state.home); }
+function goBackBtn() { const b = document.getElementById('back-btn'); if (b) b.style.display = canGoBack() ? '' : 'none'; }
 // Flèche ← (et bouton retour du téléphone) : revient à l'écran précédent sans quitter l'application.
 function goBack(fromPop) {
-  if (!state.hist.length) return;
+  if (!state.hist.length) { if (state.home && state.view !== state.home) go(state.home, true); return; }
   const v = state.hist.pop();
   go(v, true);
   if (!fromPop) { try { state.ign++; history.back(); } catch (e) { state.ign = 0; } }
 }
-window.addEventListener('popstate', () => { if (state.ign > 0) { state.ign--; return; } if (state.hist.length && document.getElementById('back-btn') && !(window.DRV && DRV.hist && DRV.hist.length)) goBack(true); });
+window.addEventListener('popstate', () => { if (state.ign > 0) { state.ign--; return; } if (canGoBack() && document.getElementById('back-btn') && !(window.DRV && DRV.hist && DRV.hist.length)) goBack(true); });
 function go(view, noPush) {
   if (!noPush && state.view && state.view !== view) { state.hist.push(state.view); if (state.hist.length > 30) state.hist.shift(); try { history.pushState({ off: 1 }, ''); } catch (e) {} }
   state.view = view;
+  if (!state.home) state.home = view;
   goBackBtn();
   if (typeof spaceApply === 'function') spaceApply();
   document.querySelectorAll('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.view === navKey(view)));
