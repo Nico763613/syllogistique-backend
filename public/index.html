@@ -586,8 +586,10 @@ const state = {
   view: 'dashboard',
 };
 
-const DEFAULT_API_URL = 'https://syllogistique-backend.onrender.com';
-if (!state.apiUrl) state.apiUrl = DEFAULT_API_URL;
+// Sur l'environnement de simulation, l'application parle TOUJOURS à son propre serveur (jamais à la production).
+const SIM_HOST = /simulation/i.test(location.hostname);
+const DEFAULT_API_URL = SIM_HOST ? location.origin : 'https://syllogistique-backend.onrender.com';
+if (SIM_HOST || !state.apiUrl) state.apiUrl = DEFAULT_API_URL;
 document.getElementById('api-url').value = state.apiUrl;
 
 // Renouvelle la session en silence (le jeton d'accès dure 15 min) ; une seule demande à la fois
