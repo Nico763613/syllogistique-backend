@@ -3,6 +3,7 @@ import { recordAssignment } from '../vehicles/assignments';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcrypt';
+import { issueInvitation, inviteLink } from '../auth/invitations';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
@@ -158,13 +159,11 @@ export class DriverDevicesService {
       await this.audit.log({ userId: actor.userId, action: 'CREATE', entity: 'User', entityId: u.id, newValue: { role: 'CHAUFFEUR', driverId: driver.id, via: 'invitation' } });
       userId = u.id;
     }
-    // Compte jamais utilisé (mot de passe provisoire pas encore remplacé) : on en génère un nouveau, pour qu'un message perdu ne bloque pas le chauffeur
-    if (!tempPassword && userId) {
+    // Compte jamais activé : lien individuel à usage unique (72 h) où le chauffeur crée lui-même son mot de passe. Aucun mot de passe n'est transmis.
+    let inviteToken: string | null = null;
+    if (userId) {
       const u = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (u && u.mustChangePassword) {
-        tempPassword = String(randomInt(100000, 1_000_000));
-        await this.prisma.user.update({ where: { id: userId }, data: { passwordHash: await bcrypt.hash(tempPassword, 10) } });
-      }
+      if (u && u.mustChangePassword) inviteToken = await issueInvitation(this.prisma, userId, actor.userId);
     }
     const prov = await this.provision(driver.id, actor);
     if (userId) await this.prisma.user.update({ where: { id: userId }, data: { invitedAt: new Date() } });
@@ -172,13 +171,13 @@ export class DriverDevicesService {
     const kind = driver.activity === 'SERVICE_VEHICLE' ? 'chauffeur de véhicule de service' : driver.activity === 'TRUCK' ? 'chauffeur de camion' : 'chauffeur';
     const lines = [
       `Bonjour ${driver.firstName},`,
-      `Voici votre application de travail SYL LOGISTIQUE (${kind}) : ${appUrl + (appUrl.includes('?') ? '&' : '?') + 'espace=chauffeurs'}`,
+      `Voici votre application de travail SYL LOGISTIQUE (${kind}) : ${inviteToken ? inviteLink(appUrl, inviteToken, 'chauffeurs') : appUrl + (appUrl.includes('?') ? '&' : '?') + 'espace=chauffeurs'}`,
       ...(veh ? [`Votre véhicule : ${veh.internalNumber} (${veh.registrationNumber}${veh.brand ? ', ' + [veh.brand, veh.model].filter(Boolean).join(' ') : ''}). Vos informations et celles du véhicule sont déjà dans l'application.`] : []),
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
-      `2) Connexion : votre numéro de téléphone${tempPassword ? ` et le mot de passe provisoire ${tempPassword} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe habituel'}.`,
+      inviteToken ? `2) Sur la page qui s'ouvre, créez votre mot de passe (lien personnel, valable 72 h, à usage unique). Ensuite, connectez-vous avec votre numéro de téléphone et ce mot de passe.` : `2) Connexion : votre numéro de téléphone et votre mot de passe habituel.`,
       `3) Code d'activation de votre téléphone : ${prov.otp} (valable 24 h).`,
     ];
-    return { driver: `${driver.firstName} ${driver.lastName}`, phone: digits, message: lines.join('\n'), newAccount: !!tempPassword };
+    return { driver: `${driver.firstName} ${driver.lastName}`, phone: digits, message: lines.join('\n'), newAccount: !!inviteToken };
   }
 
   // Transfert d'appareil : le téléphone reste au bureau, le remplaçant s'y connecte avec son propre compte.

@@ -25,6 +25,20 @@ export class AuthController {
 
   @Public()
   @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @Post('invite/info')
+  inviteInfo(@Body() body: { token: string }) {
+    return this.authService.inviteInfo(body?.token);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('invite/accept')
+  acceptInvite(@Body() body: { token: string; password: string }) {
+    return this.authService.acceptInvite(body?.token, body?.password);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @Post('refresh')
   refresh(@Body() dto: RefreshTokenDto) {
     return this.authService.refresh(dto.refreshToken);

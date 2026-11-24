@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { Actor } from '../common/actor';
+import { issueInvitation, inviteLink } from '../auth/invitations';
 import { CreateStaffDto, StaffReportDto, STAFF_ROLES, MANAGER_ROLES, ALL_STAFF_ROLES } from './staff.dto';
 
 const ESPACE: Record<string, string> = { AGENT_HSE: 'hse', GESTIONNAIRE_HSE: 'hse', MAGASINIER: 'stock', MECANICIEN: 'atelier', POINTEUR: 'pointage', DIRECTEUR_GENERAL: 'dg', ADMIN_LOGISTIQUE: 'logistique', RESPONSABLE_OPERATIONS: 'operations', COMPTABLE: 'comptabilite', RESPONSABLE_COMMERCIAL: 'commercial', CAISSIER: 'caisse' };
@@ -61,19 +62,17 @@ export class StaffService {
     if (actorRole === 'GESTIONNAIRE_HSE' && u.role.name !== 'AGENT_HSE') throw new ForbiddenException('Le responsable HSE envoie le lien uniquement aux agents HSE.');
     const digits = (u.phone ?? '').replace(/\D/g, '');
     if (digits.length < 8) throw new BadRequestException('Renseignez le numéro de téléphone.');
-    let temp: string | null = null;
-    if (u.mustChangePassword) {
-      temp = String(randomInt(100000, 1_000_000));
-      await this.prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(temp, 10), invitedAt: new Date() } });
-    } else {
-      await this.prisma.user.update({ where: { id: u.id }, data: { invitedAt: new Date() } });
-    }
+    // Aucun mot de passe n'est transmis : lien individuel, à usage unique, valable 72 h, où le collaborateur crée le sien.
+    let link = ESPACE[u.role.name] ? appUrl + (appUrl.includes('?') ? '&' : '?') + 'espace=' + ESPACE[u.role.name] : appUrl;
+    const pending = u.mustChangePassword;
+    if (pending) link = inviteLink(appUrl, await issueInvitation(this.prisma, u.id, actor.userId), ESPACE[u.role.name]);
+    await this.prisma.user.update({ where: { id: u.id }, data: { invitedAt: new Date() } });
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: u.id, newValue: { invitation: true } });
     const lines = [
       `Bonjour ${u.firstName},`,
-      `Voici votre application de travail SYL LOGISTIQUE (${LABEL[u.role.name]}) : ${ESPACE[u.role.name] ? appUrl + (appUrl.includes('?') ? '&' : '?') + 'espace=' + ESPACE[u.role.name] : appUrl}`,
+      `Voici votre application de travail SYL LOGISTIQUE (${LABEL[u.role.name]}) : ${link}`,
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
-      `2) Connexion : votre numéro de téléphone${temp ? ` et le mot de passe provisoire ${temp} (l'application vous demandera de créer votre propre mot de passe dès la première connexion)` : ' et votre mot de passe'}.`,
+      pending ? `2) Sur la page qui s'ouvre, créez votre mot de passe (lien personnel, valable 72 h, à usage unique). Ensuite, connectez-vous avec votre numéro de téléphone et ce mot de passe.` : `2) Connexion : votre numéro de téléphone et votre mot de passe.`,
       ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre espace de pilotage.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),
     ];
     return { name: `${u.firstName} ${u.lastName}`, phone: digits, message: lines.join('\n') };
@@ -88,7 +87,7 @@ export class StaffService {
       if (!u || !u.invitedAt) return 'NON_ENVOYE';
       if (activated) return 'ACTIVE';
       if (u.lastLoginAt && u.lastLoginAt >= u.invitedAt) return 'OUVERT';
-      return now - u.invitedAt.getTime() > 24 * 3600 * 1000 ? 'EXPIRE' : 'ENVOYE';
+      return now - u.invitedAt.getTime() > 72 * 3600 * 1000 ? 'EXPIRE' : 'ENVOYE';
     };
     if (kind === 'TRUCK' || kind === 'SERVICE_VEHICLE') {
       const drivers = await this.prisma.driver.findMany({ where: { deletedAt: null, activity: kind, ...(siteId ? { siteId } : {}) }, orderBy: { lastName: 'asc' } });
