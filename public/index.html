@@ -3752,8 +3752,8 @@ function dgMenuClose() { try { document.getElementById('sidebar').classList.remo
 function dgAlertsGo() { dgMenuClose(); alertsCenterOpen(); }
 
 /* ---------- Centre d'alertes : une seule fenêtre, rapide, qui ne bloque jamais le menu ---------- */
-const AL = { list: [], filter: 'ALL', busy: false, err: '' };
-const AL_VIEW = { Vehicle: 'fleet-trucks', VehicleDowntime: 'maintenance', Trip: 'driver-missions', TripNotStarted: 'driver-missions', TripDelay: 'driver-missions', NeedRequest: 'needs', PurchaseOrder: 'purchases', FuelTransaction: 'fuel', InventoryCount: 'stock', StockMovement: 'stock', InventoryItem: 'stock', Driver: 'drivers' };
+const AL = { list: [], filter: 'ALL', q: '', period: 'ALL', from: '', to: '', open: {}, det: {}, gmap: {}, smap: {}, busy: false, err: '' };
+const AL_VIEW = { Vehicle: 'fleet-trucks', VehicleDowntime: 'maintenance', Trip: 'driver-missions', TripNotStarted: 'driver-missions', TripDelay: 'driver-missions', NeedRequest: 'needs', PurchaseOrder: 'purchases', FuelTransaction: 'fuel', InventoryCount: 'stock', StockMovement: 'stock', InventoryItem: 'stock', Driver: 'drivers', DriverDailyReport: 'driver-sheets', DriverExpense: 'driver-expenses', DriverDevice: 'driver-devices', Document: 'fleet-trucks', MaintenancePlan: 'maintenance', Maintenance: 'maintenance', HseIncident: 'dash-hse' };
 const AL_SEV = { CRITICAL: ['Critique', '#D64545', 0], WARNING: ['À surveiller', '#D08A1E', 1], INFO: ['Information', '#2F6FB5', 2] };
 function alAgo(d) { const m = Math.max(0, Math.round((Date.now() - new Date(d).getTime()) / 60000)); if (m < 1) return "à l'instant"; if (m < 60) return 'il y a ' + m + ' min'; const h = Math.round(m / 60); if (h < 24) return 'il y a ' + h + ' h'; const j = Math.round(h / 24); return j === 1 ? 'hier' : 'il y a ' + j + ' j'; }
 function alertsCenterClose() { const o = document.getElementById('al-overlay'); if (o) o.remove(); document.removeEventListener('keydown', alEsc); }
@@ -3770,34 +3770,124 @@ function alertsCenterOpen() {
 }
 async function alertsCenterLoad() {
   if (AL.busy) return; AL.busy = true; AL.err = '';
-  try { AL.list = await api('/notifications?unreadOnly=true'); } catch (e) { AL.err = (e && e.message) || 'Connexion impossible'; }
+  try { AL.list = await api('/notifications?all=true&limit=300'); } catch (e) { AL.err = (e && e.message) || 'Connexion impossible'; }
   AL.busy = false; alertsCenterRender();
-  if (!AL.err) { BELL.list = AL.list.slice(); try { bellRender(); } catch (e) {} }
+  if (!AL.err) alSyncBell();
+}
+// La cloche et le badge du menu ne comptent que les alertes non lues et non traitées
+function alSyncBell() { BELL.list = AL.list.filter((n) => !n.isRead && !n.handled); try { bellRender(); } catch (e) {} }
+const AL_FOLDERS = [['CHAUFFEURS', 'Chauffeurs & conformité'], ['MISSIONS', 'Missions & fiches de bord'], ['VEHICULES', 'Véhicules & maintenance'], ['DEPENSES', 'Carburant & dépenses'], ['STOCK', 'Stock & achats'], ['HSE', 'HSE & incidents'], ['GENERAL', 'Informations générales']];
+function alFr(d) { return new Date(d).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function alInPeriod(n) {
+  if (AL.period === 'ALL') return true;
+  const t = new Date(n.createdAt).getTime(), now = new Date(), sod = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (AL.period === 'TODAY') return t >= sod;
+  if (AL.period === 'WEEK') return t >= sod - 6 * 86400000;
+  if (AL.period === 'MONTH') return t >= sod - 29 * 86400000;
+  const f = AL.from ? new Date(AL.from + 'T00:00:00').getTime() : -Infinity, u = AL.to ? new Date(AL.to + 'T23:59:59').getTime() : Infinity;
+  return t >= f && t <= u;
+}
+function alMatch(n) {
+  const q = (AL.q || '').trim().toLowerCase(); if (!q) return true;
+  const hay = [n.title, n.message, n.entity, n.sub, n.folder, alFr(n.createdAt), String(n.createdAt).slice(0, 10)].join(' ').toLowerCase();
+  return q.split(/\s+/).every((w) => hay.includes(w));
+}
+function alFilterOk(n) {
+  const f = AL.filter;
+  if (f === 'HANDLED') return n.handled;
+  if (n.handled) return false;
+  if (f === 'UNREAD') return !n.isRead;
+  if (f === 'CRITICAL' || f === 'WARNING' || f === 'INFO') return n.severity === f;
+  return true;
+}
+// Regroupe les vrais doublons (même événement copié pour plusieurs rôles) ; deux événements distincts ne sont jamais fusionnés.
+function alGroups(items) {
+  const m = new Map();
+  items.forEach((n) => { const k = n.groupKey || n.id; if (!m.has(k)) m.set(k, { key: k, items: [] }); m.get(k).items.push(n); });
+  return [...m.values()].map((g) => {
+    g.items.sort((a, c) => new Date(c.createdAt) - new Date(a.createdAt));
+    const f = g.items[0];
+    g.title = f.title; g.message = f.message; g.entity = f.entity; g.folder = f.folder || 'GENERAL'; g.sub = f.sub || 'Autres notifications'; g.createdAt = f.createdAt;
+    g.sevRank = Math.min(...g.items.map((n) => (AL_SEV[n.severity] || AL_SEV.INFO)[2]));
+    g.severity = ['CRITICAL', 'WARNING', 'INFO'][g.sevRank];
+    g.unread = g.items.some((n) => !n.isRead); g.handled = g.items.every((n) => n.handled);
+    return g;
+  }).sort((a, c) => a.sevRank - c.sevRank || new Date(c.createdAt) - new Date(a.createdAt));
 }
 function alertsCenterRender() {
   const b = document.getElementById('al-body'); if (!b) return;
-  const head = (n) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><h3 style="margin:0"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes & Notifications${n ? ' <span style="background:#D64545;color:#fff;border-radius:10px;padding:1px 9px;font-size:12px">' + n + '</span>' : ''}</h3><button class="btn" onclick="alertsCenterClose()">Fermer</button></div>`;
-  if (AL.err) { b.innerHTML = head(0) + `<div class="msg err">Impossible de charger les alertes (${esc(AL.err)}). Le service se réveille peut-être : patientez quelques secondes.</div><button class="btn primary" onclick="alertsCenterLoad()">Réessayer</button>`; return; }
-  const cnt = (k) => AL.list.filter((n) => n.severity === k).length;
-  const chips = [['ALL', 'Toutes', AL.list.length], ['CRITICAL', 'Critiques', cnt('CRITICAL')], ['WARNING', 'À surveiller', cnt('WARNING')], ['INFO', 'Infos', cnt('INFO')]]
-    .map((c) => `<button class="btn small${AL.filter === c[0] ? ' primary' : ''}" onclick="AL.filter='${c[0]}';alertsCenterRender()">${c[1]} (${c[2]})</button>`).join(' ');
-  const rows = AL.list.filter((n) => AL.filter === 'ALL' || n.severity === AL.filter)
-    .sort((a, c) => (AL_SEV[a.severity] || AL_SEV.INFO)[2] - (AL_SEV[c.severity] || AL_SEV.INFO)[2] || new Date(c.createdAt) - new Date(a.createdAt));
-  const item = (n) => { const sv = AL_SEV[n.severity] || AL_SEV.INFO; const go_ = AL_VIEW[n.entity];
-    return `<div id="al-${esc(n.id)}" style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)"><div style="width:10px;height:10px;border-radius:50%;background:${sv[1]};margin-top:5px;flex:none"></div><div style="flex:1;min-width:0"><b style="color:var(--navy)">${esc(n.title)}</b><div style="font-size:13px">${esc(n.message)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${sv[0]} · ${alAgo(n.createdAt)}</div><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${go_ ? `<button class="btn small primary" onclick="alertsOpenView('${go_}')">Voir / traiter →</button>` : ''}<button class="btn small" onclick="alertsRead('${esc(n.id)}')">Marquer comme lu</button></div></div></div>`; };
-  b.innerHTML = head(AL.list.length) + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>` + (AL.list.length > 1 ? '<div style="text-align:right"><button class="btn small" onclick="alertsReadAll()">Tout marquer comme lu</button></div>' : '')
-    + (rows.length ? rows.map(item).join('') : '<div class="empty" style="padding:24px 0">Aucune alerte dans cette catégorie. Tout est sous contrôle.</div>');
+  const act = AL.list.filter((n) => !n.handled);
+  const head = () => { const gs = alGroups(act), nu = gs.filter((g) => g.unread).length, nc = gs.filter((g) => g.severity === 'CRITICAL').length;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px"><h3 style="margin:0"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> Alertes & Notifications</h3><button class="btn" onclick="alertsCenterClose()">Fermer</button></div>`
+      + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><span style="display:inline-block;border-radius:12px;padding:2px 10px;font-size:12px;background:#e8edf5;color:var(--navy)">${gs.length} événement${gs.length > 1 ? 's' : ''}</span><span style="display:inline-block;border-radius:12px;padding:2px 10px;font-size:12px;background:#e8edf5;color:var(--navy);background:#2F6FB5;color:#fff">${nu} non lu${nu > 1 ? 's' : ''}</span><span style="display:inline-block;border-radius:12px;padding:2px 10px;font-size:12px;background:#e8edf5;color:var(--navy);background:#D64545;color:#fff">${nc} critique${nc > 1 ? 's' : ''}</span></div>`; };
+  if (AL.err) { b.innerHTML = head() + `<div class="msg err">Impossible de charger les alertes (${esc(AL.err)}). Le service se réveille peut-être : patientez quelques secondes.</div><button class="btn primary" onclick="alertsCenterLoad()">Réessayer</button>`; return; }
+  const cnt = (f) => alGroups(AL.list.filter((n) => (f === 'HANDLED' ? n.handled : !n.handled && (f === 'ALL' || (f === 'UNREAD' ? !n.isRead : n.severity === f))))).length;
+  const chips = [['ALL', 'Toutes'], ['UNREAD', 'Non lues'], ['CRITICAL', 'Critiques'], ['WARNING', 'À surveiller'], ['INFO', 'Informations'], ['HANDLED', 'Traitées']]
+    .map((c) => `<button class="btn small${AL.filter === c[0] ? ' primary' : ''}" onclick="AL.filter='${c[0]}';alertsCenterRender()">${c[1]} (${cnt(c[0])})</button>`).join(' ');
+  const per = [['ALL', 'Toutes dates'], ['TODAY', "Aujourd'hui"], ['WEEK', '7 jours'], ['MONTH', '30 jours'], ['CUSTOM', 'Période…']].map((p) => `<option value="${p[0]}"${AL.period === p[0] ? ' selected' : ''}>${p[1]}</option>`).join('');
+  const tools = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"><input id="al-q" type="search" placeholder="Chauffeur, plaque, n° de mission, type, date…" value="${esc(AL.q)}" oninput="alSearch(this.value)" style="flex:1 1 220px;min-width:0"><select onchange="AL.period=this.value;alertsCenterRender()">${per}</select></div>`
+    + (AL.period === 'CUSTOM' ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><input type="date" value="${esc(AL.from)}" onchange="AL.from=this.value;alertsCenterRender()"><input type="date" value="${esc(AL.to)}" onchange="AL.to=this.value;alertsCenterRender()"></div>` : '');
+  const shown = AL.list.filter((n) => alFilterOk(n) && alInPeriod(n) && alMatch(n));
+  const groups = alGroups(shown); AL.gmap = {}; AL.smap = {}; let gi = 0, si = 0;
+  const gcard = (g) => {
+    const id = 'g' + (gi++); AL.gmap[id] = g; const sv = AL_SEV[g.severity] || AL_SEV.INFO, go_ = AL_VIEW[g.entity], n = g.items.length, det = AL.det[g.key];
+    const unr = g.items.filter((x) => !x.isRead).length;
+    return `<div style="display:flex;gap:10px;padding:10px 0 10px 8px;border-bottom:1px solid var(--line);${g.severity === 'CRITICAL' && !g.handled ? 'border-left:4px solid #D64545;' : ''}${g.unread ? 'background:rgba(47,111,181,.06);' : ''}"><div style="width:10px;height:10px;border-radius:50%;background:${sv[1]};margin-top:5px;flex:none"></div><div style="flex:1;min-width:0">`
+      + `<b style="color:var(--navy)">${esc(g.title)}</b>${g.unread ? ' <span style="font-size:11px;background:#2F6FB5;color:#fff;border-radius:8px;padding:0 6px">Non lue</span>' : ''}${g.handled ? ' <span style="font-size:11px;background:#2E8B57;color:#fff;border-radius:8px;padding:0 6px">Traitée</span>' : ''}`
+      + `<div style="font-size:13px">${esc(g.message)}</div><div style="font-size:12px;color:var(--muted);margin-top:2px">${sv[0]} · ${alAgo(g.createdAt)}${n > 1 ? ` · 1 événement – ${n} notifications` : ''}</div>`
+      + `<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${go_ ? `<button class="btn small primary" onclick="alAct('go','${id}')">Voir / traiter →</button>` : ''}`
+      + (unr ? `<button class="btn small" onclick="alAct('read','${id}')">Marquer comme lu</button>` : `<button class="btn small" onclick="alAct('unread','${id}')">Marquer comme non lu</button>`)
+      + (g.handled ? `<button class="btn small" onclick="alAct('reopen','${id}')">Rouvrir</button>` : `<button class="btn small" onclick="alAct('handle','${id}')">Marquer comme traité</button>`)
+      + `<button class="btn small" onclick="alAct('det','${id}')">${det ? 'Masquer' : 'Détails'}</button></div>`
+      + (det ? `<div style="font-size:12px;margin-top:6px;padding:6px 8px;background:var(--bg,#f4f6fa);border-radius:6px"><div><b>Source :</b> ${esc(g.entity || '—')} · <b>Dossier :</b> ${esc(g.sub)}</div>${g.items.map((x) => `<div>• ${alFr(x.createdAt)} — ${x.handled ? 'traitée' : x.isRead ? 'lue' : 'non lue'}${x.roleName ? ' · ' + esc(x.roleName) : ''}</div>`).join('')}</div>` : '')
+      + `</div></div>`;
+  };
+  const html = AL_FOLDERS.map(([fk, label]) => {
+    const fg = groups.filter((g) => g.folder === fk); if (!fg.length) return '';
+    const crit = fg.filter((g) => g.severity === 'CRITICAL' && !g.handled).length, nu = fg.filter((g) => g.unread).length, rank = Math.min(...fg.map((g) => g.sevRank)), col = (['#D64545', '#D08A1E', '#2F6FB5'])[rank];
+    const open = AL.open[fk] === undefined ? alDefaultOpen(fg) : AL.open[fk];
+    const subs = [...new Set(fg.map((g) => g.sub))];
+    const body = open ? subs.map((s) => { const sg = fg.filter((g) => g.sub === s), sid = 's' + (si++); AL.smap[sid] = fk + ':' + s; const so = AL.open[fk + ':' + s] !== false;
+      return `<div style="margin:4px 0 0 8px"><div onclick="alToggle('${sid}')" style="cursor:pointer;display:flex;justify-content:space-between;gap:8px;padding:6px 4px;font-weight:600;color:var(--navy)"><span>${so ? '▾' : '▸'} ${esc(s)}</span><span style="font-weight:400;font-size:12px;color:var(--muted)">${sg.length}${sg.some((g) => g.unread) ? ' · ' + sg.filter((g) => g.unread).length + ' non lue(s)' : ''}</span></div>${so ? sg.map(gcard).join('') : ''}</div>`; }).join('') : '';
+    return `<div style="border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden"><div onclick="alToggle('${fk}')" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:10px;background:#f4f6fa"><span style="width:12px;height:12px;border-radius:50%;background:${col};flex:none"></span><b style="flex:1;color:var(--navy)">${open ? '▾' : '▸'} ${label}</b><span style="font-size:12px">${fg.length}</span>${nu ? `<span style="font-size:11px;background:#2F6FB5;color:#fff;border-radius:8px;padding:0 6px">${nu} non lu${nu > 1 ? 's' : ''}</span>` : ''}${crit ? `<span style="font-size:11px;background:#D64545;color:#fff;border-radius:8px;padding:0 6px">${crit} critique${crit > 1 ? 's' : ''}</span>` : ''}</div><div style="padding:0 8px 6px">${body}</div></div>`;
+  }).join('');
+  const hasUnread = shown.some((n) => !n.isRead);
+  b.innerHTML = head() + `<div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>` + tools
+    + (hasUnread ? '<div style="text-align:right;margin-bottom:6px"><button class="btn small" onclick="alertsReadAll()">Tout marquer comme lu</button></div>' : '')
+    + (html || '<div class="empty" style="padding:24px 0">Aucune alerte dans cette sélection. Tout est sous contrôle.</div>')
+    + '<div style="font-size:11px;color:var(--muted);margin-top:8px">« Lu » n\'est pas « traité » : une alerte critique reste visible tant qu\'elle n\'est pas traitée. Rien n\'est supprimé.</div>';
+  if (AL.q && AL.refocus) { const i = document.getElementById('al-q'); if (i) { i.focus(); const l = i.value.length; try { i.setSelectionRange(l, l); } catch (e) {} } AL.refocus = false; }
+}
+// Un dossier s'ouvre seul s'il contient du non lu, du critique non traité, une recherche ou l'historique des traitées
+function alDefaultOpen(fg) { return !!AL.q || AL.filter === 'HANDLED' || fg.some((g) => g.unread || (g.severity === 'CRITICAL' && !g.handled)); }
+function alSearch(v) { AL.q = v; AL.refocus = true; clearTimeout(AL.tm); AL.tm = setTimeout(alertsCenterRender, 250); }
+function alToggle(id) {
+  const k = AL.smap[id] || id; const isSub = k.indexOf(':') > 0;
+  const cur = AL.open[k];
+  if (isSub) AL.open[k] = cur === false; else if (cur === undefined) { AL.open[k] = !alDefaultOpen(alGroups(AL.list.filter((n) => alFilterOk(n) && alInPeriod(n) && alMatch(n))).filter((x) => x.folder === k)); } else AL.open[k] = !cur;
+  alertsCenterRender();
+}
+async function alApply(ids, fn, url) {
+  const set = new Set(ids); AL.list.forEach((n) => { if (set.has(n.id)) fn(n); }); alertsCenterRender(); alSyncBell();
+  const res = await Promise.all(ids.map((id) => api('/notifications/' + id + url, { method: 'PATCH' }).then(() => true).catch(() => false)));
+  if (res.some((r) => !r)) alertsCenterLoad();
+  try { bellTick(); } catch (e) {}
+}
+function alAct(a, gid) {
+  const g = AL.gmap[gid]; if (!g) return; const ids = g.items.map((n) => n.id);
+  if (a === 'go') { const v = AL_VIEW[g.entity]; if (g.unread) alApply(ids, (n) => { n.isRead = true; if (n.status === 'NEW') n.status = 'SEEN'; }, '/read'); alertsOpenView(v); return; }
+  if (a === 'det') { AL.det[g.key] = !AL.det[g.key]; alertsCenterRender(); return; }
+  if (a === 'read') return alApply(ids, (n) => { n.isRead = true; if (n.status === 'NEW') n.status = 'SEEN'; }, '/read');
+  if (a === 'unread') return alApply(ids, (n) => { n.isRead = false; if (n.status === 'SEEN') n.status = 'NEW'; }, '/unread');
+  if (a === 'handle') return alApply(ids, (n) => { n.isRead = true; n.status = 'HANDLED'; n.handled = true; }, '/handle');
+  if (a === 'reopen') return alApply(ids, (n) => { n.status = 'SEEN'; n.handled = false; }, '/handle?undo=true');
 }
 function alertsOpenView(v) { alertsCenterClose(); try { go(v); } catch (e) {} }
-async function alertsRead(id) {
-  AL.list = AL.list.filter((n) => n.id !== id); BELL.list = BELL.list.filter((n) => n.id !== id); alertsCenterRender(); try { bellRender(); } catch (e) {}
-  try { await api('/notifications/' + id + '/read', { method: 'PATCH' }); } catch (e) { alertsCenterLoad(); }
-}
+async function alertsRead(id) { return alApply([id], (n) => { n.isRead = true; if (n.status === 'NEW') n.status = 'SEEN'; }, '/read'); }
+// Tout marquer comme lu : s'applique à la sélection affichée ; ne traite pas et ne masque pas les alertes critiques
 async function alertsReadAll() {
-  const ids = AL.list.filter((n) => AL.filter === 'ALL' || n.severity === AL.filter).map((n) => n.id);
-  AL.list = AL.list.filter((n) => !ids.includes(n.id)); BELL.list = BELL.list.filter((n) => !ids.includes(n.id)); alertsCenterRender(); try { bellRender(); } catch (e) {}
-  await Promise.all(ids.map((id) => api('/notifications/' + id + '/read', { method: 'PATCH' }).catch(() => null)));
-  bellTick();
+  const ids = AL.list.filter((n) => !n.isRead && alFilterOk(n) && alInPeriod(n) && alMatch(n)).map((n) => n.id);
+  if (ids.length) await alApply(ids, (n) => { n.isRead = true; if (n.status === 'NEW') n.status = 'SEEN'; }, '/read');
 }
 // Le badge du menu suit la cloche en continu (plus seulement à l'ouverture du tableau de bord)
 { const _br = bellRender; bellRender = function () { const r = _br.apply(this, arguments); try { const nb = document.getElementById('dg-nb'), n = BELL.list.length; if (nb) { nb.textContent = n > 99 ? '99+' : n; nb.style.display = n ? 'inline-block' : 'none'; } } catch (e) {} return r; }; }

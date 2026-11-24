@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { classify, groupKey } from './notification-folders';
 
 // Centre de notifications : génère les alertes du cahier des charges §27
 // (stock sous seuil, entretien dépassé, permis bientôt expiré, etc.)
@@ -9,7 +10,8 @@ export class NotificationsService {
 
   // Chaque utilisateur voit les alertes générales + celles adressées à son rôle et à son site.
   // L'Administrateur Général voit tout.
-  findAll(unreadOnly = false, actor?: { role: string; siteId?: string }) {
+  // opts.all : inclut les alertes déjà lues (centre d'alertes) ; sinon comportement historique (cloche).
+  findAll(unreadOnly = false, actor?: { role: string; siteId?: string }, opts: { all?: boolean; limit?: number } = {}) {
     const scope: any =
       !actor || actor.role === 'SUPER_ADMIN'
         ? {}
@@ -19,13 +21,18 @@ export class NotificationsService {
               ...(actor.siteId ? [{ OR: [{ siteId: null }, { siteId: actor.siteId }] }] : []),
             ],
           };
+    const limit = Math.min(Math.max(opts.limit || 100, 1), 400);
     return this.prisma.notification
       .findMany({
         where: { ...(unreadOnly ? { isRead: false } : {}), ...scope },
         orderBy: { createdAt: 'desc' },
-        take: 200,
+        take: opts.all ? limit * 2 : 200,
       })
-      .then((list) => (actor ? list.filter((n) => NotificationsService.relevantFor(actor.role, n)) : list).slice(0, 100));
+      .then((list) =>
+        (actor ? list.filter((n) => NotificationsService.relevantFor(actor.role, n)) : list)
+          .slice(0, limit)
+          .map((n) => ({ ...n, ...classify(n), groupKey: groupKey(n), handled: n.status === 'HANDLED' })),
+      );
   }
 
   // Pertinence métier des alertes générales (sans destinataire) : chaque rôle ne voit que ce qui le concerne.
@@ -57,12 +64,30 @@ export class NotificationsService {
   }
 
   // Marquer « lu » : seulement une alerte que l'utilisateur est autorisé à voir (aucune modification des alertes d'autres rôles).
-  async markRead(id: string, actor?: { role: string; siteId?: string }) {
+  private async assertVisible(id: string, actor?: { role: string; siteId?: string }) {
     if (actor && actor.role !== 'SUPER_ADMIN') {
-      const visible = await this.findAll(false, actor);
+      const visible = await this.findAll(false, actor, { all: true, limit: 400 });
       if (!visible.some((n) => n.id === id)) throw new ForbiddenException('Alerte non accessible.');
     }
-    return this.prisma.notification.update({ where: { id }, data: { isRead: true } });
+  }
+
+  // « Lu » ≠ « traité » : lire ne change jamais le statut de traitement.
+  async markRead(id: string, actor?: { role: string; siteId?: string }) {
+    await this.assertVisible(id, actor);
+    const cur = await this.prisma.notification.findUnique({ where: { id } });
+    return this.prisma.notification.update({ where: { id }, data: { isRead: true, status: cur && cur.status === 'NEW' ? 'SEEN' : undefined } });
+  }
+
+  async markUnread(id: string, actor?: { role: string; siteId?: string }) {
+    await this.assertVisible(id, actor);
+    const cur = await this.prisma.notification.findUnique({ where: { id } });
+    return this.prisma.notification.update({ where: { id }, data: { isRead: false, status: cur && cur.status === 'SEEN' ? 'NEW' : undefined } });
+  }
+
+  // Traité : l'alerte est prise en charge (elle reste dans l'historique, filtre « Traitées »).
+  async markHandled(id: string, handled: boolean, actor?: { role: string; siteId?: string }) {
+    await this.assertVisible(id, actor);
+    return this.prisma.notification.update({ where: { id }, data: handled ? { status: 'HANDLED', isRead: true } : { status: 'SEEN' } });
   }
 
   create(title: string, message: string, severity: 'INFO' | 'WARNING' | 'CRITICAL', entity?: string, entityId?: string) {
