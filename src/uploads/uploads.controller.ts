@@ -31,6 +31,15 @@ export class UploadsController {
     if (!file) throw new BadRequestException('Aucun fichier reçu.');
     const ext = extname(file.originalname).toLowerCase();
     if (!MIME[ext]) throw new BadRequestException(`Extension non autorisée : ${ext}`);
+    // Le contenu doit correspondre à l'extension (un script renommé en .jpg est refusé)
+    const b = file.buffer;
+    const ok =
+      (['.jpg', '.jpeg'].includes(ext) && b[0] === 0xff && b[1] === 0xd8) ||
+      (ext === '.png' && b.slice(0, 4).toString('hex') === '89504e47') ||
+      (ext === '.pdf' && b.slice(0, 4).toString() === '%PDF') ||
+      (ext === '.webp' && b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP') ||
+      (ext === '.heic' && b.slice(4, 8).toString() === 'ftyp');
+    if (!ok) throw new BadRequestException("Le contenu du fichier ne correspond pas à son type (JPG, PNG, WEBP, PDF ou HEIC attendus).");
     const name = `${uuid()}${ext}`;
     await this.prisma.$executeRaw`INSERT INTO uploaded_files (name, mime, size, data) VALUES (${name}, ${MIME[ext]}, ${file.size}, ${file.buffer})`;
     return {
