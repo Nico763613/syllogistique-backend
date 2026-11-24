@@ -27,6 +27,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { QrcodesModule } from './qrcodes/qrcodes.module';
 import { MessagingModule } from './messaging/messaging.module';
 import { StaffModule } from './staff/staff.module';
+import { SimulationModule } from './simulation/simulation.module';
 import { SettingsModule } from './settings/settings.module';
 import { SitesModule } from './sites/sites.module';
 import { DocumentsModule } from './documents/documents.module';
@@ -73,6 +74,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     QrcodesModule,
     MessagingModule,
     StaffModule,
+    SimulationModule,
     SettingsModule,
     SitesModule,
     DocumentsModule,

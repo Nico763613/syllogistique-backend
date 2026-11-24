@@ -502,6 +502,7 @@
 
       <div class="nav-section-label"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Équipes</div>
       <div class="nav-item" data-view="signalements" data-roles="SUPER_ADMIN" onclick="go('signalements')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg></span> Signalements</div>
+      <div class="nav-item" data-view="simulation" data-roles="SUPER_ADMIN" style="display:none" onclick="go('simulation')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg></span><span>Simulation (test)</span></div>
       <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-building"/></svg></span> Responsables (DG &amp; Logistique)</div>
       <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-mech')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span> Mécaniciens &amp; rapports</div>
 
@@ -662,6 +663,45 @@ function togglePassword() {
   const show = i.type === 'password';
   i.type = show ? 'text' : 'password';
   document.getElementById('pw-toggle').innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-' + (show ? 'eye-off' : 'eye') + '"/></svg>';
+}
+
+/* ---------- ENVIRONNEMENT DE SIMULATION : comptes de test, bandeau d'avertissement ---------- */
+var SIM = { on: false };
+async function simBoot() {
+  try {
+    const base = (state.apiUrl || localStorage.getItem('syllo_api_url') || DEFAULT_API_URL).replace(/\/$/, '');
+    const r = await fetch(base + '/health'); const j = await r.json();
+    SIM.on = !!(j && j.simulation);
+  } catch (e) { SIM.on = false; }
+  if (!SIM.on) return;
+  if (!document.getElementById('sim-bar')) {
+    const b = document.createElement('div'); b.id = 'sim-bar';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2500;background:#C9A24D;color:#0F2747;font-weight:700;font-size:12px;text-align:center;padding:3px 6px;letter-spacing:.3px';
+    b.textContent = 'MODE SIMULATION — données de test, la production n\'est pas touchée';
+    document.body.appendChild(b); document.body.style.paddingTop = '22px';
+  }
+  try { applyRoleNav(); } catch (e) {}
+}
+setTimeout(simBoot, 80);
+async function renderSimulation() {
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Simulation de l'entreprise</h3>
+    <div class="desc">Environnement de test isolé : tout ce que vous faites ici n'affecte jamais la production. Vous jouez le PDG avec votre compte ; préparez les comptes de test des autres espaces, installez chacun sur un téléphone, puis testez le circuit complet.</div>
+    <button class="btn gold" style="margin-top:10px" onclick="simSetup()">Préparer les comptes de test et leurs invitations</button><div id="sim-msg"></div></div>
+    <div id="sim-list"></div>
+    <div class="panel"><h3>Scénario à tester</h3><ol style="margin:0;padding-left:18px;font-size:14px;line-height:1.7">
+      <li>Vous (PDG) êtes connecté à votre espace.</li><li>Le Directeur Général de test crée le compte du Responsable logistique.</li>
+      <li>Le Responsable logistique enregistre un chauffeur et lui envoie l'invitation WhatsApp.</li><li>Le chauffeur installe l'application, crée son mot de passe et retrouve son tableau de bord.</li>
+      <li>Le Responsable logistique suit l'activité du chauffeur ; le Directeur Général et vous consultez ce qui relève de vos responsabilités.</li></ol></div>`;
+}
+async function simSetup() {
+  const m = document.getElementById('sim-msg'), box = document.getElementById('sim-list'); m.innerHTML = '<div class="empty">Préparation…</div>';
+  try {
+    const link = location.origin + location.pathname.replace(/index\.html$/, '');
+    const r = await api('/simulation/setup', { method: 'POST', body: { appUrl: link } }); window._simAcc = r.accounts;
+    m.innerHTML = '<div class="msg ok">Comptes de test prêts. Chaque lien est personnel, valable 72 h et à usage unique.</div>';
+    box.innerHTML = `<div class="panel"><h3>Comptes de test</h3>${r.accounts.map((a, i) => `<div style="padding:10px 0;border-bottom:1px solid var(--line)"><b>${esc(a.name)}</b> <span class="badge warn">TEST</span><div style="font-size:12px;color:var(--muted)">${esc(a.label)} · connexion : ${esc(a.phone)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><a class="btn small gold" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(a.message)}">Envoyer par WhatsApp</a><button class="btn small" onclick="navigator.clipboard.writeText(window._simAcc[${i}].message).then(()=>alert('Message copié.'))">Copier le message</button></div></div>`).join('')}</div>`;
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 /* ---------- Invitation WhatsApp : le collaborateur crée lui-même son mot de passe (lien individuel, 72 h, usage unique) ---------- */
 function inviteClose() { const o = document.getElementById('inv-ov'); if (o) o.remove(); try { const u = new URL(location.href); u.searchParams.delete('invite'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) {} }
@@ -1609,6 +1649,7 @@ function applyRoleNav() {
   let any = false;
   document.querySelectorAll('.nav-item[data-roles]').forEach((el) => {
     let ok = el.dataset.roles.split(',').includes(role);
+    if (ok && el.dataset.view === 'simulation' && !SIM.on) ok = false;
     if (ok && ['caisse', 'ventes', 'dash-commercial'].includes(el.dataset.view) && !moduleOn('COMMERCIAL')) ok = false;
     el.style.display = ok ? '' : 'none';
     if (ok) any = true;
@@ -1663,6 +1704,7 @@ async function renderView(view) {
     if (STAFF_CFG[view]) return await (renderStaff(view));
     if (view === 'signalements') return await (renderProblemReports());
     if (view === 'staff-managers') return await (renderManagers());
+    if (view === 'simulation') return await (renderSimulation());
     if (view === 'personnel') return await (renderPersonnel());
     if (view === 'my-report') return await (renderMyReport());
     if (view === 'enrol') return await (renderEnrol());

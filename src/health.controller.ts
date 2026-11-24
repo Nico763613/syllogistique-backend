@@ -7,6 +7,6 @@ export class HealthController {
   @Public()
   @Get()
   ok() {
-    return { status: 'ok' };
+    return { status: 'ok', simulation: process.env.SIMULATION_MODE === 'true' };
   }
 }
