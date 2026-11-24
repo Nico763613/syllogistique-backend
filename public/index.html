@@ -1854,13 +1854,22 @@ async function loadVehicleDocs() {
     const stat = (d) => {
       if (!d.expiryDate) return '<span class="badge info">Sans échéance</span>';
       const days = Math.ceil((new Date(d.expiryDate) - Date.now()) / 86400000);
-      return days < 0 ? `<span class="badge bad">Expiré (${-days} j)</span>` : days <= 30 ? `<span class="badge warn">Expire dans ${days} j</span>` : '<span class="badge ok">Valide</span>';
+      return days < 0 ? `<span class="badge bad">Expiré (${-days} j)</span>` : days <= 7 ? `<span class="badge bad">Urgent : ${days} j</span>` : days <= 30 ? `<span class="badge warn">Expire dans ${days} j</span>` : '<span class="badge ok">Valide</span>';
     };
     docs.sort((a, b) => (a.expiryDate ? new Date(a.expiryDate) : 8.64e15) - (b.expiryDate ? new Date(b.expiryDate) : 8.64e15));
-    box.innerHTML = docs.length ? `<table><thead><tr><th>Véhicule</th><th>Document</th><th>Référence</th><th>Échéance</th><th>État</th></tr></thead><tbody>${docs.map(d => `
+    box.innerHTML = docs.length ? `<table><thead><tr><th>Véhicule</th><th>Document</th><th>Référence</th><th>Échéance</th><th>État</th><th></th></tr></thead><tbody>${docs.map(d => `
       <tr><td>${esc(d.vehicle?.internalNumber)} — ${esc(d.vehicle?.registrationNumber)}</td><td>${esc(names[d.type] || d.type)}</td><td>${esc(d.fileUrl)}</td>
-      <td>${d.expiryDate ? new Date(d.expiryDate).toLocaleDateString('fr-FR') : '—'}</td><td>${stat(d)}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun document enregistré. Les échéances déclenchent une alerte 30 jours avant.</div>';
+      <td>${d.expiryDate ? new Date(d.expiryDate).toLocaleDateString('fr-FR') : '—'}</td><td>${stat(d)}</td><td>${d.expiryDate && MP_FLEET.includes((state.user && state.user.role) || '') ? `<button class="btn small" onclick="renewVehicleDoc('${d.id}')">Renouveler</button>` : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun document enregistré. Les échéances déclenchent une alerte 30 jours puis 7 jours avant.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function renewVehicleDoc(id) {
+  const exp = prompt('Nouvelle date d\'échéance (AAAA-MM-JJ) :');
+  if (!exp) return;
+  const ref = prompt('Nouvelle référence du document (laisser vide pour garder l\'ancienne) :') || '';
+  try {
+    await api('/documents/' + id + '/renew', { method: 'POST', body: { expiryDate: exp, ...(ref.trim() ? { fileUrl: ref.trim() } : {}) } });
+    renderView(state.view);
+  } catch (e) { alert(e.message); }
 }
 async function addVehicleDoc() {
   const msg = document.getElementById('dc-msg');
