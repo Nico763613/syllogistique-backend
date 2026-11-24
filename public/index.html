@@ -503,6 +503,7 @@
       <div class="nav-section-label"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg> Équipes</div>
       <div class="nav-item" data-view="signalements" data-roles="SUPER_ADMIN" onclick="go('signalements')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg></span> Signalements</div>
       <div class="nav-item" data-view="staff-managers" data-roles="SUPER_ADMIN" onclick="go('staff-managers')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-building"/></svg></span> Responsables (DG &amp; Logistique)</div>
+      <div class="nav-item" data-view="simulation" data-roles="SUPER_ADMIN" onclick="go('simulation')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg></span> Mode simulation</div>
       <div class="nav-item" data-view="staff-mech" data-roles="SUPER_ADMIN,ADMIN_LOGISTIQUE,LECTEUR" onclick="go('staff-mech')"><span class="nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-wrench"/></svg></span> Mécaniciens &amp; rapports</div>
 
       <div class="nav-section-label">Système</div>
@@ -958,7 +959,7 @@ const titles = {
   ventes: 'Ventes',
   compta: 'Comptabilité',
   atelier: 'Atelier',
-  personnel: 'Gestion du personnel', home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'fleet-trucks': 'Flotte — Camions', 'fleet-service': 'Flotte — Véhicules de service', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
+  personnel: 'Gestion du personnel', simulation: 'Mode simulation', home: 'Accueil', dashboard: 'Tableau de bord', vehicles: 'Camions & Véhicules', trucks: 'Camions', 'fleet-trucks': 'Flotte — Camions', 'fleet-service': 'Flotte — Véhicules de service', 'service-vehicles': 'Véhicules de service', drivers: 'Chauffeurs',
   fuel: 'Carburant', maintenance: 'Maintenance', stock: 'Stocks', purchases: 'Achats & approvisionnement', needs: 'États des besoins', daily: 'Rapports journaliers', 'staff-hse': 'Agents HSE & rapports', 'staff-store': 'Magasiniers & rapports', 'my-report': 'Mon rapport du jour', 'espace': 'Mon espace de travail', 'pointage': 'Pointage des chauffeurs', 'pilotage': 'Tableau de bord Directeur Général', 'espace-logi': 'Espace Responsable logistique', 'staff-mech': 'Mécaniciens & rapports', 'staff-pointer': 'Pointeurs & rapports', 'staff-managers': 'Responsables', 'reports-truck': 'Rapports camions', 'reports-service': 'Rapports véhicules de service', 'reports-drivers': 'Rapports — chauffeurs & pointages', 'reports-stock': 'Rapports — stock', 'reports-hse': 'Rapports — HSE', 'ops-validation': 'Validation des fiches', 'reports-dg': 'Rapports — synthèse DG', 'enrol': 'Enrôlement WhatsApp',
   sync: 'Synchronisation', settings: 'Paramètres', 'driver-devices': 'Appareils chauffeurs', 'driver-sheets': 'Fiches de bord', 'driver-board': 'Suivi des chauffeurs', 'driver-missions': 'Historique des missions', 'driver-expenses': 'Dépenses chauffeurs',
   'dash-logistics': 'Achats & Approvisionnement', 'dash-stock': 'Entrepôt & Stocks', 'dash-commercial': 'Commercial & Caisse',
@@ -1664,6 +1665,7 @@ async function renderView(view) {
     if (view === 'signalements') return await (renderProblemReports());
     if (view === 'staff-managers') return await (renderManagers());
     if (view === 'personnel') return await (renderPersonnel());
+    if (view === 'simulation') return await (renderSimulation());
     if (view === 'my-report') return await (renderMyReport());
     if (view === 'enrol') return await (renderEnrol());
     if (view === 'reports-drivers') return await (renderReportDrivers());
@@ -3760,6 +3762,7 @@ const DG_MENU = [
   { t: 'Personnel', s: 'Gestion des accès', ic: 'users', sa: { v: 'staff-managers', vs: ['staff-managers', 'staff-store', 'staff-mech', 'staff-hse', 'drivers', 'enrol', 'pointage', 'driver-devices', 'driver-board'] } },
   { t: 'Analyses & Statistiques', s: 'Bilans et graphiques', ic: 'chart', sa: { v: 'pilotage', vs: ['pilotage', 'dash-fleet', 'dash-stock', 'dash-logistics', 'dash-hse'] }, dg: { v: 'pilotage', vs: ['pilotage'] } },
   { t: 'Gestion du personnel', s: 'Comptes & accès', ic: 'users', dg: { v: 'personnel', vs: ['personnel'] } },
+  { t: 'Mode simulation', s: 'Comptes de test', ic: 'zap', sa: { v: 'simulation', vs: ['simulation'] } },
   { t: 'Alertes & Notifications', s: 'Incidents & rappels', ic: 'bell', badge: true, sa: { act: 'dgAlertsGo()', vs: [] }, dg: { act: 'dgAlertsGo()', vs: [] } },
   { t: 'Journal d’activité', s: 'Historique', ic: 'clock', sa: { act: 'openHistory()', vs: [] } },
 ];
@@ -4359,6 +4362,44 @@ async function mgLoad() {
       <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td>
       <td><button class="btn small gold" onclick="stInvite('${esc(u.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien par WhatsApp</button></td></tr>`).join('')}</table></div>` : '<div class="empty">Aucun responsable enregistré.</div>';
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+/* ---------------- MODE SIMULATION : comptes de test et données isolées du site de production ---------------- */
+async function renderSimulation() {
+  root().innerHTML = `
+    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg> MODE SIMULATION</h3>
+      <div class="desc">Un site « SIMULATION (TEST) » séparé de la production : vous y créez des comptes de test (Directeur général, Responsable logistique, Gestionnaire de stock, Chauffeur), vous les installez sur plusieurs téléphones et vous testez tout le circuit. Les données réelles ne sont jamais touchées.</div>
+      <div id="sim-sum"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn gold" onclick="simSetup()">Créer / mettre à jour les comptes de test</button><button class="btn" onclick="simReset()" style="border-color:#B33A32;color:#B33A32">Réinitialiser les données de simulation</button></div><div id="sim-msg"></div></div>
+    <div class="panel"><h3>Comptes de test</h3><div id="sim-acc"><div class="empty">Chargement…</div></div><div id="sim-links"></div></div>
+    <div class="panel"><h3>Scénario à jouer</h3><ol class="desc" style="margin:0;padding-left:20px"><li>Installez l'espace de chaque compte sur un téléphone (lien d'invitation).</li><li>Le DG crée un compte, le Responsable logistique enregistre un chauffeur.</li><li>Le chauffeur se connecte et retrouve son tableau de bord.</li><li>Le Responsable logistique suit son activité ; le DG consulte.</li></ol></div>`;
+  simLoad();
+}
+async function simLoad() {
+  const box = document.getElementById('sim-acc'); if (!box) return;
+  try {
+    const r = await api('/simulation');
+    if (!r.exists) { box.innerHTML = '<div class="empty">Aucun compte de test pour le moment. Touchez « Créer les comptes de test ».</div>'; document.getElementById('sim-sum').innerHTML = ''; return; }
+    const tot = r.counts.reduce((n, c) => n + c.rows, 0);
+    document.getElementById('sim-sum').innerHTML = `<div class="msg ok" style="margin-top:8px">${r.accounts.length} compte(s) de test · ${tot} donnée(s) de simulation enregistrée(s)</div>`;
+    box.innerHTML = `<div style="overflow:auto"><table><tr><th>Compte</th><th>Téléphone</th><th>État</th></tr>${r.accounts.map((a) => `<tr><td><b>${esc(a.name)}</b> <span class="badge warn">TEST</span></td><td>${esc(a.phone || '')}</td><td>${a.accepted ? '<span class="badge ok">Invitation acceptée</span>' : '<span class="badge warn">Invitation en attente</span>'}</td></tr>`).join('')}</table></div>`;
+  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function simSetup() {
+  const m = document.getElementById('sim-msg'); m.innerHTML = '<div class="empty">Création en cours…</div>';
+  try {
+    const link = location.origin + location.pathname.replace(/index\.html$/, '');
+    const r = await api('/simulation/setup', { method: 'POST', body: { appUrl: link } });
+    window._simLinks = r.links;
+    m.innerHTML = '<div class="msg ok">Comptes de test prêts. Copiez chaque lien et ouvrez-le sur le téléphone concerné : la personne crée son mot de passe (lien personnel, valable 72 h, à usage unique).</div>';
+    document.getElementById('sim-links').innerHTML = r.links.map((l, i) => `<div class="drv-row"><span><b>${esc(l.name)}</b></span><span><button class="btn small gold" onclick="navigator.clipboard.writeText(window._simLinks[${i}].link).then(()=>alert('Lien copié'))">Copier le lien</button> <a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('SYL LOGISTIQUE (test) : ' + l.link)}">WhatsApp</a></span></div>`).join('');
+    simLoad();
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function simReset() {
+  const t = prompt('Cette action supprime TOUTES les données du site de simulation (missions, carburant, stocks, rapports…). Les comptes de test sont conservés et les données réelles ne sont pas touchées.\n\nPour confirmer, tapez : REINITIALISER'); if (t === null) return;
+  const m = document.getElementById('sim-msg'); m.innerHTML = '<div class="empty">Réinitialisation…</div>';
+  try { const r = await api('/simulation/reset', { method: 'POST', body: { confirm: t.trim() } }); m.innerHTML = `<div class="msg ok">Simulation réinitialisée (${r.deleted.reduce((n, c) => n + c.rows, 0)} ligne(s) supprimée(s) du site de test).</div>`; simLoad(); }
+  catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 /* ---------------- GESTION DU PERSONNEL (hiérarchie : chacun gère uniquement son domaine, contrôlé aussi côté serveur) ---------------- */
 const PERS_CFG = {

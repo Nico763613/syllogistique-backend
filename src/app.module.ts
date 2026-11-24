@@ -42,6 +42,7 @@ import { BrandingModule } from './branding/branding.module';
 import { SupportModule } from './support/support.module';
 import { SignupModule } from './signup/signup.module';
 import { LicenseModule } from './license/license.module';
+import { SimulationModule } from './simulation/simulation.module';
 
 import { HealthController } from './health.controller';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -88,6 +89,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     SupportModule,
     SignupModule,
     LicenseModule,
+    SimulationModule,
   ],
   controllers: [HealthController],
   providers: [
