@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { recordAssignment } from '../vehicles/assignments';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { currentFuelPrice } from '../common/fuel-price';
@@ -437,6 +438,7 @@ export class DriverAppService {
       this.prisma.vehicle.update({ where: { id: vehicleId }, data: { assignedDriverId: driver.id } }),
       this.prisma.trip.updateMany({ where: { vehicleId, status: 'PLANNED', ...(previous ? { driverId: previous.id } : {}) }, data: { driverId: driver.id } }),
     ]);
+    await recordAssignment(this.prisma, { vehicleId: v.id, newDriverId: driver.id, by: userId, reason: `Remplacement (${reason})${note ? ' : ' + note : ''}`, source: 'REMPLACEMENT' });
     const labels: Record<string, string> = { MALADIE: 'maladie', CONGE: 'congé', AUTRE: 'autre motif' };
     const msg = `${driver.firstName} ${driver.lastName} remplace ${previous ? previous.firstName + ' ' + previous.lastName : 'aucun chauffeur'} sur ${v.registrationNumber} (${labels[reason]})${note ? ' : ' + note : ''}.`;
     await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: v.siteId, severity: 'WARNING', entity: 'Vehicle', entityId: v.id, title: `Remplacement de chauffeur — ${v.internalNumber}`, message: msg });

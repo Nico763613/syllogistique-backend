@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { recordAssignment } from '../vehicles/assignments';
 import { createHash, randomBytes, randomInt } from 'crypto';
 import * as QRCode from 'qrcode';
 import * as bcrypt from 'bcrypt';
@@ -197,6 +198,8 @@ export class DriverDevicesService {
       this.prisma.vehicle.updateMany({ where: { assignedDriverId: oldDriver.id }, data: { assignedDriverId: target.id } }),
       this.prisma.trip.updateMany({ where: { driverId: oldDriver.id, status: 'PLANNED' }, data: { driverId: target.id } }),
     ]);
+    const moved = await this.prisma.vehicle.findMany({ where: { assignedDriverId: target.id, deletedAt: null }, select: { id: true } });
+    for (const mv of moved) await recordAssignment(this.prisma, { vehicleId: mv.id, newDriverId: target.id, by: actor.userId, reason: `Transfert d'appareil${reason ? ' (' + reason + ')' : ''}`, source: 'TRANSFERT' });
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'DriverDevice', entityId: id, oldValue: { driverId: oldDriver.id }, newValue: { driverId: target.id }, reason: `Remplacement${reason ? ' (' + reason + ')' : ''} : ${oldDriver.firstName} ${oldDriver.lastName} → ${target.firstName} ${target.lastName}` });
     return { deviceId: id, driver: `${target.firstName} ${target.lastName}` };
   }
