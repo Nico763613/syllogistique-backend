@@ -1,3 +1,4 @@
+import { nextDocNumber, maxSeqOf } from '../common/doc-numbers';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import PDFDocument = require('pdfkit');
 import { PrismaService } from '../prisma.service';
@@ -10,12 +11,12 @@ import { InventoryService } from '../inventory/inventory.service';
 export class PurchasesService {
   constructor(private prisma: PrismaService, private audit: AuditService, private inventory: InventoryService) {}
 
-  private async nextReference(prefix: string, model: 'purchaseOrder' | 'purchaseInvoice') {
-    const year = new Date().getFullYear();
-    const count = await (this.prisma[model] as any).count({
-      where: { reference: { startsWith: `${prefix}-${year}-` } },
-    });
-    return `${prefix}-${year}-${String(count + 1).padStart(4, '0')}`;
+  // Numérotation centrale atomique (voir common/doc-numbers.ts) : jamais de doublon ni de numéro réutilisé.
+  private async nextReference(prefix: string, model: 'purchaseOrder' | 'purchaseInvoice', by?: string) {
+    return nextDocNumber(this.prisma as any, prefix, prefix, async (year) => {
+      const rows = await (this.prisma[model] as any).findMany({ where: { reference: { startsWith: `${prefix}-${year}-` } }, select: { reference: true } });
+      return maxSeqOf(rows.map((r: any) => r.reference));
+    }, { by });
   }
 
   // ---- Bons de commande fournisseur ----
@@ -23,7 +24,7 @@ export class PurchasesService {
   async createOrder(dto: CreatePurchaseOrderDto, actorId: string) {
     if (!dto.lines?.length) throw new BadRequestException('Le bon de commande doit contenir au moins une ligne.');
 
-    const reference = await this.nextReference('BC', 'purchaseOrder');
+    const reference = await this.nextReference('BC', 'purchaseOrder', actorId);
     const order = await this.prisma.purchaseOrder.create({
       data: {
         siteId: dto.siteId,
@@ -231,7 +232,7 @@ export class PurchasesService {
     for (const group of suggestions.suppliers) {
       const lines = group.lines.filter((l) => !dto.itemIds || dto.itemIds.includes(l.itemId));
       if (lines.length === 0) continue;
-      const reference = await this.nextReference('BC', 'purchaseOrder');
+      const reference = await this.nextReference('BC', 'purchaseOrder', actorId);
       const order = await this.prisma.purchaseOrder.create({
         data: {
           siteId: dto.siteId,
@@ -381,7 +382,7 @@ export class PurchasesService {
     if (!order) throw new NotFoundException('Bon de commande introuvable.');
 
     const totalAmount = order.lines.reduce((sum, l) => sum + Number(l.lineTotal), 0);
-    const reference = await this.nextReference('FA', 'purchaseInvoice');
+    const reference = await this.nextReference('FA', 'purchaseInvoice', actorId);
 
     const invoice = await this.prisma.purchaseInvoice.create({
       data: {
