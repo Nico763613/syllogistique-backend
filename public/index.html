@@ -1087,14 +1087,57 @@ document.addEventListener('input', () => { clearTimeout(DRAFT.t); DRAFT.t = setT
 document.addEventListener('change', () => { clearTimeout(DRAFT.t); DRAFT.t = setTimeout(draftSave, 300); }, true);
 
 state.hist = []; state.ign = 0;
-function goBackBtn() { const b = document.getElementById('back-btn'); if (b) b.style.display = state.hist.length ? '' : 'none'; }
+function goBackBtn() { const b = document.getElementById('back-btn'); if (b) b.style.display = (state.hist.length || (state.view && state.view !== 'dashboard')) ? '' : 'none'; }
 // Flèche ← (et bouton retour du téléphone) : revient à l'écran précédent sans quitter l'application.
 function goBack(fromPop) {
-  if (!state.hist.length) return;
+  if (ovTop()) { ovClose(ovTop()); return; }
+  if (!state.hist.length) { if (state.view && state.view !== 'dashboard') go('dashboard', true); return; }
   const v = state.hist.pop();
   go(v, true);
   if (!fromPop) { try { state.ign++; history.back(); } catch (e) { state.ign = 0; } }
 }
+
+/* ---- Retour sur chaque fenêtre ouverte (fiche véhicule, historique, alertes, formulaires…) : bouton « ← Retour » + bouton retour du téléphone ---- */
+const OV_IDS = ['fl-ov', 'hist-overlay', 'report-ov', 'dt-ov', 'su-ov', 'ph-ov', 'al-overlay', 'pe-overlay', 'install-help', 'at-ov', 'lic-ov', 'pin-ov'];
+const OV = { ign: 0, tracked: new Map() };
+function ovTop() { let top = null; OV.tracked.forEach((n) => { if (n.isConnected) top = n; }); return top; }
+function ovClose(n) {
+  if (!n) return;
+  if (n.id === 'al-overlay' && typeof alertsCenterClose === 'function') alertsCenterClose();
+  else if (n.id === 'ph-ov' && typeof closePhotoEditor === 'function') closePhotoEditor();
+  else n.remove();
+}
+(function ovInit() {
+  if (!document.getElementById('ov-back-css')) { const st = document.createElement('style'); st.id = 'ov-back-css'; st.textContent = '.ov-back{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:6px;width:100%;background:#1F3A5F;color:#fff;border:0;border-bottom:2px solid #C9A24D;padding:12px 16px;font-size:16px;font-weight:700;cursor:pointer;text-align:left;min-height:48px}.ov-back.in{position:static;border-radius:8px;margin-bottom:10px}.ov-back:active{opacity:.85}'; document.head.appendChild(st); }
+  const add = (n) => {
+    let host = n;
+    try { if (getComputedStyle(n).display.includes('flex') && n.firstElementChild) host = n.firstElementChild; } catch (e) {}
+    if (host.querySelector(':scope > .ov-back')) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ov-back' + (host === n ? '' : ' in'); b.setAttribute('aria-label', 'Retour'); b.innerHTML = '← Retour'; b.onclick = (e) => { e.stopPropagation(); ovClose(n); };
+    host.insertBefore(b, host.firstChild);
+  };
+  new MutationObserver((recs) => {
+    const added = [], removed = [];
+    recs.forEach((r) => { r.addedNodes.forEach((n) => { if (n.nodeType === 1 && OV_IDS.includes(n.id)) added.push(n); }); r.removedNodes.forEach((n) => { if (n.nodeType === 1 && OV.tracked.get(n.id) === n && !n.isConnected) removed.push(n); }); });
+    added.forEach((n) => { add(n); });
+    const addedIds = added.map((n) => n.id);
+    removed.forEach((n) => {
+      const replaced = addedIds.includes(n.id);
+      OV.tracked.delete(n.id);
+      if (!replaced) { try { OV.ign++; history.back(); } catch (e) { OV.ign = 0; } }
+    });
+    added.forEach((n) => {
+      const had = removed.some((r) => r.id === n.id);
+      OV.tracked.set(n.id, n);
+      if (!had) { try { history.pushState({ ov: 1 }, ''); } catch (e) {} }
+    });
+  }).observe(document.body, { childList: true });
+  window.addEventListener('popstate', (e) => {
+    if (OV.ign > 0) { OV.ign--; e.stopImmediatePropagation(); return; }
+    const t = ovTop();
+    if (t) { e.stopImmediatePropagation(); const id = t.id; OV.tracked.delete(id); ovClose(t); }
+  });
+})();
 window.addEventListener('popstate', () => { if (state.ign > 0) { state.ign--; return; } if (state.hist.length && document.getElementById('back-btn') && !(window.DRV && DRV.hist && DRV.hist.length)) goBack(true); });
 function go(view, noPush) {
   if (!noPush && state.view && state.view !== view) { state.hist.push(state.view); if (state.hist.length > 30) state.hist.shift(); try { history.pushState({ off: 1 }, ''); } catch (e) {} }
