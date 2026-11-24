@@ -1,3 +1,4 @@
+import { nextDocNumber, maxSeqOf } from '../common/doc-numbers';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -12,12 +13,12 @@ const DISCOUNT_CAPS = { CASHIER_DISCOUNT_CAP_PERCENT: 5, MANAGER_DISCOUNT_CAP_PE
 export class SalesService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  private async nextReference(prefix: string, model: 'salesOrder' | 'salesInvoice') {
-    const year = new Date().getFullYear();
-    const count = await (this.prisma[model] as any).count({
-      where: { reference: { startsWith: `${prefix}-${year}-` } },
-    });
-    return `${prefix}-${year}-${String(count + 1).padStart(4, '0')}`;
+  // Numérotation centrale atomique (voir common/doc-numbers.ts) : jamais de doublon ni de numéro réutilisé.
+  private async nextReference(prefix: string, model: 'salesOrder' | 'salesInvoice', by?: string) {
+    return nextDocNumber(this.prisma as any, prefix, prefix, async (year) => {
+      const rows = await (this.prisma[model] as any).findMany({ where: { reference: { startsWith: `${prefix}-${year}-` } }, select: { reference: true } });
+      return maxSeqOf(rows.map((r: any) => r.reference));
+    }, { by });
   }
 
   // ---- Devis / Bon de commande client ----
@@ -39,7 +40,7 @@ export class SalesService {
 
     const status = dto.status ?? 'QUOTE';
     const prefix = status === 'QUOTE' ? 'DEV' : 'BCC';
-    const reference = await this.nextReference(prefix, 'salesOrder');
+    const reference = await this.nextReference(prefix, 'salesOrder', actor.userId);
 
     const order = await this.prisma.salesOrder.create({
       data: {
@@ -212,7 +213,7 @@ export class SalesService {
       ? Math.round(costed.reduce((a, c) => a + c.qty * (c.cost as number), 0))
       : undefined;
 
-    const reference = await this.nextReference('FV', 'salesInvoice');
+    const reference = await this.nextReference('FV', 'salesInvoice', actor.userId);
     const earliest = installments.length
       ? installments.map((i) => new Date(i.dueDate)).sort((a, b) => +a - +b)[0]
       : dto.dueDate ? new Date(dto.dueDate) : undefined;

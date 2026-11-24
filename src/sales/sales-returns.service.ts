@@ -1,3 +1,4 @@
+import { nextDocNumber, maxSeqOf } from '../common/doc-numbers';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -10,10 +11,11 @@ import { CreateSalesReturnDto } from './dto/return.dto';
 export class SalesReturnsService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  private async nextReference() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.salesReturn.count({ where: { reference: { startsWith: `AV-${year}-` } } });
-    return `AV-${year}-${String(count + 1).padStart(4, '0')}`;
+  private async nextReference(by?: string) {
+    return nextDocNumber(this.prisma as any, 'AV', 'AV', async (year) => {
+      const rows = await this.prisma.salesReturn.findMany({ where: { reference: { startsWith: `AV-${year}-` } }, select: { reference: true } });
+      return maxSeqOf(rows.map((r) => r.reference || ''));
+    }, { by });
   }
 
   private checkSite(actor: Actor, siteId: string) {
