@@ -93,6 +93,9 @@ jobs:
       - name: Test d'interface par rôles et création d'un client
         run: node scripts/ui-roles.js
       - run: sleep 61
+      - name: Test d'interface livraison et rôles terrain
+        run: node scripts/ui-livraison.js
+      - run: sleep 61
       - run: node scripts/smoke.js
       - if: failure()
         run: tail -80 server.log
