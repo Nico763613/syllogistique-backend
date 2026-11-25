@@ -78,6 +78,8 @@ jobs:
           for i in $(seq 1 40); do curl -sf http://localhost:3000/health && break; sleep 2; done
       - run: node scripts/functional.js
       - run: sleep 61
+      - run: node scripts/functional2.js
+      - run: sleep 61
       - run: node scripts/smoke.js
       - if: failure()
         run: tail -80 server.log
