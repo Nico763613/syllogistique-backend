@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { RoleName } from '@prisma/client';
 import { SalesService } from './sales.service';
 import { SalesDocumentsService } from './sales-documents.service';
+import { SalesPdfsService } from './sales-pdfs.service';
 import { CreateSalesOrderDto, DeliverSalesOrderDto, CreateSalesInvoiceDto } from './dto/sale.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -22,6 +23,7 @@ export class SalesController {
   constructor(
     private salesService: SalesService,
     private salesDocuments: SalesDocumentsService,
+    private pdfs: SalesPdfsService,
     private messaging: MessagingService,
     private returns: SalesReturnsService,
   ) {}
@@ -84,6 +86,28 @@ export class SalesController {
       'Content-Disposition': `attachment; filename="facture.pdf"`,
     });
     res.send(buffer);
+  }
+
+  // Devis / commande, bon de livraison et reçu en PDF (mêmes droits que la facture)
+  @Get('orders/:id/pdf')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+  async orderPdf(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="devis-commande.pdf"' });
+    res.send(await this.pdfs.orderPdf(id, actor));
+  }
+
+  @Get('orders/:id/delivery-note')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+  async deliveryNote(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="bon-de-livraison.pdf"' });
+    res.send(await this.pdfs.deliveryNotePdf(id, actor));
+  }
+
+  @Get('payments/:id/receipt')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
+  async receipt(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="recu.pdf"' });
+    res.send(await this.pdfs.receiptPdf(id, actor));
   }
 
   // Envoie la facture PDF par email (SMTP à configurer dans .env — sinon envoi simulé/loggé)

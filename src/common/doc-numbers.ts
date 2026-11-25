@@ -36,3 +36,12 @@ export async function nextDocNumber(db: Db, docType: string, prefix: string, see
 export function maxSeqOf(refs: string[]): number {
   return refs.reduce((m, r) => { const n = parseInt(String(r).split('-').pop() || '0', 10); return Number.isFinite(n) && n > m ? n : m; }, 0);
 }
+
+// Numéro de reçu d'un encaissement (REC-AAAA-NNNN) : attribué une seule fois, à l'enregistrement du paiement (ou à la première édition pour les paiements antérieurs).
+export async function ensureReceiptNumber(db: Db, paymentId: string, by?: string): Promise<string> {
+  const read = async () => ((await db.$queryRawUnsafe('SELECT "receipt_number" AS n FROM "payments" WHERE "id" = $1', paymentId)) as any[])[0]?.n as string | undefined;
+  const cur = await read(); if (cur) return cur;
+  const n = await nextDocNumber(db, 'REC', 'REC', async (year) => maxSeqOf(((await db.$queryRawUnsafe('SELECT "receipt_number" AS n FROM "payments" WHERE "receipt_number" LIKE $1', `REC-${year}-%`)) as any[]).map((r) => r.n)), { by });
+  const set = (await db.$queryRawUnsafe('UPDATE "payments" SET "receipt_number" = $1 WHERE "id" = $2 AND "receipt_number" IS NULL RETURNING "receipt_number" AS n', n, paymentId)) as any[];
+  return set.length ? n : ((await read()) as string);
+}

@@ -79,19 +79,19 @@ export class SalesDocumentsService {
       for (const l of lines) {
         doc.text(l.item.name, 50, doc.y, { continued: true, width: 220 });
         doc.text(String(l.quantityOrdered), 280, doc.y, { continued: true, width: 60 });
-        doc.text(Number(l.unitPrice).toLocaleString('fr-FR'), 350, doc.y, { continued: true, width: 90 });
-        doc.text(Number(l.lineTotal).toLocaleString('fr-FR'), 450, doc.y);
+        doc.text(Number(l.unitPrice).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' '), 350, doc.y, { continued: true, width: 90 });
+        doc.text(Number(l.lineTotal).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' '), 450, doc.y);
       }
       if (!lines.length && invoice.description) doc.text(invoice.description, 50, doc.y, { width: 500 });
       doc.moveDown();
 
       doc.fontSize(10);
-      doc.text(`Sous-total : ${Number(invoice.subtotal).toLocaleString('fr-FR')} GNF`, { align: 'right' });
-      doc.text(`Remise : ${Number(invoice.discountAmount).toLocaleString('fr-FR')} GNF`, { align: 'right' });
-      doc.text(`Taxe : ${Number(invoice.taxAmount).toLocaleString('fr-FR')} GNF`, { align: 'right' });
-      doc.fontSize(12).fillColor('#163A5F').text(`TOTAL : ${Number(invoice.totalAmount).toLocaleString('fr-FR')} GNF`, { align: 'right' });
-      doc.fontSize(10).fillColor('#000').text(`Déjà payé : ${Number(invoice.amountPaid).toLocaleString('fr-FR')} GNF`, { align: 'right' });
-      doc.text(`Reste à payer : ${(Number(invoice.totalAmount) - Number(invoice.amountPaid)).toLocaleString('fr-FR')} GNF`, { align: 'right' });
+      doc.text(`Sous-total : ${Number(invoice.subtotal).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} GNF`, { align: 'right' });
+      doc.text(`Remise : ${Number(invoice.discountAmount).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} GNF`, { align: 'right' });
+      doc.text(`Taxe : ${Number(invoice.taxAmount).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} GNF`, { align: 'right' });
+      doc.fontSize(12).fillColor('#163A5F').text(`TOTAL : ${Number(invoice.totalAmount).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} GNF`, { align: 'right' });
+      doc.fontSize(10).fillColor('#000').text(`Déjà payé : ${Number(invoice.amountPaid).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} GNF`, { align: 'right' });
+      doc.text(`Reste à payer : ${(Number(invoice.totalAmount) - Number(invoice.amountPaid)).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ')} GNF`, { align: 'right' });
 
       // Zone signature / tampon
       doc.moveDown(3);
