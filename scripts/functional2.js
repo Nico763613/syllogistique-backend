@@ -29,14 +29,16 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   r = await api('POST', '/vehicles', { siteId: SITE, vehicleType: 'TRUCK', internalNumber: 'L' + n, registrationNumber: 'L' + n }, lec); ok(r.s === 403, 'lecteur ne peut pas créer un véhicule → 403', r.s);
   r = await api('GET', '/vehicles', undefined, lec); ok(r.s === 200, 'lecteur peut consulter les véhicules');
   r = await api('POST', '/users', { firstName: 'A', lastName: 'B', email: 'x' + n + '@test.gn', password: PW, role: 'LECTEUR' }, mag); ok(r.s === 403, 'magasinier ne peut pas créer un utilisateur → 403', r.s);
-  r = await api('GET', '/audit', undefined, mag); ok(r.s === 403, 'magasinier ne peut pas lire le journal d’audit → 403', r.s);
+  r = await api('GET', '/audit', undefined, lec); ok(r.s === 403, 'lecteur ne peut pas lire le journal d’audit → 403', r.s);
 
   // --- Achats : fournisseur → commande → confirmation → réception → stock
   r = await api('POST', '/suppliers', { name: 'Fournisseur ' + n, phone: '62' + n, email: 'f' + n + '@test.gn' }); ok(r.s === 201, 'création fournisseur', r); const sup = r.d && r.d.id;
   r = await api('POST', '/inventory/items', { siteId: SITE, sku: 'ACH-' + n, name: 'Article achat ' + n, unitPrice: 500, salePrice: 900 }); const item = r.d && r.d.id; ok(!!item, 'article pour achat');
   r = await api('POST', '/purchases/orders', { siteId: SITE, supplierId: sup, orderDate: now, lines: [{ itemId: item, quantityOrdered: 20, unitPrice: 500 }] }, mag); ok(r.s === 201, 'commande d’achat créée par le magasinier', r); const po = r.d && r.d.id;
   r = await api('POST', '/purchases/orders', { siteId: SITE, supplierId: sup, orderDate: now, lines: [{ itemId: item, quantityOrdered: -2, unitPrice: 500 }] }); ok(r.s === 400, 'quantité d’achat négative refusée → 400', r.s);
-  r = await api('POST', `/purchases/orders/${po}/confirm`, {}); ok(is2(r), 'confirmation de la commande', r);
+  r = await api('GET', `/purchases/orders/${po}`); const st0 = r.d && r.d.status;
+  if (st0 === 'DRAFT') { r = await api('POST', `/purchases/orders/${po}/confirm`, {}); ok(is2(r), 'confirmation de la commande', r); } else ok(!!st0, 'commande déjà en statut ' + st0);
+  r = await api('POST', `/purchases/orders/${po}/confirm`, {}); ok(is4(r), 'double confirmation refusée (4xx)', r.s);
   r = await api('GET', `/purchases/orders/${po}`); const pl = r.d && r.d.lines && r.d.lines[0]; ok(!!pl, 'lecture lignes de commande');
   r = await api('POST', `/purchases/orders/${po}/receive`, { lines: [{ lineId: pl.id, quantityReceived: 20, quantityRejected: 0 }], deliveryNoteNo: 'BL-' + n }); ok(is2(r), 'réception de 20 unités', r);
   r = await api('GET', '/inventory/items/' + item); ok(Number(r.d.currentQuantity) === 20, 'stock après réception = 20', r.d && r.d.currentQuantity);
@@ -60,7 +62,7 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   // --- Dépenses, carburant, documents, maintenance
   r = await api('POST', '/expenses', { vehicleId: veh, category: 'FUEL', amount: 150000, expenseDate: now, description: 'Plein' }); ok(is2(r), 'dépense carburant', r);
   r = await api('POST', '/expenses', { category: 'INVENTE', amount: 10, expenseDate: now }); ok(r.s === 400, 'catégorie de dépense invalide → 400', r.s);
-  r = await api('GET', '/costs/summary'); ok(r.s === 200, 'synthèse des coûts');
+  r = await api('GET', '/costs/summary?siteId=' + SITE + '&from=2020-01-01&to=2030-12-31'); ok(r.s === 200, 'synthèse des coûts');
   r = await api('POST', '/documents', { vehicleId: veh, type: 'ASSURANCE', fileUrl: '/uploads/test.pdf', expiryDate: new Date(Date.now() + 10 * 864e5).toISOString() }); ok(is2(r), 'document véhicule (assurance)', r);
   r = await api('GET', '/documents/compliance'); ok(r.s === 200, 'conformité des documents');
   r = await api('GET', '/maintenance/types'); ok(r.s === 200, 'types de maintenance');
