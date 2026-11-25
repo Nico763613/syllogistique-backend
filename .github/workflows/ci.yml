@@ -18,6 +18,8 @@ jobs:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
       - run: npm run build
       - run: node scripts/check-ui.js
+      - run: npm run build:ui
+      - run: test -s public/core.js
   master:
     name: master (tests avec vraie base PostgreSQL)
     runs-on: ubuntu-latest
