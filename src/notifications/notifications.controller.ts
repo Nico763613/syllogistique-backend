@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { RoleName } from '@prisma/client';
@@ -6,6 +6,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { RoleAlertsService } from './role-alerts.service';
+import { resolveSite } from '../dashboards/dashboard-common';
 
 @ApiTags('notifications')
 @ApiBearerAuth()
@@ -43,7 +44,9 @@ export class NotificationsController {
 
   @Post('run-checks')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
-  runChecks(@Query('siteId') siteId: string) {
-    return this.notificationsService.runDailyChecks(siteId);
+  runChecks(@Query('siteId') siteId: string, @CurrentUser() actor: any) {
+    const site = resolveSite(actor, siteId);
+    if (!site) throw new BadRequestException('Indiquez le site à contrôler (paramètre siteId).');
+    return this.notificationsService.runDailyChecks(site);
   }
 }

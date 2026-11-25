@@ -184,6 +184,7 @@ export class StaffService {
     if (!r) throw new NotFoundException('Rapport introuvable.');
     if (!r.receivedAt) throw new BadRequestException("Le rapport doit d'abord être vérifié par le responsable.");
     if (r.rejectedAt) throw new BadRequestException('Ce rapport a été rejeté.');
+    if (r.opsAt) throw new BadRequestException('Ce rapport est déjà validé.'); // ne pas écraser l'auteur et la date de la première validation
     return this.prisma.staffReport.update({ where: { id }, data: { opsAt: new Date(), opsBy: actor.userId } });
   }
 
