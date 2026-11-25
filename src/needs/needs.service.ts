@@ -1,3 +1,4 @@
+import { nextRefOf } from '../common/doc-numbers';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -23,9 +24,7 @@ export class NeedsService {
   ) {}
 
   private async nextReference() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.needRequest.count({ where: { reference: { startsWith: `EB-${year}-` } } });
-    return `EB-${year}-${String(count + 1).padStart(4, '0')}`;
+    return nextRefOf(this.prisma, 'EB', 'needRequest');
   }
 
   private lineData(l: NeedLineDto) {

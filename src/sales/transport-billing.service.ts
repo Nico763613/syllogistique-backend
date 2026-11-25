@@ -1,3 +1,4 @@
+import { nextRefOf } from '../common/doc-numbers';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -83,9 +84,7 @@ export class TransportBillingService {
     const fr = (x: number) => new Date(x).toLocaleDateString('fr-FR');
     const trucks = [...new Set(trips.map((t) => t.vehicle.internalNumber))].join(', ');
     const description = `Transport du ${fr(dates[0])} au ${fr(dates[dates.length - 1])} : ${tons} t × ${Math.round(price).toLocaleString('fr-FR')} GNF/t, ${moves} mouvement(s), camion(s) ${trucks}.`;
-    const year = new Date().getFullYear();
-    const count = await this.prisma.salesInvoice.count({ where: { reference: { startsWith: `FV-${year}-` } } });
-    const reference = `FV-${year}-${String(count + 1).padStart(4, '0')}`;
+    const reference = await nextRefOf(this.prisma, 'FV', 'salesInvoice');
     const invoice = await this.prisma.$transaction(async (tx) => {
       const inv = await tx.salesInvoice.create({
         data: {

@@ -1,3 +1,4 @@
+import { nextRefOf } from '../common/doc-numbers';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { recordAssignment } from '../vehicles/assignments';
 import { PrismaService } from '../prisma.service';
@@ -359,11 +360,11 @@ export class DriverAppService {
     const at = when(p.occurredAt);
     const lat = geo(p.lat, -90, 90), lng = geo(p.lng, -180, 180);
     const year = at.getFullYear();
-    const n = await this.prisma.hseIncident.count({ where: { reference: { startsWith: `HSE-${year}-` } } });
+    const incRef = await nextRefOf(this.prisma, 'HSE', 'hseIncident');
     const vehicleId = trip?.vehicleId;
     const inc = await this.prisma.hseIncident.create({
       data: {
-        siteId: driver.siteId, reference: `HSE-${year}-${String(n + 1).padStart(4, '0')}`, occurredAt: at, type: kind === 'ACCIDENT' ? 'ACCIDENT' : 'OTHER', severity,
+        siteId: driver.siteId, reference: incRef, occurredAt: at, type: kind === 'ACCIDENT' ? 'ACCIDENT' : 'OTHER', severity,
         description: `[${labels[kind]}] ${description}`, zone: lat !== undefined && lng !== undefined ? `GPS ${lat.toFixed(5)}, ${lng.toFixed(5)}` : undefined, vehicleId, reportedBy: userId,
         latitude: lat, longitude: lng, photoUrls: urls(p.photoUrls), clientOpId: op.clientOpId, persons: { create: [{ driverId: driver.id }] },
       },
