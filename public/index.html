@@ -6213,11 +6213,11 @@ function cashState(c) {
 function vtCanAct() { return ['RESPONSABLE_COMMERCIAL', 'SUPER_ADMIN'].includes(state.user.role); }
 async function renderVentes() {
   const sid = encodeURIComponent(state.siteId || '');
-  const [sess, orders, invs, rets, custList, pendPay] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => []), api('/customers?siteId=' + sid).catch(() => []), api('/payments/pending?siteId=' + sid).catch(() => [])]);
+  const [sess, orders, invs, rets, custList] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => []), api('/customers?siteId=' + sid).catch(() => [])]);
   const g = (n) => fmt(Math.round(Number(n) || 0)), dd = (x) => new Date(x).toLocaleDateString('fr-FR'), act = vtCanAct();
   const toCheck = (sess || []).filter((c) => c.closedAt && !c.validatedBy && !c.opsAt);
   const pendRet = (rets || []).filter((r) => r.status === 'PENDING');
-  const bar = `<div class="dp-tabs" id="dp-bar">${VT_TABS.map(([k, t]) => { const n = k === 'caisses' ? toCheck.length : k === 'retours' ? pendRet.length : k === 'attente' ? (pendPay || []).length : 0; return `<button class="${vtTab === k ? 'on' : ''}" onclick="vtTab='${k}';renderVentes()">${t}${n ? ' (' + n + ')' : ''}</button>`; }).join('')}</div>`;
+  const bar = `<div class="dp-tabs" id="dp-bar">${VT_TABS.map(([k, t]) => { const n = k === 'caisses' ? toCheck.length : k === 'retours' ? pendRet.length : 0; return `<button class="${vtTab === k ? 'on' : ''}" onclick="vtTab='${k}';renderVentes()">${t}${n ? ' (' + n + ')' : ''}</button>`; }).join('')}</div>`;
   const badge = (m, k) => `<span class="badge ${m[1]}">${m[0]}</span>`;
   const opened = (invs || []).filter((i) => ['UNPAID', 'PARTIALLY_PAID'].includes(i.status));
   const due = (i) => Math.max(0, Number(i.totalAmount) - Number(i.amountPaid || 0));
@@ -6247,8 +6247,6 @@ async function renderVentes() {
   } else if (vtTab === 'catalogue') {
     body = `<div class="panel"><h3>Catalogue et tarifs de vente</h3><div class="desc">Prix de vente de chaque article. Toute modification est historisée (ancien prix, nouveau prix, qui, quand).</div><div id="vt-cat"><div class="empty">Chargement…</div></div></div>`;
     setTimeout(vtLoadCatalogue, 0);
-  } else if (vtTab === 'attente') {
-    body = `<div class="panel"><h3>Paiements mobile en attente de confirmation <span class="badge ${(pendPay || []).length ? 'warn' : 'ok'}">${(pendPay || []).length}</span></h3><div class="desc">Vérifiez le message de l'opérateur (montant et numéro de transaction), puis confirmez : la facture est alors soldée ou mise à jour et le reçu est édité. Celui qui a déclaré le paiement ne peut pas le confirmer lui-même.</div><div style="overflow:auto"><table><tr><th>Déclaré le</th><th>Facture</th><th>Client</th><th>Mode</th><th>N° transaction</th><th>Montant</th>${act ? '<th></th>' : ''}</tr>${(pendPay || []).map((p) => `<tr><td>${dd(p.declared_at)}</td><td class="mono">${esc(p.invoice_reference)}</td><td>${esc(p.customer_name || '—')}</td><td>${p.method === 'ORANGE_MONEY' ? 'Orange Money' : 'Mobile Money'}</td><td class="mono">${esc(p.external_ref || '—')}</td><td class="mono">${g(p.amount)}</td>${act ? `<td style="white-space:nowrap"><button class="btn small gold" onclick="vtPendDecide('${esc(p.id)}',true)">Confirmer</button> <button class="btn small" onclick="vtPendDecide('${esc(p.id)}',false)">Rejeter</button></td>` : ''}</tr>`).join('') || '<tr><td colspan="7" class="desc">Aucun paiement en attente.</td></tr>'}</table></div></div>`;
   } else if (vtTab === 'clients') {
     const by = {}; (invs || []).filter((i) => i.status !== 'CANCELLED' && i.status !== 'DRAFT').forEach((i) => { const n = (i.customer && i.customer.name) || '—'; const c = by[n] || (by[n] = { n, tot: 0, paid: 0, k: 0 }); c.tot += Number(i.totalAmount); c.paid += Number(i.amountPaid || 0); c.k++; });
     const list = Object.values(by).sort((a, b) => (b.tot - b.paid) - (a.tot - a.paid));
@@ -6274,13 +6272,6 @@ async function vtSavePrice(id) {
   if (v === '' || isNaN(Number(v))) { alert('Saisissez un prix valide.'); return; }
   const reason = prompt('Motif de la modification du prix (facultatif) :') || '';
   try { await api('/sales/tariffs/' + encodeURIComponent(id), { method: 'POST', body: { salePrice: Number(v), reason } }); vtLoadCatalogue(); } catch (e) { alert(e.message); }
-}
-async function vtPendDecide(id, ok) {
-  try {
-    if (ok) { if (!confirm('Le message de confirmation de l\'opérateur est-il bien reçu (montant et numéro corrects) ?')) return; await api('/payments/pending/' + encodeURIComponent(id) + '/confirm', { method: 'POST' }); }
-    else { const reason = prompt('Motif du rejet (paiement non reçu, montant incorrect…) :'); if (!reason || reason.trim().length < 3) return; await api('/payments/pending/' + encodeURIComponent(id) + '/reject', { method: 'POST', body: { reason: reason.trim() } }); }
-    renderVentes();
-  } catch (e) { alert(e.message); }
 }
 // Rapport commercial (PDF / Excel) de la période affichée dans le tableau de bord
 async function vtReport(fmtType) {
@@ -6421,13 +6412,6 @@ async function csPay() {
     if (!(amt > 0)) throw new Error('Saisissez le montant reçu.');
     if (amt > inv.rest) throw new Error('Le montant dépasse le reste à payer (' + fmt(Math.round(inv.rest)) + ' GNF).');
     if (met !== 'CASH' && !ref) throw new Error('Indiquez le numéro de transaction.');
-    const pend = document.getElementById('cs-pend') && document.getElementById('cs-pend').checked;
-    if (pend) {
-      await api('/payments/pending', { method: 'POST', body: { salesInvoiceId: id, method: met, amount: amt, paymentDate: new Date().toISOString(), externalRef: ref } });
-      window._csOp = null; csInvoice = ''; await renderCaisse();
-      document.getElementById('cs-receipt').innerHTML = `<div class="msg ok" style="margin-top:12px">Paiement de ${fmt(Math.round(amt))} GNF mis en attente de confirmation (${esc(inv.reference)}). Un responsable le confirmera après vérification du message de l'opérateur.</div>`;
-      window._csBusy = false; return;
-    }
     await api('/payments', { method: 'POST', body: { direction: 'IN', method: met, amount: amt, paymentDate: new Date().toISOString(), salesInvoiceId: id, clientOpId: window._csOp, ...(ref ? { reference: ref, externalRef: ref } : {}) } });
     window._csOp = null;
     const left = inv.rest - amt, msg = `Bonjour ${inv.customer && inv.customer.name}, nous avons bien reçu votre règlement de ${fmt(Math.round(amt))} GNF pour la facture ${inv.reference}. ${left > 0 ? 'Reste à payer : ' + fmt(Math.round(left)) + ' GNF.' : 'Facture soldée.'} Merci. — SYL LOGISTIQUE`;
