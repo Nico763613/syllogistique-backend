@@ -90,6 +90,9 @@ jobs:
           npx playwright install --with-deps chromium
           node scripts/ui-click.js
       - run: sleep 61
+      - name: Test d'interface par rôles et création d'un client
+        run: node scripts/ui-roles.js
+      - run: sleep 61
       - run: node scripts/smoke.js
       - if: failure()
         run: tail -80 server.log
