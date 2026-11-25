@@ -7,6 +7,8 @@ import { DOC_SEQUENCE_SCHEMA } from './common/doc-numbers';
 // Mises à niveau du schéma, idempotentes (sans effet si déjà appliquées). Gardées en phase avec prisma/schema.prisma.
 const AUTO_SCHEMA: string[] = [
   `CREATE TABLE IF NOT EXISTS "vehicle_assignments" ("id" TEXT NOT NULL PRIMARY KEY, "vehicle_id" TEXT NOT NULL, "driver_id" TEXT NOT NULL, "started_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "ended_at" TIMESTAMP(3), "reason" TEXT, "source" TEXT NOT NULL DEFAULT 'MANUEL', "by_user_id" TEXT)`,
+  `CREATE TABLE IF NOT EXISTS "delivery_notes" ("id" TEXT NOT NULL PRIMARY KEY, "number" TEXT NOT NULL UNIQUE, "order_id" TEXT NOT NULL, "delivered_by" TEXT, "delivered_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, "receiver_name" TEXT, "place" TEXT, "driver_name" TEXT, "observations" TEXT, "lines" JSONB NOT NULL)`,
+  'CREATE INDEX IF NOT EXISTS "delivery_notes_order_idx" ON "delivery_notes"("order_id")',
   'ALTER TABLE "payments" ADD COLUMN IF NOT EXISTS "receipt_number" TEXT',
   'CREATE UNIQUE INDEX IF NOT EXISTS "payments_receipt_number_key" ON "payments"("receipt_number") WHERE "receipt_number" IS NOT NULL',
   'CREATE INDEX IF NOT EXISTS "vehicle_assignments_vehicle_idx" ON "vehicle_assignments"("vehicle_id", "started_at")',

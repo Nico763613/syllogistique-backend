@@ -1,4 +1,4 @@
-import { IsArray, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, Max, ValidateNested } from 'class-validator';
+import { IsArray, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, Max, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SalesOrderLineDto {
@@ -30,6 +30,11 @@ export class DeliverSalesOrderDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => DeliverLineDto)
   lines: DeliverLineDto[];
   @IsOptional() allowNegative?: boolean;
+  // Bon de livraison : réceptionnaire, lieu, livreur, observations (facultatifs)
+  @IsOptional() @IsString() @MaxLength(120) receiverName?: string;
+  @IsOptional() @IsString() @MaxLength(200) place?: string;
+  @IsOptional() @IsString() @MaxLength(120) driverName?: string;
+  @IsOptional() @IsString() @MaxLength(500) observations?: string;
 }
 
 export class InstallmentDto {
