@@ -95,12 +95,10 @@ export class SalesPdfsService {
       this.customerBlock(doc, o.customer);
       this.table(doc, org.color, ['Article', 'Commandé', 'Livré ce jour', 'Total livré', 'Reste'], [195, 65, 85, 80, 70], lines.map((l) => [l.item, String(l.ordered), String(l.deliveredNow), String(l.deliveredTotal), String(l.remaining)]));
       doc.fontSize(10).text(`Responsable : ${by}`);
-      if (n.driver_name) doc.text(`Livreur : ${n.driver_name}`);
       if (n.receiver_name) doc.text(`Réceptionnaire : ${n.receiver_name}`);
       if (n.observations) doc.text(`Observations : ${n.observations}`);
       doc.moveDown(2); const y = doc.y; doc.fontSize(9).fillColor('#6B7A8F');
-      doc.text('Signature du livreur', 50, y); doc.rect(50, y + 14, 200, 60).strokeColor('#D9D9D9').stroke();
-      doc.text('Signature du réceptionnaire', 340, y); doc.rect(340, y + 14, 200, 60).strokeColor('#D9D9D9').stroke();
+      doc.text('Signature du réceptionnaire', 50, y); doc.rect(50, y + 14, 220, 60).strokeColor('#D9D9D9').stroke();
     });
   }
 
@@ -142,8 +140,7 @@ export class SalesPdfsService {
       this.table(doc, org.color, ['Article', 'Commandé', 'Livré', 'Reste à livrer'], [235, 80, 80, 100], o.lines.map((l) => [l.item.name, String(Number(l.quantityOrdered)), String(Number(l.quantityDelivered)), String(Math.max(0, Number(l.quantityOrdered) - Number(l.quantityDelivered)))]));
       doc.fontSize(10).text(`Responsable : ${agent}`).moveDown(2);
       const y = doc.y; doc.fontSize(9).fillColor('#6B7A8F');
-      doc.text('Livreur', 50, y); doc.rect(50, y + 14, 200, 60).strokeColor('#D9D9D9').stroke();
-      doc.text('Signature du réceptionnaire', 340, y); doc.rect(340, y + 14, 200, 60).strokeColor('#D9D9D9').stroke();
+      doc.text('Signature du réceptionnaire', 50, y); doc.rect(50, y + 14, 220, 60).strokeColor('#D9D9D9').stroke();
     });
   }
 

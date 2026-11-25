@@ -185,7 +185,7 @@ export class SalesService {
       return maxSeqOf(rows.map((r) => r.n));
     }, { by: actorId });
     const id = randomUUID();
-    await tx.$executeRawUnsafe('INSERT INTO "delivery_notes" ("id","number","order_id","delivered_by","receiver_name","place","driver_name","observations","lines") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)', id, number, order.id, actorId, dto.receiverName ?? null, dto.place ?? null, dto.driverName ?? null, dto.observations ?? null, JSON.stringify(lines));
+    await tx.$executeRawUnsafe('INSERT INTO "delivery_notes" ("id","number","order_id","delivered_by","receiver_name","place","driver_name","observations","lines") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)', id, number, order.id, actorId, dto.receiverName ?? null, dto.place ?? null, null, dto.observations ?? null, JSON.stringify(lines));
     return { id, number };
   }
 
