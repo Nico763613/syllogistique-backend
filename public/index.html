@@ -6073,7 +6073,7 @@ async function renderVentes() {
   }
   root().innerHTML = bar + (act ? '' : '<div class="msg">Lecture seule.</div>') + body + '<div id="vt-msg"></div>';
 }
-// Livraison (totale ou partielle) : quantités par ligne, réceptionnaire, lieu, livreur ; génère le bon de livraison numéroté et la sortie de stock
+// Livraison (totale ou partielle) : quantités par ligne, réceptionnaire, lieu ; génère le bon de livraison numéroté et la sortie de stock
 async function vtDeliver(orderId) {
   try {
     const o = await api('/sales/orders/' + encodeURIComponent(orderId));
@@ -6083,7 +6083,7 @@ async function vtDeliver(orderId) {
     const ov = document.createElement('div'); ov.id = 'dl-ov'; ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,25,45,.55);z-index:90;display:flex;align-items:center;justify-content:center;padding:12px;overflow:auto';
     ov.innerHTML = `<div class="panel" style="max-width:560px;width:100%;max-height:100%;overflow:auto"><h3>Livraison — ${esc(o.reference)}</h3><div class="desc">Indiquez les quantités réellement livrées (0 pour ne pas livrer une ligne). Le stock sort à la validation.</div>
       <table><tr><th>Article</th><th>Reste</th><th>Livré maintenant</th></tr>${rows.map((r, i) => `<tr><td>${esc((r.l.item && r.l.item.name) || 'Article')}</td><td>${r.rest}</td><td><input id="dl-q${i}" type="number" min="0" max="${r.rest}" value="${r.rest}" style="width:90px"></td></tr>`).join('')}</table>
-      <div class="grid-2" style="margin-top:8px"><div><label>Réceptionnaire</label><input id="dl-rc" autocomplete="off"></div><div><label>Livreur</label><input id="dl-dr" autocomplete="off"></div></div>
+      <label style="margin-top:8px">Réceptionnaire</label><input id="dl-rc" autocomplete="off">
       <label>Lieu de livraison</label><input id="dl-pl" autocomplete="off"><label>Observations</label><input id="dl-ob" autocomplete="off">
       <div id="dl-m"></div><div style="display:flex;gap:8px;margin-top:10px"><button class="btn gold" onclick="vtDeliverGo('${esc(orderId)}', ${rows.length})">Valider la livraison</button></div></div>`;
     window._dlRows = rows.map((r) => r.l.id);
@@ -6095,7 +6095,7 @@ async function vtDeliverGo(orderId, n) {
   const lines = []; for (let i = 0; i < n; i++) { const q = Number(document.getElementById('dl-q' + i).value); if (q < 0 || isNaN(q)) { m.innerHTML = '<div class="msg err">Quantité invalide.</div>'; return; } if (q > 0) lines.push({ lineId: window._dlRows[i], quantityDelivered: q }); }
   if (!lines.length) { m.innerHTML = '<div class="msg err">Indiquez au moins une quantité à livrer.</div>'; return; }
   try {
-    const r = await api('/sales/orders/' + encodeURIComponent(orderId) + '/deliver', { method: 'POST', body: { lines, receiverName: v('dl-rc') || undefined, driverName: v('dl-dr') || undefined, place: v('dl-pl') || undefined, observations: v('dl-ob') || undefined } });
+    const r = await api('/sales/orders/' + encodeURIComponent(orderId) + '/deliver', { method: 'POST', body: { lines, receiverName: v('dl-rc') || undefined, place: v('dl-pl') || undefined, observations: v('dl-ob') || undefined } });
     const ov = document.getElementById('dl-ov'); if (ov) ov.remove();
     if (r && r.deliveryNote) { await vtPdf('/sales/delivery-notes/' + encodeURIComponent(r.deliveryNote.id) + '/pdf', r.deliveryNote.number); }
     renderView(state.view);

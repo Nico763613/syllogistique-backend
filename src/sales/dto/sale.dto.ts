@@ -30,10 +30,9 @@ export class DeliverSalesOrderDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => DeliverLineDto)
   lines: DeliverLineDto[];
   @IsOptional() allowNegative?: boolean;
-  // Bon de livraison : réceptionnaire, lieu, livreur, observations (facultatifs)
+  // Bon de livraison : réceptionnaire, lieu, observations (facultatifs)
   @IsOptional() @IsString() @MaxLength(120) receiverName?: string;
   @IsOptional() @IsString() @MaxLength(200) place?: string;
-  @IsOptional() @IsString() @MaxLength(120) driverName?: string;
   @IsOptional() @IsString() @MaxLength(500) observations?: string;
 }
 
