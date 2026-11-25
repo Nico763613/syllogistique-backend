@@ -6,7 +6,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "test": "NODE_PATH=test/shim_modules node --test test/master.test.js test/notify.test.js test/backups.test.js test/diagnose.test.js"
+    "test": "node --test test/master.test.js test/notify.test.js test/backups.test.js test/diagnose.test.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": { "pg": "^8.11.3" }

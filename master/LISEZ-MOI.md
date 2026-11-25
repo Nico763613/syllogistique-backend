@@ -38,7 +38,7 @@ Les clients, les licences et les appareils arrivent aux étapes 2 à 6.
 - Aucune dépendance externe en dehors du client PostgreSQL (`pg`) : surface d'attaque réduite.
 
 ## Tests (développeurs)
-`npm test` — nécessite une base PostgreSQL locale (variables `PGHOST_TEST`, `PGPORT_TEST`, `PGDB_TEST`) : un simulateur du paquet `pg` (dossier `test/shim_modules`) est utilisé uniquement pour les tests.
+`npm test` — nécessite une base PostgreSQL de test (variables standard `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`) et le vrai paquet `pg` (le simulateur qui existait avant masquait des erreurs de dates réelles). Les tables du Master sont recréées à chaque lancement : ne jamais viser une base réelle.
 
 ## Étape 3 — relier une installation cliente au Master
 

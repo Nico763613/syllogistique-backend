@@ -309,7 +309,7 @@ function createApp(pool, cfg) {
       const ct = (await pool.query(`select l.id as license_id, c.name as cname, l.contract_months, l.contract_start::text as contract_start, l.expires_at, l.permanent, l.status
           from master_licenses l join master_clients c on c.id=l.client_id where l.contract_months > 0 and l.status <> 'REVOKED' order by l.expires_at`)).rows;
       return send(res, 200, { contrats: ct, items, devises: cur,
-        totaux: { recu_mois: sum((x) => x.status === 'PAID' && String(x.paid_at).slice(0, 7) === mois), attendu: sum((x) => x.status === 'DUE'), en_retard: sum((x) => x.status === 'DUE' && x.jours < 0),
+        totaux: { recu_mois: sum((x) => x.status === 'PAID' && x.paid_at && new Date(x.paid_at).toISOString().slice(0, 7) === mois), attendu: sum((x) => x.status === 'DUE'), en_retard: sum((x) => x.status === 'DUE' && x.jours < 0),
           nb_retard: items.filter((x) => x.status === 'DUE' && x.jours < 0).length, nb_tolerance: items.filter((x) => x.etat === 'tolerance').length, nb_hors_tolerance: items.filter((x) => x.etat === 'hors_tolerance').length },
         mixte: cur.length > 1 });
     }
@@ -370,11 +370,11 @@ function createApp(pool, cfg) {
       return send(res, 200, { ok: true, id: r.rows[0].id });
     }
     if (req.method === 'POST' && (fm = /^\/api\/charges\/(\d+)\/(paid|delete)$/.exec(p))) {
-      const c = (await pool.query('select * from master_charges where id=$1', [Number(fm[1])])).rows[0];
+      const c = (await pool.query('select *, next_due::text as next_due_txt from master_charges where id=$1', [Number(fm[1])])).rows[0];
       if (!c) return send(res, 404, { error: 'Abonnement introuvable.' });
       if (fm[2] === 'delete') { await pool.query('delete from master_charges where id=$1 returning id', [c.id]); await audit(s.aid, 'CHARGE_SUPPRIMEE', c.name, req); return send(res, 200, { ok: true }); }
       // « Payé » : c'est vous qui avez réglé l'abonnement ; l'échéance avance d'une période (rien n'est payé automatiquement par ce tableau de bord)
-      const next = fin.ymd(fin.addMonths(new Date(String(c.next_due).slice(0, 10) + 'T12:00:00Z'), fin.CH_FREQ[c.frequency]));
+      const next = fin.ymd(fin.addMonths(new Date(String(c.next_due_txt).slice(0, 10) + 'T12:00:00Z'), fin.CH_FREQ[c.frequency]));
       await pool.query('update master_charges set next_due=$2, last_paid_at=now() where id=$1 returning id', [c.id, next]);
       await audit(s.aid, 'CHARGE_PAYEE', `${c.name} · prochaine échéance ${next}`, req);
       return send(res, 200, { ok: true, nextDue: next });

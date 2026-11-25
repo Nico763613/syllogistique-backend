@@ -10,7 +10,18 @@ const helmet = helmetModule.default ?? helmetModule;
 import { AppModule } from './app.module';
 import { LicenseService } from './license/license.service';
 
+// Secrets JWT : sans eux, personne ne peut se connecter ; trop courts, ils se devinent. On refuse de démarrer sans, on avertit si trop courts.
+function checkSecrets() {
+  for (const k of ['JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET']) {
+    const v = process.env[k];
+    if (!v) throw new Error(`${k} est obligatoire (définissez-le dans les variables d'environnement).`);
+    if (v.length < 32) console.warn(`⚠️  ${k} fait moins de 32 caractères : utilisez une valeur aléatoire plus longue.`);
+  }
+  if (process.env.JWT_ACCESS_SECRET === process.env.JWT_REFRESH_SECRET) console.warn('⚠️  JWT_ACCESS_SECRET et JWT_REFRESH_SECRET sont identiques : utilisez deux valeurs différentes.');
+}
+
 async function bootstrap() {
+  checkSecrets();
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Derrière le proxy de l'hébergeur (Render…) : nécessaire pour que la limite
