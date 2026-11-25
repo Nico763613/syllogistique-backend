@@ -6213,7 +6213,7 @@ function cashState(c) {
 function vtCanAct() { return ['RESPONSABLE_COMMERCIAL', 'SUPER_ADMIN'].includes(state.user.role); }
 async function renderVentes() {
   const sid = encodeURIComponent(state.siteId || '');
-  const [sess, orders, invs, rets] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => [])]);
+  const [sess, orders, invs, rets, custList] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => []), api('/customers?siteId=' + sid).catch(() => [])]);
   const g = (n) => fmt(Math.round(Number(n) || 0)), dd = (x) => new Date(x).toLocaleDateString('fr-FR'), act = vtCanAct();
   const toCheck = (sess || []).filter((c) => c.closedAt && !c.validatedBy && !c.opsAt);
   const pendRet = (rets || []).filter((r) => r.status === 'PENDING');
@@ -6247,12 +6247,29 @@ async function renderVentes() {
   } else if (vtTab === 'clients') {
     const by = {}; (invs || []).filter((i) => i.status !== 'CANCELLED' && i.status !== 'DRAFT').forEach((i) => { const n = (i.customer && i.customer.name) || '—'; const c = by[n] || (by[n] = { n, tot: 0, paid: 0, k: 0 }); c.tot += Number(i.totalAmount); c.paid += Number(i.amountPaid || 0); c.k++; });
     const list = Object.values(by).sort((a, b) => (b.tot - b.paid) - (a.tot - a.paid));
-    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Clients — ce qu'ils doivent</h3><div style="overflow:auto"><table><tr><th>Client</th><th>Factures</th><th>Facturé</th><th>Payé</th><th>Reste dû</th></tr>${list.map((c) => `<tr><td>${esc(c.n)}</td><td>${c.k}</td><td class="mono">${g(c.tot)}</td><td class="mono">${g(c.paid)}</td><td class="mono">${c.tot - c.paid > 0 ? '<span class="badge bad">' + g(c.tot - c.paid) + '</span>' : '<span class="badge ok">0</span>'}</td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">Aucun client facturé.</div></td></tr>'}</table></div></div>`;
+    const cform = act ? `<div class="panel"><h3>Nouveau client ou prospect</h3><div class="grid-2"><div><label>Nom / société</label><input id="cu-n" autocomplete="off"></div><div><label>Téléphone</label><input id="cu-p" autocomplete="off"></div><div><label>Personne à contacter</label><input id="cu-c" autocomplete="off"></div><div><label>Adresse</label><input id="cu-a" autocomplete="off"></div><div><label>Type</label><select id="cu-k"><option value="CLIENT">Client</option><option value="PROSPECT">Prospect (pas encore de commande)</option></select></div></div><div id="cu-d" class="desc"></div><button class="btn gold" style="margin-top:8px" onclick="vtAddCustomer(false)">Enregistrer</button><div id="cu-m"></div></div>` : '';
+    const clist = `<div class="panel"><h3>Fichier clients et prospects (${(custList || []).length})</h3><div style="overflow:auto"><table><tr><th>Nom</th><th>Type</th><th>Téléphone</th><th>Contact</th><th>Adresse</th>${act ? '<th></th>' : ''}</tr>${(custList || []).map((c) => `<tr><td>${esc(c.name)}</td><td><span class="badge ${c.kind === 'PROSPECT' ? 'warn' : 'ok'}">${c.kind === 'PROSPECT' ? 'Prospect' : 'Client'}</span></td><td>${esc(c.phone || '—')}</td><td>${esc(c.contactName || '—')}</td><td>${esc(c.address || '—')}</td>${act ? `<td>${c.kind === 'PROSPECT' ? `<button class="btn small" onclick="vtSetKind('${esc(c.id)}','CLIENT')">Passer en client</button>` : ''}</td>` : ''}</tr>`).join('')}</table></div></div>`;
+    body = cform + clist + `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Clients — ce qu'ils doivent</h3><div style="overflow:auto"><table><tr><th>Client</th><th>Factures</th><th>Facturé</th><th>Payé</th><th>Reste dû</th></tr>${list.map((c) => `<tr><td>${esc(c.n)}</td><td>${c.k}</td><td class="mono">${g(c.tot)}</td><td class="mono">${g(c.paid)}</td><td class="mono">${c.tot - c.paid > 0 ? '<span class="badge bad">' + g(c.tot - c.paid) + '</span>' : '<span class="badge ok">0</span>'}</td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">Aucun client facturé.</div></td></tr>'}</table></div></div>`;
   } else {
     const RS = { PENDING: ['À valider', 'warn'], VALIDATED: ['Validé', 'ok'], REJECTED: ['Rejeté', 'bad'] };
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Retours clients <span class="badge ${pendRet.length ? 'warn' : 'ok'}">${pendRet.length} à valider</span></h3><div style="overflow:auto"><table><tr><th>Retour</th><th>Facture / client</th><th>Motif</th><th>Montant</th><th>État</th><th></th></tr>${(rets || []).map((r) => `<tr><td>${esc(r.reference || '')}<div style="font-size:12px;color:var(--muted)">${dd(r.createdAt)}</div></td><td>${esc(r.salesInvoice && r.salesInvoice.reference)}<div style="font-size:12px;color:var(--muted)">${esc(r.salesInvoice && r.salesInvoice.customer && r.salesInvoice.customer.name)}</div></td><td>${esc(r.reason)}</td><td class="mono">${g(r.totalAmount)}</td><td>${badge(RS[r.status] || [r.status, 'info'])}</td><td style="white-space:nowrap">${act && r.status === 'PENDING' ? `<button class="btn small gold" onclick="vtRet('${esc(r.id)}', true)"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Valider</button> <button class="btn small" onclick="vtRet('${esc(r.id)}', false)"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Rejeter</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">Aucun retour.</div></td></tr>'}</table></div></div>`;
   }
   root().innerHTML = bar + (act ? '' : '<div class="msg">Lecture seule.</div>') + body + '<div id="vt-msg"></div>';
+}
+// Création d'un client / prospect avec contrôle des doublons (nom, téléphone)
+async function vtAddCustomer(force) {
+  const v = (id) => (document.getElementById(id).value || '').trim(), m = document.getElementById('cu-m');
+  if (!v('cu-n')) { m.innerHTML = '<div class="msg err">Indiquez le nom du client.</div>'; return; }
+  try {
+    await api('/customers', { method: 'POST', body: { siteId: state.siteId, name: v('cu-n'), phone: v('cu-p') || undefined, contactName: v('cu-c') || undefined, address: v('cu-a') || undefined, kind: v('cu-k'), force: force || undefined } });
+    renderVentes();
+  } catch (e) {
+    if (/existe peut-être déjà/.test(e.message || '')) { if (confirm(e.message + '\n\nCréer quand même ?')) return vtAddCustomer(true); }
+    else m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`;
+  }
+}
+async function vtSetKind(id, kind) {
+  try { await api('/customers/' + encodeURIComponent(id), { method: 'PATCH', body: { kind } }); renderVentes(); } catch (e) { alert(e.message); }
 }
 // Livraison (totale ou partielle) : quantités par ligne, réceptionnaire, lieu ; génère le bon de livraison numéroté et la sortie de stock
 async function vtDeliver(orderId) {

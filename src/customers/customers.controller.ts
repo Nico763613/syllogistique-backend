@@ -17,7 +17,7 @@ export class CustomersController {
   constructor(private customersService: CustomersService) {}
 
   @Post()
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL)
   create(@Body() dto: CreateCustomerDto, @CurrentUser() actor: any) {
     return this.customersService.create(dto, actor.userId);
   }
@@ -27,13 +27,19 @@ export class CustomersController {
     return this.customersService.findAll(siteId);
   }
 
+  // Vérification en direct pendant la saisie (nom / téléphone)
+  @Get('check-duplicates')
+  check(@Query('siteId') siteId: string, @Query('name') name?: string, @Query('phone') phone?: string) {
+    return this.customersService.findDuplicates(siteId, name, phone);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.customersService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL)
   update(@Param('id') id: string, @Body() dto: UpdateCustomerDto, @CurrentUser() actor: any) {
     return this.customersService.update(id, dto, actor.userId);
   }

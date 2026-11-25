@@ -40,6 +40,7 @@ export class SalesService {
     }
 
     const status = dto.status ?? 'QUOTE';
+    if (status !== 'QUOTE') await this.promoteProspect(dto.customerId, actor.userId);
     const prefix = status === 'QUOTE' ? 'DEV' : 'BCC';
     const reference = await this.nextReference(prefix, 'salesOrder', actor.userId);
 
@@ -88,11 +89,19 @@ export class SalesService {
     return order;
   }
 
+  // Un prospect qui passe une commande devient client (historisé)
+  private async promoteProspect(customerId: string | null | undefined, actorId: string) {
+    if (!customerId) return;
+    const r = (await this.prisma.$queryRawUnsafe('UPDATE "customers" SET "kind" = \'CLIENT\' WHERE "id" = $1 AND "kind" = \'PROSPECT\' RETURNING "id"', customerId)) as any[];
+    if (r.length) await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'Customer', entityId: customerId, oldValue: { kind: 'PROSPECT' }, newValue: { kind: 'CLIENT' }, reason: 'Première commande' });
+  }
+
   // Transforme un devis en commande confirmée
   async confirm(id: string, actorId: string) {
     const order = await this.prisma.salesOrder.findUnique({ where: { id } });
     if (!order) throw new NotFoundException('Commande introuvable.');
     const updated = await this.prisma.salesOrder.update({ where: { id }, data: { status: 'CONFIRMED' } });
+    await this.promoteProspect(order.customerId, actorId);
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'SalesOrder', entityId: id, newValue: { event: 'CONFIRMED' } });
     return updated;
   }
