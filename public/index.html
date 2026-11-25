@@ -6200,7 +6200,7 @@ async function renderDriverExpenses(status) {
 /* ---------- Ventes (Responsable commercial) : Commandes · Factures · Clients · Retours · Caisses à valider ---------- */
 let vtTab = 'tableau';
 const VT_DASH = { period: 'MONTH', from: '', to: '' };
-const VT_TABS = [['tableau', 'Tableau de bord'], ['caisses', 'Caisses à valider'], ['attente', 'Paiements mobile'], ['catalogue', 'Catalogue et tarifs'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
+const VT_TABS = [['tableau', 'Tableau de bord'], ['caisses', 'Caisses à valider'], ['catalogue', 'Catalogue et tarifs'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
 const VT_ORDER = { QUOTE: ['Devis', 'info'], CONFIRMED: ['Confirmée', 'info'], PARTIALLY_DELIVERED: ['Livrée en partie', 'warn'], DELIVERED: ['Livrée', 'ok'], INVOICED: ['Facturée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 const VT_INV = { DRAFT: ['Brouillon', 'info'], UNPAID: ['Impayée', 'bad'], PARTIALLY_PAID: ['Partielle', 'warn'], PAID: ['Payée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 function cashState(c) {
@@ -6384,7 +6384,6 @@ async function renderCaisse() {
       <label>Montant reçu (GNF)</label><input id="cs-amt" type="number" inputmode="numeric" min="1" placeholder="Montant">
       <label>Mode de paiement</label><select id="cs-met" onchange="csMet()">${CS_METHODS.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>
       <div id="cs-refbox" style="display:none"><label>N° de transaction (obligatoire hors espèces)</label><input id="cs-ref" placeholder="Ex. numéro Orange Money"></div>
-      <label id="cs-pendbox" style="display:none;align-items:center;gap:6px;margin-top:6px"><input type="checkbox" id="cs-pend" style="width:auto"> Pas encore confirmé par l'opérateur : mettre en attente (la facture ne sera soldée qu'après confirmation)</label>
       <div id="cs-msg"></div><button class="btn gold" style="min-height:52px;width:100%;margin-top:12px;font-size:14px" onclick="csPay()"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Enregistrer l'encaissement</button><div id="cs-receipt"></div></div>`;
     if (cur) setTimeout(csPick, 0);
   } else if (csTab === 'caisse') {
@@ -6409,7 +6408,7 @@ function csPick() {
   const i = (window._csInv || []).find((x) => x.id === sel.value); csInvoice = sel.value;
   const a = document.getElementById('cs-amt'); if (a && i) a.value = Math.round(i.rest);
 }
-function csMet() { const m = document.getElementById('cs-met').value; document.getElementById('cs-refbox').style.display = m === 'CASH' ? 'none' : ''; const pb = document.getElementById('cs-pendbox'); if (pb) { pb.style.display = (m === 'MOBILE_MONEY' || m === 'ORANGE_MONEY') ? 'flex' : 'none'; if (pb.style.display === 'none') document.getElementById('cs-pend').checked = false; } }
+function csMet() { const m = document.getElementById('cs-met').value; document.getElementById('cs-refbox').style.display = m === 'CASH' ? 'none' : ''; }
 async function csOpen() { const m = document.getElementById('cs-msg'); try { await api('/cash-sessions/open', { method: 'POST', body: { openingFloat: Math.round(Number(document.getElementById('cs-float').value) || 0) } }); renderCaisse(); } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; } }
 async function csPay() {
   if (window._csBusy) return;
