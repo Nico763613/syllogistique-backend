@@ -19,6 +19,12 @@ export class SalesDashboardService {
     const invWhere: any = { status: { notIn: ['CANCELLED', 'DRAFT'] }, ...(siteId ? { siteId } : {}), ...(q.agentId ? { createdById: q.agentId } : {}), ...(q.customerId ? { customerId: q.customerId } : {}) };
     const inPeriod = { ...invWhere, invoiceDate: { gte: from, lte: to } };
 
+    // Devis : acceptés = devis (réf. DEV-) devenus commandes ; refusés/annulés = devis annulés
+    const quoteWhere: any = { reference: { startsWith: 'DEV-' }, orderDate: { gte: from, lte: to }, ...(siteId ? { siteId } : {}), ...(q.customerId ? { customerId: q.customerId } : {}), ...(q.agentId ? { createdById: q.agentId } : {}) };
+    const [quotesAccepted, quotesCancelled] = await Promise.all([
+      this.prisma.salesOrder.count({ where: { ...quoteWhere, status: { notIn: ['QUOTE', 'CANCELLED'] } } }),
+      this.prisma.salesOrder.count({ where: { ...quoteWhere, status: 'CANCELLED' } }),
+    ]);
     const [invoices, today, openInv, orderGroups, payments, lines] = await Promise.all([
       this.prisma.salesInvoice.findMany({ where: inPeriod, select: { totalAmount: true, customerId: true, createdById: true } }),
       this.prisma.salesInvoice.aggregate({ _sum: { totalAmount: true }, _count: true, where: { ...invWhere, invoiceDate: { gte: today0 } } }),
@@ -46,6 +52,8 @@ export class SalesDashboardService {
       salesToday: Math.round(num(today._sum.totalAmount)), salesTodayCount: today._count,
       ordersCount: Object.entries(byStatus).filter(([s]) => s !== 'QUOTE' && s !== 'CANCELLED').reduce((a, [, n]) => a + n, 0),
       quotesPending: byStatus.QUOTE ?? 0,
+      quotesAccepted, quotesCancelled,
+      quoteConversionPercent: quotesAccepted + quotesCancelled + (byStatus.QUOTE ?? 0) > 0 ? Math.round((quotesAccepted * 100) / (quotesAccepted + quotesCancelled + (byStatus.QUOTE ?? 0))) : null,
       ordersToPrepare: byStatus.CONFIRMED ?? 0,
       ordersPartiallyDelivered: byStatus.PARTIALLY_DELIVERED ?? 0,
       ordersDelivered: byStatus.DELIVERED ?? 0,

@@ -89,6 +89,26 @@ export class SalesService {
     return order;
   }
 
+  // ---- Catalogue et tarifs de vente ----
+  async tariffs(siteId: string | undefined, actor: Actor) {
+    const site = actor.role !== 'SUPER_ADMIN' && actor.siteId ? actor.siteId : siteId;
+    const showCost = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'COMPTABLE', 'DIRECTEUR_GENERAL'].includes(actor.role);
+    const items = await this.prisma.inventoryItem.findMany({ where: { ...(site ? { siteId: site } : {}) }, select: { id: true, sku: true, name: true, unit: true, salePrice: true, unitPrice: true, currentQuantity: true }, orderBy: { name: 'asc' }, take: 1000 });
+    return items.map((i) => ({ id: i.id, sku: i.sku, name: i.name, unit: i.unit, salePrice: i.salePrice == null ? null : Number(i.salePrice), currentQuantity: Number(i.currentQuantity), ...(showCost ? { cost: i.unitPrice == null ? null : Number(i.unitPrice) } : {}) }));
+  }
+
+  async setSalePrice(itemId: string, price: number, reason: string | undefined, actor: Actor) {
+    if (!(Number(price) >= 0)) throw new BadRequestException('Prix invalide.');
+    const item = await this.prisma.inventoryItem.findUnique({ where: { id: itemId }, select: { id: true, siteId: true, name: true, salePrice: true } });
+    if (!item) throw new NotFoundException('Article introuvable.');
+    if (actor.role !== 'SUPER_ADMIN' && actor.siteId && item.siteId !== actor.siteId) throw new ForbiddenException("Cet article n'est pas dans votre site.");
+    const old = item.salePrice == null ? null : Number(item.salePrice);
+    if (old === Number(price)) return { id: itemId, salePrice: old };
+    await this.prisma.inventoryItem.update({ where: { id: itemId }, data: { salePrice: Number(price) } });
+    await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'SalePrice', entityId: itemId, oldValue: { salePrice: old }, newValue: { salePrice: Number(price), article: item.name }, reason: reason?.trim() || undefined });
+    return { id: itemId, salePrice: Number(price) };
+  }
+
   // Un prospect qui passe une commande devient client (historisé)
   private async promoteProspect(customerId: string | null | undefined, actorId: string) {
     if (!customerId) return;
