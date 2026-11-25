@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Put, UseGuards } from '@nestjs/com
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
 import { SettingsService } from './settings.service';
-import { SetSettingDto, UpdateOrganizationDto } from './dto/settings.dto';
+import { SetNumberingDto, SetSettingDto, UpdateOrganizationDto } from './dto/settings.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -23,6 +23,17 @@ export class SettingsController {
   @Get('fuel-price')
   fuelPrice(@CurrentUser() actor: any) {
     return this.settingsService.fuelPrice(actor.organizationId);
+  }
+
+  // Numérotation des documents : lecture pour tous les responsables, modification réservée au PDG / admin
+  @Get('numbering')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.DIRECTEUR_GENERAL)
+  numbering() { return this.settingsService.numbering(); }
+
+  @Put('numbering/:docType')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
+  setNumbering(@Param('docType') docType: string, @Body() dto: SetNumberingDto, @CurrentUser() actor: any) {
+    return this.settingsService.setNumbering(docType, dto, actor.userId);
   }
 
   @Get('organization')

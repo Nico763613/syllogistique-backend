@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { UpdateOrganizationDto } from './dto/settings.dto';
+import { UpdateOrganizationDto, SetNumberingDto } from './dto/settings.dto';
+import { DOC_TYPES, formatDocNumber } from '../common/doc-numbers';
 import { FUEL_PRICE_KEY, currentFuelPrice } from '../common/fuel-price';
 
 // Paramètres administrateur (§40) : tarifs carburant, seuils, nom/logo de l'entreprise…
@@ -20,6 +21,37 @@ const KEY_PATTERN = /^[A-Z][A-Z0-9_]{1,63}$/;
 @Injectable()
 export class SettingsService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
+
+  // ---- Numérotation des documents (réglable par le PDG / l'administrateur) ----
+  async numbering() {
+    const cfg = (await this.prisma.$queryRawUnsafe('SELECT "doc_type","prefix","pad","include_year","reset_yearly" FROM "document_numbering_config"')) as any[];
+    const seqs = (await this.prisma.$queryRawUnsafe('SELECT "doc_type", MAX("last_value") AS last FROM "document_sequences" GROUP BY "doc_type"')) as any[];
+    const year = new Date().getFullYear();
+    return DOC_TYPES.map((t) => {
+      const c = cfg.find((x) => x.doc_type === t.code);
+      const prefix = c?.prefix || t.prefix; const pad = c ? Number(c.pad) : 4;
+      const resetYearly = c ? c.reset_yearly !== false : true; const includeYear = resetYearly ? true : c ? c.include_year !== false : true;
+      const last = Number(seqs.find((x) => x.doc_type === t.code)?.last || 0);
+      const next = last + 1;
+      return { ...t, prefix, pad, includeYear, resetYearly, configured: !!c, lastNumber: last, example: includeYear ? formatDocNumber(prefix, year, next, pad) : `${prefix}-${String(next).padStart(pad, '0')}` };
+    });
+  }
+
+  async setNumbering(docType: string, dto: SetNumberingDto, actorId: string) {
+    const t = DOC_TYPES.find((x) => x.code === docType);
+    if (!t) throw new NotFoundException('Type de document inconnu.');
+    const resetYearly = dto.resetYearly !== false;
+    const includeYear = resetYearly ? true : dto.includeYear !== false;
+    // Un préfixe ne peut pas être partagé par deux types (sinon deux documents pourraient recevoir le même numéro).
+    const all = await this.numbering();
+    const clash = all.find((x) => x.code !== docType && x.prefix === dto.prefix);
+    if (clash) throw new BadRequestException(`Le préfixe ${dto.prefix} est déjà utilisé par « ${clash.label} ».`);
+    await this.prisma.$executeRawUnsafe(
+      'INSERT INTO "document_numbering_config" ("doc_type","prefix","pad","include_year","reset_yearly","updated_by","updated_at") VALUES ($1,$2,$3,$4,$5,$6,CURRENT_TIMESTAMP) ON CONFLICT ("doc_type") DO UPDATE SET "prefix"=$2,"pad"=$3,"include_year"=$4,"reset_yearly"=$5,"updated_by"=$6,"updated_at"=CURRENT_TIMESTAMP',
+      docType, dto.prefix, dto.pad, includeYear, resetYearly, actorId);
+    try { await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'document_numbering', entityId: docType, newValue: { prefix: dto.prefix, pad: dto.pad, includeYear, resetYearly } }); } catch {}
+    return (await this.numbering()).find((x) => x.code === docType);
+  }
 
   list(organizationId: string) {
     return this.prisma.setting.findMany({ where: { organizationId, NOT: { key: { startsWith: 'LICENSE_' } } }, orderBy: { key: 'asc' } });
