@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { SalesDocumentsService } from './sales-documents.service';
+import { SalesDashboardService } from './sales-dashboard.service';
 import { SalesPdfsService } from './sales-pdfs.service';
 import { SalesReturnsService } from './sales-returns.service';
 import { SalesController } from './sales.controller';
@@ -11,6 +12,6 @@ import { MessagingModule } from '../messaging/messaging.module';
 @Module({
   imports: [MessagingModule],
   controllers: [SalesController, TransportBillingController],
-  providers: [SalesService, SalesDocumentsService, SalesPdfsService, SalesReturnsService, TransportBillingService],
+  providers: [SalesService, SalesDocumentsService, SalesPdfsService, SalesDashboardService, SalesReturnsService, TransportBillingService],
 })
 export class SalesModule {}

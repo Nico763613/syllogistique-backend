@@ -5,6 +5,7 @@ import { RoleName } from '@prisma/client';
 import { SalesService } from './sales.service';
 import { SalesDocumentsService } from './sales-documents.service';
 import { SalesPdfsService } from './sales-pdfs.service';
+import { SalesDashboardService } from './sales-dashboard.service';
 import { CreateSalesOrderDto, DeliverSalesOrderDto, CreateSalesInvoiceDto } from './dto/sale.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -24,9 +25,16 @@ export class SalesController {
     private salesService: SalesService,
     private salesDocuments: SalesDocumentsService,
     private pdfs: SalesPdfsService,
+    private dash: SalesDashboardService,
     private messaging: MessagingService,
     private returns: SalesReturnsService,
   ) {}
+
+  @Get('dashboard')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
+  dashboard(@Query() q: any, @CurrentUser() actor: any) {
+    return this.dash.summary({ from: q.from, to: q.to, siteId: q.siteId, agentId: q.agentId, customerId: q.customerId, productId: q.productId }, actor);
+  }
 
   @Post('orders')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER)

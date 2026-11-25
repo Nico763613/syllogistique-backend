@@ -6017,8 +6017,9 @@ async function renderDriverExpenses(status) {
     <div class="panel"><div style="overflow:auto"><table><tr><th>Date</th><th>Chauffeur</th><th>Nature</th><th>Montant</th><th>Reçu scanné</th><th>Reçu papier</th><th>Fiche</th><th>Statut</th><th></th></tr>${tr || '<tr><td colspan="9" class="empty">Aucune dépense.</td></tr>'}</table></div></div>`;
 }
 /* ---------- Ventes (Responsable commercial) : Commandes · Factures · Clients · Retours · Caisses à valider ---------- */
-let vtTab = 'caisses';
-const VT_TABS = [['caisses', 'Caisses à valider'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
+let vtTab = 'tableau';
+const VT_DASH = { period: 'MONTH', from: '', to: '' };
+const VT_TABS = [['tableau', 'Tableau de bord'], ['caisses', 'Caisses à valider'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
 const VT_ORDER = { QUOTE: ['Devis', 'info'], CONFIRMED: ['Confirmée', 'info'], PARTIALLY_DELIVERED: ['Livrée en partie', 'warn'], DELIVERED: ['Livrée', 'ok'], INVOICED: ['Facturée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 const VT_INV = { DRAFT: ['Brouillon', 'info'], UNPAID: ['Impayée', 'bad'], PARTIALLY_PAID: ['Partielle', 'warn'], PAID: ['Payée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 function cashState(c) {
@@ -6040,7 +6041,21 @@ async function renderVentes() {
   const opened = (invs || []).filter((i) => ['UNPAID', 'PARTIALLY_PAID'].includes(i.status));
   const due = (i) => Math.max(0, Number(i.totalAmount) - Number(i.amountPaid || 0));
   let body = '';
-  if (vtTab === 'caisses') {
+  if (vtTab === 'tableau') {
+    const pd = VT_DASH, t0 = new Date(), iso = (d) => d.toISOString().slice(0, 10);
+    let from = '', to = '';
+    if (pd.period === 'TODAY') { from = to = iso(t0); } else if (pd.period === 'WEEK') { const d = new Date(t0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); from = iso(d); to = iso(t0); } else if (pd.period === 'CUSTOM') { from = pd.from; to = pd.to; }
+    let D = null, err = '';
+    try { D = await api('/sales/dashboard?siteId=' + sid + (from ? '&from=' + from : '') + (to ? '&to=' + to : '')); } catch (e) { err = e.message; }
+    const tile = (n, l, c, sub) => `<div style="flex:1;min-width:140px;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--muted)">${l}</div><div style="font-size:20px;font-weight:700;color:${c || '#1F3A5F'}">${n}</div>${sub ? `<div style="font-size:12px;color:var(--muted)">${sub}</div>` : ''}</div>`;
+    const ctl = `<div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select onchange="VT_DASH.period=this.value;renderVentes()">${[['TODAY', "Aujourd'hui"], ['WEEK', 'Cette semaine'], ['MONTH', 'Ce mois'], ['CUSTOM', 'Période libre']].map(([k, l]) => `<option value="${k}" ${pd.period === k ? 'selected' : ''}>${l}</option>`).join('')}</select>${pd.period === 'CUSTOM' ? `<input type="date" value="${esc(pd.from)}" onchange="VT_DASH.from=this.value;renderVentes()"> → <input type="date" value="${esc(pd.to)}" onchange="VT_DASH.to=this.value;renderVentes()">` : ''}</div></div>`;
+    if (!D) body = ctl + `<div class="panel"><div class="msg err">${esc(err || 'Indisponible')}</div></div>`;
+    else body = ctl + `<div class="panel"><h3>Chiffres de la période</h3><div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${tile(g(D.turnover) + ' GNF', "Chiffre d'affaires", '', D.invoicesCount + ' facture(s)')}${tile(g(D.salesToday) + ' GNF', "Ventes du jour", '', D.salesTodayCount + ' facture(s)')}${tile(g(D.paymentsReceived) + ' GNF', 'Paiements reçus', '#3F8F6B', D.paymentsCount + ' encaissement(s)')}${tile(g(D.unpaid.amount) + ' GNF', 'Factures impayées', D.unpaid.count ? '#B33A32' : '#3F8F6B', D.unpaid.count + ' facture(s) · ' + D.unpaid.overdueCount + ' en retard')}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">${tile(D.ordersCount, 'Commandes', '', 'hors devis et annulées')}${tile(D.quotesPending, 'Devis en attente', '#C9A24D')}${tile(D.ordersToPrepare, 'À préparer / livrer', '#C9A24D', D.ordersPartiallyDelivered + ' partiellement livrée(s)')}${tile(D.ordersDelivered, 'Livrées')}${tile(D.activeCustomers, 'Clients actifs')}</div></div>
+      <div class="panel"><h3>Meilleurs produits</h3>${D.topProducts.length ? `<table><tr><th>Produit</th><th>Quantité</th><th>Montant (GNF)</th></tr>${D.topProducts.map((p) => `<tr><td>${esc(p.name)}</td><td>${g(p.qty)}</td><td class="mono">${g(p.amount)}</td></tr>`).join('')}</table>` : '<div class="empty">Aucune vente sur la période.</div>'}</div>
+      <div class="panel"><h3>Performance des commerciaux</h3>${D.agents.length ? `<table><tr><th>Agent</th><th>Factures</th><th>Montant (GNF)</th></tr>${D.agents.map((a) => `<tr><td>${esc(a.name)}</td><td>${a.count}</td><td class="mono">${g(a.total)}</td></tr>`).join('')}</table>` : '<div class="empty">Aucune facture sur la période.</div>'}</div>`;
+  } else if (vtTab === 'caisses') {
     const rows = (sess || []).filter((c) => c.closedAt).map((c) => { const st = cashState(c), gap = c.gapAmount == null ? null : Number(c.gapAmount); const who = c.cashier ? c.cashier.firstName + ' ' + c.cashier.lastName : '';
       return `<tr><td>${dd(c.openedAt)}<div style="font-size:12px;color:var(--muted)">${esc(who)}</div></td><td>${badge(st)}${c.rejectNote ? '<div style="font-size:12px;color:var(--muted)">' + esc(c.rejectNote) + '</div>' : ''}</td><td class="mono">${g(c.expectedCash)}</td><td class="mono">${g(c.countedCash)}</td><td>${gap === 0 ? '<span class="badge ok">0</span>' : '<span class="badge bad">' + (gap > 0 ? '+' : '') + g(gap) + '</span>'}${c.note ? '<div style="font-size:12px;color:var(--muted)">' + esc(c.note) + '</div>' : ''}</td><td style="white-space:nowrap">${act && !c.validatedBy && !c.opsAt ? `<button class="btn small gold" onclick="vtCashOk('${esc(c.id)}', ${gap === 0 ? 0 : 1})"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Vérifier</button> ` : ''}${act && !c.opsAt && !c.rejectedAt ? `<button class="btn small" onclick="vtCashNo('${esc(c.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Rejeter</button>` : ''}</td></tr>`; }).join('');
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-archive"/></svg> Caisses clôturées <span class="badge ${toCheck.length ? 'warn' : 'ok'}">${toCheck.length} à vérifier</span></h3><div class="desc">Vérifiez la caisse (écart justifié), elle passe ensuite au Responsable des opérations puis à la Comptabilité.</div><div style="overflow:auto"><table><tr><th>Caisse</th><th>État</th><th>Attendu</th><th>Compté</th><th>Écart</th><th></th></tr>${rows || '<tr><td colspan="6"><div class="empty">Aucune caisse clôturée.</div></td></tr>'}</table></div></div>`;
