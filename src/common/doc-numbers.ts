@@ -45,3 +45,11 @@ export async function ensureReceiptNumber(db: Db, paymentId: string, by?: string
   const set = (await db.$queryRawUnsafe('UPDATE "payments" SET "receipt_number" = $1 WHERE "id" = $2 AND "receipt_number" IS NULL RETURNING "receipt_number" AS n', n, paymentId)) as any[];
   return set.length ? n : ((await read()) as string);
 }
+
+// Raccourci : prochaine référence « PREFIX-AAAA-NNNN » pour une table qui a une colonne `reference` (la séquence reprend les numéros déjà utilisés).
+export async function nextRefOf(prisma: any, prefix: string, model: string, by?: string): Promise<string> {
+  return nextDocNumber(prisma, prefix, prefix, async (year) => {
+    const rows = await prisma[model].findMany({ where: { reference: { startsWith: `${prefix}-${year}-` } }, select: { reference: true } });
+    return maxSeqOf(rows.map((r: any) => r.reference || ''));
+  }, { by });
+}

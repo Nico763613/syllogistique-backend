@@ -1,3 +1,4 @@
+import { nextRefOf } from '../common/doc-numbers';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -12,9 +13,7 @@ export class TransfersService {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
   private async nextReference() {
-    const year = new Date().getFullYear();
-    const count = await this.prisma.stockTransfer.count({ where: { reference: { startsWith: `TR-${year}-` } } });
-    return `TR-${year}-${String(count + 1).padStart(4, '0')}`;
+    return nextRefOf(this.prisma, 'TR', 'stockTransfer');
   }
 
   private assertSite(actor: Actor, siteId: string) {

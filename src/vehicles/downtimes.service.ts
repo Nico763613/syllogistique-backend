@@ -1,3 +1,4 @@
+import { nextRefOf } from '../common/doc-numbers';
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
@@ -171,9 +172,7 @@ export class DowntimesService {
     const dt = await this.load(id);
     this.assertMechanicOwns(dt, actor);
     if (dt.stage === 'EN_ATTENTE_PIECES') throw new BadRequestException('Des pièces sont déjà demandées pour cette panne.');
-    const year = new Date().getFullYear();
-    const count = await this.prisma.needRequest.count({ where: { reference: { startsWith: `EB-${year}-` } } });
-    const reference = `EB-${year}-${String(count + 1).padStart(4, '0')}`;
+    const reference = await nextRefOf(this.prisma, 'EB', 'needRequest');
     const need = await this.prisma.needRequest.create({
       data: {
         siteId: dt.siteId, reference, title: `Pièces — réparation ${dt.vehicle.internalNumber}`,

@@ -1,3 +1,4 @@
+import { nextRefOf } from '../common/doc-numbers';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -14,9 +15,7 @@ export class HseService {
   }
 
   private async nextRef(): Promise<string> {
-    const year = new Date().getFullYear();
-    const n = await this.prisma.hseIncident.count({ where: { reference: { startsWith: `HSE-${year}-` } } });
-    return `HSE-${year}-${String(n + 1).padStart(4, '0')}`;
+    return nextRefOf(this.prisma, 'HSE', 'hseIncident');
   }
 
   async createIncident(dto: D.CreateIncidentDto, actor: Actor) {
