@@ -38,6 +38,15 @@ export class SalesController {
     return this.dash.summary({ from: q.from, to: q.to, siteId: q.siteId, agentId: q.agentId, customerId: q.customerId, productId: q.productId }, actor);
   }
 
+  // Catalogue et tarifs de vente
+  @Get('tariffs')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.CAISSIER, RoleName.MAGASINIER)
+  tariffs(@Query('siteId') siteId: string, @CurrentUser() actor: any) { return this.salesService.tariffs(siteId, actor); }
+
+  @Post('tariffs/:itemId')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL)
+  setTariff(@Param('itemId') itemId: string, @Body() dto: any, @CurrentUser() actor: any) { return this.salesService.setSalePrice(itemId, Number(dto && dto.salePrice), dto && dto.reason, actor); }
+
   // Rapport commercial d'une période : PDF ou Excel
   @Get('reports/pdf')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
