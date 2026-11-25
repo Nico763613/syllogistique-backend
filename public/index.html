@@ -6200,7 +6200,7 @@ async function renderDriverExpenses(status) {
 /* ---------- Ventes (Responsable commercial) : Commandes · Factures · Clients · Retours · Caisses à valider ---------- */
 let vtTab = 'tableau';
 const VT_DASH = { period: 'MONTH', from: '', to: '' };
-const VT_TABS = [['tableau', 'Tableau de bord'], ['caisses', 'Caisses à valider'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
+const VT_TABS = [['tableau', 'Tableau de bord'], ['caisses', 'Caisses à valider'], ['attente', 'Paiements mobile'], ['commandes', 'Commandes'], ['factures', 'Factures'], ['clients', 'Clients'], ['retours', 'Retours']];
 const VT_ORDER = { QUOTE: ['Devis', 'info'], CONFIRMED: ['Confirmée', 'info'], PARTIALLY_DELIVERED: ['Livrée en partie', 'warn'], DELIVERED: ['Livrée', 'ok'], INVOICED: ['Facturée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 const VT_INV = { DRAFT: ['Brouillon', 'info'], UNPAID: ['Impayée', 'bad'], PARTIALLY_PAID: ['Partielle', 'warn'], PAID: ['Payée', 'ok'], CANCELLED: ['Annulée', 'bad'] };
 function cashState(c) {
@@ -6213,11 +6213,11 @@ function cashState(c) {
 function vtCanAct() { return ['RESPONSABLE_COMMERCIAL', 'SUPER_ADMIN'].includes(state.user.role); }
 async function renderVentes() {
   const sid = encodeURIComponent(state.siteId || '');
-  const [sess, orders, invs, rets, custList] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => []), api('/customers?siteId=' + sid).catch(() => [])]);
+  const [sess, orders, invs, rets, custList, pendPay] = await Promise.all([api('/cash-sessions?siteId=' + sid), api('/sales/orders?siteId=' + sid), api('/sales/invoices?siteId=' + sid), api('/sales/returns?siteId=' + sid).catch(() => []), api('/customers?siteId=' + sid).catch(() => []), api('/payments/pending?siteId=' + sid).catch(() => [])]);
   const g = (n) => fmt(Math.round(Number(n) || 0)), dd = (x) => new Date(x).toLocaleDateString('fr-FR'), act = vtCanAct();
   const toCheck = (sess || []).filter((c) => c.closedAt && !c.validatedBy && !c.opsAt);
   const pendRet = (rets || []).filter((r) => r.status === 'PENDING');
-  const bar = `<div class="dp-tabs" id="dp-bar">${VT_TABS.map(([k, t]) => { const n = k === 'caisses' ? toCheck.length : k === 'retours' ? pendRet.length : 0; return `<button class="${vtTab === k ? 'on' : ''}" onclick="vtTab='${k}';renderVentes()">${t}${n ? ' (' + n + ')' : ''}</button>`; }).join('')}</div>`;
+  const bar = `<div class="dp-tabs" id="dp-bar">${VT_TABS.map(([k, t]) => { const n = k === 'caisses' ? toCheck.length : k === 'retours' ? pendRet.length : k === 'attente' ? (pendPay || []).length : 0; return `<button class="${vtTab === k ? 'on' : ''}" onclick="vtTab='${k}';renderVentes()">${t}${n ? ' (' + n + ')' : ''}</button>`; }).join('')}</div>`;
   const badge = (m, k) => `<span class="badge ${m[1]}">${m[0]}</span>`;
   const opened = (invs || []).filter((i) => ['UNPAID', 'PARTIALLY_PAID'].includes(i.status));
   const due = (i) => Math.max(0, Number(i.totalAmount) - Number(i.amountPaid || 0));
@@ -6244,6 +6244,8 @@ async function renderVentes() {
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Commandes</h3><div style="overflow:auto"><table><tr><th>Référence</th><th>Client</th><th>Date</th><th>Total</th><th>État</th><th>Documents</th></tr>${(orders || []).map((o) => `<tr><td>${esc(o.reference)}</td><td>${esc(o.customer && o.customer.name)}</td><td>${dd(o.orderDate)}</td><td class="mono">${g((o.lines || []).reduce((a, l) => a + Number(l.lineTotal || 0), 0))}</td><td>${badge(VT_ORDER[o.status] || [o.status, 'info'])}</td><td style="white-space:nowrap"><button class="btn small" onclick="vtPdf('/sales/orders/${esc(o.id)}/pdf','${o.status === 'QUOTE' ? 'devis' : 'commande'}_${esc(o.reference)}')">${o.status === 'QUOTE' ? 'Devis PDF' : 'Commande PDF'}</button>${act && ['CONFIRMED', 'PARTIALLY_DELIVERED'].includes(o.status) ? ` <button class="btn small gold" onclick="vtDeliver('${esc(o.id)}')">Livrer</button>` : ''}${['QUOTE', 'CANCELLED'].includes(o.status) ? '' : ` <button class="btn small" onclick="vtBl('${esc(o.id)}','${esc(o.reference)}')">Bon de livraison</button>`}</td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">Aucune commande.</div></td></tr>'}</table></div></div>`;
   } else if (vtTab === 'factures') {
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Factures <span class="badge ${opened.length ? 'warn' : 'ok'}">${opened.length} à encaisser</span></h3><div style="overflow:auto"><table><tr><th>Facture</th><th>Client</th><th>Total</th><th>Reste</th><th>État</th><th>Documents</th></tr>${(invs || []).map((i) => { const ph = String((i.customer && i.customer.phone) || '').replace(/\D/g, ''), full = ph.length === 9 ? '224' + ph : ph; const msg = `Bonjour ${(i.customer && i.customer.name) || ''}, rappel : la facture ${i.reference} présente un reste à payer de ${g(due(i))} GNF. Merci. — SYL LOGISTIQUE`; return `<tr><td>${esc(i.reference)}<div style="font-size:12px;color:var(--muted)">${dd(i.invoiceDate)}</div></td><td>${esc(i.customer && i.customer.name)}</td><td class="mono">${g(i.totalAmount)}</td><td class="mono">${['UNPAID', 'PARTIALLY_PAID'].includes(i.status) ? '<b>' + g(due(i)) + '</b>' : '—'}</td><td>${badge(VT_INV[i.status] || [i.status, 'info'])}</td><td>${['UNPAID', 'PARTIALLY_PAID'].includes(i.status) && full && act ? `<a class="btn small" target="_blank" rel="noopener" href="https://wa.me/${esc(full)}?text=${encodeURIComponent(msg)}">Relancer</a>` : ''} <button class="btn small" onclick="vtPdf('/sales/invoices/${esc(i.id)}/pdf','facture_${esc(i.reference)}')">Facture PDF</button>${Number(i.amountPaid || 0) > 0 ? ` <button class="btn small" onclick="vtReceipt('${esc(i.id)}')">Reçu PDF</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6"><div class="empty">Aucune facture.</div></td></tr>'}</table></div></div>`;
+  } else if (vtTab === 'attente') {
+    body = `<div class="panel"><h3>Paiements mobile en attente de confirmation <span class="badge ${(pendPay || []).length ? 'warn' : 'ok'}">${(pendPay || []).length}</span></h3><div class="desc">Vérifiez le message de l'opérateur (montant et numéro de transaction), puis confirmez : la facture est alors soldée ou mise à jour et le reçu est édité. Celui qui a déclaré le paiement ne peut pas le confirmer lui-même.</div><div style="overflow:auto"><table><tr><th>Déclaré le</th><th>Facture</th><th>Client</th><th>Mode</th><th>N° transaction</th><th>Montant</th>${act ? '<th></th>' : ''}</tr>${(pendPay || []).map((p) => `<tr><td>${dd(p.declared_at)}</td><td class="mono">${esc(p.invoice_reference)}</td><td>${esc(p.customer_name || '—')}</td><td>${p.method === 'ORANGE_MONEY' ? 'Orange Money' : 'Mobile Money'}</td><td class="mono">${esc(p.external_ref || '—')}</td><td class="mono">${g(p.amount)}</td>${act ? `<td style="white-space:nowrap"><button class="btn small gold" onclick="vtPendDecide('${esc(p.id)}',true)">Confirmer</button> <button class="btn small" onclick="vtPendDecide('${esc(p.id)}',false)">Rejeter</button></td>` : ''}</tr>`).join('') || '<tr><td colspan="7" class="desc">Aucun paiement en attente.</td></tr>'}</table></div></div>`;
   } else if (vtTab === 'clients') {
     const by = {}; (invs || []).filter((i) => i.status !== 'CANCELLED' && i.status !== 'DRAFT').forEach((i) => { const n = (i.customer && i.customer.name) || '—'; const c = by[n] || (by[n] = { n, tot: 0, paid: 0, k: 0 }); c.tot += Number(i.totalAmount); c.paid += Number(i.amountPaid || 0); c.k++; });
     const list = Object.values(by).sort((a, b) => (b.tot - b.paid) - (a.tot - a.paid));
@@ -6255,6 +6257,13 @@ async function renderVentes() {
     body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Retours clients <span class="badge ${pendRet.length ? 'warn' : 'ok'}">${pendRet.length} à valider</span></h3><div style="overflow:auto"><table><tr><th>Retour</th><th>Facture / client</th><th>Motif</th><th>Montant</th><th>État</th><th></th></tr>${(rets || []).map((r) => `<tr><td>${esc(r.reference || '')}<div style="font-size:12px;color:var(--muted)">${dd(r.createdAt)}</div></td><td>${esc(r.salesInvoice && r.salesInvoice.reference)}<div style="font-size:12px;color:var(--muted)">${esc(r.salesInvoice && r.salesInvoice.customer && r.salesInvoice.customer.name)}</div></td><td>${esc(r.reason)}</td><td class="mono">${g(r.totalAmount)}</td><td>${badge(RS[r.status] || [r.status, 'info'])}</td><td style="white-space:nowrap">${act && r.status === 'PENDING' ? `<button class="btn small gold" onclick="vtRet('${esc(r.id)}', true)"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Valider</button> <button class="btn small" onclick="vtRet('${esc(r.id)}', false)"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg> Rejeter</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">Aucun retour.</div></td></tr>'}</table></div></div>`;
   }
   root().innerHTML = bar + (act ? '' : '<div class="msg">Lecture seule.</div>') + body + '<div id="vt-msg"></div>';
+}
+async function vtPendDecide(id, ok) {
+  try {
+    if (ok) { if (!confirm('Le message de confirmation de l\'opérateur est-il bien reçu (montant et numéro corrects) ?')) return; await api('/payments/pending/' + encodeURIComponent(id) + '/confirm', { method: 'POST' }); }
+    else { const reason = prompt('Motif du rejet (paiement non reçu, montant incorrect…) :'); if (!reason || reason.trim().length < 3) return; await api('/payments/pending/' + encodeURIComponent(id) + '/reject', { method: 'POST', body: { reason: reason.trim() } }); }
+    renderVentes();
+  } catch (e) { alert(e.message); }
 }
 // Rapport commercial (PDF / Excel) de la période affichée dans le tableau de bord
 async function vtReport(fmtType) {
@@ -6358,6 +6367,7 @@ async function renderCaisse() {
       <label>Montant reçu (GNF)</label><input id="cs-amt" type="number" inputmode="numeric" min="1" placeholder="Montant">
       <label>Mode de paiement</label><select id="cs-met" onchange="csMet()">${CS_METHODS.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select>
       <div id="cs-refbox" style="display:none"><label>N° de transaction (obligatoire hors espèces)</label><input id="cs-ref" placeholder="Ex. numéro Orange Money"></div>
+      <label id="cs-pendbox" style="display:none;align-items:center;gap:6px;margin-top:6px"><input type="checkbox" id="cs-pend" style="width:auto"> Pas encore confirmé par l'opérateur : mettre en attente (la facture ne sera soldée qu'après confirmation)</label>
       <div id="cs-msg"></div><button class="btn gold" style="min-height:52px;width:100%;margin-top:12px;font-size:14px" onclick="csPay()"><svg class="ic" aria-hidden="true"><use href="#i-check"/></svg> Enregistrer l'encaissement</button><div id="cs-receipt"></div></div>`;
     if (cur) setTimeout(csPick, 0);
   } else if (csTab === 'caisse') {
@@ -6382,7 +6392,7 @@ function csPick() {
   const i = (window._csInv || []).find((x) => x.id === sel.value); csInvoice = sel.value;
   const a = document.getElementById('cs-amt'); if (a && i) a.value = Math.round(i.rest);
 }
-function csMet() { const m = document.getElementById('cs-met').value; document.getElementById('cs-refbox').style.display = m === 'CASH' ? 'none' : ''; }
+function csMet() { const m = document.getElementById('cs-met').value; document.getElementById('cs-refbox').style.display = m === 'CASH' ? 'none' : ''; const pb = document.getElementById('cs-pendbox'); if (pb) { pb.style.display = (m === 'MOBILE_MONEY' || m === 'ORANGE_MONEY') ? 'flex' : 'none'; if (pb.style.display === 'none') document.getElementById('cs-pend').checked = false; } }
 async function csOpen() { const m = document.getElementById('cs-msg'); try { await api('/cash-sessions/open', { method: 'POST', body: { openingFloat: Math.round(Number(document.getElementById('cs-float').value) || 0) } }); renderCaisse(); } catch (e) { m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; } }
 async function csPay() {
   if (window._csBusy) return;
@@ -6395,6 +6405,13 @@ async function csPay() {
     if (!(amt > 0)) throw new Error('Saisissez le montant reçu.');
     if (amt > inv.rest) throw new Error('Le montant dépasse le reste à payer (' + fmt(Math.round(inv.rest)) + ' GNF).');
     if (met !== 'CASH' && !ref) throw new Error('Indiquez le numéro de transaction.');
+    const pend = document.getElementById('cs-pend') && document.getElementById('cs-pend').checked;
+    if (pend) {
+      await api('/payments/pending', { method: 'POST', body: { salesInvoiceId: id, method: met, amount: amt, paymentDate: new Date().toISOString(), externalRef: ref } });
+      window._csOp = null; csInvoice = ''; await renderCaisse();
+      document.getElementById('cs-receipt').innerHTML = `<div class="msg ok" style="margin-top:12px">Paiement de ${fmt(Math.round(amt))} GNF mis en attente de confirmation (${esc(inv.reference)}). Un responsable le confirmera après vérification du message de l'opérateur.</div>`;
+      window._csBusy = false; return;
+    }
     await api('/payments', { method: 'POST', body: { direction: 'IN', method: met, amount: amt, paymentDate: new Date().toISOString(), salesInvoiceId: id, clientOpId: window._csOp, ...(ref ? { reference: ref, externalRef: ref } : {}) } });
     window._csOp = null;
     const left = inv.rest - amt, msg = `Bonjour ${inv.customer && inv.customer.name}, nous avons bien reçu votre règlement de ${fmt(Math.round(amt))} GNF pour la facture ${inv.reference}. ${left > 0 ? 'Reste à payer : ' + fmt(Math.round(left)) + ' GNF.' : 'Facture soldée.'} Merci. — SYL LOGISTIQUE`;
