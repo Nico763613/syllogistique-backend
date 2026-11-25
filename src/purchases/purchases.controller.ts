@@ -41,6 +41,16 @@ export class PurchasesController {
     return this.purchasesService.cancelOrder(id, dto, actor.userId);
   }
 
+  @Get('orders/:id/receipts')
+  receipts(@Param('id') id: string) { return this.purchasesService.receiptsOf(id); }
+
+  @Get('receipts/:id/pdf')
+  async receiptPdf(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
+    const buffer = await this.purchasesService.receiptPdf(id, actor.userId);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="bon_reception_${id}.pdf"` });
+    res.send(buffer);
+  }
+
   @Get('orders/:id/pdf')
   async pdf(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
     const buffer = await this.purchasesService.orderPdf(id, actor.userId);

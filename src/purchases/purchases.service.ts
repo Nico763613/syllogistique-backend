@@ -146,11 +146,15 @@ export class PurchasesService {
       }
 
       // Bon de réception (traçabilité : livré / accepté / rejeté, fret, bon de livraison)
+      const brNumber = await nextDocNumber(tx as any, 'BR', 'BR', async (year) => {
+        const rows = await tx.goodsReceipt.findMany({ where: { reference: { startsWith: `BR-${year}-` } }, select: { reference: true } });
+        return maxSeqOf(rows.map((r: any) => r.reference || ''));
+      }, { by: actorId });
       const receipt = await tx.goodsReceipt.create({
         data: {
           siteId: order.siteId,
           purchaseOrderId: orderId,
-          reference: order.reference,
+          reference: brNumber,
           deliveryNoteNo: dto.deliveryNoteNo,
           freightCost: Math.round(dto.freightCost ?? 0),
           notes: dto.notes,
@@ -294,6 +298,67 @@ export class PurchasesService {
       reason: dto.reason.trim(),
     });
     return updated;
+  }
+
+  // ---- Bons de réception (BR) : liste par bon de commande et PDF avec écarts / dommages ----
+  async receiptsOf(orderId: string) {
+    const rows = await this.prisma.goodsReceipt.findMany({ where: { purchaseOrderId: orderId }, include: { lines: { include: { item: { select: { sku: true, name: true, unit: true } } } } }, orderBy: { receivedAt: 'asc' } });
+    return rows;
+  }
+
+  async receiptPdf(id: string, userId: string): Promise<Buffer> {
+    const issuer = await getIssuer(this.prisma, userId);
+    const r = await this.prisma.goodsReceipt.findUnique({
+      where: { id },
+      include: {
+        site: { include: { organization: true } },
+        purchaseOrder: { include: { supplier: true, lines: true } },
+        lines: { include: { item: { select: { sku: true, name: true, unit: true } } } },
+      },
+    });
+    if (!r) throw new NotFoundException('Bon de réception introuvable.');
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c) => chunks.push(c)); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject);
+      const navy = '#163A5F'; const gold = '#E0A72E';
+      const n = (v: number) => (Math.round(v * 1000) / 1000).toLocaleString('fr-FR').replace(/[\u202F\u00A0]/g, ' ');
+      doc.rect(0, 0, doc.page.width, 70).fill(navy);
+      doc.fillColor('#FFFFFF').fontSize(18).text(r.site.organization?.name ?? 'SYL LOGISTIQUE', 50, 20);
+      doc.fillColor(gold).fontSize(12).text('BON DE RÉCEPTION', 50, 44);
+      doc.fillColor('#000000').fontSize(10);
+      doc.text(`N° ${r.reference || r.id}   —   Date : ${new Date(r.receivedAt).toLocaleDateString('fr-FR')}`, 50, 85);
+      doc.text(`Site : ${r.site.name}`);
+      doc.text(`Bon de commande : ${r.purchaseOrder.reference}   —   Fournisseur : ${r.purchaseOrder.supplier.name}`);
+      if (r.deliveryNoteNo) doc.text(`Bon de livraison du fournisseur : ${r.deliveryNoteNo}`);
+      doc.moveDown();
+      let y = doc.y;
+      const x = [50, 115, 285, 350, 415, 480];
+      doc.fillColor(navy);
+      ['Code', 'Désignation', 'Commandé', 'Livré', 'Accepté', 'Rejeté'].forEach((h, i) => doc.text(h, x[i], y, { width: i === 1 ? 165 : 62 }));
+      y += 16; doc.moveTo(50, y - 2).lineTo(545, y - 2).strokeColor(gold).stroke(); doc.fillColor('#000000');
+      let gaps = 0;
+      for (const l of r.lines) {
+        if (y > 700) { doc.addPage(); y = 50; }
+        const pol = r.purchaseOrder.lines.find((p) => p.id === l.purchaseOrderLineId);
+        const ordered = pol ? Number(pol.quantityOrdered) : 0;
+        doc.text(l.item.sku, x[0], y, { width: 62 }); doc.text(l.item.name, x[1], y, { width: 165 });
+        doc.text(n(ordered), x[2], y, { width: 62 }); doc.text(n(Number(l.quantityReceived)), x[3], y, { width: 62 });
+        doc.text(n(Number(l.quantityAccepted)), x[4], y, { width: 62 }); doc.text(n(Number(l.quantityRejected)), x[5], y, { width: 62 });
+        y += 18;
+        if (Number(l.quantityRejected) > 0) { gaps++; doc.fontSize(9).fillColor('#B00020').text(`   Écart / dommage : ${l.rejectReason || 'non précisé'}`, x[1], y, { width: 400 }); doc.fontSize(10).fillColor('#000000'); y += 14; }
+        else if (ordered && Number(l.quantityReceived) < ordered) { doc.fontSize(9).fillColor('#7A5B00').text(`   Livraison partielle (reste à recevoir sur le bon de commande)`, x[1], y, { width: 400 }); doc.fontSize(10).fillColor('#000000'); y += 14; }
+      }
+      doc.moveTo(50, y).lineTo(545, y).strokeColor(gold).stroke();
+      doc.text(gaps ? `Écarts constatés sur ${gaps} article(s).` : 'Aucun écart constaté.', 50, y + 8);
+      if (Number(r.freightCost)) doc.text(`Frais de transport : ${Math.round(Number(r.freightCost)).toLocaleString('fr-FR').replace(/[\u202F\u00A0]/g, ' ')} GNF`);
+      if (r.notes) doc.text(`Observations : ${r.notes}`, { width: 495 });
+      const sy = Math.min(doc.y + 40, 700);
+      doc.fillColor(navy).text('Réceptionné par', 50, sy, { underline: true });
+      doc.fillColor('#000000').text(issuer.name, 50, sy + 14); if (issuer.service) doc.text(issuer.service);
+      doc.fillColor(navy).text('Livreur du fournisseur (nom et signature)', 330, sy, { underline: true });
+      doc.end();
+    });
   }
 
   // ---- Bon de commande imprimable (PDF) ----

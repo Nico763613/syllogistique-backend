@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { DOC_SEQUENCE_SCHEMA } from './common/doc-numbers';
+import { PRICE_REQUEST_SCHEMA } from './purchases/price-requests.schema';
 
 // Mises à niveau du schéma, idempotentes (sans effet si déjà appliquées). Gardées en phase avec prisma/schema.prisma.
 const AUTO_SCHEMA: string[] = [
@@ -143,7 +144,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // Mise à niveau automatique et idempotente : ajoute la colonne « département » si elle manque
     // (aucune migration manuelle à lancer sur Neon). Sans effet si la colonne existe déjà.
     // Les nouvelles tables (inventaire physique, pannes…) sont créées de la même façon.
-    for (const sql of [...AUTO_SCHEMA, ...DOC_SEQUENCE_SCHEMA, ...loadDashboardUpgrades()]) {
+    for (const sql of [...AUTO_SCHEMA, ...DOC_SEQUENCE_SCHEMA, ...PRICE_REQUEST_SCHEMA, ...loadDashboardUpgrades()]) {
       try {
         await this.$executeRawUnsafe(sql);
       } catch (e: any) {
