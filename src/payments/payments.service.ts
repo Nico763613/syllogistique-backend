@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ensureReceiptNumber } from '../common/doc-numbers';
 import { CreatePaymentDto } from './dto/payment.dto';
 
 @Injectable()
@@ -104,6 +105,7 @@ export class PaymentsService {
         },
       });
 
+      if (payment.direction === 'IN' && payment.salesInvoiceId) await ensureReceiptNumber(tx as any, payment.id, actorId);
       await this.audit.log({ userId: actorId, action: 'CREATE', entity: 'Payment', entityId: payment.id, newValue: dto });
       return payment;
     });
