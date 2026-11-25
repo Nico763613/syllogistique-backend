@@ -15,7 +15,7 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   let r = await api('POST', '/auth/login', { email: 'admin@syllogistique.local', password: 'ChangeMoi123!' }, '');
   tok = r.d && r.d.accessToken; const admin = tok; ok(!!admin, 'connexion administrateur');
   const mk = (role, tag) => api('POST', '/users', { firstName: 'Test', lastName: tag, email: `${tag}${n}@test.gn`, password: PW, role, siteId: SITE });
-  ok((await mk('AGENT_HSE', 'hse')).s === 201, 'création agent HSE'); ok((await mk('CHAUFFEUR', 'chf')).s === 201, 'création chauffeur (compte)');
+  const hseUser = await mk('AGENT_HSE', 'hse'); ok(hseUser.s === 201, 'création agent HSE'); ok((await mk('CHAUFFEUR', 'chf')).s === 201, 'création chauffeur (compte)');
   const login = async (tag) => (await api('POST', '/auth/login', { email: `${tag}${n}@test.gn`, password: PW }, '')).d?.accessToken;
   const hse = await login('hse'), chf = await login('chf'); ok(!!hse && !!chf, 'connexion agent HSE et chauffeur');
 
@@ -37,7 +37,7 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   r = await api('PATCH', `/hse/talks/${talk}/hold`, { attendees: [{ fullName: 'Mamadou Test' }], notes: 'RAS' }, hse); ok(is2(r), 'causerie tenue avec participants', r);
   r = await api('POST', '/hse/inspections', { siteId: SITE, type: 'WAREHOUSE', score: 82, compliant: true, notes: 'Entrepôt conforme' }, hse); ok(r.s === 201, 'inspection enregistrée', r);
   r = await api('POST', '/hse/inspections', { siteId: SITE, type: 'AVION' }, hse); ok(r.s === 400, 'type d’inspection invalide refusé → 400', r.s);
-  r = await api('POST', '/hse/ppe', { siteId: SITE, ppeType: 'Casque', issuedAt: iso(), renewalDue: iso(180 * 864e5), compliant: true }, hse); ok(r.s === 201, 'remise d’EPI enregistrée', r);
+  r = await api('POST', '/hse/ppe', { siteId: SITE, userId: hseUser.d && hseUser.d.id, ppeType: 'Casque', issuedAt: iso(), renewalDue: iso(180 * 864e5), compliant: true }, hse); ok(r.s === 201, 'remise d’EPI enregistrée', r);
 
   // --- Maintenance
   r = await api('POST', '/vehicles', { siteId: SITE, vehicleType: 'TRUCK', internalNumber: 'M' + n, registrationNumber: 'M' + n, currentMileage: 10000 }); const veh = r.d && r.d.id; ok(!!veh, 'véhicule pour maintenance');
@@ -59,14 +59,16 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   r = await api('GET', '/staff/reports/mine', undefined, hse); ok(r.s === 200, 'agent HSE lit ses rapports');
   r = await api('GET', '/staff/reports/pending', undefined, hse); ok(r.s === 403, 'agent HSE ne peut pas voir les rapports à valider → 403', r.s);
   r = await api('POST', `/staff/reports/${rep}/validate`, {}, hse); ok(r.s === 403, 'agent HSE ne peut pas valider son propre rapport → 403', r.s);
-  r = await api('GET', '/staff/reports/pending'); ok(r.s === 200 && rows(r.d).some((x) => x.id === rep), 'le responsable voit le rapport en attente');
+    r = await api('POST', `/staff/reports/${rep}/validate`, {}); ok(is4(r), 'validation avant vérification refusée (4xx)', r.s);
+  r = await api('POST', `/staff/reports/${rep}/receive`, {}); ok(is2(r), 'le responsable reçoit et vérifie le rapport', r);
   r = await api('POST', `/staff/reports/${rep}/validate`, {}); ok(is2(r), 'le responsable valide le rapport', r);
   r = await api('POST', `/staff/reports/${rep}/validate`, {}); ok(is4(r), 'seconde validation refusée (4xx)', r.s);
   r = await api('GET', '/staff'); ok(r.s === 200 && rows(r.d).length > 0, 'liste du personnel');
 
   // --- Notifications
   r = await api('GET', '/notifications'); const nt = rows(r.d); ok(r.s === 200, 'liste des notifications (' + nt.length + ')');
-  r = await api('POST', '/notifications/run-checks', {}); ok(is2(r), 'contrôles automatiques d’alertes exécutés', r);
+  r = await api('POST', '/notifications/run-checks', {}); ok(r.s === 400, 'contrôles sans siteId : erreur claire 400 (et non 500)', r.s);
+  r = await api('POST', '/notifications/run-checks?siteId=' + SITE, {}); ok(is2(r), 'contrôles automatiques d’alertes exécutés', r);
   r = await api('POST', '/notifications/run-role-alerts', {}); ok(is2(r), 'alertes par rôle exécutées', r);
   r = await api('GET', '/notifications', undefined, chf); ok(r.s === 200, 'chauffeur lit ses propres notifications');
   if (nt[0]) { r = await api('PATCH', `/notifications/${nt[0].id}/read`, {}); ok(is2(r), 'notification marquée lue', r); r = await api('PATCH', `/notifications/${nt[0].id}/unread`, {}); ok(is2(r), 'notification remise non lue', r); }
