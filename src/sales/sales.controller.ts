@@ -6,6 +6,7 @@ import { SalesService } from './sales.service';
 import { SalesDocumentsService } from './sales-documents.service';
 import { SalesPdfsService } from './sales-pdfs.service';
 import { SalesDashboardService } from './sales-dashboard.service';
+import { SalesReportsService } from './sales-reports.service';
 import { CreateSalesOrderDto, DeliverSalesOrderDto, CreateSalesInvoiceDto } from './dto/sale.dto';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -26,6 +27,7 @@ export class SalesController {
     private salesDocuments: SalesDocumentsService,
     private pdfs: SalesPdfsService,
     private dash: SalesDashboardService,
+    private reports: SalesReportsService,
     private messaging: MessagingService,
     private returns: SalesReturnsService,
   ) {}
@@ -34,6 +36,23 @@ export class SalesController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
   dashboard(@Query() q: any, @CurrentUser() actor: any) {
     return this.dash.summary({ from: q.from, to: q.to, siteId: q.siteId, agentId: q.agentId, customerId: q.customerId, productId: q.productId }, actor);
+  }
+
+  // Rapport commercial d'une période : PDF ou Excel
+  @Get('reports/pdf')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
+  async reportPdf(@Query() q: any, @CurrentUser() actor: any, @Res() res: Response) {
+    const buf = await this.reports.pdf({ from: q.from, to: q.to, siteId: q.siteId }, actor);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="rapport_commercial.pdf"' });
+    res.send(buf);
+  }
+
+  @Get('reports/xlsx')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
+  async reportXlsx(@Query() q: any, @CurrentUser() actor: any, @Res() res: Response) {
+    const buf = await this.reports.xlsx({ from: q.from, to: q.to, siteId: q.siteId }, actor);
+    res.set({ 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': 'attachment; filename="rapport_commercial.xlsx"' });
+    res.send(buf);
   }
 
   @Post('orders')
