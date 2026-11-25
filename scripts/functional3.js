@@ -32,7 +32,9 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   r = await api('POST', '/hse/talks', { siteId: SITE, theme: 'Gestes et postures', plannedAt: soon }, hse); ok(r.s === 201, 'causerie sécurité planifiée', r); const talk = r.d && r.d.id;
   r = await api('PATCH', `/hse/talks/${talk}/hold`, { attendees: [{ fullName: 'Agent A' }, { fullName: 'Agent B' }], notes: 'RAS' }, hse); ok(is2(r), 'causerie tenue avec participants', r);
   r = await api('POST', '/hse/inspections', { siteId: SITE, type: 'WAREHOUSE', score: 85, compliant: true, notes: 'Conforme' }, hse); ok(r.s === 201, 'inspection enregistrée', r);
-  r = await api('POST', '/hse/ppe', { siteId: SITE, ppeType: 'Casque', issuedAt: now, renewalDue: soon }, hse); ok(r.s === 201, 'remise d’EPI enregistrée', r);
+  r = await api('POST', '/hse/ppe', { siteId: SITE, ppeType: 'Casque', issuedAt: now }, hse); ok(r.s === 400, 'EPI sans bénéficiaire refusé → 400', r.s);
+  r = await api('GET', '/users'); const hseUser = rows(r.d).find((u) => u.email === `hse${n}@test.gn`);
+  r = await api('POST', '/hse/ppe', { siteId: SITE, ppeType: 'Casque', issuedAt: now, renewalDue: soon, userId: hseUser && hseUser.id }, hse); ok(r.s === 201, 'remise d’EPI enregistrée', r);
   r = await api('GET', '/hse/incidents', undefined, poi); ok(r.s === 403, 'pointeur ne peut pas lire les incidents HSE → 403', r.s);
 
   // --- Maintenance
@@ -59,7 +61,9 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   r = await api('POST', '/staff/reports', { date: day, activities: 'Pointage de 12 chauffeurs, contrôle des présences', observations: 'RAS' }, poi); ok(is2(r), 'compte rendu envoyé par le pointeur', r); const rep = r.d && r.d.id;
   r = await api('POST', '/staff/reports', { date: day, activities: 'x' }, poi); ok(r.s === 400, 'compte rendu trop court refusé → 400', r.s);
   r = await api('POST', `/staff/reports/${rep}/validate`, {}, poi); ok(r.s === 403, 'le pointeur ne peut pas valider son propre compte rendu → 403', r.s);
-  r = await api('GET', '/staff/reports/pending', undefined, ops); ok(r.s === 200, 'comptes rendus en attente visibles par les opérations');
+  r = await api('POST', `/staff/reports/${rep}/validate`, {}, ops); ok(r.s === 400, 'validation refusée tant que le rapport n’est pas vérifié (saut d’étape) → 400', r.s);
+  r = await api('POST', `/staff/reports/${rep}/receive`, {}, hse); ok(is2(r), 'vérification (réception) par le responsable HSE', r);
+  r = await api('GET', '/staff/reports/pending', undefined, ops); ok(r.s === 200 && rows(r.d).some((x) => x.id === rep), 'rapport vérifié visible dans la file des opérations');
   r = await api('POST', `/staff/reports/${rep}/validate`, {}, ops); ok(is2(r), 'validation par le responsable des opérations', r);
   r = await api('POST', `/staff/reports/${rep}/validate`, {}, ops); ok(is4(r), 'seconde validation refusée (4xx)', r.s);
 
