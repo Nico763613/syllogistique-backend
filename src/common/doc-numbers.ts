@@ -7,6 +7,26 @@ export const DOC_SEQUENCE_SCHEMA: string[] = [
   `CREATE TABLE IF NOT EXISTS "document_sequences" ("doc_type" TEXT NOT NULL, "year" INTEGER NOT NULL, "last_value" INTEGER NOT NULL DEFAULT 0, "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY ("doc_type", "year"))`,
   `CREATE TABLE IF NOT EXISTS "document_number_log" ("number" TEXT NOT NULL PRIMARY KEY, "doc_type" TEXT NOT NULL, "year" INTEGER NOT NULL, "seq" INTEGER NOT NULL, "assigned_by" TEXT, "assigned_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
   'CREATE INDEX IF NOT EXISTS "document_number_log_type_idx" ON "document_number_log"("doc_type", "year", "seq")',
+  // Réglages de numérotation par type de document (préfixe, nombre de chiffres, année dans le numéro, remise à zéro annuelle).
+  `CREATE TABLE IF NOT EXISTS "document_numbering_config" ("doc_type" TEXT NOT NULL PRIMARY KEY, "prefix" TEXT NOT NULL, "pad" INTEGER NOT NULL DEFAULT 4, "include_year" BOOLEAN NOT NULL DEFAULT TRUE, "reset_yearly" BOOLEAN NOT NULL DEFAULT TRUE, "updated_by" TEXT, "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+];
+
+// Types de documents numérotés (code, libellé, préfixe par défaut) : sert à l'écran de réglages.
+export const DOC_TYPES: { code: string; label: string; prefix: string }[] = [
+  { code: 'DEV', label: 'Devis', prefix: 'DEV' },
+  { code: 'BCC', label: 'Commande client', prefix: 'BCC' },
+  { code: 'BL', label: 'Bon de livraison', prefix: 'BL' },
+  { code: 'FV', label: 'Facture de vente', prefix: 'FV' },
+  { code: 'REC', label: 'Reçu de paiement', prefix: 'REC' },
+  { code: 'AV', label: 'Avoir / retour client', prefix: 'AV' },
+  { code: 'DA', label: "Demande d'achat", prefix: 'DA' },
+  { code: 'DP', label: 'Demande de prix fournisseur', prefix: 'DP' },
+  { code: 'BC', label: 'Bon de commande fournisseur', prefix: 'BC' },
+  { code: 'BR', label: 'Bon de réception', prefix: 'BR' },
+  { code: 'FA', label: 'Facture fournisseur', prefix: 'FA' },
+  { code: 'EB', label: 'État de besoin', prefix: 'EB' },
+  { code: 'TR', label: 'Transfert de stock', prefix: 'TR' },
+  { code: 'HSE', label: 'Incident HSE', prefix: 'HSE' },
 ];
 
 export function formatDocNumber(prefix: string, year: number, seq: number, pad = 4): string {
@@ -20,14 +40,22 @@ export function formatDocNumber(prefix: string, year: number, seq: number, pad =
 export async function nextDocNumber(db: Db, docType: string, prefix: string, seed: (year: number) => Promise<number>, opts: { pad?: number; by?: string; year?: number } = {}): Promise<string> {
   const year = opts.year ?? new Date().getFullYear();
   const key = `${docType}`;
-  const row = await db.$queryRawUnsafe('SELECT 1 AS x FROM "document_sequences" WHERE "doc_type" = $1 AND "year" = $2', key, year);
+  // Réglage éventuel (préfixe / chiffres / année / remise à zéro) ; sans réglage : PREFIXE-AAAA-NNNN, remise à zéro chaque année.
+  let cfg: any = null;
+  try { cfg = ((await db.$queryRawUnsafe('SELECT "prefix","pad","include_year","reset_yearly" FROM "document_numbering_config" WHERE "doc_type" = $1', key)) as any[])?.[0] || null; } catch { cfg = null; }
+  const usePrefix = cfg?.prefix || prefix;
+  const pad = cfg ? Number(cfg.pad) || 4 : (opts.pad ?? 4);
+  const resetYearly = cfg ? cfg.reset_yearly !== false : true;
+  const includeYear = cfg ? (resetYearly ? true : cfg.include_year !== false) : true;
+  const seqYear = resetYearly ? year : 0;
+  const row = await db.$queryRawUnsafe('SELECT 1 AS x FROM "document_sequences" WHERE "doc_type" = $1 AND "year" = $2', key, seqYear);
   if (!row.length) {
     const start = Math.max(0, Math.floor(await seed(year)) || 0);
-    await db.$executeRawUnsafe('INSERT INTO "document_sequences" ("doc_type","year","last_value") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', key, year, start);
+    await db.$executeRawUnsafe('INSERT INTO "document_sequences" ("doc_type","year","last_value") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', key, seqYear, start);
   }
-  const r = await db.$queryRawUnsafe('UPDATE "document_sequences" SET "last_value" = "last_value" + 1, "updated_at" = CURRENT_TIMESTAMP WHERE "doc_type" = $1 AND "year" = $2 RETURNING "last_value" AS v', key, year);
+  const r = await db.$queryRawUnsafe('UPDATE "document_sequences" SET "last_value" = "last_value" + 1, "updated_at" = CURRENT_TIMESTAMP WHERE "doc_type" = $1 AND "year" = $2 RETURNING "last_value" AS v', key, seqYear);
   const seq = Number(r[0].v);
-  const number = formatDocNumber(prefix, year, seq, opts.pad ?? 4);
+  const number = includeYear ? formatDocNumber(usePrefix, year, seq, pad) : `${usePrefix}-${String(seq).padStart(pad, '0')}`;
   await db.$executeRawUnsafe('INSERT INTO "document_number_log" ("number","doc_type","year","seq","assigned_by") VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING', number, key, year, seq, opts.by ?? null);
   return number;
 }

@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsEmail, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export class SetSettingDto {
   @IsString() @MaxLength(200) value: string;
@@ -13,4 +13,11 @@ export class UpdateOrganizationDto {
   @IsOptional() @IsEmail() email?: string;
   @IsOptional() @IsString() logoUrl?: string;
   @IsOptional() @IsString() currency?: string;
+}
+
+export class SetNumberingDto {
+  @IsString() @Matches(/^[A-Z0-9]{1,8}$/, { message: 'Préfixe : 1 à 8 lettres majuscules ou chiffres.' }) prefix: string;
+  @IsInt() @Min(3) @Max(8) pad: number;
+  @IsOptional() @IsBoolean() includeYear?: boolean;
+  @IsOptional() @IsBoolean() resetYearly?: boolean;
 }

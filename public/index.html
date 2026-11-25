@@ -4733,6 +4733,35 @@ function renderSettings() {
     </div>` : ''}`;
   if (['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role)) loadUsersPanel();
   brandPanel(); loadUserDevices();
+  if (['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'DIRECTEUR_GENERAL'].includes(state.user.role)) {
+    const p = document.createElement('div'); p.className = 'panel'; p.id = 'nb-panel';
+    p.innerHTML = '<h3>Numérotation des documents</h3><div class="desc">Préfixe, nombre de chiffres et remise à zéro de chaque type de document. Les numéros déjà émis ne changent jamais.</div><div id="nb-body"><div class="empty">Chargement…</div></div><div id="nb-msg"></div>';
+    root().appendChild(p); loadNumbering();
+  }
+}
+async function loadNumbering() {
+  const body = document.getElementById('nb-body'); if (!body) return;
+  const canEdit = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
+  try {
+    const rows = await api('/settings/numbering');
+    body.innerHTML = `<div style="overflow-x:auto"><table><thead><tr><th>Document</th><th>Préfixe</th><th>Chiffres</th><th>Année</th><th>Remise à zéro</th><th>Dernier</th><th>Prochain</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>${rows.map(r => `<tr>
+      <td>${esc(r.label)}</td>
+      <td>${canEdit ? `<input id="nb-p-${r.code}" value="${esc(r.prefix)}" maxlength="8" style="width:70px;text-transform:uppercase" />` : esc(r.prefix)}</td>
+      <td>${canEdit ? `<input id="nb-d-${r.code}" type="number" min="3" max="8" value="${r.pad}" style="width:60px" />` : r.pad}</td>
+      <td>${canEdit ? `<input id="nb-y-${r.code}" type="checkbox" ${r.includeYear ? 'checked' : ''} />` : (r.includeYear ? 'Oui' : 'Non')}</td>
+      <td>${canEdit ? `<select id="nb-r-${r.code}"><option value="1" ${r.resetYearly ? 'selected' : ''}>Chaque année</option><option value="0" ${r.resetYearly ? '' : 'selected'}>Jamais</option></select>` : (r.resetYearly ? 'Chaque année' : 'Jamais')}</td>
+      <td>${r.lastNumber || '—'}</td><td><b>${esc(r.example)}</b></td>
+      ${canEdit ? `<td><button class="btn small" onclick="saveNumbering('${r.code}')">Enregistrer</button></td>` : ''}</tr>`).join('')}</tbody></table></div>`;
+  } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+async function saveNumbering(code) {
+  const msg = document.getElementById('nb-msg');
+  try {
+    const g = (k) => document.getElementById('nb-' + k + '-' + code);
+    await api('/settings/numbering/' + code, { method: 'PUT', body: { prefix: g('p').value.trim().toUpperCase(), pad: parseInt(g('d').value, 10), includeYear: g('y').checked, resetYearly: g('r').value === '1' } });
+    msg.innerHTML = '<div class="msg ok">Numérotation enregistrée : elle s\'applique aux prochains documents.</div>';
+    loadNumbering();
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function changePassword() {
   const msg = document.getElementById('pw-msg');
