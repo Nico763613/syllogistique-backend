@@ -14,14 +14,14 @@ const n = Date.now().toString().slice(-7);
   tok = r.d && r.d.accessToken; ok(!!tok, 'connexion administrateur');
 
   // --- Flotte
-  r = await api('POST', '/vehicles', { vehicleType: 'TRUCK', internalNumber: 'T-' + n, registrationNumber: 'RC-' + n, brand: 'Renault', currentMileage: 1000 });
+  r = await api('POST', '/vehicles', { siteId: SITE, vehicleType: 'TRUCK', internalNumber: 'T-' + n, registrationNumber: 'RC-' + n, brand: 'Renault', currentMileage: 1000 });
   ok(r.s === 201, 'création véhicule', r); const veh = r.d && r.d.id;
-  r = await api('POST', '/vehicles', { vehicleType: 'TRUCK', internalNumber: 'T-' + n, registrationNumber: 'RC-' + n });
+  r = await api('POST', '/vehicles', { siteId: SITE, vehicleType: 'TRUCK', internalNumber: 'T-' + n, registrationNumber: 'RC-' + n });
   ok(r.s >= 400 && r.s < 500, 'véhicule en double refusé (4xx)', r.s);
-  r = await api('POST', '/vehicles', { vehicleType: 'AVION', internalNumber: 'x', registrationNumber: 'y' });
+  r = await api('POST', '/vehicles', { siteId: SITE, vehicleType: 'AVION', internalNumber: 'x', registrationNumber: 'y' });
   ok(r.s === 400, 'type de véhicule invalide → 400', r.s);
   r = await api('GET', '/vehicles/' + veh); ok(r.s === 200 && r.d && r.d.id === veh, 'lecture véhicule');
-  r = await api('PATCH', '/vehicles/' + veh, { currentMileage: 1500 }); ok(r.s === 200, 'mise à jour kilométrage', r);
+  r = await api('PATCH', '/vehicles/' + veh, { observations: 'Révisé' }); ok(r.s === 200, 'mise à jour véhicule', r);
   r = await api('GET', '/vehicles'); const list = Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) || [];
   ok(r.s === 200 && list.some((v) => v.id === veh), 'liste des véhicules contient le nouveau');
   r = await api('GET', '/vehicles/fleet-overview'); ok(r.s === 200, 'vue d’ensemble flotte');
