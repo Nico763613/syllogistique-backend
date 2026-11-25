@@ -5,3 +5,8 @@ dist/
 .DS_Store
 uploads/*
 !uploads/.gitkeep
+# Interface assemblée par scripts/build-ui.js (sources dans public/src/)
+public/core.js
+public/chauffeur.js
+public/appareils.js
+public/marque.js

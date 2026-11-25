@@ -18,6 +18,8 @@ jobs:
           DATABASE_URL: postgresql://user:pass@localhost:5432/db
       - run: npm run build
       - run: node scripts/check-ui.js
+      - run: npm run build:ui
+      - run: test -s public/core.js
   master:
     name: master (tests avec vraie base PostgreSQL)
     runs-on: ubuntu-latest
@@ -76,6 +78,10 @@ jobs:
         run: |
           node dist/main.js > server.log 2>&1 &
           for i in $(seq 1 40); do curl -sf http://localhost:3000/health && break; sleep 2; done
+      - run: node scripts/functional.js
+      - run: sleep 61
+      - run: node scripts/functional2.js
+      - run: sleep 61
       - run: node scripts/smoke.js
       - if: failure()
         run: tail -80 server.log

@@ -8,6 +8,7 @@ const j = (path, opt = {}) => fetch(B + path, { ...opt, headers: { 'content-type
   ok(r.status === 200 && (await r.json()).status === 'ok', 'GET /health répond ok');
   ok(!!r.headers.get('x-content-type-options'), 'en-têtes Helmet présents');
   ok(!r.headers.get('x-powered-by'), 'X-Powered-By masqué');
+  for (const f of ['/app/', '/app/core.js', '/app/chauffeur.js', '/app/appareils.js', '/app/marque.js', '/app/css/app.css']) { r = await j(f); ok(r.status === 200, 'interface servie : ' + f + ' (' + r.status + ')'); }
   r = await j('/vehicles'); ok(r.status === 401, 'route protégée sans jeton → 401 (reçu ' + r.status + ')');
   r = await j('/vehicles', { headers: { authorization: 'Bearer jeton.invalide.xx' } }); ok(r.status === 401, 'jeton invalide → 401');
   r = await j('/auth/login', { method: 'POST', body: JSON.stringify({ email: 'admin@syllogistique.local', password: 'mauvais-mot-de-passe' }) });
