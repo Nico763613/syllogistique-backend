@@ -80,6 +80,30 @@ export class SalesPdfsService {
     doc.y = y + 4; doc.x = 50;
   }
 
+  async deliveryNotesOf(orderId: string, actor: Actor) {
+    await this.order(orderId, actor);
+    return this.prisma.$queryRawUnsafe('SELECT "id","number","delivered_at" AS "deliveredAt","receiver_name" AS "receiverName" FROM "delivery_notes" WHERE "order_id" = $1 ORDER BY "delivered_at" DESC', orderId);
+  }
+
+  // Bon de livraison numéroté d'une livraison précise (quantités livrées ce jour-là, cumul et reste)
+  async deliveryNoteById(id: string, actor: Actor) {
+    const r = (await this.prisma.$queryRawUnsafe('SELECT * FROM "delivery_notes" WHERE "id" = $1', id)) as any[];
+    if (!r.length) throw new NotFoundException('Bon de livraison introuvable.');
+    const n = r[0]; const o = await this.order(n.order_id, actor);
+    const by = await this.userLabel(n.delivered_by); const lines: any[] = Array.isArray(n.lines) ? n.lines : JSON.parse(n.lines);
+    return this.build('BON DE LIVRAISON', n.number, [`Commande : ${o.reference}`, `Livré le : ${new Date(n.delivered_at).toLocaleString('fr-FR')}`, ...(n.place ? [`Lieu de livraison : ${n.place}`] : [])], (doc, org) => {
+      this.customerBlock(doc, o.customer);
+      this.table(doc, org.color, ['Article', 'Commandé', 'Livré ce jour', 'Total livré', 'Reste'], [195, 65, 85, 80, 70], lines.map((l) => [l.item, String(l.ordered), String(l.deliveredNow), String(l.deliveredTotal), String(l.remaining)]));
+      doc.fontSize(10).text(`Responsable : ${by}`);
+      if (n.driver_name) doc.text(`Livreur : ${n.driver_name}`);
+      if (n.receiver_name) doc.text(`Réceptionnaire : ${n.receiver_name}`);
+      if (n.observations) doc.text(`Observations : ${n.observations}`);
+      doc.moveDown(2); const y = doc.y; doc.fontSize(9).fillColor('#6B7A8F');
+      doc.text('Signature du livreur', 50, y); doc.rect(50, y + 14, 200, 60).strokeColor('#D9D9D9').stroke();
+      doc.text('Signature du réceptionnaire', 340, y); doc.rect(340, y + 14, 200, 60).strokeColor('#D9D9D9').stroke();
+    });
+  }
+
   private async order(id: string, actor: Actor) {
     const o = await this.prisma.salesOrder.findUnique({ where: { id }, include: { customer: true, lines: { include: { item: true } } } });
     if (!o) throw new NotFoundException('Commande introuvable.');

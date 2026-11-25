@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { nextDocNumber, maxSeqOf } from '../common/doc-numbers';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
@@ -165,9 +166,27 @@ export class SalesService {
       const status = fullyDelivered ? 'DELIVERED' : partiallyDelivered ? 'PARTIALLY_DELIVERED' : order.status;
       const updatedOrder = await tx.salesOrder.update({ where: { id: orderId }, data: { status } });
 
-      await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'SalesOrder', entityId: orderId, newValue: dto });
-      return updatedOrder;
+      // Bon de livraison numéroté (BL-AAAA-NNNN) : une trace par livraison, partielle ou totale
+      const bl = await this.createDeliveryNote(tx, order, dto, updatedLines, actorId);
+      await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'SalesOrder', entityId: orderId, newValue: { ...dto, deliveryNote: bl.number } });
+      return { ...updatedOrder, deliveryNote: bl };
     });
+  }
+
+  private async createDeliveryNote(tx: any, order: any, dto: DeliverSalesOrderDto, updatedLines: any[], actorId: string) {
+    const items = await tx.inventoryItem.findMany({ where: { id: { in: order.lines.map((l: any) => l.itemId) } }, select: { id: true, name: true } });
+    const name = new Map<string, string>(items.map((i: any) => [i.id, i.name]));
+    const lines = dto.lines.filter((d) => d.quantityDelivered > 0).map((d) => {
+      const l = order.lines.find((x: any) => x.id === d.lineId); const u = updatedLines.find((x: any) => x.id === d.lineId);
+      return { item: name.get(l.itemId) ?? '—', ordered: Number(l.quantityOrdered), deliveredNow: d.quantityDelivered, deliveredTotal: Number(u.quantityDelivered), remaining: Math.max(0, Number(l.quantityOrdered) - Number(u.quantityDelivered)) };
+    });
+    const number = await nextDocNumber(tx, 'BL', 'BL', async (year) => {
+      const rows = (await tx.$queryRawUnsafe('SELECT "number" AS n FROM "delivery_notes" WHERE "number" LIKE $1', `BL-${year}-%`)) as any[];
+      return maxSeqOf(rows.map((r) => r.n));
+    }, { by: actorId });
+    const id = randomUUID();
+    await tx.$executeRawUnsafe('INSERT INTO "delivery_notes" ("id","number","order_id","delivered_by","receiver_name","place","driver_name","observations","lines") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb)', id, number, order.id, actorId, dto.receiverName ?? null, dto.place ?? null, dto.driverName ?? null, dto.observations ?? null, JSON.stringify(lines));
+    return { id, number };
   }
 
   // ---- Facturation client ----

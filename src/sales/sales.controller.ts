@@ -103,6 +103,17 @@ export class SalesController {
     res.send(await this.pdfs.deliveryNotePdf(id, actor));
   }
 
+  @Get('orders/:id/delivery-notes')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+  deliveryNotes(@Param('id') id: string, @CurrentUser() actor: any) { return this.pdfs.deliveryNotesOf(id, actor); }
+
+  @Get('delivery-notes/:id/pdf')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.MAGASINIER, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL, RoleName.LECTEUR)
+  async deliveryNotePdfById(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="bon-de-livraison.pdf"' });
+    res.send(await this.pdfs.deliveryNoteById(id, actor));
+  }
+
   @Get('payments/:id/receipt')
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.RESPONSABLE_COMMERCIAL, RoleName.CAISSIER, RoleName.COMPTABLE, RoleName.DIRECTEUR_GENERAL)
   async receipt(@Param('id') id: string, @CurrentUser() actor: any, @Res() res: Response) {
