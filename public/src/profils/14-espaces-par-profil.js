@@ -333,7 +333,7 @@ function profAssist(where, todo, next) {
 async function renderProfHome() {
   const P = profCur(), u = state.user; if (!P) return renderHome();
   const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-  root().innerHTML = `<div class="pf-hero"><div class="pf-id">${avatarHtml(56)}<div><h2>Bonjour ${esc(u.firstName)}</h2><div>${esc(roleLabel(u.role))} · ${esc(P.space)}</div></div></div><div class="pf-date">${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div></div>
+  root().innerHTML = `<div class="pf-hero"><div class="pf-id">${avatarHtml(56)}<div><h2>${esc(u.firstName)} ${esc(u.lastName)}</h2><div>${esc(roleLabel(u.role))} · ${esc(P.space)}</div></div></div><div class="pf-date">${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div></div>
     ${profAssist('Accueil — ' + esc(P.title), esc(P.todo), 'Ouvrez un dossier ci-dessous.')}
     <div class="pf-tiles" id="pf-tiles"><div class="empty">Chargement des indicateurs…</div></div>
     <div class="pf-cols"><div class="panel"><h3>${PROF_IC('briefcase')} Mes dossiers</h3><div class="pf-folders">${P.folders.map((f, i) => !profSubs(f).length ? '' : `<button class="pf-folder" onclick="go('prof-f-${i}')"><span class="pf-num">${i + 1}</span><span class="pf-fi">${PROF_IC(f.ic)}</span><b>${esc(f.t)}</b><small>${profSubs(f).length} rubrique(s)</small></button>`).join('')}</div></div>

@@ -333,7 +333,7 @@ const HOME_CARDS = [
 function homeCardsFor(role) { return HOME_CARDS.filter((c) => c.roles.includes(role)).map((c) => ({ ...c, view: (c.over && c.over[role]) || c.v })); }
 function renderHome() {
   const u = state.user, cards = homeCardsFor(u.role);
-  root().innerHTML = `${spaceHome() ? '<div style="margin-bottom:14px">' + spaceHome() + '</div>' : ''}<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">Bonjour ${esc(u.firstName)}</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
+  root().innerHTML = `${spaceHome() ? '<div style="margin-bottom:14px">' + spaceHome() + '</div>' : ''}<div style="margin-bottom:16px"><h2 style="margin:0;color:var(--navy)">${esc(u.firstName)} ${esc(u.lastName)}</h2><div class="desc" style="margin:4px 0 0">Choisissez votre département.</div></div>
     <div class="hm-grid">${cards.map((c) => `<button class="hm-card" onclick="go('${c.view}')"><div class="hm-ico">${c.ico}</div><div><b>${esc(c.t)}</b><span class="d">${esc(c.d)}</span></div></button>`).join('')}</div>`;
 }
 

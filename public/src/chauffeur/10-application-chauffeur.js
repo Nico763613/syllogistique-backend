@@ -167,7 +167,7 @@ function drvHomeHtml(me) {
   const pend = drvQueue().filter((o) => !o.rejected).length, ls = dget('lastsync', 0);
   const hm = ls ? new Date(ls).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—';
   const pause = act && truck ? `<button onclick="drvPauseForm('${tid}')">Pause${act.pauseMileage != null ? ' (' + fmt(act.pauseMileage) + ' km)' : ''}</button>` : '';
-  return `<div class="drv-hello"><h2>Bonjour ${first}</h2><div>${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div></div>
+  return `<div class="drv-hello"><h2>${esc(me.driver.name || '')}</h2><div>${esc(today.charAt(0).toUpperCase() + today.slice(1))}</div></div>
     <div class="drv-card"><h4>${v ? (truck ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> ' : '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> ') + esc(v.plate) + (v.registrationType === 'IT' ? ' <span class="badge warn">IT</span>' : '') : '<svg class="ic" aria-hidden="true"><use href="#i-ban"/></svg> Aucun véhicule affecté'}</h4>
       <div class="drv-row"><span>État</span><b>${stateTxt}</b></div>
       ${v ? `<div class="drv-row"><span>Kilométrage</span><b>${fmt(v.mileage)} km</b></div>` : ''}
