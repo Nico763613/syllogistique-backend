@@ -466,3 +466,64 @@ button.pf-tile{cursor:pointer;}button.pf-tile:hover{border-color:var(--navy-soft
 .db-values svg{width:16px;height:16px;color:var(--gold)}
 @media (max-width:1100px){.db-cards{grid-template-columns:repeat(2,1fr)}.db-row2,.db-row3{grid-template-columns:1fr}}
 @media (max-width:600px){.db-hero{flex-direction:column;align-items:flex-start;padding:18px;background:linear-gradient(180deg,rgba(36,59,100,.92),var(--navy)),url('../dg-camion.jpg') center/cover}.db-hero h2{font-size:1.25rem}.db-cards{gap:10px}.db-card{flex-direction:column;padding:12px;min-height:0}.db-card b{font-size:1.1rem}.db-quick{grid-template-columns:repeat(3,1fr)}.db-perf{flex-direction:column}.db-values{flex-direction:column;align-items:center}}
+.db-row2.solo{grid-template-columns:1fr}
+.pf-drv-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 4px;border:0;border-bottom:1px solid var(--line);background:none;font:inherit;text-align:left;color:var(--navy);cursor:pointer}
+.pf-drv-row:last-child{border-bottom:0}
+.pf-drv-row .ic{flex:0 0 22px;width:22px;height:22px;color:var(--navy-soft)}
+.pf-drv-row .ic:last-child{flex-basis:16px;width:16px;height:16px;color:var(--line)}
+.pf-drv-row span{flex:1;min-width:0}
+.pf-drv-row b{display:block;font-size:14px}
+.pf-drv-row small{display:block;font-size:12px;color:var(--navy-soft)}
+.pf-drv-row:disabled{opacity:.45;cursor:default}
+
+/* ===== Chauffeur simple, étapes guidées, photo de profil ===== */
+.drv-hero-id{display:flex;align-items:center;gap:12px}
+.drv-av{display:inline-flex;border-radius:50%;border:2px solid var(--gold);overflow:hidden;cursor:pointer;flex:none}
+.drv-av .av-img,.drv-av .av-ini{border-radius:50%;object-fit:cover;display:flex;align-items:center;justify-content:center;background:var(--navy-soft);color:var(--offwhite);font-weight:700}
+.drv-hero{min-height:0;margin-bottom:12px}
+.db-on.off{background:var(--terra-bg);color:var(--terra)}
+.drv-day ol{list-style:none;margin:0 0 12px;padding:0}
+.drv-day li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line);color:var(--navy-soft)}
+.drv-day li:last-child{border-bottom:0}
+.drv-day li .n{flex:0 0 28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--grey-light);color:var(--navy);font-weight:700;font-size:13px}
+.drv-day li .n svg{width:16px;height:16px}
+.drv-day li b{display:block;color:var(--navy);font-size:14px}
+.drv-day li b small{font-weight:400;color:var(--navy-soft)}
+.drv-day li>div>small{display:block;font-size:12px}
+.drv-day li.done .n{background:var(--sage);color:var(--offwhite)}
+.drv-day li.done b{color:var(--sage)}
+.drv-day li.now .n{background:var(--gold);color:var(--offwhite)}
+.drv-day li.now{color:var(--navy)}
+.drv-day li.warn .n{background:var(--terra);color:var(--offwhite)}
+.drv-ok{display:flex;align-items:center;gap:8px;padding:10px;border-radius:10px;background:var(--sage-bg);color:var(--sage);font-weight:600;font-size:14px}
+.drv-ok svg{width:18px;height:18px}
+.drv-hint{display:flex;gap:8px;align-items:flex-start;padding:10px 12px;margin:6px 0 12px;border-radius:10px;background:var(--grey-light);border-left:4px solid var(--gold);color:var(--navy);font-size:13.5px}
+.drv-hint svg{flex:0 0 18px;width:18px;height:18px;color:var(--gold)}
+#drv-done{position:fixed;left:12px;right:12px;bottom:76px;z-index:9600;display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:12px;background:var(--navy);color:var(--offwhite);box-shadow:0 6px 20px rgba(36,59,100,.35)}
+#drv-done>svg{flex:0 0 20px;width:20px;height:20px;color:var(--sage)}
+#drv-done div{flex:1}
+#drv-done b{display:block}
+#drv-done span{display:block;font-size:13px;opacity:.9}
+#drv-done button{border:0;background:none;color:var(--offwhite);cursor:pointer}
+#drv-done button svg{width:16px;height:16px}
+.drv-cnt{display:inline-block;min-width:22px;padding:1px 7px;margin-left:4px;border-radius:12px;background:var(--grey-light);color:var(--navy);font-size:12px;text-align:center}
+.drv-card h4 svg{width:16px;height:16px;vertical-align:-3px}
+.drv-sum-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.drv-sum-g button{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--navy);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.drv-sum-g button svg{flex:0 0 18px;width:18px;height:18px;color:var(--navy-soft)}
+.drv-sum-g button span{flex:1}
+.drv-sum-g button b{color:var(--gold)}
+.p-name{display:inline-flex;align-items:center;gap:8px}
+.p-av{border-radius:50%;object-fit:cover;flex:none}
+.p-av.ini{display:inline-flex;align-items:center;justify-content:center;background:var(--grey-light);color:var(--navy);font-weight:700}
+#ph-ov{z-index:9700}
+#photo-ask{position:fixed;inset:0;z-index:9650;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(36,59,100,.55)}
+.photo-ask-box{width:100%;max-width:360px;padding:22px;border-radius:16px;background:var(--offwhite);text-align:center;color:var(--navy)}
+.photo-ask-box h3{margin:10px 0 6px}
+.photo-ask-box p{margin:0 0 14px;font-size:14px;color:var(--navy-soft)}
+.photo-ask-box .btn{display:flex;width:100%;justify-content:center;gap:6px;margin-top:8px}
+.photo-ask-av{display:inline-grid;place-items:center;width:64px;height:64px;border-radius:50%;background:var(--grey-light);color:var(--gold)}
+.photo-ask-av svg{width:28px;height:28px}
+@media (max-width:600px){.drv-hero{padding:16px}.drv-hero .db-hero-date{flex-direction:row;align-items:center;flex-wrap:wrap}}
+.drv-day ol,.drv-day li{width:auto}
+.drv-day .drv-btn{width:100%}

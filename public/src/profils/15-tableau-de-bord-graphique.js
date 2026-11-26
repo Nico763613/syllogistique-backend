@@ -32,6 +32,23 @@ PROFILES.COMMERCIAL = {
   ],
 };
 
+PROFILES.CAISSE = {
+  roles: ['CAISSIER'], title: 'Tableau de bord de la caisse', space: 'Caisse',
+  todo: 'Ouvrez votre caisse, encaissez les ventes, enregistrez les dépenses, puis clôturez en fin de journée.',
+  folders: [
+    { t: 'Caisse', ic: 'wallet', subs: [['Ma caisse', 'caisse', 'Ouverture, encaissements, dépenses, clôture.'], ['Ventes et reçus', 'ventes', 'Factures et reçus des clients.']] },
+    { t: 'Rapports', ic: 'file', subs: [['Mon rapport', 'my-report', 'Rapport de fin de journée.']] },
+  ],
+};
+PROFILES.POINTAGE = {
+  roles: ['POINTEUR'], title: 'Tableau de bord du pointage', space: 'Pointage des chauffeurs',
+  todo: 'Pointez chaque chauffeur à son arrivée : présent, en retard ou absent avec le motif.',
+  folders: [
+    { t: 'Pointage', ic: 'clock', subs: [['Pointage du jour', 'pointage', 'Présents, retards, absents.'], ['Mon espace', 'espace', 'Résumé de la journée.']] },
+    { t: 'Rapports', ic: 'file', subs: [['Mon rapport', 'my-report', 'Rapport de fin de journée.']] },
+  ],
+};
+
 /* ---------- Petits graphiques SVG (sans bibliothèque, légers pour téléphone) ---------- */
 const DB_DAYS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 function dbLbl(k) {
@@ -60,6 +77,8 @@ function dbBars(items, unit) { // [{l, v}]
   return `<div class="db-bars">${it.map((x, i) => `<div class="db-bar${i === top ? ' top' : ''}"><em>${i === top ? esc(dbShort(x.v)) + (unit ? ' ' + esc(unit) : '') : ''}</em><span style="height:${Math.max(3, Math.round(vals[i] / mx * 100))}%"></span><small>${esc(x.l)}</small></div>`).join('')}</div>`;
 }
 const dbLast = (arr, n) => (arr || []).slice(-(n || 7));
+function dbDays7() { const d = []; for (let i = 6; i >= 0; i--) d.push(new Date(Date.now() - i * 864e5).toISOString().slice(0, 10)); return d; }
+function dbPerDay(list, field, val) { return dbDays7().map((d) => list.filter((x) => String(x[field] || '').slice(0, 10) === d).reduce((s, x) => s + (val ? +x[val] || 0 : 1), 0)); }
 
 /* ---------- Données de chaque profil ---------- */
 async function profDash(key) {
@@ -118,7 +137,7 @@ async function profDash(key) {
       cards: [card('wrench', 'À effectuer', profN(k.todo), 'interventions planifiées ou en retard', 'atelier', 'Ouvrir l\'atelier'), card('clock', 'En cours', profN(k.inProgress), 'interventions', 'atelier', 'Continuer'),
         card('ban', 'Véhicules immobilisés', profN(k.down), 'en attente de réparation', 'atelier', 'Voir'), card('check-circle', 'Terminées ce mois', profN(k.doneMonth), 'interventions clôturées', 'espace', 'Historique')],
       quick: [['wrench', 'Atelier', 'atelier'], ['truck', 'Camions', 'trucks'], ['car', 'Véhicules', 'service-vehicles'], ['package', 'Stock pièces', 'stock'], ['file', 'Demander des pièces', 'needs'], ['clipboard', 'Mon rapport', 'my-report']],
-      perf: { pct: tot ? Math.round((k.doneMonth || 0) / tot * 100) : null, label: 'Interventions terminées', checks: [['Terminées ce mois', profN(k.doneMonth), true], ['En cours', profN(k.inProgress), true], ['Immobilisés', profN(k.down), !k.down]], line: null },
+      perf: { pct: tot ? Math.round((k.doneMonth || 0) / tot * 100) : null, label: 'Interventions terminées', checks: [['Terminées ce mois', profN(k.doneMonth), true], ['En cours', profN(k.inProgress), true], ['Immobilisés', profN(k.down), !k.down]], line: dbPerDay((ws && ws.recent) || [], 'at'), lineT: 'Interventions (7 jours)' },
       mid: { ic: 'truck', t: 'Véhicules à l\'arrêt', rows: ((ws && ws.stopped) || []).slice(0, 3).map((v) => [v.vehicle, v.status === 'IMMOBILIZED' ? 'Immobilisé' : 'En maintenance']), empty: 'Aucun véhicule à l\'arrêt.', go: 'atelier' },
       bars: { t: 'Charge de l\'atelier', items: [{ l: 'À faire', v: k.todo }, { l: 'En cours', v: k.inProgress }, { l: 'Immobilisés', v: k.down }, { l: 'Terminées', v: k.doneMonth }] },
       alerts: ((ws && ws.stopped) || []).map((v) => ({ t: v.vehicle + ' · ' + (v.plate || ''), s: v.status === 'IMMOBILIZED' ? 'Immobilisé' : 'En maintenance', sev: 'WARNING' })),
@@ -149,8 +168,8 @@ async function profDash(key) {
         card('banknote', 'Dépenses en attente', profN(pend.length), dbShort(sum(pend)) + ' GNF', 'driver-expenses', 'Contrôler'), card('check-circle', 'Dépenses validées', profN(appr.length), dbShort(sum(appr)) + ' GNF', 'driver-expenses', 'Voir')]
         : [card('banknote', 'Dépenses à payer', profN(appr.length - paid.length), dbShort(sum(appr) - sum(paid)) + ' GNF', 'compta', 'Traiter'), card('check-circle', 'Dépenses payées', profN(paid.length), dbShort(sum(paid)) + ' GNF', 'compta', 'Voir'),
           card('truck', 'Transports à facturer', profN(U.length), 'trajets validés non facturés', 'compta', 'Facturer'), card('file', 'Factures', 'Ventes', 'factures et reçus', 'ventes', 'Ouvrir')],
-      quick: ops ? [['check-circle', 'Fiches à valider', 'ops-validation'], ['banknote', 'Dépenses & reçus', 'driver-expenses'], ['clipboard', 'Fiches de bord', 'driver-sheets'], ['map-pin', 'Missions', 'driver-missions']]
-        : [['banknote', 'Dépenses', 'compta'], ['file', 'Ventes & factures', 'ventes'], ['receipt', 'Reçus', 'compta'], ['chart', 'Paiements', 'compta']],
+      quick: ops ? [['check-circle', 'Fiches à valider', 'ops-validation'], ['banknote', 'Dépenses & reçus', 'driver-expenses'], ['clipboard', 'Fiches de bord', 'driver-sheets'], ['map-pin', 'Missions', 'driver-missions'], ['truck', 'Suivi du jour', 'driver-board'], ['file', 'Mon rapport', 'my-report']]
+        : [['banknote', 'Dépenses à traiter', 'compta'], ['file', 'Ventes & factures', 'ventes'], ['wallet', 'Caisses', 'caisse'], ['truck', 'Transports à facturer', 'compta'], ['receipt', 'Dépenses chauffeurs', 'driver-expenses'], ['file', 'Mon rapport', 'my-report']],
       perf: ops ? { pct: E.length ? Math.round((E.length - pend.length) / E.length * 100) : null, label: 'Dépenses contrôlées', checks: [['Validées', profN(appr.length), true], ['En attente', profN(pend.length), !pend.length], ['Rejetées', profN(E.filter((e) => e.status === 'REJECTED').length), true]], line: perDay, lineT: 'Dépenses saisies (7 jours)' }
         : { pct: appr.length ? Math.round(paid.length / appr.length * 100) : null, label: 'Dépenses validées payées', checks: [['Payées', profN(paid.length), true], ['À payer', profN(appr.length - paid.length), appr.length === paid.length], ['Transports à facturer', profN(U.length), !U.length]], line: perDay, lineT: 'Dépenses saisies (7 jours)' },
       mid: { ic: 'receipt', t: 'Dernières dépenses', rows: E.slice(0, 3).map((e) => [(e.driver || '—') + ' · ' + (e.category || ''), dbShort(e.amount) + ' GNF']), empty: 'Aucune dépense.', go: ops ? 'driver-expenses' : 'compta' },
@@ -164,36 +183,70 @@ async function profDash(key) {
     const ic = ['chart', 'banknote', 'file', 'wallet'];
     return {
       cards: K.slice(0, 4).map((x, i) => card(ic[i], x.label, x.value == null ? '—' : (x.unit === 'GNF' ? dbShort(x.value) + ' GNF' : fmt(x.value) + (x.unit === '%' ? ' %' : '')), x.variationPercent != null ? (x.variationPercent > 0 ? '+' : '') + x.variationPercent + ' % vs période précédente' : '', 'ventes', 'Voir')),
-      quick: [['cart', 'Ventes', 'ventes'], ['users', 'Clients', 'ventes'], ['file', 'Devis', 'ventes'], ['receipt', 'Factures', 'ventes'], ['chart', 'Indicateurs', 'dash-commercial']],
+      quick: [['cart', 'Ventes', 'ventes'], ['users', 'Clients', 'ventes'], ['file', 'Devis', 'ventes'], ['receipt', 'Factures', 'ventes'], ['wallet', 'Caisse', 'caisse'], ['chart', 'Indicateurs', 'dash-commercial']],
       perf: { pct: ttc ? Math.round(col / ttc * 100) : null, label: 'Taux d\'encaissement', checks: K.slice(4, 7).map((x) => [x.label, x.value == null ? '—' : (x.unit === 'GNF' ? dbShort(x.value) : fmt(x.value)), x.status !== 'critical']), line: tr.map((x) => x.sales), lineT: 'Nombre de ventes' },
       mid: { ic: 'wallet', t: 'Créances clients', rows: (ch.receivablesAging || []).slice(0, 4).map((x) => [x.label, dbShort(x.amount) + ' GNF']), empty: 'Aucune créance.', go: 'ventes' },
       bars: { t: 'Chiffre d\'affaires TTC (GNF)', items: tr.map((x) => ({ l: dbLbl(x.period), v: x.ttc })) },
       alerts: [],
     };
   }
+  if (key === 'CAISSE') {
+    const [cur, c] = await Promise.all([T('/cash-sessions/current'), T('/dashboards/commercial' + q)]); const sm = (cur && cur.summary) || null, ch = (c && c.charts) || {}, tr = dbLast(ch.revenueTrend);
+    const pm = (ch.paymentsByMethod || []), ttc = tr.reduce((a, x) => a + (+x.ttc || 0), 0), col = tr.reduce((a, x) => a + (+x.collected || 0), 0);
+    return {
+      cards: [card('wallet', 'Ma caisse', cur ? 'Ouverte' : 'Fermée', cur && cur.openedAt ? 'depuis ' + new Date(cur.openedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'à ouvrir pour encaisser', 'caisse', cur ? 'Ouvrir ma caisse' : 'Ouvrir la caisse'),
+        card('banknote', 'Encaissé en espèces', sm ? dbShort(sm.cashCollected) + ' GNF' : '—', 'session en cours', 'caisse', 'Détail'),
+        card('receipt', 'Dépenses de caisse', sm ? dbShort(sm.expenses) + ' GNF' : '—', 'session en cours', 'caisse', 'Ajouter'),
+        card('scale', 'Espèces attendues', sm ? dbShort(sm.expectedCash) + ' GNF' : '—', 'à retrouver à la clôture', 'caisse', 'Clôturer')],
+      quick: [['wallet', 'Ma caisse', 'caisse'], ['cart', 'Nouvelle vente', 'ventes'], ['receipt', 'Reçus', 'ventes'], ['banknote', 'Dépense de caisse', 'caisse'], ['lock', 'Clôturer', 'caisse'], ['file', 'Mon rapport', 'my-report']],
+      perf: { pct: ttc ? Math.round(col / ttc * 100) : null, label: 'Ventes encaissées', checks: [['Caisse ouverte', cur ? 'Oui' : 'Non', !!cur], ['Remboursements', sm ? dbShort(sm.cashRefunds) : '—', true], ['Moyens de paiement', profN(pm.length), true]], line: tr.map((x) => x.collected), lineT: 'Encaissements par période' },
+      mid: { ic: 'banknote', t: 'Encaissements par moyen', rows: pm.slice(0, 4).map((x) => [x.label || x.channel, dbShort(x.amount) + ' GNF']), empty: 'Aucun encaissement.', go: 'caisse' },
+      bars: { t: 'Encaissé par période (GNF)', items: tr.map((x) => ({ l: dbLbl(x.period), v: x.collected })) },
+      alerts: cur ? [] : [{ t: 'Caisse fermée', s: 'Ouvrez votre caisse avant d\'encaisser.', sev: 'WARNING' }],
+    };
+  }
+  if (key === 'POINTAGE') {
+    const ws = await T('/dashboards/workspace' + q), k = (ws && ws.kpis) || {}, ab = (ws && ws.absentees) || [];
+    return {
+      cards: [card('users', 'Chauffeurs actifs', profN(k.total), 'à pointer chaque jour', 'pointage', 'Pointer'), card('check-circle', 'Présents', profN(k.present), profN(k.late) + ' en retard', 'pointage', 'Voir'),
+        card('ban', 'Absents', profN(k.absent), 'avec motif', 'pointage', 'Voir'), card('clock', 'Restant à pointer', profN(k.remaining), 'aujourd\'hui', 'pointage', 'Continuer')],
+      quick: [['clock', 'Pointage du jour', 'pointage'], ['check-circle', 'Présents', 'pointage'], ['ban', 'Absents', 'pointage'], ['users', 'Chauffeurs', 'pointage'], ['user', 'Mon espace', 'espace'], ['file', 'Mon rapport', 'my-report']],
+      perf: { pct: k.total ? Math.round((k.total - (k.remaining || 0)) / k.total * 100) : null, label: 'Chauffeurs pointés', checks: [['Présents', profN(k.present), true], ['Retards', profN(k.late), !k.late], ['Absents', profN(k.absent), !k.absent]], line: null, lineT: 'Présences du jour' },
+      mid: { ic: 'ban', t: 'Absents du jour', rows: ab.slice(0, 4).map((a) => [a.name, a.reason || 'Motif non précisé']), empty: 'Aucun absent.', go: 'pointage' },
+      bars: { t: 'Pointage du jour', items: [{ l: 'Présents', v: (k.present || 0) - (k.late || 0) }, { l: 'Retards', v: k.late }, { l: 'Absents', v: k.absent }, { l: 'Restants', v: k.remaining }] },
+      alerts: k.remaining ? [{ t: fmt(k.remaining) + ' chauffeur(s) pas encore pointé(s)', s: 'Pointez-les avant le départ des missions.', sev: 'WARNING' }] : [],
+    };
+  }
   return { cards: [], quick: [], perf: { pct: null, label: '', checks: [] }, mid: null, bars: { t: '', items: [] }, alerts: [] };
 }
 
 /* ---------- Rendu : modèle unique ---------- */
-function dbAct(go) { return go.charAt(0) === '#' ? (go === '#stock-in' ? "stockMove('in')" : go === '#stock-out' ? "stockMove('out')" : '') : `go('${go}')`; }
+function dbBodyHtml(d, opt) {
+  opt = opt || {}; const alerts = d.alerts || [];
+  d.perf = d.perf || { pct: null, label: '', checks: [] };
+  return `${opt.noCards ? '' : `<div class="db-cards">${d.cards.map((c) => `<div class="db-card"><span class="db-ci">${PROF_IC(c.ic)}</span><div><small>${esc(c.l)}</small><b>${c.v}</b>${c.sub ? `<em>${esc(c.sub)}</em>` : ''}${c.go ? `<button class="db-btn" onclick="${dbAct(c.go)}">${esc(c.btn || 'Ouvrir')} ${PROF_IC('chevron-right')}</button>` : ''}</div></div>`)
+    .join('')}</div>`}
+    <div class="db-row2${opt.noQuick ? ' solo' : ''}">${opt.noQuick ? '' : `<div class="db-panel"><div class="db-h"><h3>${PROF_IC('zap')} Mes actions rapides</h3><a onclick="go('prof-f-0')">Mes dossiers ${PROF_IC('chevron-right')}</a></div>
+        <div class="db-quick">${d.quick.map((x) => `<button onclick="${dbAct(x[2])}">${PROF_IC(x[0])}<span>${esc(x[1])}</span></button>`).join('')}</div></div>`}
+      <div class="db-panel"><div class="db-h"><h3>${PROF_IC('chart')} Ma performance</h3><span class="db-chip">Période en cours</span></div>
+        <div class="db-perf">${dbDonut(d.perf.pct, d.perf.label)}<div class="db-perf-r"><ul>${(d.perf.checks || []).map((c) => `<li class="${c[1] === '—' ? 'na' : c[2] ? 'ok' : 'ko'}">${PROF_IC(c[1] === '—' ? 'dot' : c[2] ? 'check-circle' : 'alert')}<span>${esc(c[0])}</span><b>${c[1]}</b></li>`).join('')}</ul>
+        <div class="db-mini"><small>${esc(d.perf.lineT || 'Évolution')}</small>${dbLine(d.perf.line)}</div></div></div></div></div>
+    <div class="db-row3">${d.mid ? `<div class="db-panel"><div class="db-h"><h3>${PROF_IC(d.mid.ic)} ${esc(d.mid.t)}</h3></div>${d.mid.rows.length ? d.mid.rows.map((r) => `<div class="db-kv"><span>${esc(r[0])}</span><b>${esc(String(r[1]))}</b></div>`).join('') : `<div class="db-nodata">${esc(d.mid.empty || 'Aucune donnée.')}</div>`}<button class="db-btn ghost" onclick="go('${d.mid.go}')">Voir les détails ${PROF_IC('chevron-right')}</button></div>` : ''}
+      <div class="db-panel"><div class="db-h"><h3>${PROF_IC('chart')} ${esc(d.bars.t)}</h3></div>${dbBars(d.bars.items, d.bars.unit)}</div>
+      <div class="db-panel"><div class="db-h"><h3>${PROF_IC('bell')} Notifications</h3>${typeof dgAlertsGo === 'function' && PROF.key === 'DG' && !opt.noQuick ? `<a onclick="dgAlertsGo()">Voir tout ${PROF_IC('chevron-right')}</a>` : ''}</div>
+        ${alerts.length ? alerts.slice(0, 5).map((a) => `<div class="db-note ${/CRIT|HIGH/.test(a.sev || '') ? 'bad' : 'warn'}">${PROF_IC(/CRIT|HIGH/.test(a.sev || '') ? 'alert' : 'info')}<div><b>${esc(a.t)}</b>${a.s ? `<small>${esc(a.s)}</small>` : ''}</div></div>`).join('') : `<div class="db-note ok">${PROF_IC('check-circle')}<div><b>Aucune alerte en cours</b><small>Tout est à jour.</small></div></div>`}</div></div>
+    <div class="db-values"><span>${PROF_IC('shield')} Sécurité avant tout</span><span>${PROF_IC('users')} Ensemble plus loin</span><span>${PROF_IC('truck')} Transport responsable</span></div>`;
+}
+
+function dbAct(go) { if (go.slice(0, 3) === 'js:') return go.slice(3); return go.charAt(0) === '#' ? (go === '#stock-in' ? "stockMove('in')" : go === '#stock-out' ? "stockMove('out')" : '') : `go('${go}')`; }
 renderProfHome = async function () {
   const P = profCur(), u = state.user; if (!P) return renderHome();
   const now = new Date(), day = now.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-  root().innerHTML = `<div class="db-hero"><div class="db-hero-txt"><h2>${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${esc(P.title)} — ${esc(P.space)}</p><p class="db-todo">${esc(P.todo)}</p></div>
+  root().innerHTML = `<div class="db-hero"><div class="db-hero-txt"><div class="drv-hero-id"><span class="drv-av" data-avatar="58" onclick="openPhotoEditor()" title="Changer ma photo">${avatarHtml(58)}</span><div><h2>${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${esc(P.title)} — ${esc(P.space)}</p></div></div><p class="db-todo">${esc(P.todo)}</p></div>
       <div class="db-hero-date">${PROF_IC('clipboard')} <b>${esc(day.charAt(0).toUpperCase() + day.slice(1))}</b><span class="db-on">${PROF_IC('check-circle')} En service</span></div></div>
     <div id="db-body"><div class="db-cards">${[0, 1, 2, 3].map(() => '<div class="db-card sk"></div>').join('')}</div><div class="empty">Chargement du tableau de bord…</div></div>`;
   const view = state.view, d = await profDash(PROF.key); if (state.view !== view) return;
   const b = document.getElementById('db-body'); if (!b) return;
-  const alerts = d.alerts || [];
-  b.innerHTML = `<div class="db-cards">${d.cards.map((c) => `<div class="db-card"><span class="db-ci">${PROF_IC(c.ic)}</span><div><small>${esc(c.l)}</small><b>${c.v}</b>${c.sub ? `<em>${esc(c.sub)}</em>` : ''}${c.go ? `<button class="db-btn" onclick="${dbAct(c.go)}">${esc(c.btn || 'Ouvrir')} ${PROF_IC('chevron-right')}</button>` : ''}</div></div>`).join('')}</div>
-    <div class="db-row2"><div class="db-panel"><div class="db-h"><h3>${PROF_IC('zap')} Mes actions rapides</h3><a onclick="go('prof-f-0')">Mes dossiers ${PROF_IC('chevron-right')}</a></div>
-        <div class="db-quick">${d.quick.map((x) => `<button onclick="${dbAct(x[2])}">${PROF_IC(x[0])}<span>${esc(x[1])}</span></button>`).join('')}</div></div>
-      <div class="db-panel"><div class="db-h"><h3>${PROF_IC('chart')} Ma performance</h3><span class="db-chip">Période en cours</span></div>
-        <div class="db-perf">${dbDonut(d.perf.pct, d.perf.label)}<div class="db-perf-r"><ul>${(d.perf.checks || []).map((c) => `<li class="${c[1] === '—' ? 'na' : c[2] ? 'ok' : 'ko'}">${PROF_IC(c[1] === '—' ? 'dot' : c[2] ? 'check-circle' : 'alert')}<span>${esc(c[0])}</span><b>${c[1]}</b></li>`).join('')}</ul>
-        ${d.perf.line ? `<div class="db-mini"><small>${esc(d.perf.lineT || '')}</small>${dbLine(d.perf.line)}</div>` : ''}</div></div></div></div>
-    <div class="db-row3">${d.mid ? `<div class="db-panel"><div class="db-h"><h3>${PROF_IC(d.mid.ic)} ${esc(d.mid.t)}</h3></div>${d.mid.rows.length ? d.mid.rows.map((r) => `<div class="db-kv"><span>${esc(r[0])}</span><b>${esc(String(r[1]))}</b></div>`).join('') : `<div class="db-nodata">${esc(d.mid.empty || 'Aucune donnée.')}</div>`}<button class="db-btn ghost" onclick="go('${d.mid.go}')">Voir les détails ${PROF_IC('chevron-right')}</button></div>` : ''}
-      <div class="db-panel"><div class="db-h"><h3>${PROF_IC('chart')} ${esc(d.bars.t)}</h3></div>${dbBars(d.bars.items, d.bars.unit)}</div>
-      <div class="db-panel"><div class="db-h"><h3>${PROF_IC('bell')} Notifications</h3>${typeof dgAlertsGo === 'function' && ['DG'].includes(PROF.key) ? `<a onclick="dgAlertsGo()">Voir tout ${PROF_IC('chevron-right')}</a>` : ''}</div>
-        ${alerts.length ? alerts.slice(0, 5).map((a) => `<div class="db-note ${/CRIT|HIGH/.test(a.sev || '') ? 'bad' : 'warn'}">${PROF_IC(/CRIT|HIGH/.test(a.sev || '') ? 'alert' : 'info')}<div><b>${esc(a.t)}</b>${a.s ? `<small>${esc(a.s)}</small>` : ''}</div></div>`).join('') : `<div class="db-note ok">${PROF_IC('check-circle')}<div><b>Aucune alerte en cours</b><small>Tout est à jour.</small></div></div>`}</div></div>
-    <div class="db-values"><span>${PROF_IC('shield')} Sécurité avant tout</span><span>${PROF_IC('users')} Ensemble plus loin</span><span>${PROF_IC('truck')} Transport responsable</span></div>`;
+  b.innerHTML = dbBodyHtml(d);
 };
+

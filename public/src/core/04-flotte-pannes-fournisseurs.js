@@ -351,7 +351,7 @@ async function renderDrivers() {
     return days < 0 ? `<span class="badge bad">Expiré ${dt}</span>` : days <= 30 ? `<span class="badge warn">${dt} (${days} j)</span>` : dt;
   };
   const rows = list.map(d => `
-    <tr><td><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : d.activity === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '—'}</td>
+    <tr><td><span class="p-name">${personAv(d.firstName, d.lastName, d.photoUrl, 32)}<span><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</span></span></td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : d.activity === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '—'}</td>
     <td>${(vehOf[d.id] || []).map(v => esc(v.internalNumber + ' — ' + v.registrationNumber)).join('<br>') || '—'}</td>
     <td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button></td>
     <td>${permis(d)}${d.licensePhotoUrl ? ` <a href="${esc(brandSrc(d.licensePhotoUrl))}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> photo</a>` : ''}</td>
