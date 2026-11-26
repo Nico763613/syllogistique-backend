@@ -7,6 +7,8 @@ import { join } from 'path';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const helmetModule = require('helmet');
 const helmet = helmetModule.default ?? helmetModule;
+const compressionModule = require('compression');
+const compression = compressionModule.default ?? compressionModule;
 import { AppModule } from './app.module';
 import { LicenseService } from './license/license.service';
 
@@ -31,6 +33,10 @@ async function bootstrap() {
   // En-têtes de sécurité HTTP. CORP « cross-origin » : le site Netlify doit pouvoir
   // afficher les images téléversées. Pas de CSP : l'API ne sert que du JSON et des fichiers.
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' }, contentSecurityPolicy: false }));
+
+  // Compression des réponses (JSON, HTML, JS, CSS) : moins de données sur les connexions lentes.
+  // Les images déjà compressées (jpg, png) sont ignorées automatiquement.
+  app.use(compression());
 
   // CORS : seuls les sites listés dans CORS_ORIGINS (séparés par des virgules) peuvent appeler l'API.
   const origins = (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
