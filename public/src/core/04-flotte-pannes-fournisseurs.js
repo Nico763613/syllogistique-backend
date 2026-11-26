@@ -434,46 +434,72 @@ function fuelSummaryHtml(all) {
     <table><thead><tr><th>Véhicule</th><th>Pleins</th><th>Litres</th><th>Coût (GNF)</th><th>Km (entre pleins)</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.v.internalNumber)} <span style="font-size:12px;color:var(--muted)">${esc(r.v.registrationNumber)}</span></td><td class="mono">${r.n}</td><td class="mono">${fmt(Math.round(r.l * 10) / 10)} L</td><td class="mono">${fmt(r.c)}</td><td class="mono">${r.max > r.min ? fmt(r.max - r.min) : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="empty">Aucun plein sur cette période.</td></tr>'}
     ${rows.length ? `<tr><td><b>Total</b></td><td class="mono"><b>${tot.n}</b></td><td class="mono"><b>${fmt(Math.round(tot.l * 10) / 10)} L</b></td><td class="mono"><b>${fmt(tot.c)}</b></td><td></td></tr>` : ''}</tbody></table></div>` };
 }
+// Carburant en onglets : chaque onglet ne charge que ses propres données
+const FUEL_TABS = [['trucks', 'Camions', 'truck'], ['service', 'Véhicules de service', 'car'], ['total', 'Consommation totale', 'chart'], ['new', 'Nouveau ravitaillement', 'plus'], ['history', 'Historique et tarif', 'clock']];
+let fuelTab = 'trucks';
+function setFuelTab(k) { fuelTab = k; renderFuel(); }
+function fuelPeriodHtml() {
+  const label = fuelPeriod === 'day' ? new Date(fuelDate + 'T12:00:00').toLocaleDateString('fr-FR', { dateStyle: 'full' }) : fuelPeriod === 'year' ? 'Année ' + fuelDate.slice(0, 4) : new Date(fuelDate + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return `<div class="grid-2"><div><label>Période</label><select onchange="setFuelPeriod(this.value)"><option value="day" ${fuelPeriod === 'day' ? 'selected' : ''}>Jour</option><option value="month" ${fuelPeriod === 'month' ? 'selected' : ''}>Mois</option><option value="year" ${fuelPeriod === 'year' ? 'selected' : ''}>Année</option></select></div>
+    <div><label>Date de référence</label><input type="date" value="${esc(fuelDate)}" onchange="if(this.value)setFuelPeriod(null,this.value)" /></div></div><div class="desc">${esc(label)} — alimenté automatiquement par les pleins des fiches de bord et des chauffeurs.</div>`;
+}
+function fuelRows(all, kind) {
+  const [from, to] = fuelBounds();
+  const list = all.filter((f) => { const d = String(f.transactionDate).slice(0, 10); return d >= from && d <= to && (kind === 'ALL' || f.vehicle.vehicleType === kind || (kind === 'SERVICE_VEHICLE' && f.vehicle.vehicleType !== 'TRUCK')); });
+  const by = {};
+  for (const f of list) {
+    const k = f.vehicle.internalNumber; const r = by[k] || (by[k] = { v: f.vehicle, n: 0, l: 0, c: 0, min: Infinity, max: -Infinity });
+    r.n++; r.l += Number(f.quantityLiters); r.c += Number(f.totalCost); if (f.mileage) { r.min = Math.min(r.min, f.mileage); r.max = Math.max(r.max, f.mileage); }
+  }
+  const rows = Object.values(by).sort((a, b) => b.l - a.l);
+  const tot = rows.reduce((a, r) => ({ n: a.n + r.n, l: a.l + r.l, c: a.c + r.c }), { n: 0, l: 0, c: 0 });
+  return { list, rows, tot };
+}
+function fuelCards(tot, nb, what) {
+  const c = (l, v, sub) => `<div class="kpi-card"><div class="kpi-label">${l}</div><div class="kpi-value mono">${v}</div>${sub ? `<div class="kpi-sub">${sub}</div>` : ''}</div>`;
+  return `<div class="kpi-grid">${c('Litres consommés', fmt(Math.round(tot.l * 10) / 10), 'L')}${c('Coût du carburant', fmt(tot.c), 'GNF')}${c('Pleins', fmt(tot.n), '')}${c(what + ' concernés', fmt(nb), '')}</div>`;
+}
 async function renderFuel() {
-  const [list, vehicles, tariff] = await Promise.all([
-    api('/fuel?siteId=' + state.siteId),
-    api('/vehicles?siteId=' + state.siteId),
-    api('/settings/fuel-price'),
-  ]);
-  const canEditPrice = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role);
-  const sum = fuelSummaryHtml(list);
-  const rows = sum.list.map(f => `
-    <tr><td>${new Date(f.transactionDate).toLocaleDateString('fr-FR')}</td>
-    <td>${esc(f.vehicle.internalNumber)}</td><td class="mono">${fmt(f.quantityLiters)} L</td>
-    <td class="mono">${fmt(f.pricePerLiter)} GNF/L</td><td class="mono">${fmt(f.totalCost)} GNF</td></tr>`).join('') || `<tr><td colspan="5" class="empty">Aucun ravitaillement enregistré.</td></tr>`;
-  const options = vehicles.map(v => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('');
-
-  root().innerHTML = `
-    <div class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Tarif du carburant</h3>
-      <div class="desc">Tarif actuel : <b class="mono">${fmt(tariff.pricePerLiter)} GNF/L</b> — appliqué automatiquement à tous les nouveaux calculs.</div>
-      ${canEditPrice ? `<div class="grid-2">
-        <div><label>Nouveau prix / litre (GNF)</label><input id="fp-price" type="number" min="1" value="${esc(String(tariff.pricePerLiter))}" /></div>
-        <div><label>Motif (obligatoire)</label><input id="fp-reason" placeholder="Ex : hausse à la pompe" /></div>
-      </div>
-      <button class="btn gold" onclick="saveFuelPrice()">Modifier le tarif</button>` : ''}
-      <div id="fp-msg"></div>
-    </div>
-    ${sum.html}
-    <div class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg> Nouveau ravitaillement</h3>
+  const tab = FUEL_TABS.find((t) => t[0] === fuelTab) ? fuelTab : 'trucks';
+  const bar = syTabs(FUEL_TABS, tab, 'setFuelTab');
+  root().innerHTML = bar + '<div class="empty">Chargement…</div>';
+  let body = '';
+  if (tab === 'trucks' || tab === 'service') {
+    const truck = tab === 'trucks', all = await api('/fuel?siteId=' + state.siteId), { rows, tot } = fuelRows(all, truck ? 'TRUCK' : 'SERVICE_VEHICLE');
+    body = `${fuelCards(tot, rows.length, truck ? 'Camions' : 'Véhicules')}<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-${truck ? 'truck' : 'car'}"/></svg> Carburant consommé par ${truck ? 'camion' : 'véhicule de service'}</h3>${fuelPeriodHtml()}
+      <div class="table-wrap"><table><thead><tr><th>${truck ? 'Camion' : 'Véhicule'}</th><th>Pleins</th><th>Litres</th><th>Coût (GNF)</th><th>Km (entre pleins)</th><th>L/100 km</th></tr></thead><tbody>${rows.map((r) => { const km = r.max > r.min ? r.max - r.min : 0; return `<tr><td><b>${esc(r.v.internalNumber)}</b> <span style="font-size:12px;color:var(--muted)">${esc(r.v.registrationNumber)}</span></td><td class="mono">${r.n}</td><td class="mono">${fmt(Math.round(r.l * 10) / 10)} L</td><td class="mono">${fmt(r.c)}</td><td class="mono">${km ? fmt(km) : '—'}</td><td class="mono">${km >= 20 ? (Math.round(r.l / km * 1000) / 10) : '—'}</td></tr>`; }).join('') || `<tr><td colspan="6" class="empty">Aucun plein de ${truck ? 'camion' : 'véhicule de service'} sur cette période.</td></tr>`}
+      ${rows.length ? `<tr><td><b>Total</b></td><td class="mono"><b>${tot.n}</b></td><td class="mono"><b>${fmt(Math.round(tot.l * 10) / 10)} L</b></td><td class="mono"><b>${fmt(tot.c)}</b></td><td></td><td></td></tr>` : ''}</tbody></table></div></div>`;
+  } else if (tab === 'total') {
+    const all = await api('/fuel?siteId=' + state.siteId), T = fuelRows(all, 'TRUCK'), S = fuelRows(all, 'SERVICE_VEHICLE'), A = fuelRows(all, 'ALL');
+    const line = (l, ic, x) => `<tr><td><svg class="ic" aria-hidden="true"><use href="#i-${ic}"/></svg> ${l}</td><td class="mono">${fmt(x.rows.length)}</td><td class="mono">${x.tot.n}</td><td class="mono">${fmt(Math.round(x.tot.l * 10) / 10)} L</td><td class="mono">${fmt(x.tot.c)}</td><td class="mono">${A.tot.l ? Math.round(x.tot.l / A.tot.l * 100) + ' %' : '—'}</td></tr>`;
+    body = `${fuelCards(A.tot, A.rows.length, 'Véhicules')}<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg> Consommation totale</h3>${fuelPeriodHtml()}
+      <div class="table-wrap"><table><thead><tr><th>Catégorie</th><th>Véhicules</th><th>Pleins</th><th>Litres</th><th>Coût (GNF)</th><th>Part</th></tr></thead><tbody>${line('Camions', 'truck', T)}${line('Véhicules de service', 'car', S)}
+      <tr><td><b>Total général</b></td><td class="mono"><b>${fmt(A.rows.length)}</b></td><td class="mono"><b>${A.tot.n}</b></td><td class="mono"><b>${fmt(Math.round(A.tot.l * 10) / 10)} L</b></td><td class="mono"><b>${fmt(A.tot.c)}</b></td><td class="mono"><b>100 %</b></td></tr></tbody></table></div></div>`;
+  } else if (tab === 'new') {
+    const vehicles = await api('/vehicles?siteId=' + state.siteId);
+    const grp = (t, l) => { const vs = vehicles.filter((v) => (t === 'TRUCK') === (v.vehicleType === 'TRUCK')); return vs.length ? `<optgroup label="${l}">${vs.map((v) => `<option value="${esc(v.id)}">${esc(v.internalNumber)} — ${esc(v.registrationNumber)}</option>`).join('')}</optgroup>` : ''; };
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-fuel"/></svg> Nouveau ravitaillement</h3>
+      <div class="desc">À utiliser pour un plein qui n'a pas été déclaré par le chauffeur dans son application. Le coût est calculé automatiquement avec le tarif en vigueur.</div>
       <div class="grid-2">
-        <div><label>Véhicule</label><select id="f-vehicle">${options}</select></div>
-        <div><label>Date</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0,10)}" /></div>
-        <div><label>Kilométrage</label><input id="f-mileage" type="number" /></div>
+        <div><label>Camion ou véhicule</label><select id="f-vehicle">${grp('TRUCK', 'Camions')}${grp('SERVICE', 'Véhicules de service')}</select></div>
+        <div><label>Date</label><input id="f-date" type="date" value="${new Date().toISOString().slice(0, 10)}" /></div>
+        <div><label>Kilométrage au compteur</label><input id="f-mileage" type="number" /></div>
         <div><label>Litres</label><input id="f-liters" type="number" step="0.01" /></div>
         <div><label>Station</label><input id="f-station" /></div>
       </div>
       <button class="btn gold" onclick="createFuel()">Enregistrer</button>
-      <div id="f-msg"></div>
-    </div>
-    <div class="panel">
-      <h3>Historique</h3>
-      <table><thead><tr><th>Date</th><th>Véhicule</th><th>Litres</th><th>Prix/L</th><th>Coût total</th></tr></thead><tbody>${rows}</tbody></table>
-    </div>`;
+      <div id="f-msg"></div></div>`;
+  } else {
+    const [all, tariff] = await Promise.all([api('/fuel?siteId=' + state.siteId), api('/settings/fuel-price')]);
+    const canEditPrice = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role), { list } = fuelRows(all, 'ALL');
+    body = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-banknote"/></svg> Tarif du carburant</h3>
+      <div class="desc">Tarif actuel : <b class="mono">${fmt(tariff.pricePerLiter)} GNF/L</b> — appliqué automatiquement à tous les nouveaux calculs.</div>
+      ${canEditPrice ? `<div class="grid-2"><div><label>Nouveau prix / litre (GNF)</label><input id="fp-price" type="number" min="1" value="${esc(String(tariff.pricePerLiter))}" /></div>
+        <div><label>Motif (obligatoire)</label><input id="fp-reason" placeholder="Ex : hausse à la pompe" /></div></div>
+      <button class="btn gold" onclick="saveFuelPrice()">Modifier le tarif</button>` : ''}<div id="fp-msg"></div></div>
+      <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> Historique des pleins</h3>${fuelPeriodHtml()}
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Litres</th><th>Prix/L</th><th>Coût total</th></tr></thead><tbody>${list.map((f) => `<tr><td>${new Date(f.transactionDate).toLocaleDateString('fr-FR')}</td><td>${esc(f.vehicle.internalNumber)}</td><td>${f.vehicle.vehicleType === 'TRUCK' ? 'Camion' : 'Véhicule de service'}</td><td class="mono">${fmt(f.quantityLiters)} L</td><td class="mono">${fmt(f.pricePerLiter)} GNF/L</td><td class="mono">${fmt(f.totalCost)} GNF</td></tr>`).join('') || '<tr><td colspan="6" class="empty">Aucun plein sur cette période.</td></tr>'}</tbody></table></div></div>`;
+  }
+  if (state.view !== 'fuel') return;
+  root().innerHTML = bar + body;
 }

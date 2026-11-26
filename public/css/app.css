@@ -527,3 +527,16 @@ button.pf-tile{cursor:pointer;}button.pf-tile:hover{border-color:var(--navy-soft
 @media (max-width:600px){.drv-hero{padding:16px}.drv-hero .db-hero-date{flex-direction:row;align-items:center;flex-wrap:wrap}}
 .drv-day ol,.drv-day li{width:auto}
 .drv-day .drv-btn{width:100%}
+
+/* ===== Onglets de couleur (carburant, stock, ressources humaines) ===== */
+.sy-tabs{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;margin:4px 0 12px;scrollbar-width:thin}
+.sy-tab{--c:var(--navy);flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:1.5px solid var(--line);border-top:4px solid var(--c);background:var(--offwhite);color:var(--navy);font:inherit;font-size:.88rem;font-weight:600;cursor:pointer;white-space:nowrap}
+.sy-tab svg{width:18px;height:18px;color:var(--c)}
+.sy-tab:hover{border-color:var(--c)}
+.sy-tab.on{background:var(--c);border-color:var(--c);color:var(--offwhite)}
+.sy-tab.on svg{color:var(--offwhite)}
+.sy-tab.c-navy{--c:var(--navy)}.sy-tab.c-sage{--c:var(--sage)}.sy-tab.c-gold{--c:var(--gold)}.sy-tab.c-terra{--c:var(--terra)}.sy-tab.c-mauve{--c:var(--mauve)}.sy-tab.c-navy-soft{--c:var(--navy-soft)}
+.sy-tabs-t{display:flex;align-items:center;gap:6px;margin:4px 0 6px;font-weight:700;color:var(--navy)}
+.sy-tabs-t svg{width:18px;height:18px;color:var(--gold)}
+@media (max-width:600px){.sy-tab{padding:9px 12px;font-size:.82rem}}
+@media (max-width:600px){.st-kpis{grid-template-columns:repeat(3,1fr);gap:8px}.st-kpis .kpi-card{padding:10px}.st-kpis .kpi-value{font-size:1.05rem}.st-kpis .kpi-label{font-size:.72rem}}
