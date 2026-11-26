@@ -634,15 +634,15 @@ async function installApp() {
 const INSTALL_CUR = isIOS ? 'ios' : isAndroid ? 'android' : 'pc';
 const INSTALL_NAME = { android: 'Android', ios: 'iPhone / iPad', pc: 'Ordinateur (Windows, Mac)' };
 function installHelp() {
+  // Un seul écran, sans choix d'appareil : la bonne marche à suivre est choisie automatiquement.
   const old = document.getElementById('install-help'); if (old) old.remove();
   const ov = document.createElement('div'); ov.id = 'install-help';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1500;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
-  const kinds = ['android', 'ios', 'pc'].sort((a, b) => (b === INSTALL_CUR ? 1 : 0) - (a === INSTALL_CUR ? 1 : 0));
-  const btns = kinds.map((k) => `<button class="btn ${k === INSTALL_CUR ? 'gold' : ''}" style="width:100%;margin:6px 0;min-height:54px;text-align:left;font-size:16px" onclick="installPick('${k}')"><svg class="ic" aria-hidden="true"><use href="#${k === 'pc' ? 'i-settings' : 'i-phone'}"/></svg> ${INSTALL_NAME[k]}${k === INSTALL_CUR ? ' — cet appareil' : ''}</button>`).join('');
   ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;margin:20px auto;"><h3 style="margin-top:0"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Installer l'application</h3>
-    <div class="desc" style="margin:0 0 6px">Touchez votre appareil :</div>${btns}<div id="install-steps" style="margin-top:10px"></div>
+    <div id="install-steps"></div>
     <div style="margin-top:12px"><button class="btn" onclick="document.getElementById('install-help').remove()">Fermer</button></div></div>`;
   document.body.appendChild(ov);
+  installPick(INSTALL_CUR);
 }
 function installShareBtn() { return `<div style="margin-top:8px"><button class="btn small gold" onclick="installShare()"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Envoyer le lien (WhatsApp…)</button> <button class="btn small" onclick="installCopy()">Copier le lien</button></div>`; }
 async function installShare() {
