@@ -121,7 +121,7 @@ async function renderWorkspace() {
   const names = { STORE: 'Gestionnaire de stock', HSE: 'Agent HSE', MECHANIC: 'Mécanicien', POINTER: 'Pointeur' };
   const hello = { STORE: 'Gérez vos articles, entrées et sorties du jour.', HSE: 'Prévention, inspections et incidents de votre site.', MECHANIC: 'Interventions, diagnostics et véhicules à réparer.', POINTER: 'Pointage du jour et présence des chauffeurs.' }[d.kind];
   const rep = d.myReport ? `Rapport du jour ${stepBadge(staffStep(d.myReport))}` : `<span class="badge warn">Rapport du jour non envoyé</span>`;
-  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Actualiser</button></div></div>`;
+  const hero = `<div class="ex-hero"><div><h2>${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${names[d.kind]} — ${hello}</p></div><div class="ex-date">${rep}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Actualiser</button></div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${emoIc(ico)}</span>${label}</button>`;
   const atAct = (ico, label, tab) => `<button onclick="atTab='${tab}';go('atelier')"><span>${emoIc(ico)}</span>${label}</button>`;
   const ptAct = (ico, label, tab) => `<button onclick="ptTab='${tab}';go('pointage')"><span>${emoIc(ico)}</span>${label}</button>`;

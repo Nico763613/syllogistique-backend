@@ -23,7 +23,7 @@ async function renderExecutive(mode) {
   const d = await api('/dashboards/executive' + (state.siteId ? '?siteId=' + state.siteId : ''));
   const u = state.user, f = d.fleet, m = d.missions, pe = d.people, ex = d.expenses, hs = d.hse, st = d.stock;
   const heroTxt = mode === 'dg' ? 'Voici la situation globale de votre entreprise.' : 'Voici l’activité de votre logistique : missions, véhicules et chauffeurs.';
-  const hero = `<div class="ex-hero"><div><h2>Bonjour ${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Actualiser</button></div></div>`;
+  const hero = `<div class="ex-hero"><div><h2>${esc(u.firstName)} ${esc(u.lastName)}</h2><p>${heroTxt}</p></div><div class="ex-date">Mis à jour : ${drvDt(d.asOf)}<br><button class="btn small" style="margin-top:6px" onclick="renderView(state.view)"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Actualiser</button></div></div>`;
   const rate = m.completionRate;
   const ring = (v, col) => `<div class="ex-ring" style="background:conic-gradient(${col} ${(v || 0) * 3.6}deg,#E6ECF2 0)"><div>${v == null ? '—' : v + '%'}</div></div>`;
   const act = (ico, label, view) => `<button onclick="go('${view}')"><span>${emoIc(ico)}</span>${label}</button>`;
