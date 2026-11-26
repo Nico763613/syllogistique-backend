@@ -95,12 +95,13 @@ function gsInput() {
       const row = (view, t, sub) => '<button type="button" class="gs-r" onclick="gsGo(\'' + view + '\')">' + esc(t) + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</button>';
       const can = (v) => !!document.querySelector('#sidebar .nav-item[data-view="' + v + '"]');
       const vTrucks = can('trucks') ? 'trucks' : (can('home') ? 'home' : 'trucks');
+      const sc = typeof gsScope === 'function' ? gsScope() : null, ok = (k) => !sc || sc.includes(k);
       let h = '';
-      if ((r.vehicles || []).length) h += '<h5>Camions & véhicules</h5>' + r.vehicles.map((v) => row('trucks', (v.internalNumber || '') + ' · ' + (v.registrationNumber || ''), [v.brand, v.model, v.status].filter(Boolean).join(' · '))).join('');
-      if ((r.drivers || []).length) h += '<h5>Chauffeurs</h5>' + r.drivers.map((d) => row('drivers', d.firstName + ' ' + d.lastName, [d.phone, d.status].filter(Boolean).join(' · '))).join('');
-      if ((r.trips || []).length) h += '<h5>Missions</h5>' + r.trips.map((t) => row(vTrucks, (t.destination || 'Mission') + (t.purpose ? ' — ' + t.purpose : ''), String(t.tripDate || '').slice(0, 10))).join('');
-      if ((r.items || []).length && can('stock')) h += '<h5>Stock</h5>' + r.items.map((i) => row('stock', i.name, (i.sku || '') + ' · ' + i.currentQuantity + ' ' + (i.unit || ''))).join('');
-      if ((r.suppliers || []).length && can('purchases')) h += '<h5>Fournisseurs</h5>' + r.suppliers.map((s) => row('purchases', s.name, s.phone || '')).join('');
+      if (ok('vehicles') && (r.vehicles || []).length) h += '<h5>Camions & véhicules</h5>' + r.vehicles.map((v) => row('trucks', (v.internalNumber || '') + ' · ' + (v.registrationNumber || ''), [v.brand, v.model, v.status].filter(Boolean).join(' · '))).join('');
+      if (ok('drivers') && (r.drivers || []).length) h += '<h5>Chauffeurs</h5>' + r.drivers.map((d) => row('drivers', d.firstName + ' ' + d.lastName, [d.phone, d.status].filter(Boolean).join(' · '))).join('');
+      if (ok('trips') && (r.trips || []).length) h += '<h5>Missions</h5>' + r.trips.map((t) => row(vTrucks, (t.destination || 'Mission') + (t.purpose ? ' — ' + t.purpose : ''), String(t.tripDate || '').slice(0, 10))).join('');
+      if (ok('items') && (r.items || []).length && can('stock')) h += '<h5>Stock</h5>' + r.items.map((i) => row('stock', i.name, (i.sku || '') + ' · ' + i.currentQuantity + ' ' + (i.unit || ''))).join('');
+      if (ok('suppliers') && (r.suppliers || []).length && can('purchases')) h += '<h5>Fournisseurs</h5>' + r.suppliers.map((s) => row('purchases', s.name, s.phone || '')).join('');
       p.innerHTML = h || '<div class="gs-none">Aucun résultat pour « ' + esc(q) + ' ».</div>';
     } catch (e) { p.innerHTML = '<div class="gs-none">' + esc(e.message || 'Recherche indisponible.') + '</div>'; }
   }, 300);

@@ -142,12 +142,12 @@ async function renderStock() {
   const itemOptions = items.map(i => `<option value="${esc(i.id)}">${esc(i.sku)} — ${esc(i.name)} (${fmt(i.currentQuantity)} ${esc(i.unit)})</option>`).join('');
 
   root().innerHTML = `
-    <div class="kpi-grid">
+    <div id="st-tabs">${syTabs(STOCK_TABS, stockTab, 'setStockTab')}</div>
+    <div class="kpi-grid st-kpis">
       <div class="kpi-card"><div class="kpi-label">Articles</div><div class="kpi-value mono">${valuation.totalItems}</div></div>
       <div class="kpi-card"><div class="kpi-label">Valeur du stock</div><div class="kpi-value mono">${fmt(valuation.totalValue)}</div><div class="kpi-sub">GNF</div></div>
       <div class="kpi-card"><div class="kpi-label">Sous seuil minimum</div><div class="kpi-value mono">${valuation.belowMinimum}</div></div>
     </div>
-    <div id="st-tabs" style="margin:8px 0 12px;display:flex;flex-wrap:wrap;gap:6px">${STOCK_TABS.map(([k, t]) => `<button class="btn ${stockTab === k ? 'gold' : ''}" style="margin:0" onclick="setStockTab('${k}')">${t}</button>`).join('')}</div>
     <div data-stab="articles" class="panel">
       <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouvel article</h3>
       <div class="grid-2">
@@ -178,7 +178,7 @@ async function renderStock() {
       <div id="mv-msg"></div>
     </div>
     <div data-stab="transferts" class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Transfert entre les 2 entrepôts</h3>
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Entrepôts et transferts</h3>
       <div id="wh-box"></div>
       <div class="grid-2">
         <div><label>Article</label><select id="tf-item">${itemOptions}</select></div>
@@ -226,14 +226,14 @@ async function renderStock() {
   loadStockAlerts();
   loadStockReceipts();
 }
-const STOCK_TABS = [['articles', 'Articles'], ['entrees', 'Entrées'], ['sorties', 'Sorties'], ['inventaire', 'Inventaire'], ['rapports', 'Rapports']];
-const STOCK_PANELS = { articles: ['articles', 'alertes'], entrees: ['receptions'], sorties: ['mouvements'], inventaire: ['inventaire', 'transferts'] };
+const STOCK_TABS = [['articles', 'Articles', 'package'], ['entrepots', 'Entrepôts', 'building'], ['entrees', 'Entrées', 'download'], ['sorties', 'Sorties', 'upload'], ['inventaire', 'Inventaire', 'clipboard'], ['alertes', 'Alertes', 'alert'], ['rapports', 'Rapports', 'file']];
+const STOCK_PANELS = { articles: ['articles'], entrepots: ['transferts'], entrees: ['receptions', 'mouvements'], sorties: ['mouvements'], inventaire: ['inventaire'], alertes: ['alertes'] };
 let stockTab = 'articles';
 function setStockTab(k) { if (k === 'rapports') return go(reportsHome(state.user.role)); stockTab = k; applyStockTab(); }
 function applyStockTab() {
   document.querySelectorAll('[data-stab]').forEach((el) => { el.style.display = (STOCK_PANELS[stockTab] || []).includes(el.dataset.stab) ? '' : 'none'; });
   const bar = document.getElementById('st-tabs');
-  if (bar) bar.innerHTML = STOCK_TABS.map(([k, t]) => `<button class="btn ${stockTab === k ? 'gold' : ''}" style="margin:0" onclick="setStockTab('${k}')">${t}</button>`).join('');
+  if (bar) bar.innerHTML = syTabs(STOCK_TABS, stockTab, 'setStockTab');
 }
 async function loadStockAlerts() {
   const box = document.getElementById('st-alerts');

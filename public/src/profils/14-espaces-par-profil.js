@@ -49,13 +49,12 @@ const PROFILES = {
         ['Valorisation du stock', 'dash-stock', 'Valeur du stock (GNF).'],
       ] },
       { t: 'Ressources humaines', ic: 'users', subs: [
-        ['Personnel administratif', 'personnel', 'Comptes du personnel.', ['DIRECTEUR_GENERAL']],
+        ['Personnel et responsables', 'personnel', 'Comptes, invitations et dossier de chaque responsable.', ['DIRECTEUR_GENERAL']],
         ['Chauffeurs', 'drivers', 'Fiches chauffeurs.'],
         ['Mécaniciens', 'staff-mech', 'Mécaniciens et leurs rapports.'],
         ['Agents HSE', 'staff-hse', 'Agents HSE et leurs rapports.'],
         ['Gestionnaires de stock', 'staff-store', 'Magasiniers et leurs rapports.'],
-        ['Responsables', 'personnel', 'Responsables de départements.', ['DIRECTEUR_GENERAL']],
-        ['Dossiers individuels', 'personnel', 'Fiche de chaque employé.', ['DIRECTEUR_GENERAL']],
+        ['Pointeurs', 'staff-pointer', 'Pointeurs et leurs rapports.'],
       ] },
       { t: 'Comptabilité et dépenses', ic: 'receipt', subs: [
         ['Dépenses par département', 'compta', 'Dépenses validées et à valider.'],

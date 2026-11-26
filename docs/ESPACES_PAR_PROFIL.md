@@ -71,3 +71,14 @@ Le système existant (`/auth/photo` et l'éditeur de photo) n'a pas changé.
 - La photo est demandée à la première ouverture. Si la personne répond « Plus tard », elle est redemandée 3 jours après.
 - Elle s'affiche dans le bandeau de l'accueil.
 - Chez le responsable, elle s'affiche dans les listes du personnel et des chauffeurs : `photoUrl` est ajouté à `/staff` et `/drivers`.
+
+## Onglets de couleur (fichier 17)
+
+Le composant commun `syTabs(onglets, actif, fonction)` affiche les onglets. Seul l'onglet ouvert est chargé.
+- **Carburant** : Camions, Véhicules de service, Consommation totale, Nouveau ravitaillement, Historique et tarif.
+- **Stock** : Articles, Entrepôts, Entrées, Sorties, Inventaire, Alertes, Rapports.
+- **Ressources humaines** (DG, Logistique) : Personnel et responsables, Chauffeurs, Mécaniciens, Agents HSE, Gestionnaires de stock, Pointeurs. Chaque onglet ouvre son propre écran.
+
+## Recherche selon l'écran
+
+`GS_SCOPES` adapte la barre de recherche à l'écran ouvert. Dans le stock, elle ne cherche que les articles et les fournisseurs. Dans le carburant, uniquement les véhicules. Dans les ressources humaines, uniquement les chauffeurs. Ailleurs, la recherche reste générale.
