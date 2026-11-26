@@ -29,7 +29,11 @@ const check = (name, cond, extra) => { if (cond) { ok++; console.log('  ✓ ' + 
   const who = (await page.textContent('#side-name').catch(() => '')) || '';
   check('nom de l\'utilisateur affiché dans le menu', who.trim().length > 1 && who.trim() !== '—', who);
 
-  const views = await page.$$eval('.nav-item[data-view]', (els) => els.filter((e) => e.offsetParent !== null).map((e) => e.dataset.view));
+  // Menu classique (éléments visibles) + menu « espaces par profil » (dossiers repliés : on prend toutes les rubriques)
+  const views = await page.evaluate(() => [...new Set([
+    ...[...document.querySelectorAll('.nav-item[data-view]')].filter((e) => e.offsetParent !== null).map((e) => e.dataset.view),
+    ...[...document.querySelectorAll('#prof-nav .pf-nav-item[data-pv]')].map((e) => e.dataset.pv),
+  ])].filter((v) => v && v.charAt(0) !== '#'));
   check('le menu propose au moins 5 écrans', views.length >= 5, String(views.length));
   console.log('UI — parcours de ' + views.length + ' écrans');
   for (const v of views) {
