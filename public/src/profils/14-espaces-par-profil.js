@@ -421,7 +421,7 @@ titles['prof-home'] = 'Accueil';
 }; }
 { const _goP = go; go = function (view) {
   if (PROF.key && /^prof-f-\d+$/.test(view)) titles[view] = (+view.slice(7) + 1) + '. ' + profCur().folders[+view.slice(7)].t;
-  if (PROF.key && window._profEntering && ['home', 'dashboard', 'espace', 'espace-logi', 'dash-commercial'].includes(view)) view = 'prof-home';
+  if (PROF.key && window._profEntering && ['home', 'dashboard', 'espace', 'espace-logi', 'dash-commercial', 'caisse', 'pointage'].includes(view)) view = 'prof-home';
   if (PROF.crumb && PROF.crumb.view !== view) PROF.crumb = null;
   const r = _goP.apply(this, [view].concat([].slice.call(arguments, 1)));
   try { profNavActive(view); if (PROF.key && typeof dgMenuClose === 'function') dgMenuClose(); } catch (e) {}
@@ -434,8 +434,8 @@ titles['prof-home'] = 'Accueil';
 { const _arP = applyRoleNav; applyRoleNav = function () { const r = _arP.apply(this, arguments); profApply(); return r; }; }
 { const _beP = bottomEntries; bottomEntries = function (role) {
   if (!profKey(role)) return _beP(role);
-  const rep = { DG: 'daily', LOGI: 'reports-truck', STOCK: 'reports-stock', MECA: 'my-report', HSE: 'my-report', OPS: 'ops-validation', COMPTA: 'compta', COMMERCIAL: 'dash-commercial' }[profKey(role)];
-  return [[PROF_IC('home'), 'Accueil', 'prof-home'], [PROF_IC('archive'), 'Dossiers', '#dossiers'], [PROF_IC('file'), profKey(role) === 'MECA' || profKey(role) === 'HSE' ? 'Mon rapport' : 'Rapports', rep], [PROF_IC('user'), 'Profil', '#profil']];
+  const rep = { DG: 'daily', LOGI: 'reports-truck', STOCK: 'reports-stock', MECA: 'my-report', HSE: 'my-report', OPS: 'ops-validation', COMPTA: 'compta', COMMERCIAL: 'dash-commercial', CAISSE: 'my-report', POINTAGE: 'my-report' }[profKey(role)];
+  return [[PROF_IC('home'), 'Accueil', 'prof-home'], [PROF_IC('archive'), 'Dossiers', '#dossiers'], [PROF_IC('file'), ['MECA', 'HSE', 'CAISSE', 'POINTAGE'].includes(profKey(role)) ? 'Mon rapport' : 'Rapports', rep], [PROF_IC('user'), 'Profil', '#profil']];
 }; }
 { const _bgP = bottomGo; bottomGo = function (v) {
   if (v === '#dossiers') { setTimeout(() => { const s = document.getElementById('sidebar'); if (s) s.classList.add('open'); const sc = document.getElementById('side-scrim'); if (sc) sc.classList.add('on'); }, 0); return; } // après le clic (sinon le menu se referme aussitôt)
@@ -450,17 +450,16 @@ function drvNextAction(me) {
   if (act) return 'Mission en cours : à l\'arrivée, appuyez sur « ' + (v.type === 'TRUCK' ? 'Arrêt de la journée' : 'Arrivée') + ' ».';
   return 'Démarrez votre mission, puis enregistrez vos pleins et dépenses avec la photo du reçu.';
 }
-function drvRubriquesHtml(me) {
+function drvRubriquesHtml(me) { // seulement ce qui n'est pas déjà à l'écran (boutons, fiche, missions, barre du bas)
   const tid = me && me.activeTrip ? esc(me.activeTrip.id) : '', v = me && me.vehicle;
-  const R = [['map-pin', 'Ma mission', "drvOpenMissions()"], ['truck', 'Mon véhicule', "drvTab('maint')"], ['clipboard', 'Mon rapport journalier', "drvTab('sheet')"], ['fuel', 'Carburant', "drvTab('fuel')"],
-    ['alert', 'Signaler une panne', v ? `drvFaultForm('${tid}')` : ''], ['shield', 'Signaler un incident', v ? `drvIncidentForm('${tid}')` : ''], ['file', 'Mes documents', "drvTab('profile')"],
-    ['clock', 'Mon historique', 'drvMissionHistory()'], ['user', 'Mon profil', "drvTab('profile')"], ['message', 'Aide et assistance', 'openReportProblem()']];
-  return `<div class="drv-card pf-drv"><h4>${PROF_IC('archive')} Mes rubriques</h4><div class="pf-drv-grid">${R.map((r, i) => `<button ${r[2] ? `onclick="${r[2]}"` : 'disabled'}><span class="pf-num">${i + 1}</span>${PROF_IC(r[0])}<b>${r[1]}</b></button>`).join('')}</div></div>`;
+  const R = [['truck', 'Mon véhicule', 'Entretiens et état du véhicule', "drvTab('maint')"], ['shield', 'Signaler un incident', 'Accident, vol, conflit, danger', v ? `drvIncidentForm('${tid}')` : ''],
+    ['file', 'Mes documents', 'Permis et pièces du véhicule', "drvTab('profile')"], ['message', 'Aide et assistance', 'Écrire à la hiérarchie', 'openReportProblem()']];
+  return `<div class="drv-card pf-drv"><h4>${PROF_IC('archive')} Autres rubriques</h4>${R.map((r) => `<button class="pf-drv-row" ${r[3] ? `onclick="${r[3]}"` : 'disabled'}>${PROF_IC(r[0])}<span><b>${r[1]}</b><small>${r[2]}</small></span>${PROF_IC('chevron-right')}</button>`).join('')}</div>`;
 }
 function drvOpenMissions() { const d = document.querySelector('#drv-root details'); if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
 { const _dhP = drvHomeHtml; drvHomeHtml = function (me) {
   const h = _dhP(me);
-  const i = h.indexOf('<div class="drv-card" id="drv-fiche">');
+  const i = h.indexOf('<div class="drv-sync">');
   return i > 0 ? h.slice(0, i) + drvRubriquesHtml(me) + h.slice(i) : h + drvRubriquesHtml(me);
 }; }
 { const _dpP = drvHomeHtml; drvHomeHtml = function (me) { // prochaine action juste sous la salutation

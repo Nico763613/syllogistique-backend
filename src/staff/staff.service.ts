@@ -47,7 +47,7 @@ export class StaffService {
     const since = new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10);
     const reps = await this.prisma.staffReport.findMany({ where: { userId: { in: users.map((u) => u.id) }, date: { gte: since } }, select: { userId: true, date: true } });
     return users.map((u) => ({
-      id: u.id, firstName: u.firstName, lastName: u.lastName, phone: u.phone, role: u.role.name, status: u.status,
+      id: u.id, firstName: u.firstName, lastName: u.lastName, phone: u.phone, role: u.role.name, status: u.status, photoUrl: u.photoUrl ?? null,
       neverConnected: u.mustChangePassword, lastLoginAt: u.lastLoginAt,
       lastReport: reps.filter((r) => r.userId === u.id).map((r) => r.date).sort().pop() ?? null,
     }));

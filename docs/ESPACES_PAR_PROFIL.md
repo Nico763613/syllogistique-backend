@@ -48,3 +48,26 @@ Tous les responsables (DG, Logistique, Stock, Mécanicien, HSE, Opérations, Com
 Les données viennent uniquement du serveur (`profDash(clé)`). Quand une donnée manque, l'écran affiche « — » ou « Pas encore de données ». Aucun chiffre n'est inventé.
 
 Pour ajouter un profil : déclarer `PROFILES.CLE`, puis ajouter un bloc `if (key === 'CLE')` dans `profDash`.
+
+## Caissier et pointeur
+
+Ils ont la même maquette graphique que les autres responsables (fichier 15) : `PROFILES.CAISSE` et `PROFILES.POINTAGE`.
+
+## Chauffeur : même design, sans graphique (fichier 16)
+
+L'accueil du chauffeur contient, dans l'ordre :
+- le bandeau (photo, nom, date, état) ;
+- la prochaine action et le véhicule ;
+- les gros boutons ;
+- « Ma journée », en 4 étapes ;
+- la fiche du jour et les autres rubriques ;
+- les notifications et le bandeau des valeurs.
+
+La fiche de bord commence par les étapes de la journée et un sommaire classé, avec le nombre de saisies par rubrique. Chaque formulaire indique ce qui vient ensuite, et un message de confirmation rappelle l'étape suivante.
+
+## Photo de profil
+
+Le système existant (`/auth/photo` et l'éditeur de photo) n'a pas changé.
+- La photo est demandée à la première ouverture. Si la personne répond « Plus tard », elle est redemandée 3 jours après.
+- Elle s'affiche dans le bandeau de l'accueil.
+- Chez le responsable, elle s'affiche dans les listes du personnel et des chauffeurs : `photoUrl` est ajouté à `/staff` et `/drivers`.

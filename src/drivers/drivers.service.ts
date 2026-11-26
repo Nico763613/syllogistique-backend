@@ -16,12 +16,17 @@ export class DriversService {
       });
   }
 
-  findAll(siteId?: string) {
-    return this.prisma.driver.findMany({
+  async findAll(siteId?: string) {
+    const drivers = await this.prisma.driver.findMany({
       where: { deletedAt: null, ...(siteId ? { siteId } : {}) },
       include: { vehicles: { select: { id: true, internalNumber: true, registrationNumber: true } } },
       orderBy: { lastName: 'asc' },
     });
+    // Photo de profil : celle que le chauffeur a choisie sur son téléphone (compte lié), sinon celle de la fiche
+    const ids = drivers.map((d) => d.userId).filter((x): x is string => !!x);
+    const photos = ids.length ? await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, photoUrl: true } }) : [];
+    const byUser = new Map(photos.map((u) => [u.id, u.photoUrl]));
+    return drivers.map((d) => ({ ...d, photoUrl: (d.userId && byUser.get(d.userId)) || d.photoUrl || null }));
   }
 
   async findOne(id: string) {
