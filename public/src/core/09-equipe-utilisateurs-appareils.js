@@ -631,22 +631,57 @@ async function installApp() {
   }
   installHelp();
 }
+const INSTALL_CUR = isIOS ? 'ios' : isAndroid ? 'android' : 'pc';
+const INSTALL_NAME = { android: 'Android', ios: 'iPhone / iPad', pc: 'Ordinateur (Windows, Mac)' };
 function installHelp() {
   const old = document.getElementById('install-help'); if (old) old.remove();
   const ov = document.createElement('div'); ov.id = 'install-help';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1500;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:16px;';
-  const url = location.href.split('#')[0];
-  const step = (n, t) => `<div class="step"><b class="n">${n}</b><span>${t}</span></div>`;
-  const me = inAppBrowser ? `<div class="msg err" style="margin-top:0">Vous êtes dans un navigateur intégré (WhatsApp, Facebook…) : l'installation n'y fonctionne pas.<br><b>Copiez le lien, puis ouvrez-le dans ${isIOS ? 'Safari' : 'Chrome'}.</b>
-      <div style="margin-top:8px"><button class="btn small" onclick="installCopy()"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Copier le lien</button></div></div>` : '';
-  const android = `<h4><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Android (téléphone ou tablette)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b>.')}${step(2, 'Appuyez sur le menu <b>⋮</b> (en haut à droite).')}${step(3, 'Choisissez <b>« Installer l\'application »</b> ou <b>« Ajouter à l\'écran d\'accueil »</b>, puis confirmez.')}`;
-  const ios = `<h4><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> iPhone / iPad</h4>${step(1, 'Ouvrez le lien dans <b>Safari</b> (pas dans WhatsApp ni Chrome).')}${step(2, 'Appuyez sur <b>Partager</b> (le carré avec une flèche vers le haut).')}${step(3, 'Faites défiler et choisissez <b>« Sur l\'écran d\'accueil »</b>, puis <b>Ajouter</b>.')}`;
-  const pc = `<h4><svg class="ic" aria-hidden="true"><use href="#i-settings"/></svg> Ordinateur (Windows, Mac, Linux)</h4>${step(1, 'Ouvrez le lien dans <b>Chrome</b> ou <b>Edge</b>.')}${step(2, 'Cliquez sur l\'icône <b>Installer</b> (un écran avec une flèche) à droite de la barre d\'adresse.')}${step(3, 'Cliquez sur <b>Installer</b> : l\'application s\'ouvre dans sa propre fenêtre.')}`;
-  const order = isIOS ? [ios, android, pc] : isAndroid ? [android, ios, pc] : [pc, android, ios];
-  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;margin:20px auto;"><h3 style="margin-top:0"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Installer l'application</h3>${me}${order.join('')}
-    <div class="desc" style="margin-top:12px">Une fois installée, l'application s'ouvre comme une application normale et garde vos saisies hors connexion.</div>
-    <div style="margin-top:12px"><button class="btn gold" onclick="document.getElementById('install-help').remove()">Fermer</button></div></div>`;
+  const kinds = ['android', 'ios', 'pc'].sort((a, b) => (b === INSTALL_CUR ? 1 : 0) - (a === INSTALL_CUR ? 1 : 0));
+  const btns = kinds.map((k) => `<button class="btn ${k === INSTALL_CUR ? 'gold' : ''}" style="width:100%;margin:6px 0;min-height:54px;text-align:left;font-size:16px" onclick="installPick('${k}')"><svg class="ic" aria-hidden="true"><use href="#${k === 'pc' ? 'i-settings' : 'i-phone'}"/></svg> ${INSTALL_NAME[k]}${k === INSTALL_CUR ? ' — cet appareil' : ''}</button>`).join('');
+  ov.innerHTML = `<div class="panel" style="max-width:460px;width:100%;margin:20px auto;"><h3 style="margin-top:0"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Installer l'application</h3>
+    <div class="desc" style="margin:0 0 6px">Touchez votre appareil :</div>${btns}<div id="install-steps" style="margin-top:10px"></div>
+    <div style="margin-top:12px"><button class="btn" onclick="document.getElementById('install-help').remove()">Fermer</button></div></div>`;
   document.body.appendChild(ov);
+}
+function installShareBtn() { return `<div style="margin-top:8px"><button class="btn small gold" onclick="installShare()"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Envoyer le lien (WhatsApp…)</button> <button class="btn small" onclick="installCopy()">Copier le lien</button></div>`; }
+async function installShare() {
+  const url = location.href.split('#')[0];
+  try { if (navigator.share) { await navigator.share({ title: 'SYL LOGISTIQUE', url }); return; } } catch (e) { return; }
+  window.open('https://wa.me/?text=' + encodeURIComponent(url), '_blank');
+}
+async function installPick(k) {
+  const box = document.getElementById('install-steps'); if (!box) return;
+  const step = (n, t) => `<div class="step"><b class="n">${n}</b><span>${t}</span></div>`;
+  const msg = (t, cls) => { box.innerHTML = `<div class="msg ${cls || ''}" style="margin:0">${t}</div>`; };
+  if (k !== INSTALL_CUR) {
+    msg(`Vous êtes sur un autre type d'appareil. Ouvrez ce lien sur votre <b>${INSTALL_NAME[k]}</b> : envoyez-le-vous par WhatsApp ou copiez-le.` + installShareBtn());
+    return;
+  }
+  if (isStandalone) { msg('L\'application est déjà installée sur cet appareil.'); return; }
+  if (k === 'ios') {
+    box.innerHTML = (inAppBrowser ? `<div class="msg err" style="margin:0 0 8px">Vous êtes dans WhatsApp ou un autre navigateur intégré. Copiez le lien puis ouvrez-le dans <b>Safari</b>.` + installShareBtn() + '</div>' : '')
+      + `<div class="desc" style="margin:0 0 6px">Apple ne permet pas l'installation automatique : 3 gestes suffisent.</div>`
+      + step(1, 'Ouvrez le lien dans <b>Safari</b>.') + step(2, 'Touchez <b>Partager</b> (le carré avec une flèche vers le haut).') + step(3, 'Choisissez <b>« Sur l\'écran d\'accueil »</b>, puis <b>Ajouter</b>.');
+    return;
+  }
+  if (inAppBrowser && k === 'android') {
+    const intent = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=https;package=com.android.chrome;end';
+    box.innerHTML = `<div class="msg err" style="margin:0 0 8px">Vous êtes dans WhatsApp ou un autre navigateur intégré : l'installation n'y marche pas.</div><a class="btn gold" style="display:block;text-align:center;text-decoration:none" href="${intent}">Ouvrir dans Chrome</a>` + installShareBtn();
+    return;
+  }
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const r = await deferredInstallPrompt.userChoice.catch(() => null);
+    deferredInstallPrompt = null;
+    if (r && r.outcome === 'accepted') { installBtns(false); msg('Installation lancée. L\'icône apparaît sur votre écran.'); }
+    else msg('Installation annulée. Touchez de nouveau pour réessayer.');
+    return;
+  }
+  // Le navigateur n'a pas (encore) proposé l'installation automatique : geste manuel, très court
+  box.innerHTML = `<div class="desc" style="margin:0 0 6px">Votre navigateur n'a pas proposé l'installation automatique. Faites ceci :</div>`
+    + (k === 'android' ? step(1, 'Ouvrez le lien dans <b>Chrome</b>, touchez le menu <b>⋮</b> (en haut à droite).') + step(2, 'Choisissez <b>« Installer l\'application »</b> (ou « Ajouter à l\'écran d\'accueil »), puis confirmez.')
+      : step(1, 'Ouvrez le lien dans <b>Chrome</b> ou <b>Edge</b>.') + step(2, 'Cliquez sur l\'icône <b>Installer</b> à droite de la barre d\'adresse, puis <b>Installer</b>.'));
 }
 async function installCopy() {
   const url = location.href.split('#')[0];
