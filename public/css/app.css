@@ -113,8 +113,8 @@
   /* Téléphone : l'en-tête reste dans l'écran (cloche et profil visibles), recherche sur sa propre ligne, chiffres sans débordement. */
   @media(max-width:700px){
     .topbar{flex-wrap:wrap; gap:6px 8px;}
-    .topbar > div:first-child{flex:1 1 0; min-width:0;}
-    .topbar h2{font-size:16px; line-height:1.25; min-width:0; flex:1 1 0; overflow-wrap:break-word;}
+    .topbar > div:first-child{flex:1 1 0; min-width:0; flex-wrap:wrap; row-gap:4px;}
+    .topbar h2{font-size:16px; line-height:1.25; min-width:0; flex:1 1 100%; width:100%; overflow-wrap:break-word;}
     #space-label{display:none !important;}
     #top-logo{height:26px !important; margin-right:6px !important;}
     .topbar > div[style*="margin-left:auto"]{margin-right:0 !important;}
