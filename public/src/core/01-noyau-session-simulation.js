@@ -3,6 +3,26 @@
    Consomme l'API SYLLOGISTIQUE (NestJS + Prisma + PostgreSQL)
    ============================================================ */
 
+/* ---- Plusieurs espaces sur un même téléphone ----
+   Chaque espace installé (Chauffeurs, Logistique, Commercial, Stock…) a son lien « ?espace=… ». Les applications installées d'un même site
+   partagent le stockage du téléphone : sans séparation, se connecter dans l'une déconnectait l'autre. Ici la session (jetons, utilisateur,
+   site actif, données chauffeur) est rangée sous une clé propre à l'espace. Sans « ?espace », rien ne change (comportement habituel). */
+(function () {
+  try {
+    const q = new URLSearchParams(location.search).get('espace');
+    if (q && /^[a-z]{2,20}$/.test(q)) sessionStorage.setItem('syl_ns', q);
+    const ns = sessionStorage.getItem('syl_ns');
+    if (!ns) return;
+    const tag = '@' + ns;
+    const own = (k) => typeof k === 'string' && /^syllo_(access_token|refresh_token|user|site_id|drv_)/.test(k) && !/@[a-z]+$/.test(k);
+    const map = (k) => (own(k) ? k + tag : k);
+    const P = Storage.prototype, g = P.getItem, st = P.setItem, rm = P.removeItem;
+    P.getItem = function (k) { return g.call(this, this === localStorage ? map(k) : k); };
+    P.setItem = function (k, v) { return st.call(this, this === localStorage ? map(k) : k, v); };
+    P.removeItem = function (k) { return rm.call(this, this === localStorage ? map(k) : k); };
+  } catch (e) {}
+})();
+
 const state = {
   apiUrl: localStorage.getItem('syllo_api_url') || '',
   accessToken: localStorage.getItem('syllo_access_token') || '',

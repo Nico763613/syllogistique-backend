@@ -113,8 +113,8 @@
   /* Téléphone : l'en-tête reste dans l'écran (cloche et profil visibles), recherche sur sa propre ligne, chiffres sans débordement. */
   @media(max-width:700px){
     .topbar{flex-wrap:wrap; gap:6px 8px;}
-    .topbar > div:first-child{flex:1 1 0; min-width:0;}
-    .topbar h2{font-size:16px; line-height:1.25; min-width:0; flex:1 1 0; overflow-wrap:break-word;}
+    .topbar > div:first-child{flex:1 1 0; min-width:0; flex-wrap:wrap; row-gap:4px;}
+    .topbar h2{font-size:16px; line-height:1.25; min-width:0; flex:1 1 100%; width:100%; overflow-wrap:break-word;}
     #space-label{display:none !important;}
     #top-logo{height:26px !important; margin-right:6px !important;}
     .topbar > div[style*="margin-left:auto"]{margin-right:0 !important;}
@@ -223,11 +223,11 @@
   .drv-card h4{margin:0 0 6px; font-size:14px; color:var(--navy);}
   .drv-row{display:flex; justify-content:space-between; gap:10px; font-size:14px; padding:4px 0; border-bottom:1px dashed var(--line);} .drv-row:last-child{border-bottom:none;}
   .drv-row span:first-child{color:var(--muted);}
-  .dp-tabs{display:flex; gap:4px; overflow-x:auto; border-bottom:2px solid var(--line); margin:0 0 12px; -webkit-overflow-scrolling:touch;}
-  .dp-tabs button{flex:none; min-height:48px; padding:0 16px; border:0; background:none; font:inherit; font-weight:600; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-2px; cursor:pointer; white-space:nowrap;}
+  .dp-tabs{display:flex; flex-wrap:wrap; gap:2px 4px; border-bottom:2px solid var(--line); margin:0 0 10px;}
+  .dp-tabs button{flex:none; min-height:38px; padding:0 11px; font-size:13px; border:0; background:none; font:inherit; font-weight:600; color:var(--muted); border-bottom:3px solid transparent; margin-bottom:-2px; cursor:pointer; white-space:nowrap;}
   .dp-tabs button.on{color:var(--blue); border-bottom-color:var(--blue);}
   .dp-sub{display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px;}
-  .dp-sub button{min-height:44px; padding:0 14px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; font-weight:600; color:var(--navy); cursor:pointer;}
+  .dp-sub button{min-height:34px; padding:0 11px; font-size:13px; border-radius:8px; border:1px solid var(--line); background:#fff; font:inherit; font-weight:600; color:var(--navy); cursor:pointer;}
   .dp-sub button.on{background:var(--blue); border-color:var(--blue); color:#fff;}
   #report-fab{position:fixed; right:12px; bottom:12px; z-index:900; display:flex; align-items:center; gap:6px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--navy); font-size:12px; font-weight:600; box-shadow:var(--shadow); cursor:pointer;}
   #report-fab .ic{color:var(--warn,#B7791F);}

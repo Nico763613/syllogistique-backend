@@ -427,7 +427,7 @@ function flStyle() {
   if (document.getElementById('fl-style')) return;
   const st = document.createElement('style'); st.id = 'fl-style';
   st.textContent = `
-  .fl-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.fl-tabs .tab{border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:600;font-size:14px;padding:9px 16px;border-radius:10px;cursor:pointer}
+  .fl-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.fl-tabs .tab{border:1px solid var(--line);background:#fff;color:var(--navy);font-weight:600;font-size:13px;padding:6px 12px;border-radius:9px;cursor:pointer}
   .fl-tabs .tab.on{background:var(--navy);color:#fff;border-color:var(--navy)}.fl-tabs .sp{flex:1}
   .fl-filters{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}.fl-filters input,.fl-filters select{max-width:300px;margin:0}
   .fl-watch{background:#FFF8E6;border:1px solid #F0DDA8;border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#7A5A00}.fl-watch b{color:#5E4400}.fl-watch div{padding:2px 0}

@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>SYL LOGISTIQUE — Gestion Logistique &amp; Flotte</title>
 <link rel="manifest" href="manifest.json">
+<script>/* Choisit tout de suite le manifeste de l'espace (avant que le navigateur évalue l'installation) */
+(function(){try{var S=['chauffeurs','logistique','operations','hse','stock','dg','comptabilite','commercial','caisse','atelier','pointage','achats'];var q=new URLSearchParams(location.search).get('espace');var k=q||localStorage.getItem('syllo_icon_space');if(k&&S.indexOf(k)>=0)document.querySelector('link[rel="manifest"]').setAttribute('href','manifest-'+k+'.json');}catch(e){}})();</script>
 <meta name="theme-color" content="#1F3A5F">
 <link rel="icon" href="icon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="icon-192.png" sizes="192x192" type="image/png">
