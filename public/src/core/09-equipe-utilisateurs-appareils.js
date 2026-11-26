@@ -612,11 +612,15 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfor
 const isAndroid = /Android/i.test(navigator.userAgent);
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
 // Navigateur intégré (WhatsApp, Facebook…) : l'installation n'y est pas possible, il faut ouvrir le lien dans Chrome ou Safari
-const inAppBrowser = /; wv\)|FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(navigator.userAgent) || (isIOS && !/Safari\//.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent));
+// Lien ouvert depuis WhatsApp, Messenger, Facebook… : Chrome l'affiche dans un onglet intégré (croix en haut à gauche) où l'installation est impossible.
+// Ces onglets ne se reconnaissent que par leur origine « android-app:// » : on la mémorise pour la durée de l'onglet.
+const fromApp = (() => { try { if (/^android-app:\/\//.test(document.referrer)) sessionStorage.setItem('syl_fromapp', '1'); return sessionStorage.getItem('syl_fromapp') === '1'; } catch (e) { return false; } })();
+const inAppBrowser = (isAndroid && !isStandalone && fromApp) || /; wv\)|FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(navigator.userAgent) || (isIOS && !/Safari\//.test(navigator.userAgent) && !/CriOS|FxiOS|EdgiOS/.test(navigator.userAgent));
 function installBtns(show) {
   ['install-btn', 'install-btn-login'].forEach((id) => {
     const b = document.getElementById(id); if (!b) return;
     b.style.display = show ? (id === 'install-btn' ? 'inline-flex' : 'block') : 'none';
+    if (id === 'install-btn-login') { const n = document.getElementById('install-note'); if (n) { n.style.display = show && inAppBrowser ? 'block' : 'none'; n.innerHTML = 'Pour installer : touchez <b>⋮</b> en haut à droite, puis <b>« Ouvrir dans Chrome »</b>.'; } }
     if (show) b.innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> ' + (id === 'install-btn' ? 'Installer l\'application' : 'Installer l\'application sur cet appareil');
   });
 }
@@ -667,7 +671,9 @@ async function installPick(k) {
   }
   if (inAppBrowser && k === 'android') {
     const intent = 'intent://' + location.host + location.pathname + location.search + '#Intent;scheme=https;package=com.android.chrome;end';
-    box.innerHTML = `<div class="msg err" style="margin:0 0 8px">Vous êtes dans WhatsApp ou un autre navigateur intégré : l'installation n'y marche pas.</div><a class="btn gold" style="display:block;text-align:center;text-decoration:none" href="${intent}">Ouvrir dans Chrome</a>` + installShareBtn();
+    box.innerHTML = `<div class="msg err" style="margin:0 0 8px"><b>L'installation est impossible ici</b> : vous êtes dans le navigateur d'une autre application (WhatsApp, Messenger, Facebook…).</div>
+      <a class="btn gold" style="display:block;text-align:center;text-decoration:none;min-height:50px;line-height:50px;padding:0" href="${intent}">Ouvrir dans Chrome</a>
+      <div class="desc" style="margin:10px 0 6px">Si le bouton ne réagit pas :</div>` + step(1, 'Touchez <b>⋮</b> (trois points, en haut à droite de l\'écran).') + step(2, 'Choisissez <b>« Ouvrir dans Chrome »</b>.') + step(3, 'Dans Chrome, touchez de nouveau <b>« Installer l\'application »</b>.');
     return;
   }
   if (deferredInstallPrompt) {
