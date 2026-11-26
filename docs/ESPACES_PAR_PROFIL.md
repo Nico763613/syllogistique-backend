@@ -32,3 +32,19 @@ Le filtrage par rôle de chaque rubrique est un confort d'affichage. La sécurit
 
 ## Ajouter une rubrique
 Dans `PROFILES`, ajouter `['Libellé', 'vue', 'aide', ['ROLE_OPTIONNEL']]`. Vue `null` = bientôt. Vues spéciales : `#stock-in`, `#stock-out`, `#history`, `#alerts`.
+
+## Tableau de bord graphique (modèle unique)
+
+Fichier : `public/src/profils/15-tableau-de-bord-graphique.js`.
+
+Tous les responsables (DG, Logistique, Stock, Mécanicien, HSE, Opérations, Comptabilité, Commercial) ont le même accueil :
+- un bandeau avec la photo du camion, le nom, la date et la mention « En service » ;
+- 4 cartes résumé, chacune avec son bouton d'action ;
+- « Mes actions rapides » ;
+- « Ma performance » : un anneau en %, trois contrôles et une courbe ;
+- une carte métier, un graphique en barres (la valeur la plus haute est en doré) et les notifications ;
+- le bandeau des valeurs.
+
+Les données viennent uniquement du serveur (`profDash(clé)`). Quand une donnée manque, l'écran affiche « — » ou « Pas encore de données ». Aucun chiffre n'est inventé.
+
+Pour ajouter un profil : déclarer `PROFILES.CLE`, puis ajouter un bloc `if (key === 'CLE')` dans `profDash`.

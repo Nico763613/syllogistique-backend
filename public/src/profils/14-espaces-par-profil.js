@@ -421,7 +421,7 @@ titles['prof-home'] = 'Accueil';
 }; }
 { const _goP = go; go = function (view) {
   if (PROF.key && /^prof-f-\d+$/.test(view)) titles[view] = (+view.slice(7) + 1) + '. ' + profCur().folders[+view.slice(7)].t;
-  if (PROF.key && window._profEntering && ['home', 'dashboard', 'espace', 'espace-logi'].includes(view)) view = 'prof-home';
+  if (PROF.key && window._profEntering && ['home', 'dashboard', 'espace', 'espace-logi', 'dash-commercial'].includes(view)) view = 'prof-home';
   if (PROF.crumb && PROF.crumb.view !== view) PROF.crumb = null;
   const r = _goP.apply(this, [view].concat([].slice.call(arguments, 1)));
   try { profNavActive(view); if (PROF.key && typeof dgMenuClose === 'function') dgMenuClose(); } catch (e) {}
@@ -434,7 +434,7 @@ titles['prof-home'] = 'Accueil';
 { const _arP = applyRoleNav; applyRoleNav = function () { const r = _arP.apply(this, arguments); profApply(); return r; }; }
 { const _beP = bottomEntries; bottomEntries = function (role) {
   if (!profKey(role)) return _beP(role);
-  const rep = { DG: 'daily', LOGI: 'reports-truck', STOCK: 'reports-stock', MECA: 'my-report', HSE: 'my-report' }[profKey(role)];
+  const rep = { DG: 'daily', LOGI: 'reports-truck', STOCK: 'reports-stock', MECA: 'my-report', HSE: 'my-report', OPS: 'ops-validation', COMPTA: 'compta', COMMERCIAL: 'dash-commercial' }[profKey(role)];
   return [[PROF_IC('home'), 'Accueil', 'prof-home'], [PROF_IC('archive'), 'Dossiers', '#dossiers'], [PROF_IC('file'), profKey(role) === 'MECA' || profKey(role) === 'HSE' ? 'Mon rapport' : 'Rapports', rep], [PROF_IC('user'), 'Profil', '#profil']];
 }; }
 { const _bgP = bottomGo; bottomGo = function (v) {
