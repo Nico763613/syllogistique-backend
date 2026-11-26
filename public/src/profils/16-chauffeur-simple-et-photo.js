@@ -119,7 +119,10 @@ function personAv(first, last, photo, size) {
   return photo ? `<img class="p-av" src="${esc(photo)}" alt="" style="width:${size}px;height:${size}px">` : `<span class="p-av ini" style="width:${size}px;height:${size}px;font-size:${Math.round(size * 0.38)}px">${esc(ini)}</span>`;
 }
 function photoAskShow() {
-  const u = state.user; if (!u || u.photoUrl || document.getElementById('photo-ask')) return;
+  const u = state.user; if (!u || u.photoUrl || document.getElementById('photo-ask') || navigator.webdriver) return;
+  // seulement sur l'accueil, jamais par-dessus un formulaire en cours
+  const onHome = u.role === 'CHAUFFEUR' ? (typeof DRV !== 'undefined' && DRV.tab === 'missions' && !document.getElementById('drv-sheet')) : ['prof-home', 'home', 'dashboard', 'espace'].includes(state.view);
+  if (!onHome) return;
   let later = 0; try { later = +localStorage.getItem('syl_photo_later_' + u.id) || 0; } catch (e) {}
   if (later && Date.now() - later < 3 * 864e5) return; // redemander après 3 jours
   const d = document.createElement('div'); d.id = 'photo-ask';
