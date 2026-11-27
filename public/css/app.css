@@ -540,3 +540,31 @@ button.pf-tile{cursor:pointer;}button.pf-tile:hover{border-color:var(--navy-soft
 .sy-tabs-t svg{width:18px;height:18px;color:var(--gold)}
 @media (max-width:600px){.sy-tab{padding:9px 12px;font-size:.82rem}}
 @media (max-width:600px){.st-kpis{grid-template-columns:repeat(3,1fr);gap:8px}.st-kpis .kpi-card{padding:10px}.st-kpis .kpi-value{font-size:1.05rem}.st-kpis .kpi-label{font-size:.72rem}}
+
+/* Ajout d'un chauffeur : choix du type, puis champs du permis */
+.drv-type{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 14px}
+.drv-type-b{display:flex;align-items:center;gap:10px;padding:14px;border:1.5px solid var(--line);border-radius:12px;background:var(--offwhite);color:var(--navy);font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.drv-type-b .ic{width:22px;height:22px}
+.drv-type-b.on{border-color:var(--gold);background:var(--info-bg);box-shadow:inset 0 0 0 1px var(--gold)}
+@media (max-width:600px){.drv-type{grid-template-columns:1fr}}
+
+/* Dossiers chauffeurs : dossiers par chauffeur, fiche du jour, archives */
+.p-link{background:none;border:0;padding:0;font:inherit;color:var(--navy);cursor:pointer;text-align:left}
+.p-link:hover b{text-decoration:underline}
+.drv-folders{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-top:10px}
+.drv-folder{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid var(--line);border-left:4px solid var(--gold);border-radius:12px;background:var(--offwhite);color:var(--navy);font:inherit;text-align:left;cursor:pointer}
+.drv-folder>span{flex:1;display:flex;flex-direction:column;gap:2px}
+.drv-folder small{color:var(--muted);font-size:.8rem}
+.drv-folder:hover{border-color:var(--gold)}
+.drv-id{display:flex;align-items:center;gap:14px;margin:12px 0}
+.arc-bar{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.arc-period{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin:8px 0}
+.arc-period>div{min-width:150px}
+.arc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:10px 0}
+.arc-kpis>div{background:var(--info-bg);border-radius:10px;padding:10px;text-align:center}
+.arc-kpis b{display:block;font-size:1.05rem;color:var(--navy)}
+.arc-kpis span{font-size:.78rem;color:var(--muted)}
+.drv-sheet-ov{position:fixed;inset:0;background:rgba(20,30,50,.55);z-index:1000;display:flex;justify-content:center;align-items:flex-start;overflow:auto;padding:16px}
+.drv-sheet-box{max-width:720px;width:100%;margin:20px auto}
+.drv-sheet-box h4{margin:14px 0 4px;color:var(--navy)}
+@media (max-width:600px){.drv-sheet-ov{padding:0}.drv-sheet-box{margin:0;border-radius:0;min-height:100%}.arc-bar .btn{flex:1}}

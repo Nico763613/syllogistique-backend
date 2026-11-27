@@ -268,6 +268,21 @@ export class DriverAdminController {
     return this.sheets.board(actor.role === 'SUPER_ADMIN' ? siteId : actor.siteId ?? siteId, date);
   }
 
+  // Dossier « Rapports » d'un chauffeur : liste des fiches journalières (lecture seule, DG inclus)
+  @Get('drivers/:id/reports')
+  @Roles(...OPS, RoleName.LECTEUR)
+  driverReports(@Param('id') id: string, @Query('from') from: string | undefined, @Query('to') to: string | undefined, @CurrentUser() actor: any) {
+    return this.sheets.reportsOf(id, from, to, ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'].includes(actor.role) ? undefined : actor.siteId);
+  }
+
+  // Fiche journalière complète d'un chauffeur (lecture seule, ne vaut pas accusé de réception)
+  @Get('drivers/:id/sheet')
+  @Roles(...OPS, RoleName.LECTEUR)
+  async driverSheet(@Param('id') id: string, @Query('date') date: string | undefined, @CurrentUser() actor: any) {
+    await this.sheets.assertSite(id, ['SUPER_ADMIN', 'DIRECTEUR_GENERAL'].includes(actor.role) ? undefined : actor.siteId);
+    return this.sheets.build(id, date);
+  }
+
   @Get('sheets')
   @Roles(...OPS)
   sheetsOfDay(@Query('date') date: string | undefined, @Query('siteId') siteId: string | undefined, @CurrentUser() actor: any) {

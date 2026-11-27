@@ -313,7 +313,8 @@ async function editLicense(id, current) {
   try { await api('/drivers/' + id, { method: 'PATCH', body: { licenseNumber: v.trim() } }); renderDrivers(); } catch (e) { alert(e.message); }
 }
 window.DRVF = window.DRVF || 'ALL';
-function setDrvFilter(f) { window.DRVF = f; renderDrivers(); }
+function setDrvFilter(f) { window.DRVF = f; window._drvOpen = null; renderDrivers(); }
+function setDrvSub(k) { window.DRVSUB = k; window._drvOpen = null; renderDrivers(); }
 async function signupDecide(id, what) {
   try { await api('/driver-signup/' + id + '/' + what, { method: 'POST' }); bellToast(what === 'approve' ? 'Fiche chauffeur créée. Utilisez « Inviter » pour envoyer le QR d\'accès.' : 'Demande refusée.'); renderDrivers(); } catch (e) { alert(e.message); }
 }
@@ -343,51 +344,73 @@ async function renderDrivers() {
   window._drivers = all;
   // Véhicule ou camion affecté : repris de la fiche du véhicule (une seule source)
   const vehOf = {}; vehicles.forEach(v => { if (v.assignedDriver) (vehOf[v.assignedDriver.id] = vehOf[v.assignedDriver.id] || []).push(v); });
-  const cnt = { ALL: all.length, TRUCK: all.filter(d => d.activity === 'TRUCK').length, SERVICE_VEHICLE: all.filter(d => d.activity === 'SERVICE_VEHICLE').length };
-  const list = window.DRVF === 'ALL' ? all : all.filter(d => d.activity === window.DRVF);
+  const cnt = { TRUCK: all.filter(d => d.activity === 'TRUCK').length, SERVICE_VEHICLE: all.filter(d => d.activity === 'SERVICE_VEHICLE').length };
+  if (!['TRUCK', 'SERVICE_VEHICLE', 'ADD', 'ARCH'].includes(window.DRVF)) window.DRVF = 'TRUCK';
+  window._drvVehOf = vehOf; window._drvAll = all;
+  const tab = window.DRVF, isTruck = tab === 'TRUCK';
+  const list = all.filter(d => d.activity === tab);
   const permis = (d) => {
     if (!d.licenseExpiryDate) return '—';
     const days = Math.ceil((new Date(d.licenseExpiryDate) - Date.now()) / 86400000), dt = new Date(d.licenseExpiryDate).toLocaleDateString('fr-FR');
     return days < 0 ? `<span class="badge bad">Expiré ${dt}</span>` : days <= 30 ? `<span class="badge warn">${dt} (${days} j)</span>` : dt;
   };
+  const veh = (d) => vehOf[d.id] || [];
   const rows = list.map(d => `
-    <tr><td><span class="p-name">${personAv(d.firstName, d.lastName, d.photoUrl, 32)}<span><b>${esc(d.lastName)}</b> ${esc(d.firstName)}</span></span></td><td>${esc(d.phone || '—')}</td><td>${d.activity === 'TRUCK' ? '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camion' : d.activity === 'SERVICE_VEHICLE' ? '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicule de service' : '—'}</td>
-    <td>${(vehOf[d.id] || []).map(v => esc(v.internalNumber + ' — ' + v.registrationNumber)).join('<br>') || '—'}</td>
-    <td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" onclick="editLicense('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button></td>
-    <td>${permis(d)}${d.licensePhotoUrl ? ` <a href="${esc(brandSrc(d.licensePhotoUrl))}" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="#i-camera"/></svg> photo</a>` : ''}</td>
+    <tr><td><button class="p-name p-link" title="Ouvrir le dossier du chauffeur" onclick="drvRepOpen('${esc(d.id)}')">${personAv(d.firstName, d.lastName, d.photoUrl, 32)}<b>${esc(d.lastName)}</b></button></td><td>${esc(d.firstName)}</td><td>${esc(d.phone || '—')}</td>
+    <td>${veh(d).map(v => esc(v.internalNumber || '—')).join('<br>') || '<span class="badge warn">Non attribué</span>'}</td>
+    <td>${veh(d).map(v => `<b>${esc(v.registrationNumber || '—')}</b>`).join('<br>') || '—'}</td>
+    <td>${esc(d.licenseNumber || '—')}${d.licenseCategory ? ' (' + esc(d.licenseCategory) + ')' : ''} <button class="btn small" aria-label="Modifier le permis" onclick="editLicense('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg></button><div style="font-size:12px">${permis(d)}${d.licensePhotoUrl ? ` <a href="${esc(brandSrc(d.licensePhotoUrl))}" target="_blank" rel="noopener">photo</a>` : ''}</div></td>
     <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td>
-    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans cette liste.</td></tr>`;
-  const chip = (f, l) => `<button class="btn small ${window.DRVF === f ? 'gold' : ''}" onclick="setDrvFilter('${f}')">${l} (${cnt[f]})</button>`;
+    <td><button class="btn small" onclick="editDriver('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans ce dossier.</td></tr>`;
 
   const signups = await api('/driver-signup').catch(() => []);
+  const tabs = syTabs([['TRUCK', `Chauffeurs camion (${cnt.TRUCK})`, 'truck'], ['SERVICE_VEHICLE', `Chauffeurs véhicule de service (${cnt.SERVICE_VEHICLE})`, 'car'], ['ADD', 'Ajouter un chauffeur', 'plus'], ['ARCH', 'Archives', 'archive']], tab, 'setDrvFilter');
+  const sub = window.DRVSUB === 'rep' ? 'rep' : 'list';
+  const addForm = `<div class="panel">
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un chauffeur</h3>
+      <div class="desc">Remplissez l'identité, puis choisissez le type de chauffeur : les champs du permis s'ouvrent ensuite.</div>
+      <div class="grid-2">
+        <div><label>Nom</label><input id="d-last" /></div>
+        <div><label>Prénom</label><input id="d-first" /></div>
+        <div><label>Téléphone (WhatsApp)</label><input id="d-phone" type="tel" placeholder="6xx xx xx xx" /></div>
+      </div>
+      <label style="margin-top:10px">Type de chauffeur</label>
+      <input type="hidden" id="d-act" value="" />
+      <div class="drv-type" role="radiogroup">
+        <button type="button" class="drv-type-b" data-v="TRUCK" role="radio" aria-checked="false" onclick="drvPickType('TRUCK')"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><span>Chauffeur camion</span></button>
+        <button type="button" class="drv-type-b" data-v="SERVICE_VEHICLE" role="radio" aria-checked="false" onclick="drvPickType('SERVICE_VEHICLE')"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg><span>Chauffeur véhicule de service</span></button>
+      </div>
+      <div id="d-more" style="display:none">
+        <div class="grid-2">
+          <div><label>N° de permis</label><input id="d-license" /></div>
+          <div><label>Catégorie du permis</label><input id="d-cat" placeholder="B, C, D…" /></div>
+          <div><label>Expiration du permis</label><input id="d-exp" type="date" /></div>
+        </div>
+        <button class="btn gold" onclick="createDriver()">Enregistrer</button>
+      </div>
+      <div id="d-msg"></div>
+    </div>`;
   root().innerHTML = `
     ${signups.length ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Demandes d'inscription (${signups.length})</h3><div class="desc">Chauffeurs qui se sont inscrits eux-mêmes. Approuvez pour créer la fiche, puis utilisez « Inviter » pour leur remettre le QR d'accès.</div>
       <div class="table-wrap"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Activité</th><th>Date</th><th></th></tr></thead><tbody>${signups.map((s) => `<tr><td><b>${esc(s.lastName)}</b> ${esc(s.firstName)}</td><td>${esc(s.phone)}</td><td>${s.activity === 'TRUCK' ? 'Camion' : s.activity === 'SERVICE_VEHICLE' ? 'Véhicule de service' : '—'}</td><td>${esc(new Date(s.createdAt).toLocaleDateString('fr-FR'))}</td>
         <td><button class="btn small" onclick="signupDecide('${esc(s.id)}','approve')">Approuver</button> <button class="btn small ghost" onclick="signupDecide('${esc(s.id)}','reject')">Refuser</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}
-    <div class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un chauffeur</h3>
-      <div class="grid-2">
-        <div><label>Prénom</label><input id="d-first" /></div>
-        <div><label>Nom</label><input id="d-last" /></div>
-        <div><label>Téléphone (WhatsApp)</label><input id="d-phone" /></div>
-        <div><label>Activité</label><select id="d-act"><option value="TRUCK">Chauffeur de camion (sites / transport)</option><option value="SERVICE_VEHICLE">Chauffeur de véhicule de service</option></select></div>
-        <div><label>N° de permis</label><input id="d-license" /></div>
-        <div><label>Catégorie du permis</label><input id="d-cat" placeholder="B, C, D…" /></div>
-        <div><label>Expiration du permis</label><input id="d-exp" type="date" /></div>
-      </div>
-      <button class="btn gold" onclick="createDriver()">Enregistrer</button>
-      <div id="d-msg"></div>
-    </div>
-    <div class="panel">
-      <h3>Chauffeurs — une seule base</h3>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${chip('ALL', 'Tous')}${chip('TRUCK', '<svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions')}${chip('SERVICE_VEHICLE', '<svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service')}</div>
-      <table><thead><tr><th>Nom et prénoms</th><th>Téléphone</th><th>Activité</th><th>Camion / véhicule</th><th>N° de permis</th><th>Expiration</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table>
-    </div>`;
+    ${tabs}
+    ${tab === 'ADD' ? addForm : tab === 'ARCH' ? '<div id="drv-arch"></div>' : syTabs([['list', 'Chauffeurs', 'users'], ['rep', 'Rapports', 'file']], sub, 'setDrvSub') + (sub === 'rep' ? '<div id="drv-rep"></div>' : `<div class="panel">
+      <h3>${isTruck ? 'Chauffeurs camion' : 'Chauffeurs véhicule de service'}</h3>
+      <div class="table-wrap"><table><thead><tr><th>Nom</th><th>Prénom</th><th>Téléphone</th><th>${isTruck ? 'Camion attribué' : 'Véhicule attribué'}</th><th>N° de plaque</th><th>Permis</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    </div>`)}`;
+  if (tab === 'ARCH') drvArchRender(); else if (tab !== 'ADD' && sub === 'rep') drvRepRender();
+}
+function drvPickType(v) {
+  const h = document.getElementById('d-act'); if (h) h.value = v;
+  document.querySelectorAll('.drv-type-b').forEach((b) => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+  const m = document.getElementById('d-more'); if (m) m.style.display = '';
 }
 async function createDriver() {
   const msg = document.getElementById('d-msg');
   try {
-    await api('/drivers', { method: 'POST', body: {
+    if (!document.getElementById('d-act').value) throw new Error('Choisissez le type de chauffeur.');
+    const created = await api('/drivers', { method: 'POST', body: {
       siteId: state.siteId,
       firstName: document.getElementById('d-first').value,
       lastName: document.getElementById('d-last').value,
@@ -397,8 +420,7 @@ async function createDriver() {
       licenseCategory: document.getElementById('d-cat').value.trim() || undefined,
       licenseExpiryDate: document.getElementById('d-exp').value || undefined,
     }});
-    msg.innerHTML = '<div class="msg ok">Chauffeur ajouté.</div>';
-    renderDrivers();
+    drvAddedPanel(created || {}, document.getElementById('d-act').value);
   } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 
