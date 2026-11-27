@@ -73,3 +73,12 @@
 
 ## 2026-11-27 — Accès plateforme pour créer une entreprise
 - Décision : POST /platform/organizations, protégé par la variable PLATFORM_ADMIN_KEY (comparaison en temps constant, 5 essais/minute). Sans la variable, la route répond « introuvable ».
+
+## 2026-11-27 — Synchronisation : déduplication stricte et modification partielle
+- **Décision** : une opération synchronisée n'est ignorée comme « déjà traitée » que si le même appareil renvoie exactement la même opération avec le même contenu. Une fiche existante est mise à jour avec les seuls champs envoyés (plus d'« upsert » exigeant tous les champs). Le champ `version` ne peut jamais venir du téléphone.
+- **Raison** : les tests ont montré qu'une 2e modification de la même fiche (ou une opération sans identifiant d'appareil) était perdue sans message, et qu'une modification partielle faite hors ligne était rejetée.
+- **Risque accepté** : la comparaison porte sur les 20 derniers envois réussis de l'appareil pour cette fiche ; au-delà, un renvoi très ancien serait rejoué (sans danger pour une mise à jour, la version empêche l'écrasement d'autrui).
+
+## 2026-11-27 — Accès plateforme : clé vérifiée avant tout
+- **Décision** : la clé `x-platform-key` est contrôlée par un garde qui passe avant la validation du contenu.
+- **Raison** : sans clé, aucune information (même un message de validation) ne doit être renvoyée.
