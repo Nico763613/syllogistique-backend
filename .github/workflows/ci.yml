@@ -107,6 +107,11 @@ jobs:
       - run: sleep 61
       - name: Tests multi-entreprises et multi-sites
         run: node scripts/functional6.js
+      - run: sleep 61
+      - name: Recette des 15 profils (droits de consultation vérifiés côté serveur)
+        run: |
+          node scripts/profils15.js
+          cat profils15-matrice.md
       - run: node scripts/smoke.js
       - name: Migrations — historique, retour arrière puis réapplication
         run: |
