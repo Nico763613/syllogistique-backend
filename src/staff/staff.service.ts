@@ -1,3 +1,4 @@
+import { accountStateCache } from '../auth/account-state';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcrypt';
@@ -84,6 +85,7 @@ export class StaffService {
     const u = await this.managed(id, actorRole);
     if (u.id === actor.userId) throw new BadRequestException('Vous ne pouvez pas modifier votre propre compte ici.');
     await this.prisma.user.update({ where: { id }, data: { status: status as any, ...(status !== 'ACTIVE' ? { refreshTokenHash: null } : {}) } });
+    accountStateCache.forget(id);
     await this.audit.log({ userId: actor.userId, action: 'UPDATE', entity: 'User', entityId: id, oldValue: { status: u.status }, newValue: { status } });
     return { id, status };
   }

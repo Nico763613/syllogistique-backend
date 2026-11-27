@@ -1,3 +1,4 @@
+import { accountStateCache } from './account-state';
 import { Injectable, UnauthorizedException, BadRequestException, ForbiddenException, HttpException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
@@ -101,6 +102,7 @@ export class AuthService {
     const u = await this.prisma.user.findUnique({ where: { id: inv.userId } });
     if (!u || u.status !== 'ACTIVE' || u.deletedAt) throw new BadRequestException('Compte indisponible. Contactez votre responsable.');
     await this.prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(password, 10), mustChangePassword: false, refreshTokenHash: null } });
+    accountStateCache.forget(u.id);
     await consumeInvitation(this.prisma, inv.id);
     await this.audit.log({ userId: u.id, action: 'UPDATE', entity: 'User', entityId: u.id, newValue: { invitation: 'acceptée' } });
     return { ok: true, login: u.phone || u.email };
@@ -241,6 +243,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 10);
     await this.prisma.user.update({ where: { id: userId }, data: { passwordHash, mustChangePassword: false, refreshTokenHash: null } });
+    accountStateCache.forget(userId);
 
     await this.audit.log({
       userId,

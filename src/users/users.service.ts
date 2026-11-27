@@ -1,3 +1,4 @@
+import { accountStateCache } from '../auth/account-state';
 import { canManageRole, hierarchyMessage } from '../common/hierarchy';
 import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
@@ -108,6 +109,7 @@ export class UsersService {
       },
       include: { role: true },
     });
+    accountStateCache.forget(id);
 
     await this.audit.log({
       userId: actorId,
@@ -124,6 +126,7 @@ export class UsersService {
 
   async remove(id: string, actorId: string) {
     await this.prisma.user.update({ where: { id }, data: { deletedAt: new Date(), status: 'DISABLED', refreshTokenHash: null } });
+    accountStateCache.forget(id);
     await this.audit.log({ userId: actorId, action: 'DELETE', entity: 'User', entityId: id });
     return { success: true };
   }
@@ -135,7 +138,9 @@ export class UsersService {
     if (!user) throw new NotFoundException('Utilisateur introuvable.');
     this.assertCanManage(actorRole, user.role?.name);
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await this.prisma.user.update({ where: { id }, data: { passwordHash, refreshTokenHash: null } });
+    // Mot de passe donné par l'administrateur : l'utilisateur devra le changer à sa prochaine connexion
+    await this.prisma.user.update({ where: { id }, data: { passwordHash, refreshTokenHash: null, mustChangePassword: true } });
+    accountStateCache.forget(id);
     await this.audit.log({ userId: actorId, action: 'UPDATE', entity: 'User', entityId: id, newValue: { passwordReset: true } });
     return { message: 'Mot de passe réinitialisé. Communiquez-le à l\'utilisateur et demandez-lui de le changer.' };
   }
