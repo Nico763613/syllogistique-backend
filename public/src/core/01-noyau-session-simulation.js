@@ -62,7 +62,9 @@ async function refreshSession() {
 }
 async function api(path, options = {}, retried = false) {
   if (state.demo) return demoApi(path, options);
-  const res = await apiFetch(path, options);
+  let res;
+  try { res = await apiFetch(path, options); }
+  catch (e) { if (e instanceof TypeError) { const t = new TypeError('Pas de connexion au serveur : vérifiez votre réseau.'); t.cause = e; throw t; } throw e; }
   const out = await apiHandle(res, path, options, retried);
   // Enregistrement réussi : le brouillon de l'écran n'a plus lieu d'être
   if (options.method && options.method !== 'GET' && !path.startsWith('/auth') && typeof draftKey === 'function') { try { localStorage.removeItem(draftKey()); } catch (e) {} }
@@ -89,6 +91,54 @@ async function apiFetch(path, options) {
   }
   throw new TypeError(navigator.onLine ? 'Le serveur met quelques secondes à se réveiller. Patientez puis touchez « Actualiser » ou rechargez la page.' : 'Pas de connexion internet. Vérifiez votre réseau puis réessayez.');
 }
+/* Messages du serveur : tout ce qui arrive en anglais est traduit en français simple */
+const FR_FIELDS = { email: 'l\'e-mail', password: 'le mot de passe', phone: 'le téléphone', firstName: 'le prénom', lastName: 'le nom', name: 'le nom', amount: 'le montant', quantity: 'la quantité', date: 'la date', siteId: 'le site', vehicleId: 'le véhicule', driverId: 'le chauffeur', itemId: 'l\'article', role: 'la fonction', licenseNumber: 'le numéro de permis', registrationNumber: 'la plaque', mileage: 'le kilométrage', liters: 'les litres', quantityLiters: 'les litres', price: 'le prix', description: 'la description', reason: 'le motif', code: 'le code', status: 'le statut' };
+function frField(f) { return FR_FIELDS[f] || ('le champ « ' + f + ' »'); }
+function frErr(m, status) {
+  m = String(m || '').trim();
+  const byStatus = { 400: 'Les informations envoyées ne sont pas valides.', 401: 'Session expirée : reconnectez-vous.', 403: 'Vous n\'avez pas le droit de faire cette action.', 404: 'Élément introuvable.', 409: 'Cet élément existe déjà.', 413: 'Le fichier est trop lourd.', 429: 'Trop de tentatives : patientez une minute puis réessayez.', 500: 'Erreur du serveur : réessayez dans un instant.', 502: 'Le serveur redémarre : réessayez dans une minute.', 503: 'Le serveur est momentanément indisponible : réessayez dans une minute.', 504: 'Le serveur met trop de temps à répondre : réessayez.' };
+  if (!m) return byStatus[status] || 'Une erreur est survenue.';
+  if (/[àâçéèêëîïôûùüÿœ]/i.test(m) || /^(Le |La |Les |Un |Une |Ce |Cet |Cette |Vous |Aucun|Impossible|Pas |Session|Fiche|Chauffeur|Article|Compte|Code|Mot de passe)/.test(m)) return m; // déjà en français
+  const R = [
+    [/^Forbidden resource$|^Forbidden$/i, () => byStatus[403]],
+    [/^Unauthorized$/i, () => byStatus[401]],
+    [/^Not Found$|^Cannot (GET|POST|PUT|PATCH|DELETE) /i, () => byStatus[404]],
+    [/^Bad Request$/i, () => byStatus[400]],
+    [/^Conflict$/i, () => byStatus[409]],
+    [/^Internal server error$/i, () => byStatus[500]],
+    [/^Too Many Requests|ThrottlerException/i, () => byStatus[429]],
+    [/^Payload Too Large|request entity too large/i, () => byStatus[413]],
+    [/^Service Unavailable|Bad Gateway|Gateway Timeout/i, () => byStatus[503]],
+    [/^Failed to fetch|NetworkError|Load failed/i, () => 'Pas de connexion au serveur : vérifiez votre réseau.'],
+    [/^Invalid credentials$/i, () => 'Identifiant ou mot de passe incorrect.'],
+    [/^property (\w+) should not exist$/i, (x) => frField(x[1]) + ' n\'est pas attendu ici.'],
+    [/^(\w+) should not be empty$/i, (x) => 'Remplissez ' + frField(x[1]) + '.'],
+    [/^(\w+) must be an email$/i, () => 'L\'adresse e-mail n\'est pas valide.'],
+    [/^(\w+) must be a string$/i, (x) => frField(x[1]) + ' doit être un texte.'],
+    [/^(\w+) must be a (number|int|integer).*$|^(\w+) must be an integer number$/i, (x) => frField(x[1] || x[3]) + ' doit être un nombre.'],
+    [/^(\w+) must not be less than (\S+)$/i, (x) => frField(x[1]) + ' doit être au moins ' + x[2] + '.'],
+    [/^(\w+) must not be greater than (\S+)$/i, (x) => frField(x[1]) + ' ne doit pas dépasser ' + x[2] + '.'],
+    [/^(\w+) must be (a )?positive number$/i, (x) => frField(x[1]) + ' doit être supérieur à zéro.'],
+    [/^(\w+) must be longer than or equal to (\d+) characters$/i, (x) => frField(x[1]) + ' doit contenir au moins ' + x[2] + ' caractères.'],
+    [/^(\w+) must be shorter than or equal to (\d+) characters$/i, (x) => frField(x[1]) + ' doit contenir au plus ' + x[2] + ' caractères.'],
+    [/^(\w+) must be a valid ISO 8601 date string$|^(\w+) must be a Date instance$/i, (x) => frField(x[1] || x[2]) + ' doit être une date valide.'],
+    [/^(\w+) must be one of the following values: (.*)$/i, (x) => frField(x[1]) + ' n\'a pas une valeur autorisée.'],
+    [/^(\w+) must be a boolean value$/i, (x) => frField(x[1]) + ' doit être oui ou non.'],
+    [/^(\w+) must be a UUID$|^(\w+) must be a mongodb id$/i, (x) => frField(x[1] || x[2]) + ' n\'est pas valide.'],
+    [/^(\w+) must be an array$/i, (x) => frField(x[1]) + ' doit être une liste.'],
+    [/^(\w+) must be a valid phone number$/i, () => 'Le numéro de téléphone n\'est pas valide.'],
+    [/must match .* regular expression$/i, () => 'Le format saisi n\'est pas valide.'],
+    [/Unique constraint failed/i, () => byStatus[409]],
+    [/Record to (update|delete) not found|No .* found/i, () => byStatus[404]],
+    [/Foreign key constraint/i, () => 'Cet élément est lié à d\'autres données et ne peut pas être modifié ainsi.'],
+    [/timeout|timed out/i, () => byStatus[504]],
+  ];
+  const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
+  for (const [re, f] of R) { const x = m.match(re); if (x) return cap(f(x)); }
+  // Message anglais non reconnu : on n'affiche pas d'anglais, seulement un message clair selon le type d'erreur
+  if (/^[\x20-\x7E]+$/.test(m) && /\b(the|is|must|should|not|invalid|failed|error|cannot|required|found|already|exists)\b/i.test(m)) return byStatus[status] || 'Une erreur est survenue.';
+  return m;
+}
 async function apiHandle(res, path, options, retried) {
   if (res.status === 401 && !retried && !path.startsWith('/auth/')) {
     const rs = await refreshSession();
@@ -100,7 +150,8 @@ async function apiHandle(res, path, options, retried) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     if (res.status === 402 && String(err.code || '').startsWith('LICENSE_')) { licScreen(err.code.slice(8), err.message); }
-    const ex = new Error(Array.isArray(err.message) ? err.message.join(', ') : err.message || 'Erreur API'); ex.code = err.code; throw ex;
+    const raw = Array.isArray(err.message) ? err.message : [err.message || err.error || ''];
+    const ex = new Error([...new Set(raw.map((m) => frErr(m, res.status)))].join(' ')); ex.code = err.code; throw ex;
   }
   const ct = res.headers.get('content-type') || '';
   return ct.includes('application/json') ? res.json() : res.blob();
