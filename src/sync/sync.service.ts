@@ -26,7 +26,7 @@ const ENTITY_MODELS: Record<string, keyof PrismaService> = {
 // Champs que le client hors ligne n'a JAMAIS le droit d'écrire : ils ne changent que par les flux métier
 // (stock via mouvements, facturation via factures, périmètre via le site de l'utilisateur).
 const PROTECTED_FIELDS: Record<string, string[]> = {
-  _all: ['organizationId', 'siteId'],
+  _all: ['organizationId', 'siteId', 'version'],
   Trip: ['billedInvoiceId', 'createdById', 'reference'],
   InventoryItem: ['currentQuantity'],
   StockMovement: ['createdById'],
@@ -185,11 +185,15 @@ export class SyncService {
               }
             }
 
-            const created = await model.upsert({
-              where: { id: op.entityId },
-              create: { id: op.entityId, ...safePayload },
-              update: { ...safePayload },
-            });
+            // Fiche existante : simple mise à jour des seuls champs envoyés (une modification partielle
+            // faite hors ligne ne doit pas exiger tous les champs obligatoires d'une création).
+            const created = existingRecord
+              ? await model.update({ where: { id: op.entityId }, data: { ...safePayload } })
+              : await model.upsert({
+                  where: { id: op.entityId },
+                  create: { id: op.entityId, ...safePayload },
+                  update: { ...safePayload },
+                });
             serverId = created.id;
 
             if (op.entity === 'StockMovement' && !existingRecord && op.operation === 'CREATE') {

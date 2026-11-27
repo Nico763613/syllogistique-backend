@@ -67,7 +67,7 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   r = await api('POST', '/customers', { siteId: SITE_A, name: 'Client A ' + n, phone: '621' + n }, tA); const custA = r.d && r.d.id; ok(!!custA, 'client de A', r);
   r = await api('POST', '/inventory/items', { siteId: SITE_A, sku: 'M6A-' + n, name: 'Article A ' + n, unit: 'pièce', unitPrice: 700, salePrice: 1000 }, tA); const itemA = r.d && r.d.id; ok(!!itemA, 'article de A', r);
   r = await api('POST', '/inventory/items', { siteId: SITE_B1, sku: 'M6B-' + n, name: 'Article B ' + n, unit: 'pièce', unitPrice: 500 }, tB); const itemB = r.d && r.d.id; ok(!!itemB, 'article de B', r);
-  await api('POST', '/inventory/movements/in', { itemId: itemB, quantity: 10, reason: 'Stock initial test' }, tB);
+  r = await api('POST', '/inventory/movements/in', { itemId: itemB, siteId: SITE_B1, quantity: 10, reason: 'Stock initial test' }, tB); ok(is2(r), 'entrée de stock initiale de B', r);
 
   // ================= 2. Lectures croisées refusées =================
   for (const [p, label] of [['/vehicles/' + vehA, 'véhicule'], ['/customers/' + custA, 'client'], ['/inventory/items/' + itemA, 'article'], ['/vehicles/' + vehA + '/dossier', 'dossier du véhicule'], ['/vehicles/' + vehA + '/assignments', 'affectations du véhicule']]) {
