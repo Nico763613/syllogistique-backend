@@ -41,3 +41,8 @@
 ## 2026-11-27 — Test automatique des circuits sur base réelle
 - Décision : scripts/functional4.js (droits par rôle, comptes du DG, circuit panne, circuit chauffeur jusqu'au paiement) ajouté à l'intégration continue.
 - Raison : prouver les circuits de bout en bout sur une vraie base PostgreSQL de test, sans toucher aux données réelles.
+
+## 2026-11-27 — Journal limité au domaine pour le stock et la flotte
+- Décision : GET /audit filtre côté serveur les entités lisibles par le gestionnaire de stock (stock, achats, besoins, fournisseurs) et le gestionnaire de flotte (véhicules, chauffeurs, carburant, maintenance, fiches, missions).
+- Raison : le test des droits a montré que le gestionnaire de stock pouvait lire tout le journal, y compris les comptes utilisateurs.
+- Risque accepté : un nouvel écran d'historique d'un autre domaine resterait vide pour ces rôles tant que la liste n'est pas complétée.

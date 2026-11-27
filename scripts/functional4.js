@@ -40,12 +40,12 @@ const is2 = (r) => r.s === 200 || r.s === 201;
 
   // --- Droits par rôle (échantillon de points sensibles)
   const M = [
-    ['GET', '/audit?limit=5', 'dg', 200], ['GET', '/audit?limit=5', 'chf', 403], ['GET', '/audit?limit=5', 'stock', 403],
+    ['GET', '/audit?limit=5', 'dg', 200], ['GET', '/audit?limit=5', 'chf', 403], ['GET', '/audit?limit=5&entities=User', 'stock', 403], ['GET', '/audit?limit=5&entities=StockMovement', 'stock', 200], ['GET', '/audit?limit=5&entity=User', 'flotte', 403],
     ['GET', '/driver-admin/sheets/pending', 'ops', 200], ['GET', '/driver-admin/sheets/pending', 'compta', 403], ['GET', '/driver-admin/sheets/pending', 'chf', 403],
     ['GET', '/driver-admin/expenses', 'compta', 200], ['GET', '/driver-admin/expenses', 'stock', 403],
     ['GET', '/hse/incidents', 'chf', 403], ['GET', '/users', 'chf', 403], ['GET', '/users', 'meca', 403],
   ];
-  for (const [m, p, who, want] of M) { r = await api(m, p, undefined, T[who]); ok(r.s === want, `${who} ${m} ${p.split('?')[0]} → ${want}`, r.s); }
+  for (const [m, p, who, want] of M) { r = await api(m, p, undefined, T[who]); ok(r.s === want, `${who} ${m} ${p} → ${want}`, r.s); }
   r = await api('POST', '/downtimes', { vehicleId: crypto.randomUUID(), reason: 'Essai' }, T.stock); ok(r.s === 403, 'le gestionnaire de stock ne déclare pas de panne → 403', r.s);
   r = await api('POST', '/users', { firstName: 'X', lastName: 'Y', email: `f4x${n}@test.gn`, password: PW, role: 'SUPER_ADMIN', siteId: SITE }, T.logi); ok(r.s === 403 || r.s === 400, 'le responsable logistique ne crée pas de Master Admin', r.s);
 
