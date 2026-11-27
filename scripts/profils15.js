@@ -66,7 +66,9 @@ const allowed = (e, role) => !e.roles || !e.roles.length || e.roles.includes(rol
   // ---------- 2. Un compte par profil ----------
   const n = Date.now().toString().slice(-7), PW = 'Test1234x';
   let logins = 0;
+  const CRED = {}; // identifiants finaux de chaque profil, pour se reconnecter quand le jeton (15 min) expire
   const login = async (email, password) => {
+    login.last = { email, password };
     if (logins && logins % 4 === 0) await pause('limite de connexions par minute');
     logins++;
     const r = await api('POST', '/auth/login', { email, password }); const d = r.d || {};
@@ -77,25 +79,36 @@ const allowed = (e, role) => !e.roles || !e.roles.length || e.roles.includes(rol
     return d.accessToken;
   };
   const T = { SUPER_ADMIN: await login('admin@syllogistique.local', 'ChangeMoi123!') };
+  CRED.SUPER_ADMIN = login.last;
   ok(!!T.SUPER_ADMIN, 'connexion Super administrateur');
   for (const role of ROLES.slice(1)) {
     const email = `p15${role.toLowerCase()}${n}@test.gn`;
     const r = await api('POST', '/users', { firstName: 'Profil', lastName: role, email, password: PW, role, siteId: SITE }, T.SUPER_ADMIN);
     ok(r.s === 201, `compte de test ${role} créé`, r);
     T[role] = await login(email, PW);
+    CRED[role] = login.last;
     ok(!!T[role], `connexion ${role}`);
   }
 
   // ---------- 3. Matrice : chaque écran × chaque profil ----------
   const rows = [];
-  let failles = 0, anomalies = 0;
+  let failles = 0, anomalies = 0, regles = 0;
   for (const e of EPS) {
     const cells = [];
     for (const role of ROLES) {
       if (!T[role]) { cells.push('—'); continue; }
-      const r = await api('GET', e.path, undefined, T[role]);
+      let r = await api('GET', e.path, undefined, T[role]);
+      if (r.s === 401) { // jeton expiré : on se reconnecte une fois, puis on refait la même demande
+        T[role] = await login(CRED[role].email, CRED[role].password); CRED[role] = login.last;
+        r = await api('GET', e.path, undefined, T[role]);
+      }
       const want = allowed(e, role);
       if (!want && r.s !== 403) { failles++; console.log(`✘ FAILLE : ${role} accède à ${e.path} (${r.s}) alors que le code le réserve à ${e.roles.join(', ')}`); cells.push(`**${r.s}!**`); }
+      else if (want && r.s === 403 && r.d && (r.d.code === 'DEVICE_BLOCKED' || /fiche chauffeur/.test(String(r.d.message || '')))) {
+        // Refus voulu par une règle métier, pas par le rôle : l'espace chauffeur exige un appareil activé
+        // (un seul appareil par chauffeur) et un compte lié à une fiche chauffeur. Ce circuit est testé ailleurs.
+        regles++; cells.push('appareil');
+      }
       else if (want && r.s === 403) { anomalies++; warns++; console.log(`⚠ à examiner : ${role} refusé sur ${e.path} (autorisé par @Roles)`); cells.push('403?'); }
       else cells.push(want ? (r.s >= 500 ? `${r.s}` : 'oui') : 'non');
       if (r.s >= 500) { console.log(`✘ erreur serveur ${r.s} : ${role} sur ${e.path}`); fails++; }
@@ -103,11 +116,25 @@ const allowed = (e, role) => !e.roles || !e.roles.length || e.roles.includes(rol
     rows.push(`| \`${e.path}\` | ${cells.join(' | ')} |`);
   }
   ok(failles === 0, `aucun profil n'accède à un écran qui ne lui est pas réservé (${EPS.length} écrans × ${ROLES.length} profils)`, failles);
+  console.log(`${regles} refus dus à une règle métier (appareil chauffeur non activé, compte sans fiche chauffeur).`);
   console.log(`${anomalies} refus à examiner (profil autorisé par le code mais refusé par le serveur).`);
+
+  // ---------- 4. Rapport de période : dates obligatoires et vérifiées ----------
+  {
+    T.SUPER_ADMIN = await login(CRED.SUPER_ADMIN.email, CRED.SUPER_ADMIN.password); // jeton neuf
+    let r = await api('GET', '/reports/period', undefined, T.SUPER_ADMIN);
+    ok(r.s === 400, 'rapport de période sans dates → 400 avec message clair (et non une erreur serveur)', r);
+    r = await api('GET', '/reports/period?from=2026-12-31&to=2026-01-01', undefined, T.SUPER_ADMIN);
+    ok(r.s === 400, 'rapport de période avec dates inversées → 400', r.s);
+    r = await api('GET', `/reports/period?siteId=${SITE}&from=2026-01-01&to=2026-12-31`, undefined, T.SUPER_ADMIN);
+    ok(r.s === 200, 'rapport de période avec dates valides → 200', r.s);
+    r = await api('GET', `/reports/period/export/pdf?siteId=${SITE}&from=2026-01-01&to=2026-12-31`, undefined, T.SUPER_ADMIN);
+    ok(r.s === 200, 'export PDF du rapport de période → 200', r.s);
+  }
 
   const abbr = { SUPER_ADMIN: 'SA', DIRECTEUR_GENERAL: 'DG', ADMIN_LOGISTIQUE: 'LOG', GESTIONNAIRE_FLOTTE: 'FLO', MAGASINIER: 'MAG', CHAUFFEUR: 'CHF', LECTEUR: 'LEC', RESPONSABLE_COMMERCIAL: 'COM', CAISSIER: 'CAI', GESTIONNAIRE_HSE: 'GHSE', AGENT_HSE: 'AHSE', MECANICIEN: 'MEC', POINTEUR: 'POI', COMPTABLE: 'CPT', RESPONSABLE_OPERATIONS: 'OPS' };
   const md = [`# Matrice des droits de consultation (15 profils) — résultat du serveur`, ``, `Généré par scripts/profils15.js le ${new Date().toISOString()} sur une base de test.`,
-    `« oui » = accès accordé et prévu ; « non » = refus (403) prévu ; « 403? » = refus alors que le code l'autorise ; « NNN! » = accès NON prévu (faille).`, ``,
+    `« oui » = accès accordé et prévu ; « non » = refus (403) prévu ; « 403? » = refus alors que le code l'autorise ; « NNN! » = accès NON prévu (faille) ; « appareil » = rôle autorisé mais refus voulu par la règle « un appareil activé par chauffeur ».`, ``,
     `| Écran | ${ROLES.map((r) => abbr[r]).join(' | ')} |`, `|---|${ROLES.map(() => '---').join('|')}|`, ...rows, ``,
     `Légende : ${ROLES.map((r) => `${abbr[r]} = ${r}`).join(', ')}.`].join('\n');
   fs.writeFileSync('profils15-matrice.md', md);
