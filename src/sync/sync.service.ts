@@ -82,15 +82,25 @@ export class SyncService {
         }
 
         // Déduplication : si cette opération (même client entityId + device) a déjà réussi, on l'ignore.
-        const alreadySynced = await this.prisma.syncQueueEntry.findFirst({
-          where: {
-            entity: op.entity,
-            entityId: op.entityId,
-            deviceId: op.deviceId,
-            status: 'SUCCESS',
-            id: { not: queueEntry.id },
-          },
-        });
+        // Seul un RENVOI à l'identique (même appareil, même opération, même contenu) est ignoré :
+        // sans identifiant d'appareil, ou avec un contenu différent, l'opération est bien traitée
+        // (sinon une 2e modification de la même fiche serait perdue sans prévenir).
+        const sameContent = (a: unknown) => JSON.stringify(a ?? null) === JSON.stringify(op.payload ?? null);
+        const alreadySynced = op.deviceId
+          ? (await this.prisma.syncQueueEntry.findMany({
+              where: {
+                entity: op.entity,
+                entityId: op.entityId,
+                deviceId: op.deviceId,
+                operation: op.operation,
+                status: 'SUCCESS',
+                id: { not: queueEntry.id },
+              },
+              select: { payload: true },
+              take: 20,
+              orderBy: { createdAt: 'desc' },
+            })).find((e: any) => sameContent(e.payload))
+          : undefined;
 
         // Conflit par numéro de version : une autre personne a modifié la fiche depuis la version connue
         // du client → rien n'est écrasé, la saisie est conservée pour arbitrage.

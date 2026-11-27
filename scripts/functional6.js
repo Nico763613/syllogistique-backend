@@ -128,9 +128,17 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   r = await api('POST', `/sync/conflicts/${conflictId}/resolve`, { choice: 'SERVEUR', note: 'Valeur du gestionnaire 1 confirmée' }, tA); ok(is2(r), 'le responsable arbitre : valeur du serveur conservée', r);
   r = await api('POST', `/sync/conflicts/${conflictId}/resolve`, { choice: 'SAISIE', note: 'double' }, tA); ok(refused(r), 'un conflit déjà arbitré ne peut pas l’être une 2e fois', r.s);
   r = await api('GET', '/vehicles/' + vehA, undefined, tA); const vNow = r.d && r.d.version;
-  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U2' } }] }, U2.accessToken);
-  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U1' } }] }, U1.accessToken);
+  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U2' }, deviceId: 'tel-u2-' + n }] }, U2.accessToken);
+  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U1' }, deviceId: 'tel-u1-' + n }] }, U1.accessToken);
   const res = r.d && (r.d.results || r.d)[0]; ok(res && res.status === 'CONFLICT' && res.conflictId, 'synchronisation hors ligne sur une version dépassée : conflit enregistré', res);
+  r = await api('GET', '/vehicles/' + vehA, undefined, tA); const vAfter = r.d && r.d.version;
+  ok(r.d && r.d.model === 'Hors ligne U2' && vAfter === vNow + 1, 'la modification hors ligne du gestionnaire 2 est appliquée (version +1)', r.d && [r.d.model, r.d.version]);
+  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U2' }, deviceId: 'tel-u2-' + n }] }, U2.accessToken);
+  r = await api('GET', '/vehicles/' + vehA, undefined, tA);
+  ok(r.d && r.d.version === vAfter, 'renvoi à l’identique du même appareil : ignoré, aucune double écriture', r.d && r.d.version);
+  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vAfter, payload: { model: 'Hors ligne U2 bis' }, deviceId: 'tel-u2-' + n }] }, U2.accessToken);
+  r = await api('GET', '/vehicles/' + vehA, undefined, tA);
+  ok(r.d && r.d.model === 'Hors ligne U2 bis', 'seconde modification différente du même appareil : bien appliquée (rien n’est perdu)', r.d && r.d.model);
 
   // ================= 5. Récupération du mot de passe par code =================
   await pause('limite de connexions par minute');
