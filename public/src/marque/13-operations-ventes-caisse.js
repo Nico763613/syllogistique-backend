@@ -534,7 +534,7 @@ function licScreen(stateName, message) {
     <p style="color:#4a5a70;font-size:14px">${esc(message || (act ? "Entrez le code d'activation reçu de votre fournisseur." : 'Accès suspendu. Contactez votre fournisseur.'))}</p>
     ${act ? `<input id="lic-code" placeholder="SYLL-XXXXX-XXXXX-XXXXX-XXXXX" autocapitalize="characters" autocomplete="off" style="width:100%;padding:12px;border:1px solid #cdd6e2;border-radius:6px;font-size:14px;text-align:center;margin-top:8px">
     <button class="btn gold" style="width:100%;margin-top:12px" onclick="licActivate()">Activer</button><div id="lic-msg" style="margin-top:10px"></div>` : `<button class="btn" style="width:100%;margin-top:12px" onclick="location.reload()">Réessayer</button>`}
-    <div class="powered">Powered by Syllogistique</div></div>`;
+    <div class="powered">Réalisé par Syllogistique</div></div>`;
   document.body.appendChild(ov);
 }
 async function licActivate() {
