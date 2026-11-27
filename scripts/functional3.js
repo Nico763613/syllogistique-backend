@@ -16,7 +16,11 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   tok = r.d && r.d.accessToken; const admin = tok; ok(!!admin, 'connexion administrateur');
   const mk = (role, tag) => api('POST', '/users', { firstName: 'Test', lastName: tag, email: `${tag}${n}@test.gn`, password: PW, role, siteId: SITE });
   const hseUser = await mk('AGENT_HSE', 'hse'); ok(hseUser.s === 201, 'création agent HSE'); ok((await mk('CHAUFFEUR', 'chf')).s === 201, 'création chauffeur (compte)');
-  const login = async (tag) => (await api('POST', '/auth/login', { email: `${tag}${n}@test.gn`, password: PW }, '')).d?.accessToken;
+  const login = async (tag) => {
+    const x = await api('POST', '/auth/login', { email: `${tag}${n}@test.gn`, password: PW }, ''); const t = x.d?.accessToken;
+    if (t && x.d.user?.mustChangePassword) await api('POST', '/auth/change-password', { currentPassword: PW, newPassword: PW + 'N' }, t);
+    return t;
+  };
   const hse = await login('hse'), chf = await login('chf'); ok(!!hse && !!chf, 'connexion agent HSE et chauffeur');
 
   // --- HSE

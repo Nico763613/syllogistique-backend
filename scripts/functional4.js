@@ -33,7 +33,10 @@ const is2 = (r) => r.s === 200 || r.s === 201;
   for (let i = 0; i < tags.length; i++) {
     if (i === 4) { console.log('… pause de 61 s (limite de connexions)'); await new Promise((res) => setTimeout(res, 61000)); }
     const x = await fetch(B + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: `f4${tags[i]}${n}@test.gn`, password: PW }) });
-    T[tags[i]] = (await x.json().catch(() => ({}))).accessToken;
+    const d = await x.json().catch(() => ({}));
+    T[tags[i]] = d.accessToken;
+    // Mot de passe provisoire (compte créé par un administrateur) : on le remplace d'abord.
+    if (d.accessToken && d.user && d.user.mustChangePassword) await fetch(B + '/auth/change-password', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + d.accessToken }, body: JSON.stringify({ currentPassword: PW, newPassword: PW + 'N' }) });
     if (!T[tags[i]]) console.log('   connexion impossible pour', tags[i], x.status);
   }
   ok(Object.values(T).every(Boolean), 'connexion de chaque compte de test');

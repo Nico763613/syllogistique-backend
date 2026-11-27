@@ -13,7 +13,16 @@ const api = async (method, path, body, ...rest) => {
   return { s: r.status, d: data };
 };
 const pause = () => { console.log('… pause de 61 s (limite de 5 connexions par minute)'); return new Promise((res) => setTimeout(res, 61000)); };
-const login = async (email, password) => { const r = await api('POST', '/auth/login', { email, password }, ''); return r.d || {}; };
+const changed = new Set();
+const login = async (email, password) => {
+  // Après le premier changement imposé, le compte de test utilise son mot de passe personnel.
+  const pass = changed.has(email) && password === PW ? PW + 'N' : password;
+  const r = await api('POST', '/auth/login', { email, password: pass }, ''); const d = r.d || {};
+  if (d.accessToken && d.user && d.user.mustChangePassword && pass === PW) {
+    await api('POST', '/auth/change-password', { currentPassword: PW, newPassword: PW + 'N' }, d.accessToken); changed.add(email);
+  }
+  return d;
+};
 const n = Date.now().toString().slice(-7), PW = 'Test1234x', now = new Date().toISOString();
 const is2 = (r) => r.s === 200 || r.s === 201;
 

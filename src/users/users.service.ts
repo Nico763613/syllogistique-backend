@@ -49,6 +49,8 @@ export class UsersService {
         email: dto.email,
         phone: dto.phone,
         passwordHash,
+        // Mot de passe fixé par un administrateur = provisoire : l'utilisateur doit le changer à sa première connexion.
+        mustChangePassword: true,
       },
       include: { role: true },
     });
