@@ -296,7 +296,7 @@ async function drvChangePw() {
 }
 async function drvTakeoverForm() {
   let list;
-  try { list = await api('/driver/vehicles'); } catch (e) { return alert(e.message.includes('Failed') || e instanceof TypeError ? 'Connexion nécessaire pour changer de véhicule.' : e.message); }
+  try { list = await api('/driver/vehicles'); } catch (e) { return alert(e instanceof TypeError ? 'Connexion nécessaire pour changer de véhicule.' : e.message); }
   drvSheet('Remplacement de chauffeur', `
     <label>Véhicule à reprendre</label><select id="t-veh">${list.filter((x) => !x.mine).map((x) => `<option value="${esc(x.id)}">${esc(x.plate)} · ${esc(x.label || x.number)}${x.currentDriver ? ' — actuellement ' + esc(x.currentDriver) : ''}</option>`).join('') || '<option value="">Aucun véhicule disponible</option>'}</select>
     <label>Motif du remplacement</label><select id="t-reason"><option value="MALADIE">Maladie du chauffeur</option><option value="CONGE">Congé</option><option value="AUTRE">Autre</option></select>
