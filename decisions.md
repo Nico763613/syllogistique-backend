@@ -51,3 +51,25 @@
 - Décision : (1) la base refuse l'accès par identifiant à un élément d'un autre site (contexte de requête + contrôle Prisma) ; (2) le site de l'utilisateur est réellement imposé dans les listes sans ?siteId (Express 5 recalculait req.query, l'ancienne affectation était perdue) ; (3) un compte suspendu ou supprimé perd l'accès en 20 s maximum ; (4) le changement du mot de passe provisoire est imposé par le serveur.
 - Raison : contrôle final de sécurité ; défauts prouvés par scripts/functional5.js sur base de test.
 - Risque accepté : les opérations dans une transaction Prisma ne passent pas par le contrôle par identifiant (elles restent protégées par les contrôles métier existants) ; cache d'état de compte de 20 s.
+
+## 2026-11-27 — Plateforme multi-entreprises : filtre central entreprise / site
+- Décision : un filtre unique (src/common/tenant-scope.ts) s'applique à toute requête Prisma d'un utilisateur connecté : lectures, comptages, modifications et suppressions groupées, créations (y compris imbriquées) et transactions. Toute référence donnée (véhicule, article, client…) doit appartenir au même périmètre. Une table non classée est refusée par défaut.
+- Décision : le Super administrateur est limité à SA propre entreprise (la supervision de toutes les entreprises reste dans la console Master, serveur séparé).
+- Décision : catégories de stock et types de maintenance sans entreprise = catalogue commun en lecture seule ; chaque entreprise modifie seulement les siennes.
+- Décision : requêtes SQL directes revues une à une (appareils, demandes de prix, paiements mobiles en attente, inscriptions chauffeur, numérotation, types de clients).
+- Raison : exigence « plateforme multi-entreprises et multi-sites sécurisée dès la conception ».
+- Risques acceptés : (1) numérotation des documents commune à la plateforme (réglable seulement par l'entreprise principale) — bloquant pour vendre la facturation à plusieurs entreprises sur un même serveur ; (2) inscriptions publiques de chauffeurs rattachées à l'entreprise principale ; (3) fichiers joints protégés par lien non devinable seulement.
+
+## 2026-11-27 — Conflits de synchronisation par numéro de version
+- Décision : 11 types de fiches portent un numéro de version. Une modification envoyée avec une version dépassée par la modification d'une AUTRE personne n'écrase rien : elle devient un conflit à arbitrer par un responsable (jamais par l'auteur, jamais par le DG). Un même compte sur deux appareils n'entre pas en conflit avec lui-même.
+- Risque accepté : un conflit venant de l'écran (et non d'une saisie hors ligne) ne peut être arbitré qu'en gardant la valeur du serveur : la personne ressaisit si besoin.
+
+## 2026-11-27 — Migrations numérotées
+- Décision : prisma/migrations-sql/NNNN_nom.up.sql / .down.sql, appliquées au démarrage avec verrou, sauvegarde préalable, transaction, historique (schema_migrations) et retour arrière de la dernière migration. Procédure : docs/MIGRATIONS.md.
+
+## 2026-11-27 — Récupération du mot de passe par code
+- Décision : code à 6 chiffres, 15 minutes, 5 essais, usage unique, stocké sous forme d'empreinte HMAC ; réponse identique que le compte existe ou non ; 3 demandes par compte et 10 par adresse IP par heure. Tant que l'envoi d'e-mails n'est pas disponible, les responsables sont prévenus et remettent le code en main propre après vérification d'identité (Utilisateurs → « Code de récupération »).
+- Risque accepté : la vérification d'identité par le responsable repose sur sa vigilance (rappel affiché à chaque remise de code).
+
+## 2026-11-27 — Accès plateforme pour créer une entreprise
+- Décision : POST /platform/organizations, protégé par la variable PLATFORM_ADMIN_KEY (comparaison en temps constant, 5 essais/minute). Sans la variable, la route répond « introuvable ».
