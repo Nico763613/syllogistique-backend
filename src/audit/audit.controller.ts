@@ -14,7 +14,7 @@ export class AuditController {
   constructor(private auditService: AuditService) {}
 
   @Get()
-  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER)
+  @Roles(RoleName.SUPER_ADMIN, RoleName.DIRECTEUR_GENERAL, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE, RoleName.MAGASINIER)
   search(
     @Query('entity') entity?: string,
     @Query('entities') entities?: string,

@@ -27,8 +27,9 @@ Non modifiés (gardent leur espace actuel) : Responsable des opérations, Compta
 Le filtrage par rôle de chaque rubrique est un confort d'affichage. La sécurité reste assurée par le serveur (`RolesGuard`, Directeur général en lecture seule).
 
 ## Rubriques « bientôt disponibles »
-- Historique des décisions et Journal d'activité pour le DG (l'administrateur a déjà le journal).
-- Répertoire fournisseurs pour le gestionnaire de stock (géré par les Achats).
+Aucune depuis le 27/11/2026 (fichier `19-journal-et-fournisseurs.js`) :
+- **Journal d'activité et décisions** (DG, lecture seule) : écran `journal`, données `/audit` filtrables par domaine, période et personne ; secrets masqués par le serveur, valeurs techniques traduites.
+- **Répertoire fournisseurs** (gestionnaire de stock) : écran `suppliers`, ajout et modification (droits serveur déjà en place).
 
 ## Ajouter une rubrique
 Dans `PROFILES`, ajouter `['Libellé', 'vue', 'aide', ['ROLE_OPTIONNEL']]`. Vue `null` = bientôt. Vues spéciales : `#stock-in`, `#stock-out`, `#history`, `#alerts`.
