@@ -64,6 +64,8 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-de-test-0123456789abcdef0123456789abcdef
       NODE_ENV: test
       PORT: '3000'
+      # Valeur de test uniquement (la vraie clé est une variable secrète du serveur de production)
+      PLATFORM_ADMIN_KEY: ci-cle-plateforme-de-test-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -102,6 +104,16 @@ jobs:
       - name: Test d'interface livraison et rôles terrain
         run: node scripts/ui-livraison.js
       - run: sleep 61
+      - run: sleep 61
+      - name: Tests multi-entreprises et multi-sites
+        run: node scripts/functional6.js
       - run: node scripts/smoke.js
+      - name: Migrations — historique, retour arrière puis réapplication
+        run: |
+          node dist/migrations/cli.js status
+          node dist/migrations/cli.js down 0003
+          node dist/migrations/cli.js status
+          node dist/migrations/cli.js up
+          node dist/migrations/cli.js status
       - if: failure()
         run: tail -80 server.log
