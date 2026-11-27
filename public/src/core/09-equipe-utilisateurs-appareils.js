@@ -239,29 +239,49 @@ const PERS_ST = { ACTIVE: ['Actif', 'ok'], SUSPENDED: ['Suspendu', 'warn'], DISA
 async function renderPersonnel() {
   const cfg = PERS_CFG[state.user.role];
   if (!cfg) { root().innerHTML = '<div class="panel"><div class="msg err">Cet espace n\'est pas disponible pour votre fonction.</div></div>'; return; }
+  // Dossiers : une fonction par dossier, puis « Ajouter » ; dans chaque dossier, le statut des comptes
+  const keys = Object.keys(cfg.roles);
+  if (window._peTab !== 'ADD' && !keys.includes(window._peTab)) window._peTab = keys[0];
+  if (!['ALL', 'ACTIVE', 'WAIT', 'OFF'].includes(window._peSt)) window._peSt = 'ALL';
+  const add = window._peTab === 'ADD';
   root().innerHTML = `
     <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> ${cfg.title}</h3><div class="desc">${esc(cfg.desc)}</div>
       <div id="pe-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"></div></div>
-    <div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau collaborateur</h3>
+    <div id="pe-tabs">${peTabsHtml(window._peList || [])}</div>
+    ${add ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un collaborateur</h3>
       <h4 style="margin:6px 0 4px">Identité</h4><div class="grid-2"><div><label>Prénom</label><input id="pe-first" autocomplete="off"></div><div><label>Nom</label><input id="pe-last" autocomplete="off"></div></div>
       <h4 style="margin:10px 0 4px">Contact</h4><div><label>Téléphone (WhatsApp)</label><input id="pe-phone" type="tel" placeholder="6xx xx xx xx"></div>
-      <h4 style="margin:10px 0 4px">Fonction</h4><div><select id="pe-role">${Object.entries(cfg.roles).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('')}</select></div>
-      <button class="btn gold" style="margin-top:12px" onclick="peSave()">Enregistrer et préparer l'invitation WhatsApp</button><div id="pe-msg"></div></div>
-    <div class="panel"><h3>Personnel enregistré</h3><div id="pe-list"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`;
+      <h4 style="margin:10px 0 4px">Fonction</h4><div><select id="pe-role">${keys.map((k) => `<option value="${k}">${esc(cfg.roles[k])}</option>`).join('')}</select></div>
+      <button class="btn gold" style="margin-top:12px" onclick="peSave()">Enregistrer et préparer l'invitation WhatsApp</button><div id="pe-msg"></div><div id="st-inv"></div></div>`
+    : `<div id="pe-st"></div><div class="panel"><h3 id="pe-h">${esc(cfg.roles[window._peTab])}</h3><div id="pe-list"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`}`;
   peLoad();
 }
+function peTabsHtml(list) {
+  const cfg = PERS_CFG[state.user.role]; if (!cfg) return '';
+  const ic = { ADMIN_LOGISTIQUE: 'truck', RESPONSABLE_OPERATIONS: 'clipboard', COMPTABLE: 'receipt', RESPONSABLE_COMMERCIAL: 'target', CAISSIER: 'wallet', MAGASINIER: 'package', MECANICIEN: 'wrench', POINTEUR: 'clock', AGENT_HSE: 'hard-hat', GESTIONNAIRE_FLOTTE: 'truck' };
+  return syTabs([...Object.keys(cfg.roles).map((k) => [k, `${cfg.roles[k]} (${list.filter((u) => u.role === k).length})`, ic[k] || 'user']), ['ADD', 'Ajouter', 'plus']], window._peTab, 'peTab');
+}
+function peTab(k) { window._peTab = k; renderPersonnel(); }
+function peStTab(k) { window._peSt = k; peLoad(); }
+const PE_STF = { ALL: () => true, ACTIVE: (u) => u.status === 'ACTIVE' && !u.neverConnected, WAIT: (u) => u.status === 'ACTIVE' && u.neverConnected, OFF: (u) => u.status !== 'ACTIVE' };
 async function peLoad() {
-  const cfg = PERS_CFG[state.user.role], box = document.getElementById('pe-list'); if (!cfg || !box) return;
+  const cfg = PERS_CFG[state.user.role]; if (!cfg) return;
   try {
     const list = await api('/staff?role=' + Object.keys(cfg.roles).join(',')); window._peList = list;
     const act = list.filter((u) => u.status === 'ACTIVE').length, off = list.filter((u) => u.status !== 'ACTIVE').length, wait = list.filter((u) => u.neverConnected && u.status === 'ACTIVE').length;
     const tile = (n, l, c) => `<div style="flex:1;min-width:100px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${c}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
-    document.getElementById('pe-sum').innerHTML = tile(act, 'Comptes actifs', '#3F8F6B') + tile(wait, 'Invitations en attente', '#C9A24D') + tile(off, 'Suspendus / désactivés', '#B33A32');
-    box.innerHTML = list.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Fonction</th><th>Téléphone</th><th>Compte</th><th>Invitation</th><th></th></tr>${list.map((u) => { const st = PERS_ST[u.status] || [u.status, 'warn'];
+    const sum = document.getElementById('pe-sum'); if (sum) sum.innerHTML = tile(act, 'Comptes actifs', 'var(--success)') + tile(wait, 'Invitations en attente', 'var(--gold)') + tile(off, 'Suspendus / désactivés', 'var(--danger)');
+    const tb = document.getElementById('pe-tabs'); if (tb) tb.innerHTML = peTabsHtml(list);
+    const box = document.getElementById('pe-list'); if (!box) return;
+    const inCat = list.filter((u) => u.role === window._peTab);
+    const n = (k) => inCat.filter(PE_STF[k]).length;
+    document.getElementById('pe-st').innerHTML = syTabs([['ALL', `Tous (${inCat.length})`, 'users'], ['ACTIVE', `Comptes actifs (${n('ACTIVE')})`, 'check-circle'], ['WAIT', `Invitations en attente (${n('WAIT')})`, 'clock'], ['OFF', `Suspendus (${n('OFF')})`, 'ban']], window._peSt, 'peStTab');
+    const shown = inCat.filter(PE_STF[window._peSt]);
+    box.innerHTML = shown.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Fonction</th><th>Téléphone</th><th>Compte</th><th>Invitation</th><th></th></tr>${shown.map((u) => { const st = PERS_ST[u.status] || [u.status, 'warn'];
       return `<tr><td><span class="p-name">${personAv(u.firstName, u.lastName, u.photoUrl, 32)}<b>${esc(u.firstName + ' ' + u.lastName)}</b></span></td><td>${esc(cfg.roles[u.role] || u.role)}</td><td>${esc(u.phone || '—')}</td><td><span class="badge ${st[1]}">${st[0]}</span></td>
       <td>${u.neverConnected ? '<span class="badge warn">En attente</span>' : '<span class="badge ok">Acceptée</span>'}</td>
-      <td style="white-space:nowrap"><button class="btn small" onclick="peEdit('${esc(u.id)}')">Modifier</button> ${u.status === 'ACTIVE' ? `<button class="btn small" onclick="peStatus('${esc(u.id)}','DISABLED')">Désactiver</button> <button class="btn small gold" onclick="stInvite('${esc(u.id)}')">Invitation WhatsApp</button>` : `<button class="btn small primary" onclick="peStatus('${esc(u.id)}','ACTIVE')">Réactiver</button>`}</td></tr>`; }).join('')}</table></div>` : '<div class="empty">Aucun collaborateur enregistré pour le moment.</div>';
-  } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+      <td style="white-space:nowrap"><button class="btn small" onclick="peEdit('${esc(u.id)}')">Modifier</button> ${u.status === 'ACTIVE' ? `<button class="btn small" onclick="peStatus('${esc(u.id)}','DISABLED')">Désactiver</button> <button class="btn small gold" onclick="stInvite('${esc(u.id)}')">Invitation WhatsApp</button>` : `<button class="btn small primary" onclick="peStatus('${esc(u.id)}','ACTIVE')">Réactiver</button>`}</td></tr>`; }).join('')}</table></div>` : `<div class="empty">Personne dans ce dossier.</div><button class="btn gold" onclick="peTab('ADD')"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter</button>`;
+  } catch (e) { const box = document.getElementById('pe-list') || document.getElementById('pe-msg'); if (box) box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function peSave() {
   const m = document.getElementById('pe-msg'), g = (id) => document.getElementById(id).value.trim();
@@ -346,6 +366,7 @@ function dailyTripsTable(r) {
 }
 async function loadDaily() {
   const body = document.getElementById('d-body');
+  if (!['TRUCK', 'SERVICE_VEHICLE'].includes(dailyTab())) return dailyOther();
   try {
     const date = document.getElementById('d-date').value;
     const { report: r, text: reportText } = await api('/reports/daily?siteId=' + state.siteId + '&kind=' + dailyKind + '&date=' + date);

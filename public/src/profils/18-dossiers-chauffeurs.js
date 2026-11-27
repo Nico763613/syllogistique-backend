@@ -147,7 +147,7 @@ function drvAddedPanel(d, act) {
   m.innerHTML = `<div class="msg ok">${esc(name)} est enregistré dans le dossier « ${act === 'TRUCK' ? 'Chauffeurs camion' : 'Chauffeurs véhicule de service'} ».</div>
     <div class="desc">Étape suivante : envoyez-lui le message WhatsApp avec le lien de l'application et son code d'accès.</div>
     ${d.id ? `<button class="btn gold" onclick="drvInviteSend('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le message d'accès</button>` : ''}
-    <button class="btn" onclick="setDrvFilter('${act === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE'}')">Voir la liste</button>
+    <button class="btn" onclick="window.DRVF='${act === 'TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE'}';window.DRVSUB='list';go('drivers')">Voir le dossier chauffeurs</button>
     <div id="inv-msg"></div>`;
   document.getElementById('d-more').style.display = 'none';
 }
@@ -189,3 +189,33 @@ async function drvArcRep(how) {
     m.innerHTML = '';
   } catch (e) { if (pre) pre.close(); m.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
+
+/* ---------- Rapports journaliers : un dossier par catégorie ---------- */
+const DAILY_TABS = [['TRUCK', 'Camions', 'truck'], ['SERVICE_VEHICLE', 'Véhicules de service', 'car'], ['D_TRUCK', 'Chauffeurs camion', 'users'], ['D_SERVICE', 'Chauffeurs véhicule de service', 'user'], ['AGENT_HSE', 'HSE', 'hard-hat'], ['MECANICIEN', 'Atelier', 'wrench'], ['MAGASINIER', 'Stock', 'package'], ['POINTEUR', 'Pointage', 'clock']];
+function dailyTab() { return window._dailyTab || dailyKind; }
+function setDailyTab(k) { window._dailyTab = k; if (k === 'TRUCK' || k === 'SERVICE_VEHICLE') dailyKind = k; renderDaily(); }
+async function dailyOther() {
+  const body = document.getElementById('d-body'); if (!body) return;
+  const t = dailyTab(), date = document.getElementById('d-date').value;
+  body.innerHTML = '<div class="empty">Chargement…</div>';
+  try {
+    if (t === 'D_TRUCK' || t === 'D_SERVICE') {
+      const rows = await api('/driver-admin/reports/day?date=' + date + '&kind=' + (t === 'D_TRUCK' ? 'TRUCK' : 'SERVICE_VEHICLE') + '&siteId=' + state.siteId);
+      window._dailyArc = { title: 'Fiches de bord — ' + (t === 'D_TRUCK' ? 'chauffeurs camion' : 'chauffeurs véhicule de service') + ' — ' + date, head: ['Chauffeur', 'Véhicule', 'Rapport', 'Missions', 'Km', 'Litres', 'Dépenses GNF'], rows: rows.map((r) => [r.name, r.vehicle || '', drvRepTxt(r.report), r.missions, r.km, r.liters, r.expenses]) };
+      const sent = rows.filter((r) => r.report).length;
+      body.innerHTML = `<div class="arc-kpis">${[[sent + ' / ' + rows.length, 'Fiches envoyées'], [rows.length - sent, 'Non envoyées'], [rows.reduce((a, r) => a + r.missions, 0), 'Missions'], [fmt(rows.reduce((a, r) => a + r.km, 0)) + ' km', 'Distance']].map((x) => `<div><b>${x[0]}</b><span>${x[1]}</span></div>`).join('')}</div>
+        ${arcBar('dailyArc')}
+        <div class="table-wrap"><table><thead><tr><th>Chauffeur</th><th>Véhicule</th><th>Rapport</th><th>Missions</th><th>Km</th><th>Litres</th><th>Dépenses</th><th></th></tr></thead><tbody>${rows.map((r) => `<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.vehicle || '—')}</td><td>${drvRepBadge(r.report)}</td><td>${r.missions}</td><td>${fmt(r.km)}</td><td>${r.liters}</td><td>${fmt(r.expenses)}</td>
+          <td><button class="btn small" onclick="drvSheetView('${esc(r.id)}','${esc(date)}')"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg> Voir la fiche</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty">Aucun chauffeur.</td></tr>'}</tbody></table></div>`;
+      return;
+    }
+    const reps = await api('/staff/reports?role=' + t + '&date=' + date + '&siteId=' + state.siteId);
+    const lbl = { AGENT_HSE: 'HSE', MECANICIEN: 'Atelier', MAGASINIER: 'Stock', POINTEUR: 'Pointage' }[t];
+    window._dailyArc = { title: 'Rapports ' + lbl + ' — ' + date, head: ['Nom', 'Envoyé à', 'Activités', 'Observations', 'État'], rows: reps.map((r) => [r.name, r.sentAt ? new Date(r.sentAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '', r.activities || '', r.observations || '', r.rejectedAt ? 'Rejeté' : r.receivedAt ? 'Reçu' : 'Envoyé']) };
+    body.innerHTML = `<div class="arc-kpis"><div><b>${reps.length}</b><span>Rapports reçus ce jour</span></div><div><b>${reps.filter((r) => r.receivedAt).length}</b><span>Vérifiés</span></div></div>
+      ${arcBar('dailyArc')}
+      ${reps.map((r) => `<div class="daily-rep"><div class="daily-rep-h"><b>${esc(r.name)}</b><span>${r.rejectedAt ? '<span class="badge bad">Rejeté</span>' : r.receivedAt ? '<span class="badge ok">Reçu</span>' : '<span class="badge info">Envoyé</span>'} ${r.sentAt ? new Date(r.sentAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div>
+        <div style="white-space:pre-wrap">${esc(r.activities || '')}</div>${r.observations ? `<div class="desc" style="white-space:pre-wrap;margin-top:4px">${esc(r.observations)}</div>` : ''}</div>`).join('') || '<div class="empty">Aucun rapport envoyé pour ce jour.</div>'}`;
+  } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+function dailyArc(how) { const x = window._dailyArc; if (x) arcDo(how, x.title, '', x.head, x.rows, x.rows.length + ' ligne(s)'); }

@@ -14,15 +14,58 @@ async function renderDriverDevices() {
         ${dev && dev.status === 'BLOCKED' ? `<button class="btn small" onclick="drvUnblock('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-check-circle"/></svg> Débloquer</button> ` : ''}
         ${dev && dev.status === 'PENDING' ? `<button class="btn small" onclick="drvCancelQr('${esc(dev.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg> Annuler le QR</button> ` : ''}
         <button class="btn small" onclick="drvHistory('driver','${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-file"/></svg> Historique</button></td></tr>`;
-  }).join('') || '<tr><td colspan="4" class="empty">Aucun chauffeur.</td></tr>';
-  const allDev = list.flatMap((d) => d.devices), nowT = Date.now();
-  const kp = [['Appareils actifs', allDev.filter((x) => x.status === 'ACTIVE').length], ['QR en attente', allDev.filter((x) => x.status === 'PENDING' && !(x.expiresAt && new Date(x.expiresAt) < nowT)).length], ['QR expirés', allDev.filter((x) => x.status === 'PENDING' && x.expiresAt && new Date(x.expiresAt) < nowT).length], ['Bloqués', allDev.filter((x) => x.status === 'BLOCKED').length], ['Sans compte lié', list.filter((d) => !d.linked).length]];
-  const kpiRow = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px">${kp.map((k) => `<div class="panel" style="margin:0;padding:10px 12px"><div style="font-size:22px;font-weight:800;color:var(--navy)">${k[1]}</div><div class="desc" style="margin:0">${k[0]}</div></div>`).join('')}</div>`;
-  root().innerHTML = `${kpiRow}<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Application chauffeur — appareils autorisés</h3>
-    <div class="desc">Un chauffeur = un compte personnel = un seul appareil actif. Générez un code (QR + 6 chiffres, valable 24 h) ; l'ancien appareil est automatiquement révoqué à l'activation du nouveau.</div>
-    <button class="btn gold" onclick="drvPlanTrip()">Planifier une mission</button> <button class="btn" onclick="drvCreateAccount()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Créer un compte chauffeur</button> <button class="btn gold" onclick="drvInvitePanel()"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Envoyer l'application aux chauffeurs</button>
-    <div style="overflow:auto;margin-top:12px"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${rows}</table></div></div>
+  });
+  // Dossiers : chaque chauffeur est classé selon l'état de son appareil principal
+  const nowT = Date.now();
+  const catOf = (d) => {
+    const dev = d.devices.find((x) => x.status === 'ACTIVE') || d.devices.find((x) => x.status === 'BLOCKED') || d.devices.find((x) => x.status === 'PENDING');
+    if (!dev) return 'NONE';
+    if (dev.status === 'PENDING') return dev.expiresAt && new Date(dev.expiresAt) < nowT ? 'EXPIRED' : 'PENDING';
+    return dev.status;
+  };
+  const cats = [['ADD', 'Ajouter un chauffeur', 'plus'], ['ACTIVE', 'Appareils actifs', 'check-circle'], ['PENDING', 'Codes QR en attente', 'key'], ['EXPIRED', 'QR expirés', 'clock'], ['BLOCKED', 'Bloqués', 'ban'], ['NONE', 'Sans appareil', 'phone']];
+  const cnt = (k) => list.filter((d) => catOf(d) === k).length;
+  if (!cats.some((c) => c[0] === window._ddTab)) window._ddTab = list.length ? 'ACTIVE' : 'ADD';
+  const t = window._ddTab;
+  const tabs = syTabs(cats.map((c) => [c[0], c[0] === 'ADD' ? c[1] : `${c[1]} (${cnt(c[0])})`, c[2]]), t, 'ddTab');
+  const shown = list.filter((d) => catOf(d) === t);
+  const tbody = list.map((d, i) => (catOf(d) === t ? rows[i] : '')).join('') || `<tr><td colspan="4" class="empty">Aucun chauffeur dans ce dossier.</td></tr>`;
+  root().innerHTML = `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Appareils chauffeurs</h3>
+    <div class="desc">C'est ici, et seulement ici, qu'on ajoute un chauffeur et qu'on lui envoie l'application. Un chauffeur = un compte personnel = un seul appareil actif (code QR + 6 chiffres, valable 24 h).</div>
+    <button class="btn small" onclick="drvPlanTrip()">Planifier une mission</button></div>
+    ${tabs}
+    ${t === 'ADD' ? drvAddFormHtml() + `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Chauffeur déjà enregistré ?</h3><div class="desc">Renvoyez-lui l'application, ou créez son compte s'il n'en a pas.</div>
+      <button class="btn gold" onclick="drvInvitePanel()"><svg class="ic" aria-hidden="true"><use href="#i-phone"/></svg> Envoyer l'application aux chauffeurs</button> <button class="btn" onclick="drvCreateAccount()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Créer un compte chauffeur</button></div>`
+    : `<div class="panel"><h3>${esc(cats.find((c) => c[0] === t)[1])} (${shown.length})</h3>
+    <div style="overflow:auto"><table><tr><th>Chauffeur</th><th>Compte</th><th>Appareil</th><th>Actions</th></tr>${tbody}</table></div></div>`}
     <div id="drv-hist"></div>`;
+}
+function ddTab(k) { window._ddTab = k; renderDriverDevices(); }
+function drvAddFormHtml() {
+  return `<div class="panel">
+      <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un chauffeur</h3>
+      <div class="desc">Nom, prénom et téléphone, puis le type de chauffeur : les champs du permis s'ouvrent. Après l'enregistrement, envoyez-lui l'application par WhatsApp.</div>
+      <div class="grid-2">
+        <div><label>Nom</label><input id="d-last" /></div>
+        <div><label>Prénom</label><input id="d-first" /></div>
+        <div><label>Téléphone (WhatsApp)</label><input id="d-phone" type="tel" placeholder="6xx xx xx xx" /></div>
+      </div>
+      <label style="margin-top:10px">Type de chauffeur</label>
+      <input type="hidden" id="d-act" value="" />
+      <div class="drv-type" role="radiogroup">
+        <button type="button" class="drv-type-b" data-v="TRUCK" role="radio" aria-checked="false" onclick="drvPickType('TRUCK')"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><span>Chauffeur camion</span></button>
+        <button type="button" class="drv-type-b" data-v="SERVICE_VEHICLE" role="radio" aria-checked="false" onclick="drvPickType('SERVICE_VEHICLE')"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg><span>Chauffeur véhicule de service</span></button>
+      </div>
+      <div id="d-more" style="display:none">
+        <div class="grid-2">
+          <div><label>N° de permis</label><input id="d-license" /></div>
+          <div><label>Catégorie du permis</label><input id="d-cat" placeholder="B, C, D…" /></div>
+          <div><label>Expiration du permis</label><input id="d-exp" type="date" /></div>
+        </div>
+        <button class="btn gold" onclick="createDriver()">Enregistrer et préparer l'envoi de l'application</button>
+      </div>
+      <div id="d-msg"></div>
+    </div>`;
 }
 function drvInvitePanel() {
   const list = window._drvOv || [];

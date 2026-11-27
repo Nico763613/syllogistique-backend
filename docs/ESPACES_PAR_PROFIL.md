@@ -85,10 +85,14 @@ Le composant commun `syTabs(onglets, actif, fonction)` affiche les onglets. Seul
 
 ## Dossiers chauffeurs, personnel et archives
 
-- **Chauffeurs** : dossiers « Chauffeurs camion », « Chauffeurs véhicule de service », « Ajouter un chauffeur », « Archives ».
+- **Chauffeurs** : dossiers « Chauffeurs camion », « Chauffeurs véhicule de service », « Archives ».
   - Dans chaque dossier, deux sous-dossiers : **Chauffeurs** (nom, prénom, téléphone, véhicule attribué, plaque, permis) et **Rapports** (un dossier par chauffeur : rapports journaliers, missions, km, litres, dépenses, fiche du jour complète).
+- **Appareils chauffeurs** : seul endroit où l'on ajoute un chauffeur. Dossiers : Ajouter un chauffeur, Appareils actifs, Codes QR en attente, QR expirés, Bloqués, Sans appareil.
   - Ajout : nom, prénom, téléphone, puis choix du type ; les champs du permis s'ouvrent ensuite. Après l'enregistrement, bouton « Envoyer le message d'accès » (WhatsApp prêt à envoyer).
+- **Personnel et responsables** : un dossier par fonction + « Ajouter » ; dans chaque dossier : Tous, Comptes actifs, Invitations en attente, Suspendus.
+- **Rapports journaliers** : un seul endroit, un dossier par catégorie (Camions, Véhicules de service, Chauffeurs camion, Chauffeurs véhicule de service, HSE, Atelier, Stock, Pointage), avec télécharger / imprimer / envoyer.
+- **Menus sans doublon** (DG, Responsable logistique, Stock) : chaque écran n'apparaît qu'une fois ; « écran:onglet » ouvre directement le bon onglet (ex. `stock:entrees`, `fuel:total`).
   - Archives : liste des chauffeurs et rapports d'un chauffeur sur une période, à **télécharger** (fichier tableur), **imprimer / enregistrer en PDF** ou **envoyer** (partage du téléphone ou WhatsApp).
 - **Personnel de terrain** (Agents HSE, Mécaniciens, Gestionnaires de stock, Pointeurs) : deux dossiers, l'équipe et les Rapports.
-- **Recherche générale** retirée de tous les écrans : chaque liste garde ses filtres.
-- Serveur : `GET /driver-admin/drivers/:id/reports` et `GET /driver-admin/drivers/:id/sheet` (lecture seule, ouverts au DG ; limités au site de la personne sauf Super admin et DG).
+- **Recherche générale** retirée de tous les écrans, remplacée par un slogan qui défile (arrêté si l'appareil demande moins d'animations).
+- Serveur : `GET /driver-admin/reports/day`, `GET /driver-admin/drivers/:id/reports` et `GET /driver-admin/drivers/:id/sheet` (lecture seule, ouverts au DG ; limités au site de la personne sauf Super admin et DG).

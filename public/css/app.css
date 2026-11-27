@@ -568,3 +568,14 @@ button.pf-tile{cursor:pointer;}button.pf-tile:hover{border-color:var(--navy-soft
 .drv-sheet-box{max-width:720px;width:100%;margin:20px auto}
 .drv-sheet-box h4{margin:14px 0 4px;color:var(--navy)}
 @media (max-width:600px){.drv-sheet-ov{padding:0}.drv-sheet-box{margin:0;border-radius:0;min-height:100%}.arc-bar .btn{flex:1}}
+.daily-rep{border:1px solid var(--line);border-left:4px solid var(--sage);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--offwhite)}
+.daily-rep-h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+
+/* Slogan défilant à la place de la recherche générale */
+#sy-slogan{position:relative;flex:0 1 360px;min-width:140px;margin-right:8px;overflow:hidden;height:34px;border-radius:17px;background:var(--navy);color:var(--offwhite);-webkit-mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent);mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent)}
+.sy-slogan-t{display:inline-flex;white-space:nowrap;height:100%;align-items:center;animation:sy-slide 28s linear infinite}
+.sy-slogan-t span{display:inline-flex;align-items:center;padding:0 18px;font-size:.8rem;font-weight:600;letter-spacing:.04em}
+.sy-slogan-t span::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);margin-left:36px}
+@keyframes sy-slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.sy-slogan-t{animation:none}}
+@media(max-width:700px){#sy-slogan{flex-basis:100%;order:9;margin:6px 0 0;height:30px}}

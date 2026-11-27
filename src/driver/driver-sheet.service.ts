@@ -362,6 +362,34 @@ export class DriverSheetService {
     return [...days.values()].map((d) => ({ ...d, liters: Math.round(d.liters * 100) / 100 })).sort((a, b) => (a.date < b.date ? 1 : -1));
   }
 
+  // Rapports journaliers : état de la fiche de chaque chauffeur pour un jour (lecture seule, ne vaut pas accusé de réception)
+  async dayOverview(siteId: string | undefined, date?: string, kind?: string) {
+    const day = dayStart(date), next = new Date(+day + 86400000);
+    const drivers = await this.prisma.driver.findMany({
+      where: { deletedAt: null, ...(siteId ? { siteId } : {}), ...(kind === 'TRUCK' || kind === 'SERVICE_VEHICLE' ? { activity: kind } : {}) },
+      select: { id: true, firstName: true, lastName: true, phone: true, activity: true }, orderBy: { lastName: 'asc' },
+    });
+    const ids = drivers.map((d) => d.id);
+    const [reps, trips, fuel, exp, veh] = await Promise.all([
+      this.prisma.driverDailyReport.findMany({ where: { driverId: { in: ids }, reportDate: day } }),
+      this.prisma.trip.findMany({ where: { driverId: { in: ids }, startTime: { gte: day, lt: next } }, select: { driverId: true, distance: true } }),
+      this.prisma.fuelTransaction.findMany({ where: { driverId: { in: ids }, transactionDate: { gte: day, lt: next } }, select: { driverId: true, quantityLiters: true } }),
+      this.prisma.driverExpense.findMany({ where: { driverId: { in: ids }, date: { gte: day, lt: next } }, select: { driverId: true, amount: true } }),
+      this.prisma.vehicle.findMany({ where: { assignedDriverId: { in: ids } }, select: { assignedDriverId: true, registrationNumber: true, internalNumber: true } }),
+    ]);
+    return drivers.map((d) => {
+      const r = reps.find((x) => x.driverId === d.id), t = trips.filter((x) => x.driverId === d.id);
+      return {
+        id: d.id, name: `${d.lastName} ${d.firstName}`, phone: d.phone, activity: d.activity,
+        vehicle: veh.filter((v) => v.assignedDriverId === d.id).map((v) => v.registrationNumber || v.internalNumber).join(', '),
+        missions: t.length, km: t.reduce((a, x) => a + n(x.distance), 0),
+        liters: Math.round(fuel.filter((x) => x.driverId === d.id).reduce((a, x) => a + n(x.quantityLiters), 0) * 100) / 100,
+        expenses: exp.filter((x) => x.driverId === d.id).reduce((a, x) => a + x.amount, 0),
+        report: r ? { status: r.rejectedAt ? 'REJECTED' : r.opsAt ? 'VALIDATED' : r.processedAt ? 'CHECKED' : r.receivedAt ? 'RECEIVED' : 'SENT', sentAt: r.sentAt, note: r.rejectNote || r.opsNote || r.processNote || null } : null,
+      };
+    });
+  }
+
   async listForDay(siteId: string | undefined, date?: string, actorId?: string) {
     const day = dayStart(date);
     const next = new Date(+day + 86400000);

@@ -345,7 +345,7 @@ async function renderDrivers() {
   // Véhicule ou camion affecté : repris de la fiche du véhicule (une seule source)
   const vehOf = {}; vehicles.forEach(v => { if (v.assignedDriver) (vehOf[v.assignedDriver.id] = vehOf[v.assignedDriver.id] || []).push(v); });
   const cnt = { TRUCK: all.filter(d => d.activity === 'TRUCK').length, SERVICE_VEHICLE: all.filter(d => d.activity === 'SERVICE_VEHICLE').length };
-  if (!['TRUCK', 'SERVICE_VEHICLE', 'ADD', 'ARCH'].includes(window.DRVF)) window.DRVF = 'TRUCK';
+  if (!['TRUCK', 'SERVICE_VEHICLE', 'ARCH'].includes(window.DRVF)) window.DRVF = 'TRUCK';
   window._drvVehOf = vehOf; window._drvAll = all;
   const tab = window.DRVF, isTruck = tab === 'TRUCK';
   const list = all.filter(d => d.activity === tab);
@@ -364,42 +364,19 @@ async function renderDrivers() {
     <td><button class="btn small" onclick="editDriver('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans ce dossier.</td></tr>`;
 
   const signups = await api('/driver-signup').catch(() => []);
-  const tabs = syTabs([['TRUCK', `Chauffeurs camion (${cnt.TRUCK})`, 'truck'], ['SERVICE_VEHICLE', `Chauffeurs véhicule de service (${cnt.SERVICE_VEHICLE})`, 'car'], ['ADD', 'Ajouter un chauffeur', 'plus'], ['ARCH', 'Archives', 'archive']], tab, 'setDrvFilter');
+  const tabs = syTabs([['TRUCK', `Chauffeurs camion (${cnt.TRUCK})`, 'truck'], ['SERVICE_VEHICLE', `Chauffeurs véhicule de service (${cnt.SERVICE_VEHICLE})`, 'car'], ['ARCH', 'Archives', 'archive']], tab, 'setDrvFilter');
   const sub = window.DRVSUB === 'rep' ? 'rep' : 'list';
-  const addForm = `<div class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Ajouter un chauffeur</h3>
-      <div class="desc">Remplissez l'identité, puis choisissez le type de chauffeur : les champs du permis s'ouvrent ensuite.</div>
-      <div class="grid-2">
-        <div><label>Nom</label><input id="d-last" /></div>
-        <div><label>Prénom</label><input id="d-first" /></div>
-        <div><label>Téléphone (WhatsApp)</label><input id="d-phone" type="tel" placeholder="6xx xx xx xx" /></div>
-      </div>
-      <label style="margin-top:10px">Type de chauffeur</label>
-      <input type="hidden" id="d-act" value="" />
-      <div class="drv-type" role="radiogroup">
-        <button type="button" class="drv-type-b" data-v="TRUCK" role="radio" aria-checked="false" onclick="drvPickType('TRUCK')"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><span>Chauffeur camion</span></button>
-        <button type="button" class="drv-type-b" data-v="SERVICE_VEHICLE" role="radio" aria-checked="false" onclick="drvPickType('SERVICE_VEHICLE')"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg><span>Chauffeur véhicule de service</span></button>
-      </div>
-      <div id="d-more" style="display:none">
-        <div class="grid-2">
-          <div><label>N° de permis</label><input id="d-license" /></div>
-          <div><label>Catégorie du permis</label><input id="d-cat" placeholder="B, C, D…" /></div>
-          <div><label>Expiration du permis</label><input id="d-exp" type="date" /></div>
-        </div>
-        <button class="btn gold" onclick="createDriver()">Enregistrer</button>
-      </div>
-      <div id="d-msg"></div>
-    </div>`;
   root().innerHTML = `
     ${signups.length ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Demandes d'inscription (${signups.length})</h3><div class="desc">Chauffeurs qui se sont inscrits eux-mêmes. Approuvez pour créer la fiche, puis utilisez « Inviter » pour leur remettre le QR d'accès.</div>
       <div class="table-wrap"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Activité</th><th>Date</th><th></th></tr></thead><tbody>${signups.map((s) => `<tr><td><b>${esc(s.lastName)}</b> ${esc(s.firstName)}</td><td>${esc(s.phone)}</td><td>${s.activity === 'TRUCK' ? 'Camion' : s.activity === 'SERVICE_VEHICLE' ? 'Véhicule de service' : '—'}</td><td>${esc(new Date(s.createdAt).toLocaleDateString('fr-FR'))}</td>
         <td><button class="btn small" onclick="signupDecide('${esc(s.id)}','approve')">Approuver</button> <button class="btn small ghost" onclick="signupDecide('${esc(s.id)}','reject')">Refuser</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}
     ${tabs}
-    ${tab === 'ADD' ? addForm : tab === 'ARCH' ? '<div id="drv-arch"></div>' : syTabs([['list', 'Chauffeurs', 'users'], ['rep', 'Rapports', 'file']], sub, 'setDrvSub') + (sub === 'rep' ? '<div id="drv-rep"></div>' : `<div class="panel">
+    ${tab === 'ARCH' ? '<div id="drv-arch"></div>' : syTabs([['list', 'Chauffeurs', 'users'], ['rep', 'Rapports', 'file']], sub, 'setDrvSub') + (sub === 'rep' ? '<div id="drv-rep"></div>' : `<div class="panel">
       <h3>${isTruck ? 'Chauffeurs camion' : 'Chauffeurs véhicule de service'}</h3>
+      <div class="desc">Un nouveau chauffeur s'ajoute à un seul endroit : <a class="p-link" onclick="window._ddTab='ADD';go('driver-devices')"><b>Appareils chauffeurs › Ajouter un chauffeur</b></a> (fiche + envoi de l'application).</div>
       <div class="table-wrap"><table><thead><tr><th>Nom</th><th>Prénom</th><th>Téléphone</th><th>${isTruck ? 'Camion attribué' : 'Véhicule attribué'}</th><th>N° de plaque</th><th>Permis</th><th>Statut</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     </div>`)}`;
-  if (tab === 'ARCH') drvArchRender(); else if (tab !== 'ADD' && sub === 'rep') drvRepRender();
+  if (tab === 'ARCH') drvArchRender(); else if (sub === 'rep') drvRepRender();
 }
 function drvPickType(v) {
   const h = document.getElementById('d-act'); if (h) h.value = v;
