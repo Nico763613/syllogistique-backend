@@ -36,6 +36,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       const req = context.switchToHttp().getRequest();
       if (!String(req.path || '').startsWith('/auth/')) throw new ForbiddenException('Changez d\'abord votre mot de passe provisoire.');
     }
+    // Moindre privilège pour le compte Chauffeur : il n'utilise que l'application chauffeur.
+    // Il n'a donc accès qu'à ses propres écrans (/driver/…), à son compte (/auth/…), à l'envoi de photos
+    // de reçus, à ses alertes et au signalement d'un problème. Les écrans du bureau (dépenses, carburant,
+    // stock, clients…) lui sont refusés, même en consultation.
+    if (u && u.role === 'CHAUFFEUR') {
+      const req = context.switchToHttp().getRequest();
+      const path = String(req.path || '');
+      // Seule exception : déclarer un incident ou un presque-accident HSE (sans pouvoir lister ceux des autres).
+      if (!JwtAuthGuard.driverAllowed(path) && !(req.method === 'POST' && path === '/hse/incidents')) throw new ForbiddenException('Le compte chauffeur ne donne accès qu\'à l\'application chauffeur.');
+    }
     if (u && u.role === 'DIRECTEUR_GENERAL') {
       const req = context.switchToHttp().getRequest();
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !String(req.path || '').startsWith('/auth/') && req.path !== '/support/reports' && !(req.method === 'PATCH' && /^\/notifications\/[^/]+\/read$/.test(String(req.path || ''))) && !JwtAuthGuard.dgStaffWrite(req.method, String(req.path || ''))) {
@@ -43,6 +53,10 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       }
     }
     return u;
+  }
+
+  static driverAllowed(path: string): boolean {
+    return /^\/(driver|auth|uploads|notifications|support)(\/|$)/.test(path) || ['/branding', '/license', '/health'].some((x) => path === x || path.startsWith(x + '/'));
   }
 
   // Écritures autorisées au DG sur les comptes de ses responsables (jamais sur les rapports du personnel).

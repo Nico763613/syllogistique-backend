@@ -49,7 +49,7 @@ const upload = async (token) => { const fd = new FormData(); fd.append('file', n
     ['GET', '/audit?limit=5', 'dg', 200], ['GET', '/audit?limit=5', 'chf', 403], ['GET', '/audit?limit=5&entities=User', 'stock', 403], ['GET', '/audit?limit=5&entities=StockMovement', 'stock', 200], ['GET', '/audit?limit=5&entity=User', 'flotte', 403],
     ['GET', '/driver-admin/sheets/pending', 'ops', 200], ['GET', '/driver-admin/sheets/pending', 'compta', 403], ['GET', '/driver-admin/sheets/pending', 'chf', 403],
     ['GET', '/driver-admin/expenses', 'compta', 200], ['GET', '/driver-admin/expenses', 'stock', 403],
-    ['GET', '/hse/incidents', 'chf', 403], ['GET', '/users', 'chf', 403], ['GET', '/users', 'meca', 403],
+    ['GET', '/hse/incidents', 'chf', 403], ['GET', '/users', 'chf', 403], ['GET', '/expenses', 'chf', 403], ['GET', '/fuel', 'chf', 403], ['GET', '/inventory/valuation', 'chf', 403], ['GET', '/customers', 'chf', 403], ['GET', '/expenses', 'compta', 200], ['GET', '/users', 'meca', 403],
   ];
   for (const [m, p, who, want] of M) { r = await api(m, p, undefined, T[who]); ok(r.s === want, `${who} ${m} ${p} → ${want}`, r.s); }
   r = await api('POST', '/downtimes', { vehicleId: crypto.randomUUID(), reason: 'Essai' }, T.stock); ok(r.s === 403, 'le gestionnaire de stock ne déclare pas de panne → 403', r.s);

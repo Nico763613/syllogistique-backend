@@ -56,7 +56,9 @@ for (const f of walk(DIST)) {
 }
 const uniq = new Map(); for (const e of endpoints) if (!uniq.has(e.path)) uniq.set(e.path, e);
 const EPS = [...uniq.values()].sort((a, b) => a.path.localeCompare(b.path));
-const allowed = (e, role) => !e.roles || !e.roles.length || e.roles.includes(role) || (role === 'DIRECTEUR_GENERAL' && e.roles.includes('LECTEUR'));
+// Compte Chauffeur : limité à l'application chauffeur (même règle que JwtAuthGuard.driverAllowed)
+const driverAllowed = (p) => /^\/(driver|auth|uploads|notifications|support)(\/|$)/.test(p) || ['/branding', '/license', '/health'].some((x) => p === x || p.startsWith(x + '/'));
+const allowed = (e, role) => (role !== 'CHAUFFEUR' || driverAllowed(e.path)) && (!e.roles || !e.roles.length || e.roles.includes(role) || (role === 'DIRECTEUR_GENERAL' && e.roles.includes('LECTEUR')));
 
 (async () => {
   console.log(`${EPS.length} écrans de consultation trouvés dans ${new Set(EPS.map((e) => e.file)).size} contrôleurs.`);
