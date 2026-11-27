@@ -363,7 +363,9 @@ async function renderDrivers() {
     <td>${statusBadge(d.status === 'ACTIVE' ? 'AVAILABLE' : d.status)}</td>
     <td><button class="btn small" onclick="editDriver('${esc(d.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg> Modifier</button></td></tr>`).join('') || `<tr><td colspan="8" class="empty">Aucun chauffeur dans ce dossier.</td></tr>`;
 
-  const signups = await api('/driver-signup').catch(() => []);
+  const signupsAll = await api('/driver-signup').catch(() => []);
+  // Chaque dossier ne montre que ses propres demandes (camion ou véhicule de service), rien dans Archives
+  const signups = tab === 'ARCH' ? [] : (Array.isArray(signupsAll) ? signupsAll : []).filter((s) => !s.activity || s.activity === tab);
   const tabs = syTabs([['TRUCK', `Chauffeurs camion (${cnt.TRUCK})`, 'truck'], ['SERVICE_VEHICLE', `Chauffeurs véhicule de service (${cnt.SERVICE_VEHICLE})`, 'car'], ['ARCH', 'Archives', 'archive']], tab, 'setDrvFilter');
   const sub = window.DRVSUB === 'rep' ? 'rep' : 'list';
   root().innerHTML = `
