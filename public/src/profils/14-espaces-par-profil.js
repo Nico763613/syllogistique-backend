@@ -7,7 +7,7 @@
    Les chiffres viennent uniquement du serveur ; une donnée absente
    s'affiche « — » (jamais inventée).
    Pour ajouter une rubrique : ajouter [libellé, vue, aide] dans PROFILES.
-   Une vue à null = rubrique prévue, pas encore d'écran (affichée « bientôt »).
+   Une vue à null = rubrique prévue sans écran : elle n'est pas affichée.
    ===================================================================== */
 
 const PROF_IC = (n) => `<svg class="ic" aria-hidden="true"><use href="#i-${n}"/></svg>`;
@@ -295,7 +295,7 @@ function renderProfFolder(i) {
   root().innerHTML = profAssist(esc(P.title) + ' › ' + (i + 1) + '. ' + esc(f.t), 'Choisissez la rubrique à ouvrir.', subs[0] ? esc(subs[0][0]) : '')
     + `<div class="panel"><h3>${PROF_IC(f.ic)} ${i + 1}. ${esc(f.t)}</h3><div class="pf-subs">${subs.map((s, j) => s[1]
       ? `<button class="pf-sub" onclick="profOpen(${i},${j})"><b>${esc(s[0])}</b><small>${esc(s[2] || '')}</small><span>${PROF_IC('chevron-right')}</span></button>`
-      : `<div class="pf-sub off"><b>${esc(s[0])}</b><small>${esc(s[2] || '')} — rubrique prévue, bientôt disponible.</small></div>`).join('')}</div></div>`;
+      : '').join('')}</div></div>`;
 }
 function profOpen(i, j) {
   const f = profCur().folders[i], s = profSubs(f)[j]; if (!s || !s[1]) return;
@@ -351,7 +351,7 @@ function profNavBuild() {
   let open = {}; try { open = JSON.parse(localStorage.getItem('syl_pf_open') || '{}'); } catch (e) {}
   nav.innerHTML = `<div class="pf-nav-item" data-pv="prof-home" onclick="go('prof-home')">${PROF_IC('home')}<span>Accueil — ${esc(P.title)}</span></div>`
     + P.folders.map((f, i) => !profSubs(f).length ? '' : `<div class="pf-nav-f${open[i] ? ' open' : ''}" data-f="${i}"><div class="pf-nav-h" onclick="profNavToggle(${i})"><span class="pf-num">${i + 1}</span><span>${esc(f.t)}</span>${PROF_IC('chevron-down')}</div>
-      <div class="pf-nav-s">${profSubs(f).map((s, j) => s[1] ? `<div class="pf-nav-item sub" data-pv="${esc(String(s[1]).split(':')[0])}" data-i="${i}" data-j="${j}" onclick="profOpen(${i},${j})"><span>${esc(s[0])}</span></div>` : `<div class="pf-nav-item sub off"><span>${esc(s[0])}</span><em>bientôt</em></div>`).join('')}</div></div>`).join('');
+      <div class="pf-nav-s">${profSubs(f).map((s, j) => s[1] ? `<div class="pf-nav-item sub" data-pv="${esc(String(s[1]).split(':')[0])}" data-i="${i}" data-j="${j}" onclick="profOpen(${i},${j})"><span>${esc(s[0])}</span></div>` : '').join('')}</div></div>`).join('');
 }
 function profNavToggle(i) {
   const el = document.querySelector(`#prof-nav .pf-nav-f[data-f="${i}"]`); if (!el) return;

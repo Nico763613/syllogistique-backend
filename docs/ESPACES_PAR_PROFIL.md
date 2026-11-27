@@ -9,7 +9,7 @@ Source : `public/src/profils/14-espaces-par-profil.js` (assemblé en `public/pro
 - Sur téléphone, barre du bas : Accueil · Dossiers · Rapports · Profil.
 - Les anciens menus restent dans la page (masqués) : aucune fonction supprimée.
 - Les chiffres viennent uniquement des tableaux de bord serveur ; une donnée absente s'affiche « — ».
-- Une rubrique sans écran est affichée « bientôt disponible » (jamais de faux écran).
+- Une rubrique sans écran n'est pas affichée (jamais de faux écran ni de mention « bientôt disponible »).
 
 ## Profils couverts
 | Profil | Rôles | Dossiers |
@@ -39,13 +39,13 @@ test, lit les droits réellement appliqués par le serveur, essaie chaque écran
 ## Droits
 Le filtrage par rôle de chaque rubrique est un confort d'affichage. La sécurité reste assurée par le serveur (`RolesGuard`, Directeur général en lecture seule).
 
-## Rubriques « bientôt disponibles »
+## Rubriques sans écran
 Aucune depuis le 27/11/2026 (fichier `19-journal-et-fournisseurs.js`) :
 - **Journal d'activité et décisions** (DG, lecture seule) : écran `journal`, données `/audit` filtrables par domaine, période et personne ; secrets masqués par le serveur, valeurs techniques traduites.
 - **Répertoire fournisseurs** (gestionnaire de stock) : écran `suppliers`, ajout et modification (droits serveur déjà en place).
 
 ## Ajouter une rubrique
-Dans `PROFILES`, ajouter `['Libellé', 'vue', 'aide', ['ROLE_OPTIONNEL']]`. Vue `null` = bientôt. Vues spéciales : `#stock-in`, `#stock-out`, `#history`, `#alerts`.
+Dans `PROFILES`, ajouter `['Libellé', 'vue', 'aide', ['ROLE_OPTIONNEL']]`. Vue `null` = rubrique masquée tant que son écran n'existe pas. Vues spéciales : `#stock-in`, `#stock-out`, `#history`, `#alerts`.
 
 ## Tableau de bord graphique (modèle unique)
 

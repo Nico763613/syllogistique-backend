@@ -101,3 +101,8 @@
 - **Constat** : la production ne contient que 11 des 15 profils ; créer un Mécanicien, un Pointeur, un Comptable ou un Responsable des opérations depuis « Utilisateurs » échouait (« Rôle introuvable »), alors que l'écran « Personnel » (/staff) les enregistrait déjà.
 - **Décision** : « Utilisateurs » (création et modification) enregistre lui aussi le profil s'il manque, uniquement parmi les 15 profils prévus par l'application. Aucun profil n'est créé en production par la mise en ligne elle-même : il l'est au moment où un responsable crée le premier compte concerné.
 - **Preuve** : l'intégration continue retire ces 4 profils de la base de test (situation de la production) avant tous les tests.
+
+## 2026-11-27 — Rapport de période : dates obligatoires
+- Décision : `/reports/period`, ses exports (Excel, PDF), l'envoi par e-mail et le lien WhatsApp vérifient la période (dates AAAA-MM-JJ, début avant fin) et répondent 400 avec un message en français.
+- Raison : sans dates, le serveur renvoyait une erreur 500 (trouvée par le contrôle des 15 profils).
+- Risque accepté : aucun pour l'interface actuelle, qui n'appelle pas ces adresses sans dates.

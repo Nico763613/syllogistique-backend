@@ -116,6 +116,7 @@ jobs:
         run: |
           node scripts/profils15.js
           cat profils15-matrice.md
+      - run: sleep 61
       - run: node scripts/smoke.js
       - name: Migrations — historique, retour arrière puis réapplication
         run: |
