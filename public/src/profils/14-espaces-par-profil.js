@@ -186,19 +186,13 @@ const PROFILES = {
     title: 'Tableau de bord HSE', space: 'Santé, sécurité, environnement',
     todo: 'Réalisez les inspections prévues, signalez tout incident avec photos, puis complétez votre rapport.',
     folders: [
-      { t: 'Inspections', ic: 'eye', subs: [
-        ['Inspections et contrôles', 'dash-hse', 'Camions, véhicules, équipements, sites.'],
-      ] },
-      { t: 'Incidents et accidents', ic: 'alert', subs: [
-        ['Incidents et suivi', 'dash-hse', 'Déclarer, décrire, suivre le traitement.'],
-      ] },
-      { t: 'Équipements de protection', ic: 'hard-hat', subs: [
-        ['Conformité EPI', 'dash-hse', 'Distribution, contrôles, renouvellements.'],
+      { t: 'Terrain HSE', ic: 'hard-hat', subs: [
+        ['Inspections, incidents et EPI', 'dash-hse', 'Contrôles, déclarations avec photos, équipements de protection.'],
       ] },
       { t: 'Rapports HSE', ic: 'file', subs: [
         ['Mon rapport du jour', 'my-report', 'Rapport journalier.'],
         ['Rapports et historique', 'reports-hse', 'Rapports hebdomadaires et mensuels.', ['GESTIONNAIRE_HSE']],
-        ['Mon espace', 'espace', 'Inspections et incidents récents.'],
+        ['Mon historique', 'espace', 'Mes inspections et incidents récents.'],
         ['Enrôlement des agents', 'enrol', 'Envoyer le lien aux agents HSE.', ['GESTIONNAIRE_HSE']],
       ] },
     ],
