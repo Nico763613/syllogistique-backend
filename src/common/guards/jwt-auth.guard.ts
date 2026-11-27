@@ -9,15 +9,20 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     super();
   }
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
     if (isPublic) {
-      return true;
+      // Route publique : si un jeton valable est fourni, on reconnaît quand même l'utilisateur
+      // (ex. /branding renvoie alors le nom et le logo de SA propre entreprise). Sans jeton ou jeton
+      // invalide, la route reste accessible comme avant, sans utilisateur.
+      const req = context.switchToHttp().getRequest();
+      if (!req?.headers?.authorization) return true;
+      try { return (await (super.canActivate(context) as Promise<boolean>)) || true; } catch { return true; }
     }
-    return super.canActivate(context);
+    return (await super.canActivate(context)) as boolean;
   }
 
   // Le Directeur Général est en lecture seule : aucune création, modification ni suppression,

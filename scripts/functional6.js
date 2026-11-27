@@ -179,6 +179,47 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   r = await api('POST', '/auth/password-reset/request', { identifier: `f6flotte2${n}@test.gn` });
   ok(r.s === 429 || (r.d && r.d.message === generic), 'demandes répétées : limitées (anti-abus), toujours sans divulgation', r.s);
 
+  // ================= Livraison 195 : fichiers protégés, numérotation et inscriptions par entreprise =================
+  await pause('limite de requêtes par minute');
+  // Fichiers : lien signé et temporaire, jamais lisible par la seule adresse
+  const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a0b00000000049454e44ae426082', 'hex');
+  const fd = new FormData(); fd.append('file', new Blob([png], { type: 'image/png' }), 'photo.png');
+  let up = await fetch(B + '/uploads?category=vehicle_photo', { method: 'POST', headers: { authorization: 'Bearer ' + tA }, body: fd });
+  const upd = await up.json().catch(() => ({}));
+  ok(up.status === 201 && /^\/uploads\/[0-9a-f-]{36}\.png\?e=\d+&t=[\w-]{32}$/.test(upd.url || ''), 'envoi de photo : adresse signée renvoyée', upd);
+  const bare = (upd.url || '').split('?')[0];
+  let g = await fetch(B + upd.url); ok(g.status === 200 && (await g.arrayBuffer()).byteLength === png.length, 'lien signé : fichier lu, contenu intact', g.status);
+  g = await fetch(B + bare); ok(g.status === 403, 'adresse sans signature : refusée', g.status);
+  g = await fetch(B + (upd.url || '').replace(/t=[\w-]{4}/, 't=AAAA')); ok(g.status === 403, 'signature modifiée : refusée', g.status);
+  g = await fetch(B + bare + '?e=1000000000&t=' + 'A'.repeat(32)); ok(g.status === 403, 'lien expiré : refusé', g.status);
+  g = await fetch(B + '/uploads/../../etc/passwd'); ok(g.status === 403 || g.status === 404, 'nom de fichier invalide : refusé', g.status);
+  // Une adresse signée renvoyée par l'application est enregistrée sans sa signature, puis re-signée à la lecture
+  r = await api('PATCH', '/branding', { logoUrl: upd.url }, tB);
+  ok(r.s === 200 || r.s === 403, 'logo de B : adresse signée acceptée (ou licence non payée)', r);
+  if (r.s === 200) {
+    const row = await api('GET', '/branding', undefined, tB);
+    ok(row.d && /\?e=\d+&t=/.test(row.d.logoUrl || ''), 'logo relu avec une signature neuve', row.d);
+    const rowA = await api('GET', '/branding', undefined, tA);
+    ok(rowA.d && rowA.d.logoUrl !== row.d.logoUrl, 'A ne reçoit pas le logo de B', rowA.d);
+  }
+
+  // Numérotation : chaque entreprise a son code et ses propres compteurs
+  const numA = await api('GET', '/settings/numbering', undefined, tA), numB = await api('GET', '/settings/numbering', undefined, tB);
+  const codeA = JSON.stringify(numA.d || {}).match(/"companyCode":"([A-Z0-9]+)"/), codeB = JSON.stringify(numB.d || {}).match(/"companyCode":"([A-Z0-9]+)"/);
+  ok(is2(numA) && is2(numB) && codeA && codeB && codeA[1] !== codeB[1], 'numérotation : un code distinct par entreprise', { a: codeA && codeA[1], b: codeB && codeB[1] });
+
+  // Inscriptions de chauffeurs : rattachées à l'entreprise du lien partagé
+  const lnk = await api('GET', '/driver-signup/link', undefined, tB);
+  ok(is2(lnk) && lnk.d && lnk.d.code && lnk.d.path === '/?entreprise=' + lnk.d.code, 'lien d’inscription propre à B', lnk.d);
+  const tel = '62' + n;
+  r = await api('POST', '/driver-signup', { firstName: 'Mamadou', lastName: 'Test', phone: tel, company: lnk.d && lnk.d.code });
+  ok(is2(r), 'demande d’inscription envoyée avec le lien de B', r);
+  const lb = await api('GET', '/driver-signup', undefined, tB), la = await api('GET', '/driver-signup', undefined, tA);
+  const has = (x) => (Array.isArray(x.d) ? x.d : []).some((y) => y.phone === tel);
+  ok(has(lb) && !has(la), 'la demande apparaît chez B et pas chez A', { b: has(lb), a: has(la) });
+  const sid = (Array.isArray(lb.d) ? lb.d : []).find((y) => y.phone === tel);
+  if (sid) { r = await api('POST', `/driver-signup/${sid.id}/reject`, {}, tA); ok(refused(r), 'A ne peut pas traiter une demande de B', r.s); }
+
   console.log(fails ? `\n${fails} échec(s)` : '\nTous les contrôles multi-entreprises sont passés.');
   process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

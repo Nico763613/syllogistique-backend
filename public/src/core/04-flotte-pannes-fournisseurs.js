@@ -328,12 +328,23 @@ function openDriverSignup() {
     <div id="su-m"></div><div class="row" style="margin-top:10px"><button class="btn" onclick="sendDriverSignup()">Envoyer ma demande</button><button class="btn ghost" onclick="document.getElementById('su-ov').remove()">Fermer</button></div></div>`;
   document.body.appendChild(ov);
 }
+// Code de l'entreprise inscrit dans le lien d'inscription (?entreprise=VTX) : la demande arrive chez cette entreprise.
+function signupCompany() { try { return (new URLSearchParams(location.search).get('entreprise') || '').trim().toUpperCase().slice(0, 12); } catch (e) { return ''; } }
+// Lien d'inscription de l'entreprise, à envoyer aux chauffeurs par WhatsApp.
+async function shareSignupLink() {
+  try {
+    const r = await api('/driver-signup/link');
+    const url = location.origin + (r && r.path ? r.path : '/');
+    const text = "Pour vous inscrire comme chauffeur, ouvrez ce lien puis touchez « Je suis chauffeur : demander mon inscription » : " + url;
+    window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+  } catch (e) { bellToast(e.message || 'Lien indisponible.'); }
+}
 async function sendDriverSignup() {
   const m = document.getElementById('su-m'), g = (i) => document.getElementById(i).value.trim();
   try {
     if (!g('su-f') || !g('su-l') || g('su-p').replace(/\D/g, '').length < 8) throw new Error('Renseignez votre prénom, votre nom et un numéro de téléphone valide.');
     const base = (state.apiUrl || DEFAULT_API_URL).replace(/\/$/, '');
-    const r = await fetch(base + '/driver-signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: g('su-f'), lastName: g('su-l'), phone: g('su-p'), activity: document.getElementById('su-a').value }) });
+    const r = await fetch(base + '/driver-signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ firstName: g('su-f'), lastName: g('su-l'), phone: g('su-p'), activity: document.getElementById('su-a').value, company: signupCompany() || undefined }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(Array.isArray(j.message) ? j.message[0] : j.message || 'Envoi impossible.');
     m.innerHTML = `<div class="msg ok">${esc(j.message)}</div>`;
@@ -369,6 +380,7 @@ async function renderDrivers() {
   const tabs = syTabs([['TRUCK', `Chauffeurs camion (${cnt.TRUCK})`, 'truck'], ['SERVICE_VEHICLE', `Chauffeurs véhicule de service (${cnt.SERVICE_VEHICLE})`, 'car'], ['ARCH', 'Archives', 'archive']], tab, 'setDrvFilter');
   const sub = window.DRVSUB === 'rep' ? 'rep' : 'list';
   root().innerHTML = `
+    ${tab !== 'ARCH' ? `<div class="row" style="justify-content:flex-end;margin-bottom:8px"><button class="btn small ghost" onclick="shareSignupLink()">Envoyer le lien d'inscription (WhatsApp)</button></div>` : ''}
     ${signups.length ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg> Demandes d'inscription (${signups.length})</h3><div class="desc">Chauffeurs qui se sont inscrits eux-mêmes. Approuvez pour créer la fiche, puis utilisez « Inviter » pour leur remettre le QR d'accès.</div>
       <div class="table-wrap"><table><thead><tr><th>Nom</th><th>Téléphone</th><th>Activité</th><th>Date</th><th></th></tr></thead><tbody>${signups.map((s) => `<tr><td><b>${esc(s.lastName)}</b> ${esc(s.firstName)}</td><td>${esc(s.phone)}</td><td>${s.activity === 'TRUCK' ? 'Camion' : s.activity === 'SERVICE_VEHICLE' ? 'Véhicule de service' : '—'}</td><td>${esc(new Date(s.createdAt).toLocaleDateString('fr-FR'))}</td>
         <td><button class="btn small" onclick="signupDecide('${esc(s.id)}','approve')">Approuver</button> <button class="btn small ghost" onclick="signupDecide('${esc(s.id)}','reject')">Refuser</button></td></tr>`).join('')}</tbody></table></div></div>` : ''}

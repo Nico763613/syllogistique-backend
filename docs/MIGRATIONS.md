@@ -12,6 +12,8 @@ prisma/migrations-sql/
   0002_versions_et_conflits.down.sql
   0003_codes_reinitialisation.up.sql
   0003_codes_reinitialisation.down.sql
+  0004_numerotation_par_entreprise.up.sql / .down.sql   (code d'entreprise, compteurs de missions par entreprise)
+  0005_inscriptions_par_entreprise.up.sql / .down.sql   (rattachement des inscriptions de chauffeurs)
 ```
 
 Au démarrage, le serveur applique automatiquement les migrations en attente (`src/migrations/migration-runner.ts`) :
@@ -32,7 +34,7 @@ node dist/migrations/cli.js down 0003       # annule la dernière migration (si 
 ```
 
 Seule la **dernière** migration appliquée peut être annulée ; pour remonter plus loin, on annule une par une.
-Le retour arrière est aussi testé automatiquement en intégration continue (annulation de 0003 puis réapplication).
+Le retour arrière est aussi testé automatiquement en intégration continue (annulation de 0005, 0004 puis 0003, puis réapplication).
 
 ## Procédure en production (obligatoire)
 

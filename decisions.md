@@ -82,3 +82,17 @@
 ## 2026-11-27 — Accès plateforme : clé vérifiée avant tout
 - **Décision** : la clé `x-platform-key` est contrôlée par un garde qui passe avant la validation du contenu.
 - **Raison** : sans clé, aucune information (même un message de validation) ne doit être renvoyée.
+
+## 2026-11-27 — Numérotation des documents par entreprise (livraison 195)
+- **Décision** : chaque entreprise reçoit un code court unique (`organizations.doc_code`, 3 lettres tirées de son nom, ex. SYL, puis SYL1… en cas de doublon). Les nouveaux numéros prennent la forme `PRÉFIXE-CODE-AAAA-NNNN` (ex. `FAC-SYL-2026-0001`, `TRP-SYL-2026-0001`) avec un compteur propre à chaque entreprise. Chaque entreprise règle elle-même ses préfixes.
+- **Raison** : les références sont uniques sur toute la plateforme ; sans code d'entreprise, deux entreprises ne pouvaient pas avoir chacune leur propre suite de numéros (risque de collision ou de numéros partagés).
+- **Risque accepté** : les numéros déjà émis gardent leur ancienne forme (rien n'est renuméroté) ; la suite de l'entreprise principale change donc de forme à partir de la mise en production.
+
+## 2026-11-27 — Inscriptions de chauffeurs rattachées à l'entreprise du lien
+- **Décision** : le formulaire public accepte un code d'entreprise (`?entreprise=CODE` dans le lien partagé par WhatsApp). La demande est enregistrée dans cette entreprise (`driver_signups.organization_id`) et n'est visible et traitable que par ses responsables. Sans code, ou code inconnu : entreprise principale (comportement actuel). Les demandes existantes sont rattachées à l'entreprise principale.
+- **Risque accepté** : un chauffeur qui n'utilise pas le lien de son entreprise arrive dans l'entreprise principale ; un responsable peut alors la refuser.
+
+## 2026-11-27 — Fichiers protégés par lien signé et temporaire
+- **Décision** : photos, reçus et documents ne sont plus lisibles par leur seule adresse. Le serveur ajoute à chaque adresse renvoyée une expiration et une signature HMAC (clé `FILES_SIGNING_KEY`, sinon `JWT_ACCESS_SECRET`) ; un lien vaut 24 à 25 heures. La lecture libre du dossier `uploads` est supprimée. La base garde l'adresse nue (les signatures reçues sont retirées à l'entrée). Les logos des PDF et de l'écran sont désormais ceux de l'entreprise de l'utilisateur (auparavant : première entreprise de la plateforme).
+- **Raison** : exigence de cloisonnement des pièces jointes entre entreprises ; seules les réponses déjà filtrées par entreprise et site fournissent un lien valable.
+- **Risques acceptés** : (1) un lien transféré reste lisible jusqu'à son expiration ; (2) changer `JWT_ACCESS_SECRET` sans `FILES_SIGNING_KEY` invalide les liens en cours (il suffit de rouvrir la page) ; (3) une image gardée en cache hors ligne au-delà de 25 heures doit être rechargée.

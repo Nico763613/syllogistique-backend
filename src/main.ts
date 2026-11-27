@@ -64,10 +64,8 @@ async function bootstrap() {
     }),
   );
 
-  // Fichiers uploadés (photos, reçus, documents) servis statiquement.
-  // En production sur un disque éphémère (Render, Railway…), pensez à un volume
-  // persistant ou à basculer vers un stockage S3-compatible (voir uploads.controller.ts).
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), { prefix: '/uploads/', index: false, dotfiles: 'deny' });
+  // Fichiers envoyés (photos, reçus, documents) : servis uniquement par UploadsController, avec un lien
+  // signé et temporaire (src/uploads/file-links.ts). Plus de lecture libre du dossier du disque.
 
   // Application web SYLLOGISTIQUE (PWA) servie sur /app/ — même adresse que l'API, donc sans CORS.
   app.useStaticAssets(join(__dirname, '..', 'public'), { prefix: '/app/', index: 'index.html', dotfiles: 'deny' });

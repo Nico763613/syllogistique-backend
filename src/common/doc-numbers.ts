@@ -1,6 +1,11 @@
 // Numérotation centrale des documents : une séquence par type de document et par exercice (année).
 // Attribution atomique (une seule instruction SQL verrouille la ligne) : deux utilisateurs simultanés ne reçoivent jamais le même numéro,
 // et un numéro attribué n'est jamais réutilisé (même si le document est annulé). Chaque attribution est historisée (document_number_log).
+import { currentOrganizationId } from './tenant-scope';
+
+// Numérotation par entreprise (migration 0004) : chaque entreprise a son code (ex. VTX) et ses propres compteurs,
+// le numéro devient PREFIXE-CODE-AAAA-NNNN et reste unique sur toute la plateforme. Sans entreprise connue
+// (tâches internes) ou si la migration n'est pas encore appliquée : ancienne numérotation commune.
 type Db = { $queryRawUnsafe: (q: string, ...a: any[]) => Promise<any>; $executeRawUnsafe: (q: string, ...a: any[]) => Promise<any> };
 
 export const DOC_SEQUENCE_SCHEMA: string[] = [
@@ -37,20 +42,31 @@ export function formatDocNumber(prefix: string, year: number, seq: number, pad =
  * @param seed donne le plus grand numéro déjà utilisé pour ce type/exercice (documents créés avant la mise en place de la séquence) ;
  *             appelé seulement à la première attribution.
  */
-export async function nextDocNumber(db: Db, docType: string, prefix: string, seed: (year: number) => Promise<number>, opts: { pad?: number; by?: string; year?: number } = {}): Promise<string> {
+/** Code de numérotation de l'entreprise (créé au premier appel), ou null si indisponible. */
+export async function orgDocCode(db: Db, orgId: string | null | undefined): Promise<string | null> {
+  if (!orgId) return null;
+  try { return (((await db.$queryRawUnsafe('SELECT org_doc_code($1) AS c', orgId)) as any[])[0]?.c as string) || null; } catch { return null; }
+}
+
+/** Clé de séquence et de réglage d'un type de document pour une entreprise. */
+export const docKey = (orgId: string | null, docType: string) => (orgId ? `${orgId}:${docType}` : docType);
+
+export async function nextDocNumber(db: Db, docType: string, prefix: string, seed: (year: number, fullPrefix: string) => Promise<number>, opts: { pad?: number; by?: string; year?: number; orgId?: string | null } = {}): Promise<string> {
   const year = opts.year ?? new Date().getFullYear();
-  const key = `${docType}`;
-  // Réglage éventuel (préfixe / chiffres / année / remise à zéro) ; sans réglage : PREFIXE-AAAA-NNNN, remise à zéro chaque année.
+  const orgId = opts.orgId !== undefined ? opts.orgId : currentOrganizationId();
+  const code = await orgDocCode(db, orgId);
+  const key = docKey(code ? orgId! : null, docType);
+  // Réglage éventuel (préfixe / chiffres / année / remise à zéro) : celui de l'entreprise, sinon le réglage commun.
   let cfg: any = null;
-  try { cfg = ((await db.$queryRawUnsafe('SELECT "prefix","pad","include_year","reset_yearly" FROM "document_numbering_config" WHERE "doc_type" = $1', key)) as any[])?.[0] || null; } catch { cfg = null; }
-  const usePrefix = cfg?.prefix || prefix;
+  try { cfg = ((await db.$queryRawUnsafe('SELECT "prefix","pad","include_year","reset_yearly" FROM "document_numbering_config" WHERE "doc_type" IN ($1,$2) ORDER BY ("doc_type" = $1) DESC LIMIT 1', key, docType)) as any[])?.[0] || null; } catch { cfg = null; }
+  const usePrefix = (cfg?.prefix || prefix) + (code ? `-${code}` : '');
   const pad = cfg ? Number(cfg.pad) || 4 : (opts.pad ?? 4);
   const resetYearly = cfg ? cfg.reset_yearly !== false : true;
   const includeYear = cfg ? (resetYearly ? true : cfg.include_year !== false) : true;
   const seqYear = resetYearly ? year : 0;
   const row = await db.$queryRawUnsafe('SELECT 1 AS x FROM "document_sequences" WHERE "doc_type" = $1 AND "year" = $2', key, seqYear);
   if (!row.length) {
-    const start = Math.max(0, Math.floor(await seed(year)) || 0);
+    const start = Math.max(0, Math.floor(await seed(year, usePrefix)) || 0);
     await db.$executeRawUnsafe('INSERT INTO "document_sequences" ("doc_type","year","last_value") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING', key, seqYear, start);
   }
   const r = await db.$queryRawUnsafe('UPDATE "document_sequences" SET "last_value" = "last_value" + 1, "updated_at" = CURRENT_TIMESTAMP WHERE "doc_type" = $1 AND "year" = $2 RETURNING "last_value" AS v', key, seqYear);
@@ -76,8 +92,8 @@ export async function ensureReceiptNumber(db: Db, paymentId: string, by?: string
 
 // Raccourci : prochaine référence « PREFIX-AAAA-NNNN » pour une table qui a une colonne `reference` (la séquence reprend les numéros déjà utilisés).
 export async function nextRefOf(prisma: any, prefix: string, model: string, by?: string): Promise<string> {
-  return nextDocNumber(prisma, prefix, prefix, async (year) => {
-    const rows = await prisma[model].findMany({ where: { reference: { startsWith: `${prefix}-${year}-` } }, select: { reference: true } });
+  return nextDocNumber(prisma, prefix, prefix, async (year, full) => {
+    const rows = await prisma[model].findMany({ where: { reference: { startsWith: `${full}-${year}-` } }, select: { reference: true } });
     return maxSeqOf(rows.map((r: any) => r.reference || ''));
   }, { by });
 }

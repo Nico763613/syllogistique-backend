@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Param, Res, UploadedFile, UseInterceptors, UseGuards, BadRequestException, NotFoundException, Query } from '@nestjs/common';
+import { Controller, Post, Get, Param, Res, UploadedFile, UseInterceptors, UseGuards, BadRequestException, ForbiddenException, NotFoundException, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { extname } from 'path';
@@ -9,6 +9,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PrismaService } from '../prisma.service';
+import { FILE_NAME_RE, readUpload, signedPath, verifyLink } from './file-links';
 
 const MIME: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.pdf': 'application/pdf', '.heic': 'image/heic' };
 const MAX_SIZE = 15 * 1024 * 1024; // 15 Mo
@@ -43,22 +44,30 @@ export class UploadsController {
     const name = `${uuid()}${ext}`;
     await this.prisma.$executeRaw`INSERT INTO uploaded_files (name, mime, size, data) VALUES (${name}, ${MIME[ext]}, ${file.size}, ${file.buffer})`;
     return {
-      url: `/uploads/${name}`,
+      url: signedPath(name),
       originalName: file.originalname,
       size: file.size,
       category: category || 'other', // vehicle_photo, fuel_receipt, maintenance_invoice, driver_license, document, signature
     };
   }
 
-  // Lecture publique (balises <img>) : les noms sont des UUID non devinables
+  // Lecture par lien signé et temporaire (balises <img> sans en-tête de connexion) : voir file-links.ts.
+  // Sans signature valable, le fichier est introuvable, même si son nom est connu.
   @Public()
   @Get(':name')
-  async read(@Param('name') name: string, @Res() res: any) {
-    if (!/^[0-9a-f-]{36}\.(jpg|jpeg|png|webp|pdf|heic)$/.test(name)) throw new NotFoundException();
+  async read(@Param('name') name: string, @Query('e') e: string, @Query('t') t: string, @Res() res: any) {
+    if (!FILE_NAME_RE.test(name)) throw new NotFoundException();
+    if (!verifyLink(name, e, t)) throw new ForbiddenException('Lien de fichier expiré ou invalide. Rouvrez la page pour obtenir un nouveau lien.');
     const rows = await this.prisma.$queryRaw<{ mime: string; data: Buffer }[]>`SELECT mime, data FROM uploaded_files WHERE name = ${name}`;
-    if (!rows.length) throw new NotFoundException();
+    if (!rows.length) {
+      // Ancien fichier encore sur le disque du serveur
+      const disk = await readUpload(this.prisma, `/uploads/${name}`);
+      if (!disk) throw new NotFoundException();
+      const ext = name.slice(name.lastIndexOf('.'));
+      rows.push({ mime: MIME[ext] || 'application/octet-stream', data: disk });
+    }
     res.setHeader('Content-Type', rows[0].mime);
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'");
     res.send(Buffer.from(rows[0].data));

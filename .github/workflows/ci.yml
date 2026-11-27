@@ -111,6 +111,8 @@ jobs:
       - name: Migrations — historique, retour arrière puis réapplication
         run: |
           node dist/migrations/cli.js status
+          node dist/migrations/cli.js down 0005
+          node dist/migrations/cli.js down 0004
           node dist/migrations/cli.js down 0003
           node dist/migrations/cli.js status
           node dist/migrations/cli.js up
