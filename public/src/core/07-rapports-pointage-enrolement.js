@@ -123,21 +123,25 @@ async function renderStaff(view, reportsOnly) {
   const c = STAFF_CFG[view]; window._stView = view; window._stRo = !!reportsOnly;
   const today = window._stDate || new Date().toISOString().slice(0, 10);
   const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) && !reportsOnly;
-  root().innerHTML = `
+  if (reportsOnly) window._stTab = 'rep'; else if (!['team', 'rep'].includes(window._stTab)) window._stTab = 'team';
+  const t = window._stTab;
+  const tabs = reportsOnly ? '' : syTabs([['team', c.title.replace(/[^\wÀ-ÿ ]/g, '').trim(), 'users'], ['rep', 'Rapports', 'file']], t, 'stTab');
+  root().innerHTML = tabs + (t === 'rep' ? `
     <div class="panel"><h3>${c.rep}</h3>
       <div class="desc">${reportsOnly ? `Rapport d'activité envoyé chaque jour par les ${c.one}s. L'enregistrement et l'envoi du lien se font dans Logistique › Équipes terrain › Enrôlement.` : `Chaque ${c.one} est enregistré, reçoit son lien par WhatsApp, puis envoie chaque jour son rapport d'activité : vous le recevez ici.`}</div>
       <label>Jour</label><input id="st-date" type="date" value="${esc(today)}" onchange="window._stDate=this.value;stLoad()" style="max-width:220px">
       <div id="st-sum" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px"></div></div>
-    <div id="st-reports"><div class="empty">Chargement…</div></div>
+    <div id="st-reports"><div class="empty">Chargement…</div></div>` : `
     ${office ? `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouveau ${c.one}</h3>
       <div class="grid-2"><div><label>Prénom</label><input id="st-first"></div><div><label>Nom</label><input id="st-last"></div><div><label>Téléphone (WhatsApp)</label><input id="st-phone" type="tel" placeholder="6xx xx xx xx"></div></div>
       <button class="btn gold" onclick="stSave()">Enregistrer</button><div id="st-msg"></div></div>` : ''}
-    ${reportsOnly ? '' : '<div class="panel"><h3>Équipe</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>'}`;
+    <div class="panel"><h3>${c.title.replace(/[^\wÀ-ÿ ]/g, '').trim()}</h3><div id="st-team"><div class="empty">Chargement…</div></div><div id="st-inv"></div></div>`);
   stLoad();
 }
+function stTab(k) { window._stTab = k; renderStaff(window._stView, window._stRo); }
 async function stLoad() {
   const c = STAFF_CFG[window._stView]; if (!c) return;
-  const d = document.getElementById('st-date').value;
+  const dEl = document.getElementById('st-date'), d = dEl ? dEl.value : (window._stDate || new Date().toISOString().slice(0, 10));
   const office = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE'].includes(state.user.role) && !window._stRo;
   const canReceive = !['LECTEUR', 'DIRECTEUR_GENERAL'].includes(state.user.role);
   try {
@@ -146,9 +150,9 @@ async function stLoad() {
     const byName = {}; reps.forEach((r) => { byName[r.name] = r; });
     const missing = active.filter((u) => !byName[u.firstName + ' ' + u.lastName]);
     const tile = (n, l, col) => `<div style="flex:1;min-width:110px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center"><div style="font-size:20px;font-weight:700;color:${col}">${n}</div><div style="font-size:12px;color:var(--muted)">${l}</div></div>`;
-    document.getElementById('st-sum').innerHTML = tile(active.length, 'Personnes', 'var(--navy)') + tile(reps.length, 'Rapports envoyés', '#3F8F6B') + tile(reps.filter((r) => r.receivedAt).length, 'Reçus', '#3F8F6B') + tile(missing.length, 'Non envoyés', '#A8403D');
+    if (document.getElementById('st-sum')) document.getElementById('st-sum').innerHTML = tile(active.length, 'Personnes', 'var(--navy)') + tile(reps.length, 'Rapports envoyés', '#3F8F6B') + tile(reps.filter((r) => r.receivedAt).length, 'Reçus', '#3F8F6B') + tile(missing.length, 'Non envoyés', '#A8403D');
     const wa = (u) => { const n = String(u.phone || '').replace(/\D/g, ''), f = n.length === 9 ? '224' + n : n; return u.phone ? `<a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${esc(f)}?text=${encodeURIComponent('Bonjour ' + u.firstName + ', merci d\'envoyer votre rapport du jour dans l\'application.')}">Relancer</a>` : ''; };
-    document.getElementById('st-reports').innerHTML = reps.map((r) => `<div class="panel"><h3 style="margin-bottom:4px">${esc(r.name)} ${stepBadge(staffStep(r))} <span style="font-size:12px;font-weight:400;color:var(--muted)">${drvDt(r.sentAt)}</span></h3>
+    const rpEl = document.getElementById('st-reports'); if (rpEl) rpEl.innerHTML = reps.map((r) => `<div class="panel"><h3 style="margin-bottom:4px">${esc(r.name)} ${stepBadge(staffStep(r))} <span style="font-size:12px;font-weight:400;color:var(--muted)">${drvDt(r.sentAt)}</span></h3>
         <div class="desc">${esc(r.phone || '')}</div>
         <h4 style="margin:8px 0 2px">Activités</h4><div style="white-space:pre-wrap">${esc(r.activities)}</div>
         ${r.observations ? `<h4 style="margin:8px 0 2px">Observations</h4><div style="white-space:pre-wrap">${esc(r.observations)}</div>` : ''}
@@ -159,7 +163,7 @@ async function stLoad() {
     const tmEl = document.getElementById('st-team'); if (tmEl) tmEl.innerHTML = team.length ? `<div style="overflow:auto"><table><tr><th>Nom</th><th>Téléphone</th><th>Application</th><th>Dernier rapport</th><th></th></tr>${team.map((u) => `<tr><td><b>${esc(u.lastName)}</b> ${esc(u.firstName)}</td><td>${esc(u.phone || '—')}</td>
       <td>${u.neverConnected ? '<span class="badge warn">Pas encore connecté</span>' : '<span class="badge ok">Connecté</span>'}</td><td>${esc(u.lastReport || '—')}</td>
       <td>${office ? `<button class="btn small gold" onclick="stInvite('${esc(u.id)}')"><svg class="ic" aria-hidden="true"><use href="#i-message"/></svg> Envoyer le lien</button>` : ''}</td></tr>`).join('')}</table></div>` : '<div class="empty">Aucune personne enregistrée.</div>';
-  } catch (e) { document.getElementById('st-reports').innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
+  } catch (e) { const er = document.getElementById('st-reports') || document.getElementById('st-team'); if (er) er.innerHTML = `<div class="panel"><div class="msg err">${esc(e.message)}</div></div>`; }
 }
 async function stSave() {
   const c = STAFF_CFG[window._stView], m = document.getElementById('st-msg'), g = (id) => document.getElementById(id).value.trim();

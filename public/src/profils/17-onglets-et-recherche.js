@@ -47,9 +47,13 @@ function gsScope() { const v = state.view || ''; const s = GS_SCOPES.find((x) =>
 function gsPlaceholder() {
   const i = document.getElementById('gs-input'); if (!i) return;
   const v = state.view || '', s = GS_SCOPES.find((x) => x[0].includes(v));
-  i.placeholder = s ? s[2] : 'Rechercher un camion, un chauffeur, un article…';
+  i.placeholder = s ? s[2] : 'Rechercher…';
   const p = document.getElementById('gs-panel'); if (p) p.style.display = 'none';
+  gsShow();
 }
+/* Barre de recherche générale retirée de tous les écrans (demande du client) :
+   chaque liste garde ses propres filtres. Le code de recherche reste en place, simplement masqué. */
+gsShow = function () { const w = document.getElementById('gs-wrap'); if (w) w.style.display = 'none'; };
 {
   const _g = go;
   go = function () { const r = _g.apply(this, arguments); try { gsPlaceholder(); } catch (e) {} return r; };

@@ -450,10 +450,8 @@ async function renderDaily() {
   root().innerHTML = `
     <div class="panel">
       <h3><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Rapports journaliers</h3>
-      <div class="tabs" style="display:flex;gap:8px;margin:6px 0 12px">
-        <button class="btn ${dailyKind === 'TRUCK' ? 'gold' : ''}" onclick="setDailyKind('TRUCK')"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg> Camions</button>
-        <button class="btn ${dailyKind === 'SERVICE_VEHICLE' ? 'gold' : ''}" onclick="setDailyKind('SERVICE_VEHICLE')"><svg class="ic" aria-hidden="true"><use href="#i-car"/></svg> Véhicules de service</button>
-      </div>
+      <div class="desc">Tous les rapports du jour, classés par dossier.</div>
+      ${syTabs(DAILY_TABS, dailyTab(), 'setDailyTab')}
       <div class="grid-2">
         <div><label>Date</label><input id="d-date" type="date" value="${today}" onchange="loadDaily()" /></div>
       </div>

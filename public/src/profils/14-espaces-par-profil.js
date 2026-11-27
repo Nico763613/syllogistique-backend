@@ -18,71 +18,51 @@ const PROFILES = {
     roles: ['DIRECTEUR_GENERAL', 'SUPER_ADMIN'],
     title: 'Tableau de bord DG', space: 'Direction générale',
     todo: 'Consultez les indicateurs, traitez les alertes, puis ouvrez le dossier du responsable concerné.',
+    // Règle : chaque écran n'apparaît qu'une seule fois dans le menu (pas de doublon)
     folders: [
       { t: 'Direction et administration', ic: 'building', subs: [
-        ['Organisation de l\'entreprise', 'settings', 'Nom, coordonnées et sites de l\'entreprise.'],
         ['Départements', 'home', 'Les départements actifs et leur accès direct.'],
-        ['Responsables', 'personnel', 'Créer les responsables et leur envoyer leur invitation.', ['DIRECTEUR_GENERAL']],
-        ['Responsables (administrateur)', 'staff-managers', 'Comptes DG et Responsable logistique.', ['SUPER_ADMIN']],
-        ['Personnel', 'personnel', 'Comptes actifs, désactivés, invitations.', ['DIRECTEUR_GENERAL']],
-        ['Affectations', 'drivers', 'Chauffeurs et véhicules affectés.'],
-        ['Historique des décisions', '#history', 'Journal des validations et décisions.', ['SUPER_ADMIN']],
-        ['Historique des décisions', null, 'Journal des validations et décisions.', ['DIRECTEUR_GENERAL']],
+        ['Historique des décisions', '#history', 'Journal des validations, décisions et activités.', ['SUPER_ADMIN']],
+        ['Historique des décisions', null, 'Journal des validations, décisions et activités.', ['DIRECTEUR_GENERAL']],
       ] },
       { t: 'Gestion logistique', ic: 'truck', subs: [
-        ['Flotte de camions', 'trucks', 'Dossier du Responsable logistique : camions.'],
+        ['Flotte de camions', 'trucks', 'Camions, fiches et documents.'],
         ['Véhicules de service', 'service-vehicles', 'Véhicules de service et IT.'],
-        ['Chauffeurs', 'drivers', 'Liste, affectations, appareils.'],
         ['Missions et déplacements', 'driver-missions', 'Historique des missions.'],
-        ['Carburant', 'fuel', 'Approvisionnements et consommation.'],
+        ['Carburant', 'fuel', 'Consommation par camion, par véhicule, totale.'],
         ['Maintenance', 'maintenance', 'Pannes, entretiens, réparations.'],
-        ['Dépenses logistiques', 'driver-expenses', 'Dépenses et reçus des chauffeurs.'],
         ['Validation des fiches', 'ops-validation', 'Fiches vérifiées à valider.', ['SUPER_ADMIN']],
       ] },
       { t: 'Gestion des stocks', ic: 'package', subs: [
-        ['Stock global', 'dash-stock', 'Indicateurs de l\'entrepôt.'],
-        ['Articles', 'stock', 'Catalogue des articles.'],
-        ['Entrées et sorties', 'stock', 'Mouvements de stock.'],
-        ['Inventaires', 'stock', 'Comptages et écarts.'],
-        ['Alertes', 'dash-stock', 'Ruptures, seuils, péremptions.'],
+        ['Stock global', 'dash-stock', 'Indicateurs, alertes et valeur du stock.'],
+        ['Articles', 'stock:articles', 'Catalogue des articles.'],
+        ['Entrées', 'stock:entrees', 'Réceptions et entrées.'],
+        ['Sorties', 'stock:sorties', 'Sorties vers les véhicules et départements.'],
+        ['Inventaires', 'stock:inventaire', 'Comptages et écarts.'],
         ['Réapprovisionnement', 'needs', 'États des besoins.'],
-        ['Valorisation du stock', 'dash-stock', 'Valeur du stock (GNF).'],
       ] },
       { t: 'Ressources humaines', ic: 'users', subs: [
-        ['Personnel et responsables', 'personnel', 'Comptes, invitations et dossier de chaque responsable.', ['DIRECTEUR_GENERAL']],
-        ['Chauffeurs', 'drivers', 'Fiches chauffeurs.'],
-        ['Mécaniciens', 'staff-mech', 'Mécaniciens et leurs rapports.'],
-        ['Agents HSE', 'staff-hse', 'Agents HSE et leurs rapports.'],
-        ['Gestionnaires de stock', 'staff-store', 'Magasiniers et leurs rapports.'],
-        ['Pointeurs', 'staff-pointer', 'Pointeurs et leurs rapports.'],
+        ['Personnel et responsables', 'personnel', 'Comptes actifs, invitations en attente, suspendus.', ['DIRECTEUR_GENERAL']],
+        ['Responsables', 'staff-managers', 'Comptes DG et Responsable logistique.', ['SUPER_ADMIN']],
+        ['Chauffeurs', 'drivers', 'Chauffeurs camion, véhicule de service, rapports, archives.'],
+        ['Mécaniciens', 'staff-mech', 'Équipe et rapports.'],
+        ['Agents HSE', 'staff-hse', 'Équipe et rapports.'],
+        ['Gestionnaires de stock', 'staff-store', 'Équipe et rapports.'],
+        ['Pointeurs', 'staff-pointer', 'Équipe et rapports.'],
       ] },
       { t: 'Comptabilité et dépenses', ic: 'receipt', subs: [
         ['Dépenses par département', 'compta', 'Dépenses validées et à valider.'],
+        ['Dépenses des chauffeurs', 'driver-expenses', 'Dépenses et reçus photographiés.'],
         ['Dépenses par véhicule', 'reports-truck', 'Coûts par camion et véhicule.'],
-        ['Dépenses par période', 'dashboard', 'Filtre jour, semaine, mois, année.'],
-        ['Justificatifs', 'driver-expenses', 'Reçus photographiés.'],
-        ['Rapports financiers', 'reports-dg', 'Synthèse financière.'],
       ] },
       { t: 'Rapports et statistiques', ic: 'chart', subs: [
         ['Tableau de bord détaillé', 'dashboard', 'Graphiques, filtres jour, semaine, mois, année.'],
-        ['Alertes et notifications', '#alerts', 'Incidents et rappels.'],
-        ['Rapports journaliers', 'daily', 'Rapports du jour de chaque département.'],
-        ['Rapports hebdomadaires', 'reports-dg', 'Synthèse de la semaine.'],
-        ['Rapports mensuels', 'reports-dg', 'Synthèse du mois.'],
-        ['Rapports par département', 'reports-truck', 'Camions, véhicules, stock, HSE.'],
-        ['Rapports consolidés', 'reports-dg', 'Vue d\'ensemble de l\'entreprise.'],
-        ['Exports et archives', 'reports-dg', 'Télécharger, imprimer, envoyer.'],
+        ['Rapports journaliers', 'daily', 'Tous les rapports du jour, classés par dossier.'],
+        ['Synthèses et archives', 'reports-dg', 'Semaine, mois, vue consolidée ; télécharger, imprimer, envoyer.'],
       ] },
       { t: 'Paramètres et sécurité', ic: 'shield', subs: [
-        ['Entreprise', 'settings', 'Identité de l\'entreprise.'],
-        ['Logo', 'settings', 'Logo affiché dans l\'application.'],
-        ['Utilisateurs', 'personnel', 'Comptes utilisateurs.', ['DIRECTEUR_GENERAL']],
-        ['Utilisateurs (administrateur)', 'staff-managers', 'Comptes des responsables.', ['SUPER_ADMIN']],
-        ['Rôles et autorisations', 'personnel', 'Rôle de chaque compte.', ['DIRECTEUR_GENERAL']],
+        ['Entreprise et logo', 'settings', 'Identité de l\'entreprise, logo, sites.'],
         ['Appareils autorisés', 'driver-devices', 'Téléphones des chauffeurs.'],
-        ['Invitations', 'personnel', 'Invitations WhatsApp individuelles.', ['DIRECTEUR_GENERAL']],
-        ['Journal d\'activité', '#history', 'Qui a fait quoi, et quand.', ['SUPER_ADMIN']],
-        ['Journal d\'activité', null, 'Qui a fait quoi, et quand.', ['DIRECTEUR_GENERAL']],
         ['Signalements des utilisateurs', 'signalements', 'Problèmes signalés depuis l\'application.', ['SUPER_ADMIN']],
         ['Simulation (test)', 'simulation', 'Comptes de test et scénario.', ['SUPER_ADMIN']],
         ['Sauvegardes', 'sync', 'Synchronisation et sauvegarde.'],
@@ -97,74 +77,43 @@ const PROFILES = {
     todo: 'Vérifiez les fiches de bord reçues, traitez les pannes et les alertes carburant, puis transmettez.',
     folders: [
       { t: 'Flotte de camions', ic: 'truck', subs: [
-        ['Liste des camions', 'trucks', 'Tous les camions et leur statut.'],
-        ['Fiche individuelle', 'trucks', 'Ouvrez un camion pour voir sa fiche complète.'],
-        ['Documents administratifs', 'trucks', 'Onglet « Documents » de la fiche du camion.'],
-        ['Chauffeur affecté', 'drivers', 'Affectation chauffeur ↔ camion.'],
-        ['Missions et trajets', 'driver-missions', 'Historique des missions.'],
+        ['Liste des camions', 'trucks', 'Fiche de chaque camion, documents administratifs.'],
+        ['Missions et trajets', 'driver-missions', 'Historique des missions camions et véhicules.'],
         ['Rapports journaliers', 'driver-sheets', 'Fiches de bord du jour.'],
-        ['Carburant', 'fuel', 'Pleins et consommation.'],
-        ['Pannes', 'maintenance', 'Pannes déclarées par les chauffeurs.'],
-        ['Maintenance', 'maintenance', 'Entretiens et réparations.'],
-        ['Dépenses', 'driver-expenses', 'Dépenses et reçus.'],
-        ['Historique complet', 'reports-truck', 'Rapports camions.'],
+        ['Historique et coûts par camion', 'reports-truck', 'Rapports camions.'],
       ] },
       { t: 'Véhicules de service', ic: 'car', subs: [
-        ['Liste des véhicules', 'service-vehicles', 'Véhicules de service et IT.'],
-        ['Fiche individuelle', 'service-vehicles', 'Ouvrez un véhicule pour sa fiche.'],
-        ['Conducteur affecté', 'drivers', 'Affectation conducteur ↔ véhicule.'],
-        ['Documents', 'service-vehicles', 'Onglet « Documents » de la fiche.'],
-        ['Déplacements', 'driver-missions', 'Historique des déplacements.'],
-        ['Rapports', 'reports-service', 'Rapports véhicules de service.'],
-        ['Carburant', 'fuel', 'Pleins et consommation.'],
-        ['Maintenance', 'maintenance', 'Entretiens et réparations.'],
-        ['Dépenses', 'driver-expenses', 'Dépenses et reçus.'],
-        ['Historique', 'reports-service', 'Historique par véhicule.'],
+        ['Liste des véhicules', 'service-vehicles', 'Fiche de chaque véhicule, documents.'],
+        ['Historique et coûts par véhicule', 'reports-service', 'Rapports véhicules de service.'],
       ] },
       { t: 'Chauffeurs', ic: 'users', subs: [
-        ['Liste des chauffeurs', 'drivers', 'Tous les chauffeurs.'],
-        ['Fiche individuelle', 'drivers', 'Photo, coordonnées, permis.'],
-        ['Camion ou véhicule affecté', 'drivers', 'Affectation en cours.'],
-        ['Missions', 'driver-board', 'Suivi du jour.'],
-        ['Rapports', 'reports-drivers', 'Présence et fiches de bord.'],
-        ['Incidents', 'dash-hse', 'Incidents signalés.'],
+        ['Dossiers chauffeurs', 'drivers', 'Camion, véhicule de service, ajouter, rapports, archives.'],
+        ['Suivi du jour', 'driver-board', 'Missions en cours.'],
+        ['Rapports et présence', 'reports-drivers', 'Présence, fiches de bord, consommation par chauffeur.'],
         ['Pointage', 'pointage', 'Présence du jour.'],
         ['Enrôlement WhatsApp', 'enrol', 'Envoyer le lien d\'installation.', ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE']],
         ['Appareils', 'driver-devices', 'Téléphone autorisé de chaque chauffeur.'],
       ] },
       { t: 'Carburant', ic: 'fuel', subs: [
-        ['Approvisionnements', 'fuel', 'Pleins enregistrés.'],
-        ['Consommation des camions', 'dash-fleet', 'L/100 km par camion.'],
-        ['Consommation des véhicules', 'dash-fleet', 'L/100 km par véhicule.'],
-        ['Consommation par chauffeur', 'reports-drivers', 'Par chauffeur.'],
-        ['Coûts', 'dash-fleet', 'Coût carburant de la période.'],
-        ['Écarts et anomalies', 'dash-fleet', 'Consommations anormales.'],
-        ['Historique', 'fuel', 'Tous les pleins.'],
-        ['Rapports périodiques', 'reports-truck', 'Rapports carburant.'],
+        ['Camions', 'fuel:trucks', 'Consommation par camion.'],
+        ['Véhicules de service', 'fuel:service', 'Consommation par véhicule.'],
+        ['Consommation totale', 'fuel:total', 'Camions et véhicules réunis.'],
+        ['Nouveau ravitaillement', 'fuel:new', 'Enregistrer un plein et le kilométrage.'],
+        ['Historique et tarif', 'fuel:history', 'Tous les pleins.'],
       ] },
       { t: 'Maintenance', ic: 'wrench', subs: [
-        ['Maintenance des camions', 'maintenance', 'Entretiens des camions.'],
-        ['Maintenance des véhicules', 'maintenance', 'Entretiens des véhicules de service.'],
-        ['Pannes', 'maintenance', 'Qualifier la priorité et le délai.'],
-        ['Interventions', 'maintenance', 'Interventions en cours.'],
-        ['Pièces utilisées', 'stock', 'Sorties de stock imputées aux véhicules.'],
-        ['Coûts', 'dash-fleet', 'Coût d\'entretien.'],
-        ['Préventive et corrective', 'dash-fleet', 'Entretiens dus au kilométrage ou à la date.'],
-        ['Mécaniciens & rapports', 'staff-mech', 'Rapports des mécaniciens.'],
+        ['Pannes et entretiens', 'maintenance', 'Pannes, interventions, camions et véhicules.'],
+        ['Statistiques de la flotte', 'dash-fleet', 'Coûts, préventif, correctif, écarts carburant.'],
+        ['Pièces utilisées', 'stock:sorties', 'Sorties de stock imputées aux véhicules.'],
+        ['Mécaniciens', 'staff-mech', 'Équipe et rapports.'],
       ] },
       { t: 'HSE', ic: 'hard-hat', subs: [
-        ['Tableau HSE', 'dash-hse', 'Indicateurs sécurité.'],
+        ['Tableau HSE', 'dash-hse', 'Incidents, accidents, mesures correctives.'],
         ['Agents HSE et rapports', 'reports-hse', 'Rapports journaliers, hebdomadaires, mensuels.'],
-        ['Incidents et accidents', 'dash-hse', 'Incidents ouverts.'],
-        ['Mesures correctives', 'dash-hse', 'Actions correctives ouvertes.'],
       ] },
-      { t: 'Dépenses et rapports', ic: 'chart', subs: [
-        ['Dépenses par camion', 'reports-truck', 'Coûts par camion.'],
-        ['Dépenses par véhicule', 'reports-service', 'Coûts par véhicule.'],
+      { t: 'Dépenses et achats', ic: 'chart', subs: [
         ['Dépenses des chauffeurs', 'driver-expenses', 'Dépenses et reçus.'],
-        ['Statistiques flotte', 'dash-fleet', 'Disponibilité, km, coûts.'],
         ['Achats et besoins', 'purchases', 'Achats et réapprovisionnement.'],
-        ['Archives', 'driver-missions', 'Historique des fiches.'],
       ] },
       { t: 'Personnel logistique', ic: 'user', subs: [
         ['Gestion du personnel', 'personnel', 'Gestionnaires de stock, mécaniciens, pointeurs.', ['ADMIN_LOGISTIQUE']],
@@ -179,26 +128,24 @@ const PROFILES = {
     todo: 'Enregistrez chaque entrée et sortie le jour même, traitez les articles sous le minimum, puis envoyez votre rapport.',
     folders: [
       { t: 'Gestion des articles', ic: 'package', subs: [
-        ['Catalogue des articles', 'stock', 'Tous les articles et leur quantité.'],
-        ['Fiche article', 'stock', 'Ouvrez un article pour sa fiche.'],
-        ['Historique des mouvements', 'stock', 'Entrées et sorties par article.'],
+        ['Catalogue des articles', 'stock:articles', 'Tous les articles, leur fiche et leurs mouvements.'],
       ] },
       { t: 'Entrées de stock', ic: 'download', subs: [
         ['Nouvelle entrée', '#stock-in', 'Réception fournisseur ou de pièces.'],
-        ['Historique des entrées', 'stock', 'Entrées enregistrées.'],
+        ['Historique des entrées', 'stock:entrees', 'Entrées enregistrées.'],
       ] },
       { t: 'Sorties de stock', ic: 'upload', subs: [
         ['Nouvelle sortie', '#stock-out', 'Affectation à un véhicule ou un département.'],
-        ['Historique des sorties', 'stock', 'Sorties enregistrées.'],
+        ['Historique des sorties', 'stock:sorties', 'Sorties enregistrées.'],
       ] },
       { t: 'Inventaires', ic: 'clipboard', subs: [
-        ['Inventaires', 'stock', 'Quantité théorique, physique et écarts.'],
+        ['Inventaires', 'stock:inventaire', 'Quantité théorique, physique et écarts.'],
       ] },
       { t: 'Analyse et calculs', ic: 'scale', subs: [
         ['Indicateurs du stock', 'dash-stock', 'Rotation, couverture, stock dormant.'],
       ] },
       { t: 'Alertes', ic: 'alert', subs: [
-        ['Stock faible et ruptures', 'dash-stock', 'Articles sous le seuil ou en rupture.'],
+        ['Stock faible et ruptures', 'stock:alertes', 'Articles sous le seuil ou en rupture.'],
         ['Besoins de réapprovisionnement', 'needs', 'États des besoins à transmettre.'],
       ] },
       { t: 'Fournisseurs et rapports', ic: 'file', subs: [
@@ -354,16 +301,27 @@ function renderProfFolder(i) {
 }
 function profOpen(i, j) {
   const f = profCur().folders[i], s = profSubs(f)[j]; if (!s || !s[1]) return;
-  PROF.crumb = { i, label: s[0], view: s[1], hint: s[2] };
+  PROF.crumb = { i, label: s[0], view: String(s[1]).split(':')[0], hint: s[2] };
   if (s[1] === '#stock-in') return stockMove('in');
   if (s[1] === '#stock-out') return stockMove('out');
   if (s[1] === '#history') return typeof openHistory === 'function' && openHistory();
   if (s[1] === '#alerts') return typeof dgAlertsGo === 'function' && dgAlertsGo();
-  go(s[1]);
+  profGoTab(s[1]);
+}
+// « écran:onglet » ouvre directement le bon onglet (stock, carburant, chauffeurs)
+function profGoTab(v) {
+  const [view, tab] = String(v).split(':');
+  if (tab) {
+    if (view === 'stock') stockTab = tab;
+    else if (view === 'fuel') fuelTab = tab;
+    else if (view === 'drivers') window.DRVF = tab;
+  }
+  go(view);
+  if (tab && view === 'stock' && typeof applyStockTab === 'function') setTimeout(() => { try { stockTab = tab; applyStockTab(); } catch (e) {} }, 0);
 }
 function profFind(view) { // retrouve le dossier d'un écran ouvert autrement (lien interne, recherche)
   const P = profCur(); if (!P) return null;
-  for (let i = 0; i < P.folders.length; i++) { const s = profSubs(P.folders[i]).find((x) => x[1] === view); if (s) return { i, label: s[0], view, hint: s[2] }; }
+  for (let i = 0; i < P.folders.length; i++) { const s = profSubs(P.folders[i]).find((x) => x[1] && String(x[1]).split(':')[0] === view); if (s) return { i, label: s[0], view, hint: s[2] }; }
   return null;
 }
 function profCrumbHtml(view) {
@@ -390,7 +348,7 @@ function profNavBuild() {
   let open = {}; try { open = JSON.parse(localStorage.getItem('syl_pf_open') || '{}'); } catch (e) {}
   nav.innerHTML = `<div class="pf-nav-item" data-pv="prof-home" onclick="go('prof-home')">${PROF_IC('home')}<span>Accueil — ${esc(P.title)}</span></div>`
     + P.folders.map((f, i) => !profSubs(f).length ? '' : `<div class="pf-nav-f${open[i] ? ' open' : ''}" data-f="${i}"><div class="pf-nav-h" onclick="profNavToggle(${i})"><span class="pf-num">${i + 1}</span><span>${esc(f.t)}</span>${PROF_IC('chevron-down')}</div>
-      <div class="pf-nav-s">${profSubs(f).map((s, j) => s[1] ? `<div class="pf-nav-item sub" data-pv="${esc(s[1])}" data-i="${i}" data-j="${j}" onclick="profOpen(${i},${j})"><span>${esc(s[0])}</span></div>` : `<div class="pf-nav-item sub off"><span>${esc(s[0])}</span><em>bientôt</em></div>`).join('')}</div></div>`).join('');
+      <div class="pf-nav-s">${profSubs(f).map((s, j) => s[1] ? `<div class="pf-nav-item sub" data-pv="${esc(String(s[1]).split(':')[0])}" data-i="${i}" data-j="${j}" onclick="profOpen(${i},${j})"><span>${esc(s[0])}</span></div>` : `<div class="pf-nav-item sub off"><span>${esc(s[0])}</span><em>bientôt</em></div>`).join('')}</div></div>`).join('');
 }
 function profNavToggle(i) {
   const el = document.querySelector(`#prof-nav .pf-nav-f[data-f="${i}"]`); if (!el) return;
