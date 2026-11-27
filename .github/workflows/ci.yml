@@ -115,5 +115,7 @@ jobs:
           node dist/migrations/cli.js status
           node dist/migrations/cli.js up
           node dist/migrations/cli.js status
+      - name: Audit comptable (lecture seule)
+        run: node scripts/audit-comptable.js
       - if: failure()
         run: tail -80 server.log

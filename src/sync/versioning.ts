@@ -34,7 +34,7 @@ export async function assertNoConflict(prisma: any, c: ConflictInput): Promise<v
     'SELECT MAX("version") AS v, BOOL_OR("modified_by" <> $4) AS other FROM "record_versions" WHERE "entity" = $1 AND "entity_id" = $2 AND "version" > $3',
     c.entity, c.entityId, c.baseVersion, c.userId)) as any[];
   if (!rows[0]?.other) return;
-  const current = await inContext({ ...(requestContext.getStore() || {}), bypass: true }, () =>
+  const current: any = await inContext<any>({ ...(requestContext.getStore() || {}), bypass: true }, () =>
     prisma[delegateName(c.entity)].findUnique({ where: { id: c.entityId } }));
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
@@ -70,7 +70,7 @@ export function versionMiddleware(client: any) {
     try {
       let rid = result?.id ?? id, ver = result?.version;
       if (rid && ver === undefined) {
-        const r = await inContext({ ...(ctx || {}), bypass: true }, () => client[delegateName(model)].findUnique({ where: { id: rid }, select: { version: true } }));
+        const r: any = await inContext<any>({ ...(ctx || {}), bypass: true }, () => client[delegateName(model)].findUnique({ where: { id: rid }, select: { version: true } }));
         ver = r?.version;
       }
       if (rid && ver !== undefined) {
