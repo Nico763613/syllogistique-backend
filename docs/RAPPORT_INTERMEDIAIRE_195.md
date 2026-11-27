@@ -1,6 +1,6 @@
 # Rapport intermédiaire — livraison n°195 (avant toute intervention en production)
 
-Date : 27/11/2026. Branche : `fix/plateforme-multi-entreprises` (PR #195). Commit vérifié : voir § 9.
+Date : 27/11/2026. Branche : `fix/plateforme-multi-entreprises` (PR #195). Commit vérifié : `3de54d4`.
 
 **Aucune intervention n'a eu lieu en production.** Aucun déploiement, aucune création de rôle réel, aucune modification de compte réel, aucune suppression. La production tourne toujours sur l'ancienne version (Render, branche `main`).
 
@@ -46,7 +46,7 @@ Les tests tournent sur une base PostgreSQL neuve et jetable, créée par l'inté
 
 ## 3. Les 15 profils
 
-**Conforme et vérifié** (CI du commit `ad22bb9`, étape « Recette des 15 profils »).
+**Conforme et vérifié** (CI des commits `ad22bb9` et `3de54d4`, étape « Recette des 15 profils », même résultat les deux fois).
 
 - Les droits sont lus directement dans l'application compilée : 106 écrans de consultation dans 37 modules.
 - Un compte de test par profil a été créé, puis chaque profil a ouvert chacun des 106 écrans (1 590 essais) :
@@ -101,4 +101,17 @@ L'espace chauffeur exige un **appareil activé** (un seul appareil par chauffeur
 
 ## 9. Preuves
 
-RESULTAT_CI
+Intégration continue du commit `3de54d4` : **les 3 étapes sont au vert**.
+Lien : https://github.com/Nico763613/syllogistique-backend/actions/runs/46071422281
+
+- **build** : compilation réussie.
+- **master** (vraie base PostgreSQL) : 21 tests réussis, 0 échec.
+- **smoke** (application démarrée sur une vraie base PostgreSQL neuve) : 463 contrôles réussis, 0 échec. Cette étape comprend :
+  - les tests `functional` à `functional6` et les tests d'interface par rôle ;
+  - la recette des 15 profils ;
+  - les migrations, avec retour arrière puis réapplication ;
+  - l'audit comptable.
+- **Audit comptable** (lecture seule) : tous les contrôles sont cohérents. Il reste un point de vigilance normal : un paiement Orange Money de test n'est pas encore rapproché du relevé de l'opérateur.
+- **Limite rappelée par l'audit** : SYL n'a pas de plan comptable, d'écritures en partie double, de grand livre, de balance ni de bilan. Voir l'étude `docs/ETUDE_COMPTABILITE_PERMISSIONS.md`.
+
+Ces preuves viennent d'une base de test. Elles ne remplacent ni le démarrage sur la copie restaurée de la production, ni les essais sur téléphones réels (§ 7).
