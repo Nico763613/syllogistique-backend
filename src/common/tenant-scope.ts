@@ -99,8 +99,14 @@ const andWhere = (where: any, scope: any) => {
 const orgSites = new Map<string, { ids: string[]; at: number }>();
 export const forgetOrgSites = (orgId?: string) => (orgId ? orgSites.delete(orgId) : orgSites.clear());
 
-/** Exécute fn sans cloisonnement (lectures de contrôle internes uniquement). */
-const bypass = <T>(ctx: RequestContext, fn: () => Promise<T>) => requestContext.run({ ...ctx, bypass: true }, fn);
+/**
+ * Exécute fn sans cloisonnement (lectures de contrôle internes uniquement).
+ * Important : une requête Prisma ne démarre qu'au moment où on l'attend (« await ») ; il faut donc
+ * l'attendre À L'INTÉRIEUR du contexte, sinon elle s'exécuterait avec le contexte de l'appelant
+ * (ce qui provoquait une boucle sans fin : contrôle → requête filtrée → contrôle → …).
+ */
+export const inContext = <T>(ctx: RequestContext, fn: () => Promise<T>): Promise<T> => requestContext.run(ctx, async () => await fn());
+const bypass = <T>(ctx: RequestContext, fn: () => Promise<T>) => inContext({ ...ctx, bypass: true }, fn);
 
 async function ensureSites(client: any, ctx: RequestContext) {
   if (ctx.siteIds) return;
@@ -231,7 +237,7 @@ export async function withinOrganization<T>(client: any, fn: () => Promise<T>): 
   if (!ctx || !ctx.organizationId) return fn();
   const wide: RequestContext = { ...ctx, siteId: undefined, siteIds: undefined };
   await ensureSites(client, wide);
-  return requestContext.run(wide, fn);
+  return inContext(wide, fn);
 }
 
 /**

@@ -1,3 +1,4 @@
+import { inContext } from '../common/tenant-scope';
 import { ConflictException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { requestContext } from '../common/request-context';
@@ -33,7 +34,7 @@ export async function assertNoConflict(prisma: any, c: ConflictInput): Promise<v
     'SELECT MAX("version") AS v, BOOL_OR("modified_by" <> $4) AS other FROM "record_versions" WHERE "entity" = $1 AND "entity_id" = $2 AND "version" > $3',
     c.entity, c.entityId, c.baseVersion, c.userId)) as any[];
   if (!rows[0]?.other) return;
-  const current = await requestContext.run({ ...(requestContext.getStore() || {}), bypass: true }, () =>
+  const current = await inContext({ ...(requestContext.getStore() || {}), bypass: true }, () =>
     prisma[delegateName(c.entity)].findUnique({ where: { id: c.entityId } }));
   const id = randomUUID();
   await prisma.$executeRawUnsafe(
@@ -69,7 +70,7 @@ export function versionMiddleware(client: any) {
     try {
       let rid = result?.id ?? id, ver = result?.version;
       if (rid && ver === undefined) {
-        const r = await requestContext.run({ ...(ctx || {}), bypass: true }, () => client[delegateName(model)].findUnique({ where: { id: rid }, select: { version: true } }));
+        const r = await inContext({ ...(ctx || {}), bypass: true }, () => client[delegateName(model)].findUnique({ where: { id: rid }, select: { version: true } }));
         ver = r?.version;
       }
       if (rid && ver !== undefined) {
