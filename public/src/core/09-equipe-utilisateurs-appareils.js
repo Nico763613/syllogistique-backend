@@ -610,9 +610,12 @@ function saveSettings() {
   document.getElementById('s-msg').innerHTML = '<div class="msg ok">Paramètres enregistrés.</div>';
 }
 
-/* ---------------- Auto-login si session valide ---------------- */
+/* ---------------- Auto-login si session valide ----------------
+   Lancé une fois TOUS les scripts chargés (marque, profils…) : sinon la reprise de session
+   s'arrêtait sur « spaceApply is not defined » et le menu du rôle n'était pas appliqué. */
 if (state.accessToken && state.user) {
-  enterApp();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => enterApp());
+  else setTimeout(() => enterApp(), 0);
 }
 
 /* ---------------- PWA : service worker + installation ---------------- */

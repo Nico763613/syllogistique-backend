@@ -13,3 +13,17 @@
 - Décision : un écran ouvert depuis une rubrique précise du menu (Entrées, Sorties, Chauffeurs camion, Carburant par camion…) n'affiche que cette rubrique ; la barre d'onglets qui répétait le menu est masquée. Le bandeau « Ressources humaines » qui doublait le menu est désactivé. Chauffeurs camion, Chauffeurs véhicule de service et Archives sont trois rubriques séparées du menu.
 - Raison : éviter les doublons et le mélange d'informations demandés par le client.
 - Risque accepté : ouvert autrement que par le menu (lien interne), l'écran garde sa barre d'onglets complète.
+
+## 2026-11-27 — Plus aucune rubrique « bientôt disponible »
+- Décision : le DG consulte le journal d'activité (lecture seule, `GET /audit` ouvert au rôle DIRECTEUR_GENERAL) ; le gestionnaire de stock a un écran « Répertoire fournisseurs » séparé des Achats.
+- Raison : consigne n° 23 du client (pas de page vide ni de rubrique inachevée).
+- Risque accepté : le journal affiche au plus les 300 opérations les plus récentes par recherche (réduire la période pour remonter plus loin).
+
+## 2026-11-27 — Reprise de session après chargement complet
+- Décision : la reconnexion automatique (session déjà ouverte) attend que tous les scripts de l'interface soient chargés.
+- Raison : elle s'arrêtait sur l'erreur « spaceApply is not defined » et pouvait laisser le menu du rôle non appliqué.
+- Risque accepté : aucun (quelques millisecondes de plus au démarrage).
+
+## 2026-11-27 — Entrée/sortie de stock : message visible
+- Décision : toute erreur de « Nouvelle entrée / Nouvelle sortie » (aucun article, réseau) s'affiche à l'écran.
+- Raison : le bouton semblait ne rien faire quand aucun article n'existait.
