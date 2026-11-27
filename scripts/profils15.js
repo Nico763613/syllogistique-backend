@@ -1,7 +1,7 @@
 // Recette des 15 profils (base de test uniquement) : droits de consultation vérifiés CÔTÉ SERVEUR.
 //
-// Référence : les droits déclarés dans le code (@Roles sur chaque contrôleur ou méthode, appliqués par RolesGuard).
-// Le script lit ces déclarations, crée un compte de chaque profil, puis appelle chaque écran de consultation
+// Référence : les droits appliqués par le serveur (@Roles + RolesGuard), lus dans l'application compilée.
+// Le script lit ces droits, crée un compte de chaque profil, puis appelle chaque écran de consultation
 // (GET sans paramètre) avec chaque profil :
 //   - profil NON autorisé  → doit recevoir 403 (sinon : FAILLE, le test échoue) ;
 //   - profil autorisé      → ne doit pas recevoir 403 (sinon : anomalie signalée, à examiner).
@@ -25,34 +25,33 @@ const api = async (method, p, body, token, tries = 0) => {
 };
 const pause = (why) => { console.log(`… pause de 61 s (${why})`); return new Promise((res) => setTimeout(res, 61000)); };
 
-// ---------- 1. Lecture des droits déclarés dans le code ----------
-function walk(dir) { return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(dir, e.name)) : e.name.endsWith('.controller.ts') ? [path.join(dir, e.name)] : []); }
-const rolesOf = (txt) => { const m = txt.match(/@Roles\(([^)]*)\)/); return m ? [...m[1].matchAll(/RoleName\.(\w+)|'(\w+)'/g)].map((x) => x[1] || x[2]) : null; };
+// ---------- 1. Droits réellement appliqués : lus dans l'application compilée (métadonnées Nest) ----------
+// On lit exactement ce que le serveur applique (@Roles, RolesGuard, @Public), y compris les listes de rôles
+// regroupées sous un nom (ex. ...CASH_ROLES), au lieu d'analyser le texte des fichiers.
+require(require.resolve('reflect-metadata', { paths: [path.join(__dirname, '..')] }));
+const DIST = path.join(__dirname, '..', 'dist');
+const { PATH_METADATA, METHOD_METADATA, GUARDS_METADATA } = require(require.resolve('@nestjs/common/constants', { paths: [DIST] }));
+function walk(d) { return fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.controller.js') ? [path.join(d, e.name)] : []); }
 const endpoints = [];
-for (const f of walk(path.join(__dirname, '..', 'src'))) {
-  const src = fs.readFileSync(f, 'utf8');
-  // Décorateurs de classe : tout ce qui se trouve entre la dernière importation et « export class ».
-  const ci = src.indexOf('export class');
-  const head = ci < 0 ? '' : src.slice(0, ci);
-  const lastImport = head.lastIndexOf('\nimport ');
-  const classDecos = head.slice(lastImport < 0 ? 0 : head.indexOf('\n', lastImport + 1)).replace(/\/\/.*$/gm, '');
-  const ctrl = (src.match(/@Controller\(\s*'([^']*)'\s*\)/) || [])[1];
-  if (ctrl === undefined) continue;
-  const classRoles = rolesOf(classDecos);
-  const classGuard = /RolesGuard/.test(classDecos);
-  const classPublic = /@Public\(\)/.test(classDecos);
-  const re = /((?:\s*@\w+(?:\([^)]*\))?\s*)+)\s*(?:async\s+)?(\w+)\s*\(/g;
-  let m;
-  while ((m = re.exec(src))) {
-    const decos = m[1];
-    const g = decos.match(/@Get\(\s*(?:'([^']*)')?\s*\)/);
-    if (!g) continue;
-    const sub = g[1] || '';
-    if (sub.includes(':') || /@Public\(\)/.test(decos) || classPublic) continue;
-    const full = '/' + [ctrl, sub].filter(Boolean).join('/');
-    const roles = rolesOf(decos) || classRoles;
-    const guard = classGuard || /RolesGuard/.test(decos);
-    endpoints.push({ path: full, roles, guard, file: path.relative(path.join(__dirname, '..'), f) });
+for (const f of walk(DIST)) {
+  const mod = require(f);
+  for (const C of Object.values(mod)) {
+    if (typeof C !== 'function') continue;
+    const base = Reflect.getMetadata(PATH_METADATA, C); if (base === undefined) continue;
+    const cRoles = Reflect.getMetadata('roles', C), cGuards = (Reflect.getMetadata(GUARDS_METADATA, C) || []).map((g) => g.name), cPublic = Reflect.getMetadata('isPublic', C);
+    for (const k of Object.getOwnPropertyNames(C.prototype)) {
+      const h = C.prototype[k]; if (k === 'constructor' || typeof h !== 'function') continue;
+      if (Reflect.getMetadata(METHOD_METADATA, h) !== 0) continue; // 0 = GET (lecture seule)
+      const sub = Reflect.getMetadata(PATH_METADATA, h);
+      const roles = Reflect.getMetadata('roles', h) || cRoles || null;
+      const guard = cGuards.concat((Reflect.getMetadata(GUARDS_METADATA, h) || []).map((g) => g.name)).includes('RolesGuard');
+      if (Reflect.getMetadata('isPublic', h) || cPublic) continue;
+      for (const sb of (Array.isArray(sub) ? sub : [sub])) {
+        const full = '/' + [base, sb].map((x) => String(x || '').replace(/^\/|\/$/g, '')).filter(Boolean).join('/');
+        if (full.includes(':')) continue;
+        endpoints.push({ path: full, roles, guard, file: path.relative(DIST, f) });
+      }
+    }
   }
 }
 const uniq = new Map(); for (const e of endpoints) if (!uniq.has(e.path)) uniq.set(e.path, e);
