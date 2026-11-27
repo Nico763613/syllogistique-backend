@@ -230,6 +230,7 @@ model Driver {
   userId           String?   @unique @map("user_id")
   // Activité : TRUCK (chauffeur de camion / sites miniers) ou SERVICE_VEHICLE (véhicule de service)
   activity         String?
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([siteId])
   @@map("drivers")
 }
@@ -317,6 +318,7 @@ model Vehicle {
   purchaseOrders     PurchaseOrder[]
   hseIncidents       HseIncident[]
   hseInspections     HseInspection[]
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@unique([siteId, registrationNumber])
   @@index([siteId, vehicleType])
   @@map("vehicles")
@@ -400,6 +402,7 @@ model Trip {
   loaderName    String?  @map("loader_name")
   pauseMileage  Int?     @map("pause_mileage")
   pauseAt       DateTime? @map("pause_at")
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([siteId, tripDate])
   @@index([vehicleId])
   @@map("trips")
@@ -452,6 +455,7 @@ model MaintenanceType {
   maintenances Maintenance[]
   plans        MaintenancePlan[]
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@map("maintenance_types")
 }
 
@@ -527,6 +531,7 @@ model StockCategory {
 
   items InventoryItem[]
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@map("stock_categories")
 }
 
@@ -576,6 +581,7 @@ model InventoryItem {
   transferLines    StockTransferLine[]
   salesReturnLines SalesReturnLine[]
   hseIncidents     HseIncident[]
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@unique([siteId, sku])
   @@index([siteId])
   @@map("stock_items")
@@ -688,6 +694,8 @@ model Supplier {
 
   contractualLeadDays Int?  @map("contractual_lead_days")
   paymentTermDays     Int?  @map("payment_term_days")
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@map("suppliers")
 }
 
@@ -706,6 +714,7 @@ model Expense {
 
   vehicle      Vehicle? @relation(fields: [vehicleId], references: [id])
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@map("expenses")
 }
 
@@ -774,6 +783,7 @@ model AuditLog {
 
   user      User?    @relation(fields: [userId], references: [id])
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@index([entity, entityId])
   @@map("audit_logs")
 }
@@ -795,6 +805,7 @@ model SyncQueueEntry {
   createdAt   DateTime @default(now()) @map("created_at")
   syncedAt    DateTime? @map("synced_at")
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@map("sync_queue")
 }
 
@@ -846,6 +857,7 @@ model Customer {
 
 
   paymentTermDays Int? @map("payment_term_days")
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([siteId])
   @@map("customers")
 }
@@ -891,6 +903,7 @@ model PurchaseOrder {
 
   vehicle      Vehicle? @relation(fields: [vehicleId], references: [id])
   goodsReceipts GoodsReceipt[]
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([siteId, status])
   @@map("purchase_orders")
 }
@@ -986,6 +999,7 @@ model SalesOrder {
 
 
   saleType     String   @default("CASH") @map("sale_type") // CASH | CREDIT | INSTALLMENT | PROMO
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([siteId, status])
   @@map("sales_orders")
 }
@@ -1149,6 +1163,7 @@ model NeedRequest {
 
   lines         NeedRequestLine[]
 
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([siteId, status])
   @@map("need_requests")
 }
@@ -1553,6 +1568,7 @@ model HseTraining {
   user       User?    @relation(fields: [userId], references: [id])
   driver     Driver?  @relation(fields: [driverId], references: [id])
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@map("hse_trainings")
 }
 
@@ -1593,6 +1609,7 @@ model DriverDevice {
   createdBy           String?   @map("created_by")
   createdAt           DateTime  @default(now()) @map("created_at")
 
+  siteId String? @map("site_id") // cloisonnement par site (migration 0001)
   @@index([driverId, status])
   @@index([userId, fingerprint])
   @@map("driver_devices")
@@ -1611,6 +1628,7 @@ model TripLog {
   occurredAt    DateTime @map("occurred_at")
   createdAt     DateTime @default(now()) @map("created_at")
 
+  siteId String? @map("site_id") // cloisonnement par site (migration 0001)
   @@index([tripId, occurredAt])
   @@map("trip_logs")
 }
@@ -1634,6 +1652,7 @@ model DriverMaintenance {
   observations String?
   clientOpId  String?  @unique @map("client_op_id")
   createdAt   DateTime @default(now()) @map("created_at")
+  siteId String? @map("site_id") // cloisonnement par site (migration 0001)
   @@index([driverId, date])
   @@map("driver_maintenance_entries")
 }
@@ -1658,6 +1677,8 @@ model DriverDailyReport {
   rejectedAt DateTime? @map("rejected_at")
   rejectedBy String?   @map("rejected_by")
   rejectNote String?   @map("reject_note")
+  siteId String? @map("site_id") // cloisonnement par site (migration 0001)
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@unique([driverId, reportDate])
   @@map("driver_daily_reports")
 }
@@ -1684,6 +1705,8 @@ model DriverExpense {
   paidBy       String?   @map("paid_by")
   clientOpId   String?  @unique @map("client_op_id")
   createdAt    DateTime @default(now()) @map("created_at")
+  siteId String? @map("site_id") // cloisonnement par site (migration 0001)
+  version Int @default(1) // numéro de version de la fiche (migration 0002)
   @@index([driverId, date])
   @@index([status])
   @@map("driver_expenses")
@@ -1754,6 +1777,7 @@ model ProblemReport {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
 
+  organizationId String? @map("organization_id") // cloisonnement par entreprise (migration 0001)
   @@index([status, createdAt])
   @@map("problem_reports")
 }

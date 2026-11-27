@@ -1,5 +1,7 @@
+import { assertNoConflict } from '../sync/versioning';
+import { conflictAppliers } from '../sync/conflicts.service';
 import { nextRefOf } from '../common/doc-numbers';
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { recordAssignment } from '../vehicles/assignments';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -30,7 +32,9 @@ const tankLiters = (v: unknown): number | undefined => { const n = typeof v === 
 
 @Injectable()
 export class DriverAppService {
-  constructor(private prisma: PrismaService, private audit: AuditService, private sheets: DriverSheetService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService, private sheets: DriverSheetService) {
+    conflictAppliers.set('SYNC_CHAUFFEUR', (c: any) => this.applyConflict(c));
+  }
 
   private async driverOf(userId: string) {
     const d = await this.prisma.driver.findFirst({ where: { userId, deletedAt: null } });
@@ -104,28 +108,49 @@ export class DriverAppService {
   // Traitement idempotent d'un lot d'opérations (en ligne ou rejouées après une coupure réseau)
   async sync(userId: string, organizationId: string, ops: SyncOpDto[]) {
     const driver = await this.driverOf(userId);
-    const results: { clientOpId: string; ok: boolean; duplicate?: boolean; error?: string; result?: unknown }[] = [];
+    const results: { clientOpId: string; ok: boolean; duplicate?: boolean; conflict?: boolean; conflictId?: string; error?: string; result?: unknown }[] = [];
     for (const op of ops) {
       try {
-        const p = (op.payload ?? {}) as P;
-        // Fiche du jour déjà envoyée : plus aucune modification possible
-        if (await this.sheets.isSent(driver.id, dayStart(when(p.occurredAt).toISOString().slice(0, 10)))) throw new BadRequestException('La fiche de cette journée a déjà été envoyée au responsable : elle ne peut plus être modifiée.');
-        let r: { duplicate?: boolean; [k: string]: unknown };
-        if (op.type === 'start') r = await this.start(driver, userId, op, p);
-        else if (op.type === 'arrive') r = await this.arrive(driver, userId, op, p);
-        else if (op.type === 'pause') r = await this.pause(driver, op, p);
-        else if (op.type === 'fuel') r = await this.fuel(driver, userId, organizationId, op, p);
-        else if (op.type === 'breakdown') r = await this.breakdown(driver, userId, op, p);
-        else if (op.type === 'maintenance') r = await this.maintenance(driver, userId, op, p);
-        else if (op.type === 'expense') r = await this.expense(driver, userId, op, p);
-        else r = await this.incident(driver, userId, op, p);
+        // Mission modifiée par le bureau pendant que le chauffeur était hors ligne : rien n'est écrasé,
+        // la saisie est conservée et arbitrée par un responsable (voir src/sync/versioning.ts).
+        if (op.tripId && op.baseVersion && ['start', 'pause', 'arrive'].includes(op.type)) {
+          await assertNoConflict(this.prisma, { entity: 'Trip', entityId: op.tripId, baseVersion: op.baseVersion, userId, organizationId, source: 'SYNC_CHAUFFEUR', payload: { ...op, driverUserId: userId } });
+        }
+        const r = await this.applyOp(driver, userId, organizationId, op);
         results.push({ clientOpId: op.clientOpId, ok: true, duplicate: r.duplicate, result: r });
       } catch (e: any) {
+        const body = e instanceof ConflictException ? (e.getResponse() as any) : null;
+        if (body?.code === 'SYNC_CONFLICT') { results.push({ clientOpId: op.clientOpId, ok: false, conflict: true, conflictId: body.conflictId, error: body.message }); continue; }
         const msg = e?.response?.message ?? e?.message ?? 'Erreur';
         results.push({ clientOpId: op.clientOpId, ok: false, error: Array.isArray(msg) ? msg.join(', ') : String(msg) });
       }
     }
     return { results };
+  }
+
+  private async applyOp(driver: any, userId: string, organizationId: string, op: SyncOpDto) {
+    const p = (op.payload ?? {}) as P;
+    // Fiche du jour déjà envoyée : plus aucune modification possible
+    if (await this.sheets.isSent(driver.id, dayStart(when(p.occurredAt).toISOString().slice(0, 10)))) throw new BadRequestException('La fiche de cette journée a déjà été envoyée au responsable : elle ne peut plus être modifiée.');
+    let r: { duplicate?: boolean; [k: string]: unknown };
+    if (op.type === 'start') r = await this.start(driver, userId, op, p);
+    else if (op.type === 'arrive') r = await this.arrive(driver, userId, op, p);
+    else if (op.type === 'pause') r = await this.pause(driver, op, p);
+    else if (op.type === 'fuel') r = await this.fuel(driver, userId, organizationId, op, p);
+    else if (op.type === 'breakdown') r = await this.breakdown(driver, userId, op, p);
+    else if (op.type === 'maintenance') r = await this.maintenance(driver, userId, op, p);
+    else if (op.type === 'expense') r = await this.expense(driver, userId, op, p);
+    else r = await this.incident(driver, userId, op, p);
+    return r;
+  }
+
+  /** Arbitrage « appliquer la saisie » : la saisie du chauffeur est appliquée telle quelle, au nom du chauffeur. */
+  private async applyConflict(c: any) {
+    const op = c.client_payload || {};
+    const userId = op.driverUserId || c.requested_by;
+    const driver = await this.driverOf(userId);
+    const { baseVersion: _b, driverUserId: _d, ...clean } = op;
+    return this.applyOp(driver, userId, c.organization_id, clean as SyncOpDto);
   }
 
   async transmissions(userId: string) {

@@ -504,3 +504,49 @@ async function renderFuel() {
   if (state.view !== 'fuel') return;
   root().innerHTML = bar + body;
 }
+
+// ---- Mot de passe oublié : code à 6 chiffres (e-mail, ou remis par le responsable après vérification) ----
+function openForgotPassword() {
+  const old = document.getElementById('fpw-ov'); if (old) old.remove();
+  const ov = document.createElement('div'); ov.id = 'fpw-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(31,58,95,.6);z-index:4000;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto';
+  const ident = (document.getElementById('login-email') || {}).value || '';
+  ov.innerHTML = `<div class="panel" style="max-width:380px;width:100%"><h3>Mot de passe oublié</h3>
+    <p class="muted" style="margin:4px 0 10px">1. Demandez un code. 2. Saisissez-le avec votre nouveau mot de passe. Le code est valable 15 minutes.</p>
+    <label>E-mail ou numéro de téléphone</label><input id="fpw-id" autocomplete="username" value="${esc(ident)}">
+    <button class="btn" style="width:100%;margin-top:8px" onclick="forgotPasswordRequest()">Recevoir un code</button>
+    <label style="margin-top:12px">Code à 6 chiffres</label><input id="fpw-code" inputmode="numeric" maxlength="7" autocomplete="one-time-code">
+    <label>Nouveau mot de passe</label><input id="fpw-new" type="password" autocomplete="new-password" placeholder="8 caractères, lettres et chiffres">
+    <label>Confirmer le mot de passe</label><input id="fpw-new2" type="password" autocomplete="new-password">
+    <div id="fpw-m"></div>
+    <div class="row" style="margin-top:10px"><button class="btn gold" onclick="forgotPasswordConfirm()">Changer mon mot de passe</button><button class="btn ghost" onclick="document.getElementById('fpw-ov').remove()">Fermer</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function forgotPasswordCall(path, body) {
+  const base = (state.apiUrl || DEFAULT_API_URL).replace(/\/$/, '');
+  const r = await fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 429) throw new Error('Trop de demandes : patientez une minute puis réessayez.');
+  if (!r.ok) throw new Error(Array.isArray(j.message) ? j.message[0] : j.message || 'Opération impossible.');
+  return j;
+}
+async function forgotPasswordRequest() {
+  const m = document.getElementById('fpw-m'), id = document.getElementById('fpw-id').value.trim();
+  try {
+    if (id.length < 5) throw new Error('Saisissez votre e-mail ou votre numéro de téléphone.');
+    const j = await forgotPasswordCall('/auth/password-reset/request', { identifier: id });
+    m.innerHTML = `<div class="msg ok">${esc(j.message)}</div>`;
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(navigator.onLine ? e.message : 'Pas de réseau : réessayez dès que la connexion revient.')}</div>`; }
+}
+async function forgotPasswordConfirm() {
+  const m = document.getElementById('fpw-m'), g = (i) => document.getElementById(i).value.trim();
+  try {
+    if (!/^\d{3}\s?\d{3}$/.test(g('fpw-code'))) throw new Error('Le code comporte 6 chiffres.');
+    if (g('fpw-new').length < 8 || !/[A-Za-z]/.test(g('fpw-new')) || !/\d/.test(g('fpw-new'))) throw new Error('Le mot de passe doit contenir au moins 8 caractères, avec des lettres et des chiffres.');
+    if (g('fpw-new') !== g('fpw-new2')) throw new Error('Les deux mots de passe ne sont pas identiques.');
+    const j = await forgotPasswordCall('/auth/password-reset/confirm', { identifier: g('fpw-id'), code: g('fpw-code'), newPassword: g('fpw-new') });
+    m.innerHTML = `<div class="msg ok">${esc(j.message)}</div>`;
+    const le = document.getElementById('login-email'); if (le) le.value = g('fpw-id');
+    setTimeout(() => { const o = document.getElementById('fpw-ov'); if (o) o.remove(); }, 2500);
+  } catch (e) { m.innerHTML = `<div class="msg err">${esc(navigator.onLine ? e.message : 'Pas de réseau : réessayez dès que la connexion revient.')}</div>`; }
+}

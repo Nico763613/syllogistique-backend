@@ -75,7 +75,7 @@ export class AuthService {
     if (mine) await this.prisma.$executeRaw`update user_devices set attempts = ${attempts}, status = ${status}, last_seen = now() where id = ${mine.id}`;
     else await this.prisma.$executeRaw`insert into user_devices (id, user_id, fp, kind, name, status, attempts) values (${randomUUID()}, ${user.id}, ${dto.deviceFp}, ${kind}, ${name}, ${status}, ${attempts})`;
     await this.prisma.notification
-      .create({ data: { title: status === 'BLOCKED' ? 'Appareil bloqué' : 'Appareil non autorisé', message: `${user.firstName} ${user.lastName} (${role}) a tenté de se connecter depuis un autre appareil (${name ?? kind}). Tentative ${attempts}/3${status === 'BLOCKED' ? ' : appareil bloqué.' : '.'}`, severity: status === 'BLOCKED' ? 'CRITICAL' : 'WARNING', entity: 'UserDevice', entityId: user.id, roleName: 'SUPER_ADMIN' } })
+      .create({ data: { title: status === 'BLOCKED' ? 'Appareil bloqué' : 'Appareil non autorisé', message: `${user.firstName} ${user.lastName} (${role}) a tenté de se connecter depuis un autre appareil (${name ?? kind}). Tentative ${attempts}/3${status === 'BLOCKED' ? ' : appareil bloqué.' : '.'}`, severity: status === 'BLOCKED' ? 'CRITICAL' : 'WARNING', entity: 'UserDevice', entityId: user.id, roleName: 'SUPER_ADMIN' , siteId: user.siteId ?? undefined} })
       .catch(() => undefined);
     throw new ForbiddenException("Cet appareil n'est pas autorisé pour votre compte. Contactez votre administrateur.");
   }

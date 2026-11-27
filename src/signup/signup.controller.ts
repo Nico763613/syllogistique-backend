@@ -10,6 +10,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { currentOrganizationId } from '../common/tenant-scope';
 
 class SignupDto {
   @IsString() @MinLength(2) @MaxLength(60) firstName: string;
@@ -26,6 +27,21 @@ class SignupDto {
 export class SignupController {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
+  // Le formulaire public d'inscription ne porte pas encore de code entreprise : les demandes sont
+  // rattachées à l'entreprise principale (la plus ancienne). Les autres entreprises ne les voient pas.
+  private async mainOrganization() {
+    // Lecture directe (hors filtre) : on cherche l'entreprise principale de toute la plateforme, pas celle de l'utilisateur.
+    const rows = await this.prisma.$queryRaw<{ id: string; organizationId: string }[]>`select id, organization_id as "organizationId" from sites order by created_at asc limit 1`;
+    return rows[0] ?? null;
+  }
+
+  private async assertMainOrganization() {
+    const main = await this.mainOrganization();
+    const org = currentOrganizationId();
+    if (!main || (org && org !== main.organizationId)) throw new NotFoundException('Demande introuvable ou déjà traitée.');
+    return main;
+  }
+
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post()
@@ -39,9 +55,10 @@ export class SignupController {
     }
     const id = randomUUID();
     await this.prisma.$executeRaw`insert into driver_signups (id, first_name, last_name, phone, activity) values (${id}, ${dto.firstName.trim()}, ${dto.lastName.trim()}, ${dto.phone.trim()}, ${dto.activity ?? null})`;
+    const main = await this.mainOrganization();
     for (const roleName of ['ADMIN_LOGISTIQUE', 'GESTIONNAIRE_FLOTTE', 'SUPER_ADMIN']) {
       await this.prisma.notification
-        .create({ data: { title: "Demande d'inscription chauffeur", message: `${dto.firstName.trim()} ${dto.lastName.trim()} (${dto.phone.trim()}) demande à s'inscrire comme chauffeur.`, severity: 'INFO', entity: 'DriverSignup', entityId: id, roleName } })
+        .create({ data: { title: "Demande d'inscription chauffeur", message: `${dto.firstName.trim()} ${dto.lastName.trim()} (${dto.phone.trim()}) demande à s'inscrire comme chauffeur.`, severity: 'INFO', entity: 'DriverSignup', entityId: id, roleName, siteId: main?.id } })
         .catch(() => undefined);
     }
     return { ok: true, message: "Demande envoyée. Le responsable va la valider puis vous remettre votre code d'accès." };
@@ -51,7 +68,10 @@ export class SignupController {
   @UseGuards(RolesGuard)
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   @Get()
-  list() {
+  async list() {
+    const main = await this.mainOrganization();
+    const org = currentOrganizationId();
+    if (!main || (org && org !== main.organizationId)) return [];
     return this.prisma.$queryRaw`select id, first_name as "firstName", last_name as "lastName", phone, activity, status, created_at as "createdAt" from driver_signups where status = 'PENDING' order by created_at desc limit 100`;
   }
 
@@ -60,6 +80,7 @@ export class SignupController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   @Post(':id/approve')
   async approve(@Param('id') id: string, @CurrentUser() actor: any) {
+    await this.assertMainOrganization();
     const r = (await this.prisma.$queryRaw<any[]>`select * from driver_signups where id = ${id} and status = 'PENDING'`)[0];
     if (!r) throw new NotFoundException('Demande introuvable ou déjà traitée.');
     const site = actor.siteId ? { id: actor.siteId } : await this.prisma.site.findFirst({ orderBy: { createdAt: 'asc' } });
@@ -75,6 +96,7 @@ export class SignupController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE, RoleName.GESTIONNAIRE_FLOTTE)
   @Post(':id/reject')
   async reject(@Param('id') id: string, @CurrentUser() actor: any) {
+    await this.assertMainOrganization();
     const n = await this.prisma.$executeRaw`update driver_signups set status = 'REJECTED', decided_by = ${actor.userId}, decided_at = now() where id = ${id} and status = 'PENDING'`;
     if (!n) throw new NotFoundException('Demande introuvable ou déjà traitée.');
     return { ok: true };

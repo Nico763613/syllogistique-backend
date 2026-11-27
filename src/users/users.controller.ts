@@ -1,3 +1,4 @@
+import { Throttle } from '@nestjs/throttler';
 import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { RoleName } from '@prisma/client';
@@ -42,6 +43,14 @@ export class UsersController {
   @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
   resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto, @CurrentUser() actor: any) {
     return this.usersService.resetPassword(id, dto.newPassword, actor.userId, actor.role);
+  }
+
+  // Code de récupération remis en main propre (procédure administrateur sécurisée).
+  @Post(':id/reset-code')
+  @Roles(RoleName.SUPER_ADMIN, RoleName.ADMIN_LOGISTIQUE)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  issueResetCode(@Param('id') id: string, @CurrentUser() actor: any) {
+    return this.usersService.issueResetCode(id, actor.userId, actor.role);
   }
 
   // Déconnecte un utilisateur à distance (compte, mot de passe et données conservés).

@@ -36,7 +36,7 @@ export class SupportController {
       data: { userId: user.userId, userName: name, role: user.role, screen: dto.screen, device: dto.device, appVersion: dto.appVersion, network: dto.network, lastError: dto.lastError, message: dto.message },
     });
     await this.prisma.notification
-      .create({ data: { title: 'Nouveau signalement', message: `${name} (${user.role}) a signalé un problème${dto.screen ? ' sur « ' + dto.screen + ' »' : ''}.`, severity: 'WARNING', entity: 'ProblemReport', entityId: r.id, roleName: 'SUPER_ADMIN' } })
+      .create({ data: { title: 'Nouveau signalement', message: `${name} (${user.role}) a signalé un problème${dto.screen ? ' sur « ' + dto.screen + ' »' : ''}.`, severity: 'WARNING', entity: 'ProblemReport', entityId: r.id, roleName: 'SUPER_ADMIN' , siteId: u?.siteId ?? undefined} })
       .catch(() => undefined);
     return { id: r.id };
   }

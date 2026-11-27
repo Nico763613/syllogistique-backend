@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SyncOperationDto {
@@ -10,6 +10,8 @@ export class SyncOperationDto {
   // Date de dernière mise à jour de la fiche telle que le client la connaissait (ISO).
   // Sert à détecter un conflit si un autre utilisateur l'a modifiée entre-temps (§26).
   @IsOptional() @IsString() baseUpdatedAt?: string;
+  // Numéro de version de la fiche connu du client (prioritaire sur baseUpdatedAt).
+  @IsOptional() @IsInt() @Min(1) baseVersion?: number;
 }
 
 export class SyncPushDto {
@@ -17,4 +19,9 @@ export class SyncPushDto {
   @ValidateNested({ each: true })
   @Type(() => SyncOperationDto)
   operations: SyncOperationDto[];
+}
+
+export class ResolveConflictDto {
+  @IsIn(['SERVEUR', 'SAISIE']) choice: 'SERVEUR' | 'SAISIE';
+  @IsOptional() @IsString() @MaxLength(500) note?: string;
 }

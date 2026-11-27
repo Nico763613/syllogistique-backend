@@ -6,10 +6,13 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UserDevicesController } from './user-devices.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { PasswordResetService } from './password-reset.service';
+import { MessagingModule } from '../messaging/messaging.module';
 
 @Module({
   imports: [
     PassportModule,
+    MessagingModule,
     ConfigModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -21,7 +24,7 @@ import { JwtStrategy } from './jwt.strategy';
     }),
   ],
   controllers: [AuthController, UserDevicesController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, PasswordResetService],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -1,5 +1,6 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { currentOrganizationId } from '../common/tenant-scope';
 import { AuditService } from '../audit/audit.service';
 import { UpdateOrganizationDto, SetNumberingDto } from './dto/settings.dto';
 import { DOC_TYPES, formatDocNumber } from '../common/doc-numbers';
@@ -40,6 +41,11 @@ export class SettingsService {
   async setNumbering(docType: string, dto: SetNumberingDto, actorId: string) {
     const t = DOC_TYPES.find((x) => x.code === docType);
     if (!t) throw new NotFoundException('Type de document inconnu.');
+    // La numérotation est encore commune à toute la plateforme (numéros uniques partout) : seule
+    // l'entreprise principale peut la régler, pour qu'une entreprise ne modifie jamais celle d'une autre.
+    const main = ((await this.prisma.$queryRawUnsafe('SELECT "organization_id" AS o FROM "sites" ORDER BY "created_at" ASC LIMIT 1')) as any[])[0]?.o;
+    const org = currentOrganizationId();
+    if (org && main && org !== main) throw new ForbiddenException("La numérotation des documents est réglée par l'éditeur pour votre entreprise. Contactez le support.");
     const resetYearly = dto.resetYearly !== false;
     const includeYear = resetYearly ? true : dto.includeYear !== false;
     // Un préfixe ne peut pas être partagé par deux types (sinon deux documents pourraient recevoir le même numéro).

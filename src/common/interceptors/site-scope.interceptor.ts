@@ -1,6 +1,6 @@
 import { CallHandler, ExecutionContext, ForbiddenException, Injectable, NestInterceptor } from '@nestjs/common';
 import { Observable } from 'rxjs';
-import { requestContext } from '../request-context';
+import { RequestContext, requestContext } from '../request-context';
 
 // Cloisonnement par site, appliqué à TOUTE l'API : un utilisateur rattaché à un site
 // ne peut ni lire ni filtrer un autre site via le paramètre ?siteId=.
@@ -28,10 +28,16 @@ export class SiteScopeInterceptor implements NestInterceptor {
         throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
       }
     }
-    // Le contexte suit tout le traitement de la requête : la base refuse ensuite l'accès par identifiant
-    // à un élément d'un autre site (voir PrismaService).
-    if (user && user.role !== 'SUPER_ADMIN' && user.siteId) {
-      const ctx = { siteId: user.siteId as string, role: user.role as string };
+    // Le contexte suit tout le traitement de la requête : la base applique ensuite le cloisonnement
+    // entreprise / site à chaque accès (voir src/common/tenant-scope.ts).
+    if (user && user.organizationId) {
+      const ev = Number(String(req.headers?.['if-match'] ?? req.headers?.['x-expected-version'] ?? '').replace(/^W\//, '').replace(/"/g, ''));
+      const ctx: RequestContext = {
+        userId: user.userId, organizationId: user.organizationId, role: user.role,
+        siteId: user.role !== 'SUPER_ADMIN' && user.siteId ? user.siteId : undefined,
+        expectedVersion: Number.isInteger(ev) && ev > 0 ? ev : undefined,
+        expectedTarget: typeof req.params?.id === 'string' ? req.params.id : undefined,
+      };
       return new Observable((sub) => requestContext.run(ctx, () => next.handle().subscribe(sub)));
     }
     return next.handle();

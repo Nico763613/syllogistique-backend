@@ -35,7 +35,7 @@ export class CustomersService {
       where: siteId ? { siteId } : {},
       orderBy: { name: 'asc' },
     });
-    const kinds = (await this.prisma.$queryRawUnsafe('SELECT "id","kind" FROM "customers"')) as any[];
+    const kinds = (await this.prisma.$queryRawUnsafe('SELECT "id","kind" FROM "customers" WHERE "id" = ANY($1::text[])', rows.map((r) => r.id))) as any[];
     const map = new Map(kinds.map((k) => [k.id, k.kind]));
     return rows.map((c) => ({ ...c, kind: map.get(c.id) || 'CLIENT' }));
   }

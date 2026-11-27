@@ -26,6 +26,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { QrcodesModule } from './qrcodes/qrcodes.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { PlatformModule } from './platform/platform.controller';
 import { StaffModule } from './staff/staff.module';
 import { SimulationModule } from './simulation/simulation.module';
 import { SettingsModule } from './settings/settings.module';
@@ -90,6 +91,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     SupportModule,
     SignupModule,
     LicenseModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [

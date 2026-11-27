@@ -1,4 +1,6 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { assertNoConflict } from './versioning';
+import { conflictAppliers } from './conflicts.service';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SyncOperationDto } from './sync.dto';
@@ -34,7 +36,13 @@ const PROTECTED_FIELDS: Record<string, string[]> = {
 
 @Injectable()
 export class SyncService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService) {
+    // Arbitrage « appliquer la saisie » d'un conflit venu de la synchronisation du bureau.
+    conflictAppliers.set('SYNC_BUREAU', async (c: any, resolverId: string) => {
+      const { baseVersion: _v, baseUpdatedAt: _u, ...op } = c.client_payload || {};
+      return this.push([op], resolverId, c.organization_id);
+    });
+  }
 
   async push(
     operations: SyncOperationDto[],
@@ -84,6 +92,19 @@ export class SyncService {
           },
         });
 
+        // Conflit par numéro de version : une autre personne a modifié la fiche depuis la version connue
+        // du client → rien n'est écrasé, la saisie est conservée pour arbitrage.
+        if (!alreadySynced && op.operation === 'UPDATE' && op.baseVersion && organizationId) {
+          try {
+            await assertNoConflict(this.prisma, { entity: op.entity, entityId: op.entityId, baseVersion: op.baseVersion, userId: actorId, organizationId, source: 'SYNC_BUREAU', payload: op });
+          } catch (e: any) {
+            if (!(e instanceof ConflictException)) throw e;
+            const body: any = e.getResponse();
+            await this.prisma.syncQueueEntry.update({ where: { id: queueEntry.id }, data: { status: 'FAILED', lastError: 'CONFLICT : ' + body.conflictId } });
+            results.push({ entityId: op.entityId, entity: op.entity, status: 'CONFLICT', error: body.message, conflictId: body.conflictId, serverVersion: body.currentVersion } as any);
+            continue;
+          }
+        }
         // Détection de conflit (§26) : si la fiche a été modifiée sur le serveur après la version
         // connue du client, on ne l'écrase PAS silencieusement — on la signale pour résolution.
         if (!alreadySynced && op.operation === 'UPDATE' && op.baseUpdatedAt) {
