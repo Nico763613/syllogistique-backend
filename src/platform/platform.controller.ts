@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Headers, Module, NotFoundException, Post } from '@nestjs/common';
+import { Body, CanActivate, Controller, ExecutionContext, ForbiddenException, Injectable, Module, NotFoundException, Post, UseGuards } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { IsEmail, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
@@ -22,6 +22,21 @@ class CreateOrganizationDto {
   adminTemporaryPassword: string;
 }
 
+// Contrôle de la clé AVANT la validation du contenu : sans la bonne clé, aucune information
+// (ni message de validation) n'est renvoyée.
+@Injectable()
+class PlatformKeyGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest();
+    const expected = process.env.PLATFORM_ADMIN_KEY || '';
+    if (expected.length < 24) throw new NotFoundException();
+    const a = createHash('sha256').update(String(req.headers['x-platform-key'] || '')).digest();
+    const b = createHash('sha256').update(expected).digest();
+    if (!timingSafeEqual(a, b)) throw new ForbiddenException('Clé plateforme invalide.');
+    return true;
+  }
+}
+
 // Accès « plateforme » (éditeur de SYL uniquement) : création d'une nouvelle entreprise cliente avec
 // son premier site et son Super administrateur (mot de passe provisoire à changer à la 1re connexion).
 // Protégé par la clé PLATFORM_ADMIN_KEY (en-tête x-platform-key), comparée en temps constant.
@@ -31,19 +46,11 @@ class CreateOrganizationDto {
 export class PlatformController {
   constructor(private prisma: PrismaService, private audit: AuditService) {}
 
-  private checkKey(given?: string) {
-    const expected = process.env.PLATFORM_ADMIN_KEY || '';
-    if (expected.length < 24) throw new NotFoundException();
-    const a = createHash('sha256').update(String(given || '')).digest();
-    const b = createHash('sha256').update(expected).digest();
-    if (!timingSafeEqual(a, b)) throw new ForbiddenException('Clé plateforme invalide.');
-  }
-
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @UseGuards(PlatformKeyGuard)
   @Post('organizations')
-  async createOrganization(@Headers('x-platform-key') key: string, @Body() dto: CreateOrganizationDto) {
-    this.checkKey(key);
+  async createOrganization(@Body() dto: CreateOrganizationDto) {
     const role = await this.prisma.role.findUnique({ where: { name: 'SUPER_ADMIN' } });
     if (!role) throw new NotFoundException('Rôle Super administrateur absent.');
     const email = dto.adminEmail.trim().toLowerCase();

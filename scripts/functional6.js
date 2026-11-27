@@ -37,11 +37,11 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   // ================= 1. Deux entreprises =================
   const A = await login('admin@syllogistique.local', 'ChangeMoi123!'); // connexion 1
   ok(!!A.accessToken, 'connexion Super administrateur de l’entreprise A');
-  let r = await api('POST', '/platform/organizations', { name: 'Entreprise B ' + n, siteName: 'Dépôt B1', adminFirstName: 'Admin', adminLastName: 'B', adminEmail: `adminb${n}@test.gn`, adminTemporaryPassword: PW });
+  let r = await api('POST', '/platform/organizations', { name: 'Entreprise B ' + n, siteName: 'Dépôt B1', adminFirstName: 'Admin', adminLastName: 'Bah', adminEmail: `adminb${n}@test.gn`, adminTemporaryPassword: PW });
   ok(r.s === 403, 'accès plateforme sans clé : refusé', r.s);
   r = await api('POST', '/platform/organizations', { name: 'X', siteName: 'X', adminFirstName: 'Xx', adminLastName: 'Xx', adminEmail: `x${n}@test.gn`, adminTemporaryPassword: PW }, null, { 'x-platform-key': 'mauvaise-cle-mauvaise-cle-123' });
   ok(r.s === 403, 'accès plateforme avec une mauvaise clé : refusé', r.s);
-  r = await api('POST', '/platform/organizations', { name: 'Entreprise B ' + n, siteName: 'Dépôt B1', siteLocation: 'Kamsar', adminFirstName: 'Admin', adminLastName: 'B', adminEmail: `adminb${n}@test.gn`, adminTemporaryPassword: PW }, null, { 'x-platform-key': PKEY });
+  r = await api('POST', '/platform/organizations', { name: 'Entreprise B ' + n, siteName: 'Dépôt B1', siteLocation: 'Kamsar', adminFirstName: 'Admin', adminLastName: 'Bah', adminEmail: `adminb${n}@test.gn`, adminTemporaryPassword: PW }, null, { 'x-platform-key': PKEY });
   ok(r.s === 201 && r.d && r.d.organizationId, 'entreprise B créée par l’accès plateforme', r);
   const ORG_B = r.d && r.d.organizationId, SITE_B1 = r.d && r.d.siteId;
   const Bx = await login(`adminb${n}@test.gn`, PW); // connexion 2 (mot de passe provisoire imposé)
@@ -50,7 +50,11 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
 
   // Sites : chaque entreprise ne voit que les siens ; B ouvre un second site
   r = await api('POST', '/sites', { name: 'Dépôt B2 ' + n, location: 'Boké' }, tB); ok(r.s === 201, 'entreprise B : second site créé', r); const SITE_B2 = r.d && r.d.id;
-  r = await api('POST', '/sites', { name: 'Site A2 ' + n, location: 'Kindia' }, tA); ok(r.s === 201, 'entreprise A : second site créé', r); const SITE_A2 = r.d && r.d.id;
+  // A a peut-être déjà atteint la limite de sites de son offre : on réutilise alors son second site existant.
+  let sitesA = (await api('GET', '/sites', undefined, tA)).d || [];
+  let SITE_A2 = (sitesA.find((x) => x.id !== SITE_A) || {}).id;
+  if (!SITE_A2) { r = await api('POST', '/sites', { name: 'Site A2 ' + n, location: 'Kindia' }, tA); SITE_A2 = r.d && r.d.id; }
+  ok(!!SITE_A2, 'entreprise A : second site disponible', SITE_A2);
   r = await api('GET', '/sites', undefined, tB); let s = ids(r);
   ok(s.includes(SITE_B1) && s.includes(SITE_B2) && !s.includes(SITE_A) && !s.includes(SITE_A2), 'B ne voit que ses deux sites', s);
   r = await api('GET', '/sites', undefined, tA); s = ids(r);
@@ -123,8 +127,9 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   r = await api('POST', `/sync/conflicts/${conflictId}/resolve`, { choice: 'SERVEUR', note: 'test' }, U2.accessToken); ok(refused(r), 'l’auteur de la saisie ne peut pas arbitrer son propre conflit', r.s);
   r = await api('POST', `/sync/conflicts/${conflictId}/resolve`, { choice: 'SERVEUR', note: 'Valeur du gestionnaire 1 confirmée' }, tA); ok(is2(r), 'le responsable arbitre : valeur du serveur conservée', r);
   r = await api('POST', `/sync/conflicts/${conflictId}/resolve`, { choice: 'SAISIE', note: 'double' }, tA); ok(refused(r), 'un conflit déjà arbitré ne peut pas l’être une 2e fois', r.s);
-  r = await api('POST', '/sync/push', { operations: [{ entity: 'Customer', entityId: custA, operation: 'UPDATE', baseVersion: 1, payload: { name: 'Hors ligne U2' } }] }, U2.accessToken);
-  r = await api('POST', '/sync/push', { operations: [{ entity: 'Customer', entityId: custA, operation: 'UPDATE', baseVersion: 1, payload: { name: 'Hors ligne U1' } }] }, U1.accessToken);
+  r = await api('GET', '/vehicles/' + vehA, undefined, tA); const vNow = r.d && r.d.version;
+  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U2' } }] }, U2.accessToken);
+  r = await api('POST', '/sync/push', { operations: [{ entity: 'Vehicle', entityId: vehA, operation: 'UPDATE', baseVersion: vNow, payload: { model: 'Hors ligne U1' } }] }, U1.accessToken);
   const res = r.d && (r.d.results || r.d)[0]; ok(res && res.status === 'CONFLICT' && res.conflictId, 'synchronisation hors ligne sur une version dépassée : conflit enregistré', res);
 
   // ================= 5. Récupération du mot de passe par code =================
