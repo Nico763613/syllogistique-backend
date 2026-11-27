@@ -96,3 +96,8 @@ Le composant commun `syTabs(onglets, actif, fonction)` affiche les onglets. Seul
 - **Personnel de terrain** (Agents HSE, Mécaniciens, Gestionnaires de stock, Pointeurs) : deux dossiers, l'équipe et les Rapports.
 - **Recherche générale** retirée de tous les écrans, remplacée par un slogan qui défile (arrêté si l'appareil demande moins d'animations).
 - Serveur : `GET /driver-admin/reports/day`, `GET /driver-admin/drivers/:id/reports` et `GET /driver-admin/drivers/:id/sheet` (lecture seule, ouverts au DG ; limités au site de la personne sauf Super admin et DG).
+
+
+## Un menu = un seul contenu
+
+Chaque rubrique du menu ouvre uniquement son contenu : « Entrées » montre la nouvelle entrée, l'historique des entrées et les réceptions ; « Sorties » montre la nouvelle sortie, l'historique des sorties et le bon de sortie ; « Chauffeurs camion » ne montre que les chauffeurs camion. Les barres d'onglets qui répétaient le menu ne s'affichent plus. Les indicateurs du stock ne montrent jamais « undefined ».

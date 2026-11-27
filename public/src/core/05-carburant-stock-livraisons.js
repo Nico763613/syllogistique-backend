@@ -124,13 +124,18 @@ function stockNamePick() {
   if (hit && sel) { sel.value = hit[1]; stockUnitPick(); }
 }
 async function renderStock() {
-  const [items, valuation, fleet] = await Promise.all([
+  let [items, valuation, fleet] = await Promise.all([
     api('/inventory/items?siteId=' + state.siteId),
-    api('/inventory/valuation?siteId=' + state.siteId),
+    api('/inventory/valuation?siteId=' + state.siteId).catch(() => ({})),
     api('/vehicles?siteId=' + state.siteId).catch(() => []),
   ]);
   const vehOptions = (Array.isArray(fleet) ? fleet : []).slice().sort((a, b) => (a.vehicleType === 'TRUCK' ? 0 : 1) - (b.vehicleType === 'TRUCK' ? 0 : 1))
     .map(v => `<option value="${esc(v.id)}">${v.vehicleType === 'TRUCK' ? '' : ''} ${esc(v.internalNumber || '')} — ${esc(v.registrationNumber || '')}</option>`).join('');
+  // Indicateurs : jamais « undefined » ; à défaut, calculés à partir des articles
+  valuation = valuation && typeof valuation === 'object' ? valuation : {};
+  if (typeof valuation.totalItems !== 'number') valuation.totalItems = items.length;
+  if (typeof valuation.belowMinimum !== 'number') valuation.belowMinimum = items.filter((i) => Number(i.currentQuantity) < Number(i.minimumQuantity)).length;
+  if (typeof valuation.totalValue !== 'number') valuation.totalValue = items.reduce((t, i) => t + Number(i.currentQuantity || 0) * Number(i.unitPrice || 0), 0);
   const rows = items.map(i => `
     <tr><td><b>${esc(i.sku)}</b></td><td><a href="#" style="color:var(--primary);font-weight:600" onclick="stockItemSheet('${esc(i.id)}');return false">${esc(i.name)}</a></td>
     <td class="mono">${fmt(i.currentQuantity)} ${esc(i.unit)}</td>
@@ -144,14 +149,14 @@ async function renderStock() {
   root().innerHTML = `
     <div id="st-tabs">${syTabs(STOCK_TABS, stockTab, 'setStockTab')}</div>
     <div class="kpi-grid st-kpis">
-      <div class="kpi-card"><div class="kpi-label">Articles</div><div class="kpi-value mono">${valuation.totalItems}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Articles</div><div class="kpi-value mono">${fmt(valuation.totalItems)}</div></div>
       <div class="kpi-card"><div class="kpi-label">Valeur du stock</div><div class="kpi-value mono">${fmt(valuation.totalValue)}</div><div class="kpi-sub">GNF</div></div>
-      <div class="kpi-card"><div class="kpi-label">Sous seuil minimum</div><div class="kpi-value mono">${valuation.belowMinimum}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Sous seuil minimum</div><div class="kpi-value mono">${fmt(valuation.belowMinimum)}</div></div>
     </div>
     <div data-stab="articles" class="panel">
       <h3><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Nouvel article</h3>
       <div class="grid-2">
-        <div><label>Code (SKU)</label><input id="i-sku" /></div>
+        <div><label>Code article</label><input id="i-sku" /></div>
         <div><label>Désignation</label><input id="i-name" list="stock-catalog" autocomplete="off" placeholder="Saisie libre ou choisir dans la liste" oninput="stockNamePick()" />
           <datalist id="stock-catalog">${STOCK_CATALOG.map(c => `<option value="${esc(c[0])}"></option>`).join('')}</datalist></div>
         <div><label>Unité</label><select id="i-unit" onchange="stockUnitPick()">${STOCK_UNITS.map(u => `<option>${esc(u)}</option>`).join('')}</select>
@@ -164,16 +169,16 @@ async function renderStock() {
       <div id="i-msg"></div>
     </div>
     <div data-stab="mouvements" class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Mouvement de stock</h3>
+      <h3 id="mv-title"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Mouvement de stock</h3>
       <div class="grid-2">
         <div><label>Article</label><select id="mv-item">${itemOptions}</select></div>
         <div><label>Quantité</label><input id="mv-qty" type="number" step="0.01" /></div>
         <div><label>Motif (obligatoire)</label><input id="mv-reason" placeholder="Ex : approvisionnement, livraison, dépotage…" /></div>
-        <div><label>Imputer à (sortie : camion / véhicule)</label><select id="mv-veh"><option value="">— Aucun —</option>${vehOptions}</select></div>
+        <div id="mv-veh-w"><label>Imputer à (sortie : camion / véhicule)</label><select id="mv-veh"><option value="">— Aucun —</option>${vehOptions}</select></div>
       </div>
       <div style="display:flex; gap:8px; margin-top:14px;">
-        <button class="btn small" style="background:var(--success); margin-top:0;" onclick="stockMovePanel('in')" aria-label="Entrée de stock">＋ Entrée</button>
-        <button class="btn small" style="background:var(--danger); margin-top:0;" onclick="stockMovePanel('out')" aria-label="Sortie de stock">－ Sortie</button>
+        <button id="mv-in-b" class="btn small" style="background:var(--success); margin-top:0;" onclick="stockMovePanel('in')" aria-label="Entrée de stock">＋ Entrée</button>
+        <button id="mv-out-b" class="btn small" style="background:var(--danger); margin-top:0;" onclick="stockMovePanel('out')" aria-label="Sortie de stock">－ Sortie</button>
       </div>
       <div id="mv-msg"></div>
     </div>
@@ -201,14 +206,14 @@ async function renderStock() {
       <div id="ic-detail"></div>
     </div>
     <div data-stab="mouvements" class="panel">
-      <h3><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg> Journal des mouvements</h3>
+      <h3 id="jm-title"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg> Journal des mouvements</h3>
       <div class="grid-2">
         <div><label>Du</label><input id="jm-from" type="date" onchange="loadMovements()" /></div>
         <div><label>Au</label><input id="jm-to" type="date" onchange="loadMovements()" /></div>
-        <div><label>Type</label><select id="jm-type" onchange="loadMovements()"><option value="">Tous</option><option value="IN">Entrées</option><option value="OUT">Sorties</option><option value="ADJUSTMENT">Ajustements</option></select></div>
+        <div id="jm-type-w"><label>Type</label><select id="jm-type" onchange="loadMovements()"><option value="">Tous</option><option value="IN">Entrées</option><option value="OUT">Sorties</option><option value="ADJUSTMENT">Ajustements</option></select></div>
       </div>
       <button class="btn small" onclick="downloadMovementsExcel()"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Exporter en Excel</button>
-      <button class="btn small" style="margin-left:6px;" onclick="downloadDeliveryNote()"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Bon de sortie (PDF)</button>
+      <button id="jm-bs" class="btn small" style="margin-left:6px;" onclick="downloadDeliveryNote()"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg> Bon de sortie (PDF)</button>
       <div id="jm-body" style="margin-top:10px;"></div>
     </div>
     <div data-stab="alertes" class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Alertes stock</h3><div id="st-alerts"><div class="empty">Chargement…</div></div></div>
@@ -232,6 +237,15 @@ let stockTab = 'articles';
 function setStockTab(k) { if (k === 'rapports') return go(reportsHome(state.user.role)); stockTab = k; applyStockTab(); }
 function applyStockTab() {
   document.querySelectorAll('[data-stab]').forEach((el) => { el.style.display = (STOCK_PANELS[stockTab] || []).includes(el.dataset.stab) ? '' : 'none'; });
+  // Chaque onglet ne montre que ce qui le concerne
+  const $ = (id) => document.getElementById(id), show = (id, on) => { const e = $(id); if (e) e.style.display = on ? '' : 'none'; };
+  const isIn = stockTab === 'entrees', isOut = stockTab === 'sorties';
+  const k = document.querySelector('.st-kpis'); if (k) k.style.display = ['articles', 'alertes'].includes(stockTab) ? '' : 'none';
+  show('mv-in-b', !isOut); show('mv-out-b', !isIn); show('mv-veh-w', !isIn); show('jm-type-w', !isIn && !isOut); show('jm-bs', !isIn);
+  if ($('mv-title')) $('mv-title').innerHTML = `<svg class="ic" aria-hidden="true"><use href="#i-${isOut ? 'upload' : 'download'}"/></svg> ${isIn ? 'Nouvelle entrée de stock' : isOut ? 'Nouvelle sortie de stock' : 'Mouvement de stock'}`;
+  if ($('jm-title')) $('jm-title').innerHTML = `<svg class="ic" aria-hidden="true"><use href="#i-book"/></svg> ${isIn ? 'Historique des entrées' : isOut ? 'Historique des sorties' : 'Journal des mouvements'}`;
+  if ($('mv-reason')) $('mv-reason').placeholder = isIn ? 'Ex : achat, livraison fournisseur, retour…' : isOut ? 'Ex : réparation camion, consommation atelier…' : 'Ex : approvisionnement, livraison, dépotage…';
+  const ty = $('jm-type'); if (ty) { const want = isIn ? 'IN' : isOut ? 'OUT' : ty.value; if (ty.value !== want) { ty.value = want; if (typeof loadMovements === 'function') loadMovements(); } }
   const bar = document.getElementById('st-tabs');
   if (bar) bar.innerHTML = syTabs(STOCK_TABS, stockTab, 'setStockTab');
 }
@@ -398,7 +412,7 @@ async function loadMovements() {
     box.innerHTML = list.length ? `<table><thead><tr><th>Date</th><th>Type</th><th>Article</th><th>Qté</th><th>Motif</th><th>Par</th></tr></thead><tbody>${list.map(m => `
       <tr><td>${new Date(m.createdAt).toLocaleString('fr-FR')}</td><td>${lab[m.movementType] || esc(m.movementType)}</td>
       <td>${esc(m.item.name)}</td><td class="mono">${fmt(m.quantity)} ${esc(m.item.unit)}</td>
-      <td>${esc(m.reason || '')}</td><td>${m.createdBy ? esc(m.createdBy.firstName + ' ' + m.createdBy.lastName) : ''}</td></tr>`).join('')}</tbody></table>` : '<div class="desc">Aucun mouvement.</div>';
+      <td>${esc(m.reason || '')}</td><td>${m.createdBy ? esc(m.createdBy.firstName + ' ' + m.createdBy.lastName) : ''}</td></tr>`).join('')}</tbody></table>` : `<div class="desc">${stockTab === 'entrees' ? 'Aucune entrée sur cette période.' : stockTab === 'sorties' ? 'Aucune sortie sur cette période.' : 'Aucun mouvement.'}</div>`;
   } catch (e) { box.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function downloadDeliveryNote() {

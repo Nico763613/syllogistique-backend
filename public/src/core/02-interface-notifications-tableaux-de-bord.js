@@ -117,6 +117,7 @@ function ovClose(n) {
 })();
 window.addEventListener('popstate', () => { if (state.ign > 0) { state.ign--; return; } if (state.hist.length && document.getElementById('back-btn') && !(window.DRV && DRV.hist && DRV.hist.length)) goBack(true); });
 function go(view, noPush) {
+  if (window._menuLock && window._menuLock.view !== view) window._menuLock = null;
   if (!noPush && state.view && state.view !== view) { state.hist.push(state.view); if (state.hist.length > 30) state.hist.shift(); try { history.pushState({ off: 1 }, ''); } catch (e) {} }
   state.view = view;
   goBackBtn();

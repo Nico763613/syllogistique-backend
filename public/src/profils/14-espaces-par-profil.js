@@ -44,7 +44,9 @@ const PROFILES = {
       { t: 'Ressources humaines', ic: 'users', subs: [
         ['Personnel et responsables', 'personnel', 'Comptes actifs, invitations en attente, suspendus.', ['DIRECTEUR_GENERAL']],
         ['Responsables', 'staff-managers', 'Comptes DG et Responsable logistique.', ['SUPER_ADMIN']],
-        ['Chauffeurs', 'drivers', 'Chauffeurs camion, véhicule de service, rapports, archives.'],
+        ['Chauffeurs camion', 'drivers:TRUCK', 'Liste, camion attribué, permis, rapports.'],
+        ['Chauffeurs véhicule de service', 'drivers:SERVICE_VEHICLE', 'Liste, véhicule attribué, permis, rapports.'],
+        ['Archives chauffeurs', 'drivers:ARCH', 'Historique à télécharger, imprimer ou envoyer.'],
         ['Mécaniciens', 'staff-mech', 'Équipe et rapports.'],
         ['Agents HSE', 'staff-hse', 'Équipe et rapports.'],
         ['Gestionnaires de stock', 'staff-store', 'Équipe et rapports.'],
@@ -87,7 +89,9 @@ const PROFILES = {
         ['Historique et coûts par véhicule', 'reports-service', 'Rapports véhicules de service.'],
       ] },
       { t: 'Chauffeurs', ic: 'users', subs: [
-        ['Dossiers chauffeurs', 'drivers', 'Camion, véhicule de service, ajouter, rapports, archives.'],
+        ['Chauffeurs camion', 'drivers:TRUCK', 'Liste, camion attribué, permis, rapports.'],
+        ['Chauffeurs véhicule de service', 'drivers:SERVICE_VEHICLE', 'Liste, véhicule attribué, permis, rapports.'],
+        ['Archives chauffeurs', 'drivers:ARCH', 'Historique à télécharger, imprimer ou envoyer.'],
         ['Suivi du jour', 'driver-board', 'Missions en cours.'],
         ['Rapports et présence', 'reports-drivers', 'Présence, fiches de bord, consommation par chauffeur.'],
         ['Pointage', 'pointage', 'Présence du jour.'],
@@ -303,14 +307,19 @@ function profOpen(i, j) {
   profGoTab(s[1]);
 }
 // « écran:onglet » ouvre directement le bon onglet (stock, carburant, chauffeurs)
+// Ouvert depuis le menu avec un onglet précis : l'écran n'affiche que ce contenu (pas de barre d'onglets en doublon du menu)
+const MENU_LOCK_FN = { stock: 'setStockTab', fuel: 'setFuelTab', drivers: 'setDrvFilter' };
 function profGoTab(v) {
   const [view, tab] = String(v).split(':');
+  window._menuLock = tab && MENU_LOCK_FN[view] ? { view, fn: MENU_LOCK_FN[view] } : null;
   if (tab) {
     if (view === 'stock') stockTab = tab;
     else if (view === 'fuel') fuelTab = tab;
-    else if (view === 'drivers') window.DRVF = tab;
+    else if (view === 'drivers') { window.DRVF = tab; window._drvOpen = null; window.DRVSUB = 'list'; }
   }
+  if (tab) { try { const P = profCur(); if (P) P.folders.forEach((f, i) => { const s = profSubs(f).find((x) => x[1] === v); if (s) PROF.crumb = { i, label: s[0], view, hint: s[2] }; }); } catch (e) {} }
   go(view);
+  if (tab) { try { const P = profCur(); const s = P && P.folders.flatMap((f) => profSubs(f)).find((x) => x[1] === v); const t = document.getElementById('view-title'); if (s && t) t.textContent = s[0]; } catch (e) {} }
   if (tab && view === 'stock' && typeof applyStockTab === 'function') setTimeout(() => { try { stockTab = tab; applyStockTab(); } catch (e) {} }, 0);
 }
 function profFind(view) { // retrouve le dossier d'un écran ouvert autrement (lien interne, recherche)

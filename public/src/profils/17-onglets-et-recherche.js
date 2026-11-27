@@ -4,6 +4,7 @@
    ===================================================================== */
 const SY_TAB_COLORS = ['navy', 'sage', 'gold', 'terra', 'mauve', 'navy-soft', 'sage', 'gold'];
 function syTabs(tabs, cur, fn) { // tabs : [[clé, libellé, icône]]
+  if (window._menuLock && window._menuLock.fn === fn && typeof state !== 'undefined' && state.view === window._menuLock.view) return '';
   setTimeout(() => document.querySelectorAll('.sy-tabs').forEach((bar) => { const on = bar.querySelector('.sy-tab.on'); if (on) bar.scrollLeft = on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2; }), 0);
   return `<div class="sy-tabs" role="tablist">${tabs.map((t, i) => `<button role="tab" aria-selected="${t[0] === cur}" class="sy-tab c-${SY_TAB_COLORS[i % SY_TAB_COLORS.length]}${t[0] === cur ? ' on' : ''}" onclick="${fn}('${t[0]}')">${t[2] ? PROF_IC(t[2]) : ''}<span>${t[1]}</span></button>`).join('')}</div>`;
 }
@@ -18,6 +19,7 @@ const RH_TABS = [
   ['staff-store', 'Gestionnaires de stock', 'package'],
   ['staff-pointer', 'Pointeurs', 'clock'],
 ];
+const RH_BAR = false; // désactivé : le menu Ressources humaines liste déjà ces écrans (pas de doublon)
 function rhTabsFor() { const r = state.user && state.user.role; return RH_TABS.filter((t) => !t[3] || t[3].includes(r)); }
 function rhGo(v) { go(v); }
 {
@@ -26,7 +28,7 @@ function rhGo(v) { go(v); }
     await _rv.apply(this, arguments);
     try {
       const tabs = rhTabsFor();
-      if (PROF.key && state.view === view && tabs.some((t) => t[0] === view) && ['DG', 'LOGI'].includes(PROF.key) && !document.getElementById('rh-tabs')) {
+      if (RH_BAR && PROF.key && state.view === view && tabs.some((t) => t[0] === view) && ['DG', 'LOGI'].includes(PROF.key) && !document.getElementById('rh-tabs')) {
         const html = `<div id="rh-tabs"><div class="sy-tabs-t">${PROF_IC('users')} Ressources humaines</div>${syTabs(tabs, view, 'rhGo')}</div>`;
         const c = document.getElementById('pf-crumb');
         if (c) c.insertAdjacentHTML('afterend', html); else root().insertAdjacentHTML('afterbegin', html);
