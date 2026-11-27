@@ -18,7 +18,11 @@ export class SiteScopeInterceptor implements NestInterceptor {
       if (typeof asked === 'string' && asked && asked !== user.siteId) {
         throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
       }
-      req.query.siteId = user.siteId;
+      // Express 5 recalcule req.query à chaque lecture : une simple affectation serait perdue.
+      // On remplace donc la propriété par un objet fixe qui contient le site de l'utilisateur.
+      Object.defineProperty(req, 'query', {
+        value: { ...req.query, siteId: user.siteId }, writable: true, configurable: true, enumerable: true,
+      });
       const bodySite = req.body && typeof req.body === 'object' ? req.body.siteId : undefined;
       if (typeof bodySite === 'string' && bodySite && bodySite !== user.siteId) {
         throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");

@@ -46,3 +46,8 @@
 - Décision : GET /audit filtre côté serveur les entités lisibles par le gestionnaire de stock (stock, achats, besoins, fournisseurs) et le gestionnaire de flotte (véhicules, chauffeurs, carburant, maintenance, fiches, missions).
 - Raison : le test des droits a montré que le gestionnaire de stock pouvait lire tout le journal, y compris les comptes utilisateurs.
 - Risque accepté : un nouvel écran d'historique d'un autre domaine resterait vide pour ces rôles tant que la liste n'est pas complétée.
+
+## 2026-11-27 — Cloisonnement par site : identifiants, listes, comptes suspendus, mot de passe provisoire
+- Décision : (1) la base refuse l'accès par identifiant à un élément d'un autre site (contexte de requête + contrôle Prisma) ; (2) le site de l'utilisateur est réellement imposé dans les listes sans ?siteId (Express 5 recalculait req.query, l'ancienne affectation était perdue) ; (3) un compte suspendu ou supprimé perd l'accès en 20 s maximum ; (4) le changement du mot de passe provisoire est imposé par le serveur.
+- Raison : contrôle final de sécurité ; défauts prouvés par scripts/functional5.js sur base de test.
+- Risque accepté : les opérations dans une transaction Prisma ne passent pas par le contrôle par identifiant (elles restent protégées par les contrôles métier existants) ; cache d'état de compte de 20 s.
