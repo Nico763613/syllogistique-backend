@@ -1,5 +1,6 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Prisma, PrismaClient } from '@prisma/client';
+import { requestContext } from './common/request-context';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { DOC_SEQUENCE_SCHEMA } from './common/doc-numbers';
@@ -141,6 +142,32 @@ function loadDashboardUpgrades(): string[] {
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+  // Modèles rattachés à un site (champ siteId) : cloisonnés lors des accès par identifiant
+  static readonly SITE_MODELS = new Set(Prisma.dmmf.datamodel.models.filter((m) => m.fields.some((f) => f.name === 'siteId')).map((m) => m.name));
+
+  constructor() {
+    super();
+    // Cloisonnement par identifiant : un utilisateur rattaché à un site ne lit, ne modifie ni ne supprime
+    // un élément d'un autre site en donnant directement son identifiant. Les transactions internes
+    // (ex. transfert de stock entre sites) restent libres : leur point d'entrée est déjà contrôlé.
+    (this as any).$use(async (params: any, next: (p: any) => Promise<any>) => {
+      const ctx = requestContext.getStore();
+      const where = params.args?.where;
+      const sel = params.args?.select;
+      const probe = sel && Object.keys(sel).length === 1 && sel.siteId === true;
+      if (!ctx?.siteId || params.runInTransaction || probe || !PrismaService.SITE_MODELS.has(params.model)) return next(params);
+      if (!['findUnique', 'findUniqueOrThrow', 'update', 'delete', 'upsert'].includes(params.action)) return next(params);
+      if (!where || typeof where.id !== 'string') return next(params);
+      const delegate = (this as any)[params.model.charAt(0).toLowerCase() + params.model.slice(1)];
+      const row = await delegate.findUnique({ where: { id: where.id }, select: { siteId: true } });
+      if (row && row.siteId && row.siteId !== ctx.siteId) {
+        if (params.action === 'findUnique') return null;
+        throw new NotFoundException('Élément introuvable.');
+      }
+      return next(params);
+    });
+  }
+
   async onModuleInit() {
     await this.$connect();
     // Mise à niveau automatique et idempotente : ajoute la colonne « département » si elle manque
