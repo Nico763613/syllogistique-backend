@@ -116,3 +116,13 @@
 - **Décision** : un compte chauffeur ne peut être lié qu'à une fiche chauffeur du même site (et donc de la même entreprise).
 - **Raison** : un administrateur d'entreprise sans site pouvait lier le compte d'un site à la fiche d'un autre site.
 - **Risque accepté** : aucun.
+
+## 28/11/2026 — Requêtes SQL directes : relecture complète et contrôle automatique
+- **Décision** : relecture des 22 fichiers qui contiennent du SQL direct (non filtré par le cloisonnement automatique) ; correction de la recherche de doublons de clients, qui acceptait le site d'une autre entreprise et pouvait renvoyer les noms et téléphones de ses clients ; création de `scripts/check-raw-sql.js` (cité dans le code mais absent), exécuté en CI : tout nouveau fichier avec du SQL direct fait échouer la CI tant qu'il n'a pas été relu.
+- **Raison** : le cloisonnement entre entreprises est une exigence de sécurité majeure ; ce contrôle évite qu'une faille du même type réapparaisse.
+- **Risque accepté** : la liste des fichiers relus est tenue à la main ; une modification d'un fichier déjà relu n'est pas détectée automatiquement (relecture humaine nécessaire).
+
+## 28/11/2026 — Test des modules sans test direct (functional7)
+- **Décision** : ajout de `scripts/functional7.js` (transferts entre sites, rapports et exports, recherche, QR codes, signalements, licence, simulation, envoi d'e-mail de test).
+- **Raison** : ces modules n'étaient vérifiés par aucun test automatique.
+- **Risque accepté** : l'envoi réel d'e-mails et l'activation de licence auprès du serveur externe ne sont pas testables en CI.

@@ -86,6 +86,12 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   r = await api('PATCH', '/inventory/items/' + itemA, { name: 'Piraté' }, tB); ok(refused(r), 'B ne modifie pas l’article de A', r.s);
   r = await api('POST', '/vehicles', { siteId: SITE_A, vehicleType: 'TRUCK', internalNumber: 'X' + n, registrationNumber: 'X' + n }, tB); ok(refused(r), 'B ne crée pas de véhicule dans un site de A', r.s);
   r = await api('POST', '/customers', { siteId: SITE_A, name: 'Intrus ' + n }, tB); ok(refused(r), 'B ne crée pas de client dans un site de A', r.s);
+  r = await api('GET', `/customers/check-duplicates?siteId=${SITE_A}&phone=621${n}`, undefined, tB);
+  ok(r.s === 403 && !JSON.stringify(r.d || '').includes('Client A'), 'B ne lit pas les clients de A par la recherche de doublons', r);
+  r = await api('POST', '/customers', { siteId: SITE_A, name: 'Client A ' + n, phone: '621' + n }, tB);
+  ok(refused(r) && !JSON.stringify(r.d || '').includes('621' + n), 'B ne découvre pas un client de A en créant un doublon', r);
+  r = await api('GET', `/customers/check-duplicates?siteId=${SITE_A}&phone=621${n}`, undefined, tA);
+  ok(r.s === 200 && ids(r).includes(custA), 'A retrouve bien son propre client comme doublon', r);
   r = await api('POST', '/users', { firstName: 'Intrus', lastName: 'B', email: `intrus${n}@test.gn`, password: PW, role: 'MAGASINIER', siteId: SITE_A }, tB); ok(refused(r), 'B ne crée pas de compte rattaché à un site de A', r.s);
   const fuel = (vehicleId) => ({ vehicleId, siteId: SITE_B1, quantityLiters: 10, mileage: 1000, transactionDate: new Date().toISOString() });
   r = await api('POST', '/fuel', fuel(vehB), tB); ok(is2(r), 'témoin : B enregistre du carburant pour son propre véhicule', r);

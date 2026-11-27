@@ -1,4 +1,5 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { allowedSiteIds } from '../common/tenant-scope';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
@@ -11,6 +12,10 @@ export class CustomersService {
   private norm(s?: string | null) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
   private digits(s?: string | null) { return String(s || '').replace(/\D/g, '').slice(-9); }
   async findDuplicates(siteId: string, name?: string, phone?: string, excludeId?: string) {
+    // Requête SQL directe (non filtrée automatiquement) : le site doit appartenir au périmètre de l'utilisateur,
+    // sinon on pourrait lire les noms et téléphones des clients d'une autre entreprise.
+    const allowed = await allowedSiteIds(this.prisma);
+    if (allowed && !allowed.includes(siteId)) throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
     const nn = this.norm(name), pp = this.digits(phone);
     if (!nn && pp.length < 8) return [];
     const all = (await this.prisma.$queryRawUnsafe('SELECT "id","name","phone","kind" FROM "customers" WHERE "site_id" = $1', siteId) as any[]).filter((c) => c.id !== excludeId);

@@ -19,6 +19,8 @@ jobs:
       - run: npm run build
       - run: node scripts/check-ui.js
       - run: npm run build:ui
+      - name: Requêtes SQL directes toutes relues (cloisonnement)
+        run: node scripts/check-raw-sql.js
       - run: test -s public/core.js
   master:
     name: master (tests avec vraie base PostgreSQL)
@@ -111,6 +113,9 @@ jobs:
       - run: sleep 61
       - name: Tests multi-entreprises et multi-sites
         run: node scripts/functional6.js
+      - run: sleep 61
+      - name: Modules sans test direct (transferts, rapports, recherche, QR codes, signalements)
+        run: node scripts/functional7.js
       - run: sleep 61
       - name: Recette des 15 profils (droits de consultation vérifiés côté serveur)
         run: |
