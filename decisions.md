@@ -27,3 +27,17 @@
 ## 2026-11-27 — Entrée/sortie de stock : message visible
 - Décision : toute erreur de « Nouvelle entrée / Nouvelle sortie » (aucun article, réseau) s'affiche à l'écran.
 - Raison : le bouton semblait ne rien faire quand aucun article n'existait.
+
+## 2026-11-27 — Le DG gère les comptes de ses responsables
+- Décision : le DG reste en lecture seule, sauf pour créer, modifier, suspendre et inviter les comptes qu'il encadre (POST /staff, PATCH /staff/:id, POST /staff/:id/status, POST /staff/invite). Les rapports du personnel restent interdits en écriture.
+- Raison : l'écran « Gestion des responsables » échouait à chaque enregistrement (le garde global bloquait toute écriture du DG).
+- Risque accepté : surface d'écriture du DG élargie, limitée par la hiérarchie serveur (canManageRole) et testée dans scripts/functional4.js.
+
+## 2026-11-27 — Responsable commercial et Caissier ajoutés aux comptes créés par le DG
+- Décision : ajout de RESPONSABLE_COMMERCIAL et CAISSIER à la liste des postes de bureau (staff.dto) et à l'écran du DG.
+- Raison : la hiérarchie les plaçait déjà sous le DG, mais aucun écran ne permettait de les créer.
+- Risque accepté : aucun nouveau droit, seulement un formulaire qui manquait.
+
+## 2026-11-27 — Test automatique des circuits sur base réelle
+- Décision : scripts/functional4.js (droits par rôle, comptes du DG, circuit panne, circuit chauffeur jusqu'au paiement) ajouté à l'intégration continue.
+- Raison : prouver les circuits de bout en bout sur une vraie base PostgreSQL de test, sans toucher aux données réelles.

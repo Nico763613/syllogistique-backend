@@ -20,16 +20,26 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  // Le Directeur Général est en lecture seule absolue : aucune création, modification ni suppression
-  // (seuls sa photo, son mot de passe et sa déconnexion restent possibles).
+  // Le Directeur Général est en lecture seule : aucune création, modification ni suppression,
+  // sauf sa photo, son mot de passe, sa déconnexion et la gestion des comptes de ses responsables
+  // (création, invitation, modification, suspension via /staff). La hiérarchie (canManageRole)
+  // limite ces écritures aux seuls rôles qu'il encadre.
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
     const u = super.handleRequest(err, user, info, context);
     if (u && u.role === 'DIRECTEUR_GENERAL') {
       const req = context.switchToHttp().getRequest();
-      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !String(req.path || '').startsWith('/auth/') && req.path !== '/support/reports' && !(req.method === 'PATCH' && /^\/notifications\/[^/]+\/read$/.test(String(req.path || '')))) {
+      if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !String(req.path || '').startsWith('/auth/') && req.path !== '/support/reports' && !(req.method === 'PATCH' && /^\/notifications\/[^/]+\/read$/.test(String(req.path || ''))) && !JwtAuthGuard.dgStaffWrite(req.method, String(req.path || ''))) {
         throw new ForbiddenException('Le Directeur Général a un accès en lecture seule.');
       }
     }
     return u;
+  }
+
+  // Écritures autorisées au DG sur les comptes de ses responsables (jamais sur les rapports du personnel).
+  static dgStaffWrite(method: string, path: string): boolean {
+    if (path.startsWith('/staff/reports')) return false;
+    if (method === 'POST' && (path === '/staff' || path === '/staff/invite' || /^\/staff\/[^/]+\/status$/.test(path))) return true;
+    if (method === 'PATCH' && /^\/staff\/[^/]+$/.test(path)) return true;
+    return false;
   }
 }

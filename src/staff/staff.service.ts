@@ -107,7 +107,7 @@ export class StaffService {
       `Voici votre application de travail SYL LOGISTIQUE (${LABEL[u.role.name]}) : ${link}`,
       `1) Ouvrez le lien puis installez l'application (menu du navigateur > « Ajouter à l'écran d'accueil »).`,
       pending ? `2) Sur la page qui s'ouvre, créez votre mot de passe (lien personnel, valable 72 h, à usage unique). Ensuite, connectez-vous avec votre numéro de téléphone et ce mot de passe.` : `2) Connexion : votre numéro de téléphone et votre mot de passe.`,
-      ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre espace de pilotage.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),
+      ...(isManager(u.role.name) ? [`3) Vous arrivez directement dans votre propre espace de travail.`] : [`3) Chaque jour, remplissez « Mon rapport du jour » : il arrive directement chez votre responsable.`]),
     ];
     return { name: `${u.firstName} ${u.lastName}`, phone: digits, message: lines.join('\n') };
   }

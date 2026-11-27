@@ -84,6 +84,9 @@ jobs:
       - run: sleep 61
       - run: node scripts/functional3.js
       - run: sleep 61
+      - name: Circuits complets (droits, DG, panne, chauffeur)
+        run: node scripts/functional4.js
+      - run: sleep 61
       - name: Test d'interface par clics (Chrome sans écran)
         run: |
           npm install --no-save --no-audit --no-fund playwright

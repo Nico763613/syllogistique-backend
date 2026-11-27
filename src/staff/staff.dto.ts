@@ -2,8 +2,8 @@ import { IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validato
 
 // Personnel de terrain : envoie un rapport d'activité chaque jour
 export const STAFF_ROLES = ['AGENT_HSE', 'GESTIONNAIRE_HSE', 'MAGASINIER', 'MECANICIEN', 'POINTEUR'] as const;
-// Responsables : enregistrés uniquement par le Master Admin (SUPER_ADMIN)
-export const MANAGER_ROLES = ['DIRECTEUR_GENERAL', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS', 'COMPTABLE'] as const;
+// Responsables et postes de bureau : le DG crée ceux qu'il encadre (voir common/hierarchy.ts), le Master Admin crée tout
+export const MANAGER_ROLES = ['DIRECTEUR_GENERAL', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS', 'COMPTABLE', 'RESPONSABLE_COMMERCIAL', 'CAISSIER'] as const;
 export const ALL_STAFF_ROLES = [...STAFF_ROLES, ...MANAGER_ROLES] as const;
 
 export class CreateStaffDto {

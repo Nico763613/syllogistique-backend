@@ -233,7 +233,7 @@ async function mgLoad() {
 /* ---------------- GESTION DU PERSONNEL (hiérarchie : chacun gère uniquement son domaine, contrôlé aussi côté serveur) ---------------- */
 const PERS_CFG = {
   ADMIN_LOGISTIQUE: { title: 'GESTION DU PERSONNEL LOGISTIQUE', desc: "Enregistrez vos collaborateurs, activez ou désactivez leur compte et envoyez-leur une invitation individuelle par WhatsApp. Les chauffeurs (permis, véhicule, appareil) se gèrent dans « Équipes terrain ».", roles: { MAGASINIER: 'Gestionnaire de stock', MECANICIEN: 'Mécanicien', POINTEUR: 'Pointeur' } },
-  DIRECTEUR_GENERAL: { title: 'GESTION DES RESPONSABLES', desc: "Créez les comptes de vos responsables, puis envoyez à chacun son invitation individuelle par WhatsApp. Chacun arrive directement dans son propre espace.", roles: { ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité', GESTIONNAIRE_HSE: 'Responsable HSE' } },
+  DIRECTEUR_GENERAL: { title: 'GESTION DES RESPONSABLES', desc: "Créez les comptes de vos responsables, puis envoyez à chacun son invitation individuelle par WhatsApp. Chacun arrive directement dans son propre espace.", roles: { ADMIN_LOGISTIQUE: 'Responsable logistique', RESPONSABLE_OPERATIONS: 'Responsable des opérations', COMPTABLE: 'Comptabilité', GESTIONNAIRE_HSE: 'Responsable HSE', RESPONSABLE_COMMERCIAL: 'Responsable commercial', CAISSIER: 'Caissier' } },
 };
 const PERS_ST = { ACTIVE: ['Actif', 'ok'], SUSPENDED: ['Suspendu', 'warn'], DISABLED: ['Désactivé', 'bad'] };
 async function renderPersonnel() {
