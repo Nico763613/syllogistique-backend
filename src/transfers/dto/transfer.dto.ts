@@ -1,10 +1,11 @@
-import { IsArray, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested, ArrayMinSize } from 'class-validator';
+import { MAX_QUANTITY } from '../../common/limits';
+import { IsArray, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested, ArrayMinSize, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class TransferLineDto {
   // Article du site d'origine
   @IsString() itemId: string;
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
 }
 
 export class CreateTransferDto {

@@ -6,6 +6,8 @@ import { recordAssignment } from '../vehicles/assignments';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { currentFuelPrice } from '../common/fuel-price';
+import { uploadExists } from '../uploads/file-links';
+import { FUEL_PRICE_MAX_RATIO, FUEL_PRICE_MIN_RATIO, MAX_DRIVER_EXPENSE_GNF, MAX_FUEL_LITERS } from '../common/limits';
 import { SyncOpDto } from './driver.dto';
 import { DriverSheetService, dayStart } from './driver-sheet.service';
 
@@ -310,6 +312,16 @@ export class DriverAppService {
     return { tripId: trip.id, status: 'COMPLETED', distance, consumption, gapPct };
   }
 
+  /** Un même reçu ne justifie qu'une seule dépense ou un seul plein (pas de double remboursement). */
+  private async receiptNotReused(receipt: string) {
+    const bare = receipt.split('?')[0];
+    const [e, f] = await Promise.all([
+      this.prisma.driverExpense.count({ where: { receiptUrl: { startsWith: bare } } }),
+      this.prisma.fuelTransaction.count({ where: { receiptImageUrl: { startsWith: bare } } }),
+    ]);
+    if (e + f > 0) throw new BadRequestException('Ce reçu a déjà été utilisé pour une autre déclaration. Photographiez le reçu de cette dépense.');
+  }
+
   private async fuel(driver: { id: string; siteId: string }, userId: string, organizationId: string, op: SyncOpDto, p: P) {
     if (await this.prisma.fuelTransaction.findUnique({ where: { clientOpId: op.clientOpId } })) return { duplicate: true };
     const trip = op.tripId ? await this.tripOf(driver.id, op.tripId) : null;
@@ -318,12 +330,21 @@ export class DriverAppService {
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: vehicleId } });
     if (!vehicle) throw new NotFoundException('Véhicule introuvable.');
     const liters = num(p.liters);
-    if (!liters || liters <= 0 || liters > 2000) throw new BadRequestException('Quantité de carburant invalide.');
+    if (!liters || liters <= 0 || liters > MAX_FUEL_LITERS) throw new BadRequestException('Quantité de carburant invalide.');
     const receipt = str(p.receiptImageUrl, 300);
     if (!receipt) throw new BadRequestException('La photo du reçu de carburant est obligatoire.');
-    if (!receipt.startsWith('/uploads/')) throw new BadRequestException('Justificatif invalide.');
+    if (!receipt.startsWith('/uploads/') || !(await uploadExists(this.prisma, receipt))) throw new BadRequestException('Justificatif invalide : la photo du reçu est introuvable. Reprenez la photo puis renvoyez.');
+    await this.receiptNotReused(receipt);
     const declared = num(p.totalCost);
-    const total = declared && declared > 0 ? declared : Number((liters * (await currentFuelPrice(this.prisma, organizationId))).toFixed(2));
+    const refPrice = await currentFuelPrice(this.prisma, organizationId);
+    if (declared !== undefined && declared !== 0) {
+      // Montant déclaré : il doit rester cohérent avec le tarif central (voir src/common/limits.ts)
+      const perLiter = declared / liters;
+      if (!(declared > 0) || perLiter < refPrice * FUEL_PRICE_MIN_RATIO || perLiter > refPrice * FUEL_PRICE_MAX_RATIO) {
+        throw new BadRequestException(`Montant du plein incohérent : ${Math.round(perLiter).toLocaleString('fr-FR')} GNF le litre, alors que le tarif est de ${Math.round(refPrice).toLocaleString('fr-FR')} GNF. Vérifiez le montant et les litres.`);
+      }
+    }
+    const total = declared && declared > 0 ? declared : Number((liters * refPrice).toFixed(2));
     const price = Number((total / liters).toFixed(2));
     const odometer = num(p.odometer);
     const row = await this.prisma.fuelTransaction.create({
@@ -489,12 +510,13 @@ export class DriverAppService {
     const vehicleId = trip?.vehicleId ?? (await this.prisma.vehicle.findFirst({ where: { assignedDriverId: driver.id, deletedAt: null } }))?.id;
     const category = ['PEAGE', 'AMENDE', 'DEPANNAGE', 'LAVAGE', 'REPARATION', 'REPAS', 'HEBERGEMENT', 'PARKING', 'AUTRE'].includes(p.category) ? (p.category as string) : 'AUTRE';
     const amount = num(p.amount);
-    if (amount === undefined || !Number.isFinite(amount) || amount <= 0 || amount > 100_000_000) throw new BadRequestException('Montant de la dépense invalide.');
+    if (amount === undefined || !Number.isFinite(amount) || amount <= 0 || amount > MAX_DRIVER_EXPENSE_GNF) throw new BadRequestException('Montant de la dépense invalide.');
     const description = str(p.description, 500);
     if (category === 'AUTRE' && !description) throw new BadRequestException('Précisez la nature de la dépense.');
     const receipt = str(p.receiptImageUrl, 300);
     if (!receipt) throw new BadRequestException('La photo du reçu ou de la facture est obligatoire.');
-    if (!receipt.startsWith('/uploads/')) throw new BadRequestException('Justificatif invalide.');
+    if (!receipt.startsWith('/uploads/') || !(await uploadExists(this.prisma, receipt))) throw new BadRequestException('Justificatif invalide : la photo du reçu est introuvable. Reprenez la photo puis renvoyez.');
+    await this.receiptNotReused(receipt);
     const row = await this.prisma.driverExpense.create({ data: { insured: category === 'DEPANNAGE' && typeof p.insured === 'boolean' ? p.insured : undefined, driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), category, amount: Math.round(amount), description, receiptUrl: receipt ?? null, clientOpId: op.clientOpId } });
     const labels: Record<string, string> = { PEAGE: 'Péages et taxes', AMENDE: 'Contravention / amende', DEPANNAGE: 'Dépannage d\'urgence', LAVAGE: 'Lavage', REPARATION: "Réparation d'urgence", REPAS: 'Repas', HEBERGEMENT: 'Hébergement', PARKING: 'Parking', AUTRE: 'Autre' };
     await this.notify({ role: 'GESTIONNAIRE_FLOTTE', siteId: driver.siteId, severity: 'INFO', entity: 'DriverExpense', entityId: row.id, title: 'Dépense à valider', message: `${labels[category]} : ${new Intl.NumberFormat('fr-FR').format(row.amount)} GNF${description ? ' — ' + description.slice(0, 120) : ''}.` });
@@ -514,7 +536,7 @@ export class DriverAppService {
     if ((nature === 'AUTRE' || nature === 'ANOMALIE' || nature === 'PIECES') && !detail) throw new BadRequestException('Précisez la nature de la maintenance.');
     const mileage = num(p.mileage);
     const cost = num(p.cost);
-    if (cost !== undefined && (cost < 0 || !Number.isFinite(cost))) throw new BadRequestException('Coût invalide.');
+    if (cost !== undefined && (cost < 0 || !Number.isFinite(cost) || cost > MAX_DRIVER_EXPENSE_GNF)) throw new BadRequestException('Coût invalide (négatif ou supérieur à 100 millions GNF).');
     const row = await this.prisma.driverMaintenance.create({
       data: { severity: ['LEGERE', 'MOYENNE'].includes(p.severity) ? (p.severity as string) : undefined, photoUrls: urls(p.photoUrls), latitude: geo(p.lat, -90, 90), longitude: geo(p.lng, -180, 180), driverId: driver.id, vehicleId, tripId: trip?.id, date: when(p.occurredAt), nature, detail, mileage: mileage !== undefined && Number.isInteger(mileage) ? mileage : vehicle.currentMileage, cost: cost !== undefined ? Math.round(cost) : undefined, nextServiceKm: num(p.nextServiceKm) !== undefined && Number.isInteger(num(p.nextServiceKm)) && (num(p.nextServiceKm) as number) > 0 ? num(p.nextServiceKm) : undefined, observations: str(p.observations, 500), clientOpId: op.clientOpId },
     });

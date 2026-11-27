@@ -1,9 +1,10 @@
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { MAX_QUANTITY } from '../../common/limits';
+import { IsArray, IsBoolean, IsNumber, IsOptional, IsString, Min, ValidateNested, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ReturnLineDto {
   @IsString() itemId: string;
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
 }
 
 export class CreateSalesReturnDto {

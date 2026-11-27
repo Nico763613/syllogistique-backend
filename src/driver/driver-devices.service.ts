@@ -37,6 +37,12 @@ export class DriverDevicesService {
     const user = await this.prisma.user.findFirst({ where: { email: email.trim().toLowerCase(), deletedAt: null }, include: { role: true } });
     if (!user) throw new NotFoundException("Aucun compte avec cet e-mail. Créez d'abord l'utilisateur (rôle Chauffeur) dans Utilisateurs.");
     if (user.role.name !== 'CHAUFFEUR') throw new BadRequestException('Ce compte doit avoir le rôle Chauffeur.');
+    // Rattachement cohérent : le compte et la fiche chauffeur appartiennent au même site (donc à la même entreprise)
+    if (user.siteId && user.siteId !== driver.siteId) throw new BadRequestException("Ce compte appartient à un autre site que la fiche du chauffeur. Rattachez-les au même site.");
+    if (!user.siteId) {
+      const site = await this.prisma.site.findUnique({ where: { id: driver.siteId }, select: { organizationId: true } });
+      if (!site || site.organizationId !== user.organizationId) throw new BadRequestException("Ce compte n'appartient pas à la même entreprise que la fiche du chauffeur.");
+    }
     const taken = await this.prisma.driver.findFirst({ where: { userId: user.id, id: { not: driverId } } });
     if (taken) throw new BadRequestException(`Ce compte est déjà lié à ${taken.firstName} ${taken.lastName}.`);
     await this.prisma.driver.update({ where: { id: driverId }, data: { userId: user.id } });

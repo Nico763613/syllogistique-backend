@@ -84,6 +84,20 @@ export async function readUpload(prisma: any, url?: string | null): Promise<Buff
   try { return await readFile(join(__dirname, '..', '..', 'uploads', name)); } catch { return null; }
 }
 
+/**
+ * Vrai si le fichier envoyé existe vraiment (base de données, ou disque pour les anciens fichiers).
+ * Sert à refuser une dépense ou un plein dont le « reçu » est une adresse inventée.
+ */
+export async function uploadExists(prisma: any, url?: string | null): Promise<boolean> {
+  const name = uploadName(url);
+  if (!name || !FILE_NAME_RE.test(name)) return false;
+  try {
+    const rows = (await prisma.$queryRawUnsafe('SELECT 1 FROM "uploaded_files" WHERE "name" = $1', name)) as any[];
+    if (rows.length) return true;
+  } catch { /* table absente : disque */ }
+  try { await readFile(join(__dirname, '..', '..', 'uploads', name)); return true; } catch { return false; }
+}
+
 /** Retire les signatures des adresses de fichiers reçues (on enregistre toujours l'adresse nue /uploads/<nom>). */
 export function unsignText(s: string): string {
   return s.includes('/uploads/') ? s.replace(LINK_RE, (_m, name: string) => `/uploads/${name}`) : s;

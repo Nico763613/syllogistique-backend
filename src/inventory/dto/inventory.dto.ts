@@ -1,4 +1,5 @@
-import { IsArray, IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { MAX_QUANTITY, MAX_UNIT_PRICE_GNF } from '../../common/limits';
+import { IsArray, IsBoolean, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export const REASON_CODES = ['RECEIPT', 'CONSUMPTION', 'SALE', 'RETURN', 'LOSS', 'BREAKAGE', 'DONATION', 'SCRAP', 'COUNT_GAP'];
@@ -13,18 +14,18 @@ export class CreateInventoryItemDto {
   @IsOptional() @IsString() brand?: string;
   @IsOptional() @IsString() reference?: string;
   @IsOptional() @IsString() unit?: string;
-  @IsOptional() @IsNumber() @Min(0) currentQuantity?: number;
-  @IsOptional() @IsNumber() @Min(0) minimumQuantity?: number;
-  @IsOptional() @IsNumber() @Min(0) maximumQuantity?: number;
-  @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) currentQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) minimumQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) maximumQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) unitPrice?: number;
   @IsOptional() @IsString() location?: string;
   @IsOptional() @IsString() supplierId?: string;
   @IsOptional() @IsString() photoUrl?: string;
   @IsOptional() @IsString() locationId?: string;
   @IsOptional() @IsIn(VALUATION_METHODS) valuationMethod?: string;
-  @IsOptional() @IsNumber() @Min(0) reorderPoint?: number;
-  @IsOptional() @IsNumber() @Min(0) taxRate?: number;
-  @IsOptional() @IsNumber() @Min(0) salePrice?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) reorderPoint?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) taxRate?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) salePrice?: number;
   @IsOptional() @IsBoolean() hasExpiry?: boolean;
   @IsOptional() @IsBoolean() isHazardous?: boolean;
   @IsOptional() @IsString() sdsUrl?: string;
@@ -33,10 +34,10 @@ export class CreateInventoryItemDto {
 export class StockInDto {
   @IsString() itemId: string;
   @IsString() siteId: string;
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
   @IsOptional() @IsString() supplierId?: string;
   @IsOptional() @IsString() reference?: string;
-  @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) unitPrice?: number;
   // Motif obligatoire (approvisionnement, retour, dépotage…)
   @IsString() @MinLength(3) reason: string;
   @IsOptional() @IsString() observations?: string;
@@ -50,7 +51,7 @@ export class StockInDto {
 export class StockOutDto {
   @IsString() itemId: string;
   @IsString() siteId: string;
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
   @IsOptional() @IsString() vehicleId?: string;
   // Motif obligatoire (livraison, consommation, panne…)
   @IsString() @MinLength(3) reason: string;
@@ -63,7 +64,7 @@ export class StockOutDto {
 
 // Correction d'un mouvement de stock : motif obligatoire (Audit Trail)
 export class CorrectStockMovementDto {
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
   @IsString() @MinLength(3) reason: string;
   @IsOptional() @IsBoolean() allowNegative?: boolean;
 }
@@ -76,14 +77,14 @@ export class UpdateInventoryItemDto {
   @IsOptional() @IsString() reference?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() location?: string;
-  @IsOptional() @IsNumber() @Min(0) minimumQuantity?: number;
-  @IsOptional() @IsNumber() @Min(0) maximumQuantity?: number;
-  @IsOptional() @IsNumber() @Min(0) unitPrice?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) minimumQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) maximumQuantity?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) unitPrice?: number;
   @IsOptional() @IsString() locationId?: string;
   @IsOptional() @IsIn(VALUATION_METHODS) valuationMethod?: string;
-  @IsOptional() @IsNumber() @Min(0) reorderPoint?: number;
-  @IsOptional() @IsNumber() @Min(0) taxRate?: number;
-  @IsOptional() @IsNumber() @Min(0) salePrice?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) reorderPoint?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(100) taxRate?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) salePrice?: number;
   @IsOptional() @IsBoolean() hasExpiry?: boolean;
   @IsOptional() @IsBoolean() isHazardous?: boolean;
   @IsOptional() @IsString() sdsUrl?: string;
@@ -99,7 +100,7 @@ export class StartInventoryCountDto {
 
 export class CountLineDto {
   @IsString() itemId: string;
-  @IsNumber() @Min(0) countedQuantity: number;
+  @IsNumber() @Min(0) @Max(MAX_QUANTITY) countedQuantity: number;
   @IsOptional() @IsString() note?: string;
 }
 
@@ -117,6 +118,6 @@ export class CloseInventoryCountDto {
 export class TransferStockDto {
   @IsString() itemId: string;
   @IsString() toSiteId: string;
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
   @IsString() @MinLength(3) reason: string;
 }

@@ -1,10 +1,11 @@
+import { MAX_AMOUNT_GNF, MAX_QUANTITY, MAX_UNIT_PRICE_GNF } from '../../common/limits';
 import { IsArray, IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, Max, MaxLength, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SalesOrderLineDto {
   @IsString() itemId: string;
-  @IsNumber() @Min(0.01) quantityOrdered: number;
-  @IsNumber() @Min(0) unitPrice: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantityOrdered: number;
+  @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) unitPrice: number;
 }
 
 export class CreateSalesOrderDto {
@@ -23,7 +24,7 @@ export class CreateSalesOrderDto {
 
 export class DeliverLineDto {
   @IsString() lineId: string;
-  @IsNumber() @Min(0.01) quantityDelivered: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantityDelivered: number;
 }
 
 export class DeliverSalesOrderDto {
@@ -38,7 +39,7 @@ export class DeliverSalesOrderDto {
 
 export class InstallmentDto {
   @IsDateString() dueDate: string;
-  @IsNumber() @Min(1) amount: number;
+  @IsNumber() @Min(1) @Max(MAX_AMOUNT_GNF) amount: number;
 }
 
 export class CreateSalesInvoiceDto {

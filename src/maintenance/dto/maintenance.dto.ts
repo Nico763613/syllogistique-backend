@@ -1,4 +1,5 @@
-import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { MAX_AMOUNT_GNF } from '../../common/limits';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
 
 export class CreateMaintenanceDto {
   @IsString() vehicleId: string;
@@ -7,7 +8,7 @@ export class CreateMaintenanceDto {
   @IsOptional() @IsInt() @Min(0) mileage?: number;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsString() supplierId?: string;
-  @IsOptional() @IsNumber() @Min(0) cost?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_AMOUNT_GNF) cost?: number;
   @IsOptional() @IsDateString() nextDate?: string;
   @IsOptional() @IsInt() @Min(0) nextMileage?: number;
   @IsOptional() @IsString() invoiceNumber?: string;

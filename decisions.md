@@ -106,3 +106,13 @@
 - Décision : `/reports/period`, ses exports (Excel, PDF), l'envoi par e-mail et le lien WhatsApp vérifient la période (dates AAAA-MM-JJ, début avant fin) et répondent 400 avec un message en français.
 - Raison : sans dates, le serveur renvoyait une erreur 500 (trouvée par le contrôle des 15 profils).
 - Risque accepté : aucun pour l'interface actuelle, qui n'appelle pas ces adresses sans dates.
+
+## 28/11/2026 — Clôture : contrôle des montants et des justificatifs
+- **Décision** : plafonds communs des montants et quantités (`src/common/limits.ts`) appliqués à toutes les saisies ; prix au litre d'un plein déclaré par un chauffeur limité à 50 %–200 % du tarif central ; reçu obligatoire **présent sur le serveur** ; un même reçu ne justifie qu'une seule déclaration.
+- **Raison** : un montant démesuré provoquait une erreur 500 ; un chauffeur pouvait déclarer un plein à n'importe quel prix ou citer une adresse de reçu inventée ; un même reçu pouvait servir deux fois.
+- **Risque accepté** : la vérification du « reçu déjà utilisé » se fait dans le périmètre du site du chauffeur (les noms de fichiers sont aléatoires et non devinables). La fourchette de prix du carburant doit être revue si le tarif central n'est pas tenu à jour dans Paramètres.
+
+## 28/11/2026 — Rattachement des chauffeurs
+- **Décision** : un compte chauffeur ne peut être lié qu'à une fiche chauffeur du même site (et donc de la même entreprise).
+- **Raison** : un administrateur d'entreprise sans site pouvait lier le compte d'un site à la fiche d'un autre site.
+- **Risque accepté** : aucun.

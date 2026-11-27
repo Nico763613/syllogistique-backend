@@ -1,4 +1,5 @@
-import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, MinLength, Min } from 'class-validator';
+import { MAX_FUEL_PRICE_GNF, MAX_QUANTITY } from '../../common/limits';
+import { IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, MinLength, Min, Max } from 'class-validator';
 
 export class CreateFuelTransactionDto {
   @IsString() vehicleId: string;
@@ -6,9 +7,9 @@ export class CreateFuelTransactionDto {
   @IsString() siteId: string;
   @IsDateString() transactionDate: string;
   @IsInt() @Min(0) mileage: number;
-  @IsNumber() @Min(0.01) quantityLiters: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantityLiters: number;
   // Ignoré : le tarif central (Paramètres, 12 000 GNF/L par défaut) s'applique toujours côté serveur
-  @IsOptional() @IsNumber() @Min(0) pricePerLiter?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_FUEL_PRICE_GNF) pricePerLiter?: number;
   @IsOptional() @IsString() station?: string;
   @IsOptional() @IsString() receiptNumber?: string;
   @IsOptional() @IsString() receiptImageUrl?: string;
@@ -22,8 +23,8 @@ export class CreateFuelTransactionDto {
 export class CorrectFuelTransactionDto {
   @IsString() @MinLength(3) reason: string;
   @IsOptional() @IsInt() @Min(0) mileage?: number;
-  @IsOptional() @IsNumber() @Min(0.01) quantityLiters?: number;
-  @IsOptional() @IsNumber() @Min(1) pricePerLiter?: number;
+  @IsOptional() @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantityLiters?: number;
+  @IsOptional() @IsNumber() @Min(1) @Max(MAX_FUEL_PRICE_GNF) pricePerLiter?: number;
   @IsOptional() @IsDateString() transactionDate?: string;
   @IsOptional() @IsString() station?: string;
   @IsOptional() @IsString() receiptNumber?: string;

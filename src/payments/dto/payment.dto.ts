@@ -1,9 +1,10 @@
-import { IsDateString, IsIn, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { MAX_AMOUNT_GNF } from '../../common/limits';
+import { IsDateString, IsIn, IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
 
 export class CreatePaymentDto {
   @IsIn(['IN', 'OUT']) direction: 'IN' | 'OUT';
   @IsIn(['CASH', 'BANK_TRANSFER', 'MOBILE_MONEY', 'ORANGE_MONEY', 'CHEQUE', 'OTHER']) method: string;
-  @IsNumber() @Min(0.01) amount: number;
+  @IsNumber() @Min(0.01) @Max(MAX_AMOUNT_GNF) amount: number;
   @IsDateString() paymentDate: string;
   @IsOptional() @IsString() reference?: string;
   @IsOptional() @IsString() salesInvoiceId?: string;

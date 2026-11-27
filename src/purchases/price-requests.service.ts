@@ -1,3 +1,4 @@
+import { MAX_UNIT_PRICE_GNF } from '../common/limits';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import PDFDocument = require('pdfkit');
@@ -133,7 +134,7 @@ export class PriceRequestsService {
       if (!ids.has(p.requestLineId)) throw new BadRequestException('Ligne inconnue dans la demande de prix.');
       if (seen.has(p.requestLineId)) throw new BadRequestException('Une même ligne ne peut pas figurer deux fois.');
       seen.add(p.requestLineId);
-      if (!(Number(p.unitPrice) >= 0)) throw new BadRequestException('Prix unitaire invalide.');
+      if (!(Number(p.unitPrice) >= 0) || Number(p.unitPrice) > MAX_UNIT_PRICE_GNF) throw new BadRequestException('Prix unitaire invalide (négatif ou supérieur à 1 milliard GNF).');
     }
     if (seen.size !== lines.length) throw new BadRequestException('Saisissez le prix de chaque article (une offre incomplète ne peut pas être comparée).');
     const days = dto.deliveryDays == null || (dto.deliveryDays as any) === '' ? null : Math.max(0, Math.floor(Number(dto.deliveryDays)));

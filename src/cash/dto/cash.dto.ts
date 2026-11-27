@@ -1,4 +1,5 @@
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { MAX_AMOUNT_GNF } from '../../common/limits';
+import { IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
 
 export class OpenCashSessionDto {
   @IsOptional() @IsString() siteId?: string;
@@ -11,7 +12,7 @@ export class CloseCashSessionDto {
 }
 
 export class CashExpenseDto {
-  @IsNumber() @Min(1) amount: number;
+  @IsNumber() @Min(1) @Max(MAX_AMOUNT_GNF) amount: number;
   @IsString() reason: string;
 }
 

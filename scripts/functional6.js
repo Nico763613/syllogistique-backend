@@ -220,6 +220,14 @@ const ids = (r) => (Array.isArray(r.d) ? r.d : (r.d && (r.d.items || r.d.data)) 
   const sid = (Array.isArray(lb.d) ? lb.d : []).find((y) => y.phone === tel);
   if (sid) { r = await api('POST', `/driver-signup/${sid.id}/reject`, {}, tA); ok(refused(r), 'A ne peut pas traiter une demande de B', r.s); }
 
+  // Rattachement des chauffeurs : un compte ne se lie qu'à une fiche du même site et de la même entreprise
+  const em2 = `chf2site${n}@test.gn`, emB = `chfb${n}@test.gn`;
+  r = await api('POST', '/users', { firstName: 'Kaba', lastName: 'Site2', email: em2, password: PW, role: 'CHAUFFEUR', siteId: SITE_A2 }, tA); ok(r.s === 201, 'A : compte chauffeur créé sur son second site', r);
+  r = await api('POST', '/users', { firstName: 'Diallo', lastName: 'EntB', email: emB, password: PW, role: 'CHAUFFEUR', siteId: SITE_B1 }, tB); ok(r.s === 201, 'B : compte chauffeur créé', r);
+  r = await api('POST', '/drivers', { firstName: 'Fiche', lastName: 'SiteA' + n, phone: '64' + n, licenseNumber: 'RA' + n, licenseExpiryDate: new Date(Date.now() + 365 * 864e5).toISOString(), activity: 'TRUCK', siteId: SITE_A }, tA); ok(r.s === 201, 'A : fiche chauffeur sur le site principal', r); const drvA = r.d && r.d.id;
+  r = await api('POST', '/driver-admin/link', { driverId: drvA, email: em2 }, tA); ok(r.s === 400, 'compte d’un autre site lié à la fiche : refusé → 400', r);
+  r = await api('POST', '/driver-admin/link', { driverId: drvA, email: emB }, tA); ok(r.s === 400 || r.s === 404, 'compte d’une autre entreprise lié à la fiche : refusé', r.s);
+
   console.log(fails ? `\n${fails} échec(s)` : '\nTous les contrôles multi-entreprises sont passés.');
   process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
