@@ -3,6 +3,7 @@ import { canManageRole, hierarchyMessage } from '../common/hierarchy';
 import { issueResetCode } from '../auth/password-reset';
 import { Injectable, BadRequestException, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { RoleName } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
@@ -35,8 +36,10 @@ export class UsersService {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) throw new ConflictException('Cet email est déjà utilisé.');
 
-    const role = await this.prisma.role.findUnique({ where: { name: dto.role } });
-    if (!role) throw new NotFoundException('Rôle introuvable.');
+    // Les rôles sont des données de référence : un profil prévu par l'application (ex. MECANICIEN, POINTEUR,
+    // COMPTABLE, RESPONSABLE_OPERATIONS) est enregistré à la création de son premier compte, comme dans /staff.
+    if (!Object.values(RoleName).includes(dto.role as any)) throw new NotFoundException('Rôle introuvable.');
+    const role = await this.prisma.role.upsert({ where: { name: dto.role }, update: {}, create: { name: dto.role } });
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
@@ -94,8 +97,9 @@ export class UsersService {
 
     let roleId: string | undefined;
     if (dto.role) {
-      const role = await this.prisma.role.findUnique({ where: { name: dto.role } });
-      roleId = role?.id;
+      if (!Object.values(RoleName).includes(dto.role as any)) throw new NotFoundException('Rôle introuvable.');
+      const role = await this.prisma.role.upsert({ where: { name: dto.role }, update: {}, create: { name: dto.role } });
+      roleId = role.id;
     }
 
     const user = await this.prisma.user.update({

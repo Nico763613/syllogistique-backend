@@ -23,6 +23,19 @@ Source : `public/src/profils/14-espaces-par-profil.js` (assemblé en `public/pro
 
 Non modifiés (gardent leur espace actuel) : Responsable des opérations, Comptabilité, Commercial, Caissier, Pointeur.
 
+## Les 15 profils (rôles techniques)
+SUPER_ADMIN (Super administrateur de l'entreprise), DIRECTEUR_GENERAL, ADMIN_LOGISTIQUE (Responsable logistique),
+GESTIONNAIRE_FLOTTE, MAGASINIER, CHAUFFEUR, LECTEUR, RESPONSABLE_COMMERCIAL, CAISSIER, GESTIONNAIRE_HSE, AGENT_HSE,
+MECANICIEN, POINTEUR, COMPTABLE, RESPONSABLE_OPERATIONS.
+Les quatre derniers ajoutés (Mécanicien, Pointeur, Comptable, Responsable des opérations) existent dans le code et sont
+testés ; en production, le rôle est enregistré automatiquement à la création du premier compte de ce profil
+(aucune création préalable nécessaire, aucune création faite sans accord).
+
+## Vérification des droits (recette)
+`scripts/profils15.js` (exécuté à chaque version par l'intégration continue) crée un compte de chaque profil sur une base de
+test, lit les droits réellement appliqués par le serveur, essaie chaque écran de consultation avec chaque profil et produit
+`profils15-matrice.md`. Un profil qui accède à un écran qui ne lui est pas réservé fait échouer la version.
+
 ## Droits
 Le filtrage par rôle de chaque rubrique est un confort d'affichage. La sécurité reste assurée par le serveur (`RolesGuard`, Directeur général en lecture seule).
 

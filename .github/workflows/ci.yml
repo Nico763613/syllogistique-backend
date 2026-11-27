@@ -76,6 +76,10 @@ jobs:
       - run: npx prisma db push --skip-generate --accept-data-loss
       - run: npm run build
       - run: npx ts-node prisma/seed.ts
+      - name: Situation de la production (11 rôles sur 15 en base)
+        run: |
+          psql postgresql://postgres:postgres@localhost:5432/postgres -c "DELETE FROM roles r WHERE r.name IN ('MECANICIEN','POINTEUR','COMPTABLE','RESPONSABLE_OPERATIONS') AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role_id = r.id)"
+          psql postgresql://postgres:postgres@localhost:5432/postgres -Atc "SELECT count(*) FROM roles"
       - name: Démarrage du serveur
         run: |
           node dist/main.js > server.log 2>&1 &

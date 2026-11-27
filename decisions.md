@@ -96,3 +96,8 @@
 - **Décision** : photos, reçus et documents ne sont plus lisibles par leur seule adresse. Le serveur ajoute à chaque adresse renvoyée une expiration et une signature HMAC (clé `FILES_SIGNING_KEY`, sinon `JWT_ACCESS_SECRET`) ; un lien vaut 24 à 25 heures. La lecture libre du dossier `uploads` est supprimée. La base garde l'adresse nue (les signatures reçues sont retirées à l'entrée). Les logos des PDF et de l'écran sont désormais ceux de l'entreprise de l'utilisateur (auparavant : première entreprise de la plateforme).
 - **Raison** : exigence de cloisonnement des pièces jointes entre entreprises ; seules les réponses déjà filtrées par entreprise et site fournissent un lien valable.
 - **Risques acceptés** : (1) un lien transféré reste lisible jusqu'à son expiration ; (2) changer `JWT_ACCESS_SECRET` sans `FILES_SIGNING_KEY` invalide les liens en cours (il suffit de rouvrir la page) ; (3) une image gardée en cache hors ligne au-delà de 25 heures doit être rechargée.
+
+## 2026-11-27 — Profils enregistrés à la création de leur premier compte
+- **Constat** : la production ne contient que 11 des 15 profils ; créer un Mécanicien, un Pointeur, un Comptable ou un Responsable des opérations depuis « Utilisateurs » échouait (« Rôle introuvable »), alors que l'écran « Personnel » (/staff) les enregistrait déjà.
+- **Décision** : « Utilisateurs » (création et modification) enregistre lui aussi le profil s'il manque, uniquement parmi les 15 profils prévus par l'application. Aucun profil n'est créé en production par la mise en ligne elle-même : il l'est au moment où un responsable crée le premier compte concerné.
+- **Preuve** : l'intégration continue retire ces 4 profils de la base de test (situation de la production) avant tous les tests.
