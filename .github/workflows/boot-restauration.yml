@@ -9,6 +9,8 @@ on:
 jobs:
   paquet:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -17,9 +19,10 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npx prisma generate
       - run: npm run build
-      - run: tar czf paquet.tgz dist public node_modules/.prisma node_modules/@prisma node_modules/prisma
-      - uses: actions/upload-artifact@v4
-        with:
-          name: paquet-demarrage
-          path: paquet.tgz
-          retention-days: 2
+      - name: Publication du paquet sur la branche test/paquet-demarrage (artefacts non téléchargeables depuis la recette)
+        run: |
+          mkdir /tmp/p && tar czf /tmp/p/paquet.tgz dist node_modules/.prisma node_modules/@prisma/client
+          ls -la /tmp/p
+          cd /tmp/p && git init -q && git checkout -q -b test/paquet-demarrage
+          git -c user.name=ci -c user.email=ci@local add paquet.tgz && git -c user.name=ci -c user.email=ci@local commit -qm "Paquet de démarrage ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" test/paquet-demarrage
