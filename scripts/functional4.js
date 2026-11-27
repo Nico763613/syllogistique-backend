@@ -6,7 +6,9 @@ const B = process.env.SMOKE_URL || 'http://localhost:3000';
 const SITE = '00000000-0000-0000-0000-000000000002';
 let fails = 0, tok = '';
 const ok = (c, m, extra) => { console.log((c ? '✔ ' : '✘ ') + m + (c || extra === undefined ? '' : ' → ' + JSON.stringify(extra).slice(0, 300))); if (!c) fails++; };
-const api = async (method, path, body, token = tok, headers = {}) => {
+const api = async (method, path, body, ...rest) => {
+  // un jeton passé explicitement (même vide) n'est jamais remplacé par celui de l'administrateur
+  const token = rest.length ? (rest[0] || 'jeton-absent') : tok, headers = rest[1] || {};
   const r = await fetch(B + path, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: 'Bearer ' + token } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   let data = null; const ct = r.headers.get('content-type') || ''; if (ct.includes('json')) data = await r.json().catch(() => null); else await r.arrayBuffer();
   return { s: r.status, d: data };
@@ -16,7 +18,7 @@ const n = Date.now().toString().slice(-7), PW = 'Test1234x', day = new Date().to
 const is2 = (r) => r.s === 200 || r.s === 201;
 
 (async () => {
-  let r = await api('POST', '/auth/login', { email: 'admin@syllogistique.local', password: 'ChangeMoi123!' }, '');
+  let r = await fetch(B + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@syllogistique.local', password: 'ChangeMoi123!' }) }).then(async (x) => ({ s: x.status, d: await x.json() }));
   tok = r.d && r.d.accessToken; ok(!!tok, 'connexion administrateur');
 
   // --- Comptes de test, un par rôle
@@ -25,7 +27,14 @@ const is2 = (r) => r.s === 200 || r.s === 201;
   for (const [tag, role] of Object.entries(ROLES)) {
     r = await api('POST', '/users', { firstName: 'Test', lastName: tag, email: `f4${tag}${n}@test.gn`, password: PW, role, siteId: SITE });
     ok(r.s === 201, `création du compte ${role} (${tag})`, r); U[tag] = r.d && r.d.id;
-    T[tag] = (await api('POST', '/auth/login', { email: `f4${tag}${n}@test.gn`, password: PW }, '')).d?.accessToken;
+  }
+  // La connexion est limitée à 5 essais par minute et par adresse : connexions par lots de 5
+  const tags = Object.keys(ROLES);
+  for (let i = 0; i < tags.length; i++) {
+    if (i === 4) { console.log('… pause de 61 s (limite de connexions)'); await new Promise((res) => setTimeout(res, 61000)); }
+    const x = await fetch(B + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: `f4${tags[i]}${n}@test.gn`, password: PW }) });
+    T[tags[i]] = (await x.json().catch(() => ({}))).accessToken;
+    if (!T[tags[i]]) console.log('   connexion impossible pour', tags[i], x.status);
   }
   ok(Object.values(T).every(Boolean), 'connexion de chaque compte de test');
 
