@@ -1,4 +1,6 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { assertNoConflict } from './versioning';
+import { conflictAppliers } from './conflicts.service';
+import { Injectable, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SyncOperationDto } from './sync.dto';
@@ -24,7 +26,7 @@ const ENTITY_MODELS: Record<string, keyof PrismaService> = {
 // Champs que le client hors ligne n'a JAMAIS le droit d'écrire : ils ne changent que par les flux métier
 // (stock via mouvements, facturation via factures, périmètre via le site de l'utilisateur).
 const PROTECTED_FIELDS: Record<string, string[]> = {
-  _all: ['organizationId', 'siteId'],
+  _all: ['organizationId', 'siteId', 'version'],
   Trip: ['billedInvoiceId', 'createdById', 'reference'],
   InventoryItem: ['currentQuantity'],
   StockMovement: ['createdById'],
@@ -34,7 +36,13 @@ const PROTECTED_FIELDS: Record<string, string[]> = {
 
 @Injectable()
 export class SyncService {
-  constructor(private prisma: PrismaService, private audit: AuditService) {}
+  constructor(private prisma: PrismaService, private audit: AuditService) {
+    // Arbitrage « appliquer la saisie » d'un conflit venu de la synchronisation du bureau.
+    conflictAppliers.set('SYNC_BUREAU', async (c: any, resolverId: string) => {
+      const { baseVersion: _v, baseUpdatedAt: _u, ...op } = c.client_payload || {};
+      return this.push([op], resolverId, c.organization_id);
+    });
+  }
 
   async push(
     operations: SyncOperationDto[],
@@ -74,16 +82,39 @@ export class SyncService {
         }
 
         // Déduplication : si cette opération (même client entityId + device) a déjà réussi, on l'ignore.
-        const alreadySynced = await this.prisma.syncQueueEntry.findFirst({
-          where: {
-            entity: op.entity,
-            entityId: op.entityId,
-            deviceId: op.deviceId,
-            status: 'SUCCESS',
-            id: { not: queueEntry.id },
-          },
-        });
+        // Seul un RENVOI à l'identique (même appareil, même opération, même contenu) est ignoré :
+        // sans identifiant d'appareil, ou avec un contenu différent, l'opération est bien traitée
+        // (sinon une 2e modification de la même fiche serait perdue sans prévenir).
+        const sameContent = (a: unknown) => JSON.stringify(a ?? null) === JSON.stringify(op.payload ?? null);
+        const alreadySynced = op.deviceId
+          ? (await this.prisma.syncQueueEntry.findMany({
+              where: {
+                entity: op.entity,
+                entityId: op.entityId,
+                deviceId: op.deviceId,
+                operation: op.operation,
+                status: 'SUCCESS',
+                id: { not: queueEntry.id },
+              },
+              select: { payload: true },
+              take: 20,
+              orderBy: { createdAt: 'desc' },
+            })).find((e: any) => sameContent(e.payload))
+          : undefined;
 
+        // Conflit par numéro de version : une autre personne a modifié la fiche depuis la version connue
+        // du client → rien n'est écrasé, la saisie est conservée pour arbitrage.
+        if (!alreadySynced && op.operation === 'UPDATE' && op.baseVersion && organizationId) {
+          try {
+            await assertNoConflict(this.prisma, { entity: op.entity, entityId: op.entityId, baseVersion: op.baseVersion, userId: actorId, organizationId, source: 'SYNC_BUREAU', payload: op });
+          } catch (e: any) {
+            if (!(e instanceof ConflictException)) throw e;
+            const body: any = e.getResponse();
+            await this.prisma.syncQueueEntry.update({ where: { id: queueEntry.id }, data: { status: 'FAILED', lastError: 'CONFLICT : ' + body.conflictId } });
+            results.push({ entityId: op.entityId, entity: op.entity, status: 'CONFLICT', error: body.message, conflictId: body.conflictId, serverVersion: body.currentVersion } as any);
+            continue;
+          }
+        }
         // Détection de conflit (§26) : si la fiche a été modifiée sur le serveur après la version
         // connue du client, on ne l'écrase PAS silencieusement — on la signale pour résolution.
         if (!alreadySynced && op.operation === 'UPDATE' && op.baseUpdatedAt) {
@@ -164,11 +195,15 @@ export class SyncService {
               }
             }
 
-            const created = await model.upsert({
-              where: { id: op.entityId },
-              create: { id: op.entityId, ...safePayload },
-              update: { ...safePayload },
-            });
+            // Fiche existante : simple mise à jour des seuls champs envoyés (une modification partielle
+            // faite hors ligne ne doit pas exiger tous les champs obligatoires d'une création).
+            const created = existingRecord
+              ? await model.update({ where: { id: op.entityId }, data: { ...safePayload } })
+              : await model.upsert({
+                  where: { id: op.entityId },
+                  create: { id: op.entityId, ...safePayload },
+                  update: { ...safePayload },
+                });
             serverId = created.id;
 
             if (op.entity === 'StockMovement' && !existingRecord && op.operation === 'CREATE') {

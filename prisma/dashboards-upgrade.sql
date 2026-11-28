@@ -221,9 +221,25 @@ BEGIN
   RETURN 'TRP-' || y || '-' || lpad(k::text, 4, '0');
 END $fn$ LANGUAGE plpgsql
 --#
+CREATE OR REPLACE FUNCTION next_trip_ref_org(d date, site text) RETURNS text AS $fn$
+DECLARE y integer := EXTRACT(YEAR FROM COALESCE(d, CURRENT_DATE))::integer; k integer; org text; c text;
+BEGIN
+  -- Numérotation par entreprise (migration 0004) : TRP-CODE-AAAA-NNNN. Sans la migration : ancienne numérotation commune.
+  SELECT organization_id INTO org FROM sites WHERE id = site;
+  IF org IS NULL THEN RETURN next_trip_ref(d); END IF;
+  BEGIN
+    c := org_doc_code(org);
+    IF c IS NULL THEN RETURN next_trip_ref(d); END IF;
+    INSERT INTO trip_ref_counters_org (organization_id, year, n) VALUES (org, y, 1) ON CONFLICT (organization_id, year) DO UPDATE SET n = trip_ref_counters_org.n + 1 RETURNING n INTO k;
+  EXCEPTION WHEN undefined_function OR undefined_table OR undefined_column THEN
+    RETURN next_trip_ref(d);
+  END;
+  RETURN 'TRP-' || c || '-' || y || '-' || lpad(k::text, 4, '0');
+END $fn$ LANGUAGE plpgsql
+--#
 CREATE OR REPLACE FUNCTION trips_set_reference() RETURNS trigger AS $fn$
 BEGIN
-  IF NEW.reference IS NULL THEN NEW.reference := next_trip_ref(NEW.trip_date); END IF;
+  IF NEW.reference IS NULL THEN NEW.reference := next_trip_ref_org(NEW.trip_date, NEW.site_id); END IF;
   RETURN NEW;
 END $fn$ LANGUAGE plpgsql
 --#

@@ -94,6 +94,11 @@ export class NotificationsService {
     return this.prisma.notification.create({ data: { title, message, severity, entity, entityId } });
   }
 
+  // Alerte rattachée à un site : visible par les équipes de ce site uniquement (cloisonnement).
+  createForSite(siteId: string, title: string, message: string, severity: 'INFO' | 'WARNING' | 'CRITICAL', entity?: string, entityId?: string) {
+    return this.prisma.notification.create({ data: { title, message, severity, entity, entityId, siteId } });
+  }
+
   // Analyse quotidienne : permis chauffeurs bientôt expirés, stock sous seuil, entretiens en retard
   // Évite les doublons : ne recrée pas une alerte déjà émise dans les dernières 24h pour la même entité.
   async runDailyChecks(siteId: string) {
@@ -150,7 +155,7 @@ export class NotificationsService {
       if (await alreadyNotified('Vehicle', v.id)) continue;
       const expired = v.itExpiryDate! < now;
       created.push(
-        await this.create(
+        await this.createForSite(siteId, 
           expired ? 'Plaque IT expirée' : 'Plaque IT bientôt expirée',
           `La plaque IT du véhicule ${v.internalNumber} (${v.registrationNumber}) ${expired ? 'a expiré' : 'expire'} le ${v.itExpiryDate!.toLocaleDateString('fr-FR')}.`,
           'WARNING',
@@ -165,7 +170,7 @@ export class NotificationsService {
       if (Number(i.currentQuantity) < Number(i.minimumQuantity)) {
         if (await alreadyNotified('InventoryItem', i.id)) continue;
         created.push(
-          await this.create(
+          await this.createForSite(siteId, 
             'Stock sous le seuil minimum',
             `${i.name} : ${i.currentQuantity} ${i.unit} restant (seuil : ${i.minimumQuantity}).`,
             'CRITICAL',
@@ -186,7 +191,7 @@ export class NotificationsService {
       if (last.nextDate < now) {
         if (await alreadyNotified('Vehicle', v.id)) continue;
         created.push(
-          await this.create(
+          await this.createForSite(siteId, 
             'Entretien en retard',
             `${v.internalNumber} — entretien attendu depuis le ${last.nextDate.toLocaleDateString('fr-FR')}.`,
             'CRITICAL',
@@ -206,7 +211,7 @@ export class NotificationsService {
       if (await alreadyNotified('VehicleKm', v.id)) continue;
       const over = left <= 0;
       created.push(
-        await this.create(
+        await this.createForSite(siteId, 
           over ? 'Entretien kilométrique dépassé' : 'Entretien kilométrique proche',
           `${v.internalNumber} — entretien prévu à ${nextKm.toLocaleString('fr-FR')} km ; ${over ? `dépassé de ${(-left).toLocaleString('fr-FR')} km` : `il reste ${left.toLocaleString('fr-FR')} km`} (compteur : ${v.currentMileage.toLocaleString('fr-FR')} km).`,
           over ? 'CRITICAL' : 'WARNING',
@@ -255,7 +260,7 @@ export class NotificationsService {
         if (avg > 0 && Number(f.quantityLiters) > avg * (1 + anomalyPercent / 100)) {
           if (!(await alreadyNotified('FuelTransaction', f.id))) {
             created.push(
-              await this.create(
+              await this.createForSite(siteId, 
                 'Carburant anormalement élevé',
                 `${f.vehicle.internalNumber} : ${f.quantityLiters} L pour une moyenne habituelle de ${avg.toFixed(0)} L.`,
                 'WARNING',
@@ -271,7 +276,7 @@ export class NotificationsService {
       if (previous && f.mileage < previous.mileage) {
         if (!(await alreadyNotified('FuelTransaction', f.id + ':km'))) {
           created.push(
-            await this.create(
+            await this.createForSite(siteId, 
               'Kilométrage incohérent',
               `${f.vehicle.internalNumber} : ${f.mileage} km saisis alors que le dernier plein indiquait ${previous.mileage} km.`,
               'WARNING',

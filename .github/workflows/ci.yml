@@ -19,6 +19,8 @@ jobs:
       - run: npm run build
       - run: node scripts/check-ui.js
       - run: npm run build:ui
+      - name: Requêtes SQL directes toutes relues (cloisonnement)
+        run: node scripts/check-raw-sql.js
       - run: test -s public/core.js
   master:
     name: master (tests avec vraie base PostgreSQL)
@@ -64,6 +66,8 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-de-test-0123456789abcdef0123456789abcdef
       NODE_ENV: test
       PORT: '3000'
+      # Valeur de test uniquement (la vraie clé est une variable secrète du serveur de production)
+      PLATFORM_ADMIN_KEY: ci-cle-plateforme-de-test-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -74,6 +78,10 @@ jobs:
       - run: npx prisma db push --skip-generate --accept-data-loss
       - run: npm run build
       - run: npx ts-node prisma/seed.ts
+      - name: Situation de la production (11 rôles sur 15 en base)
+        run: |
+          psql postgresql://postgres:postgres@localhost:5432/postgres -c "DELETE FROM roles r WHERE r.name IN ('MECANICIEN','POINTEUR','COMPTABLE','RESPONSABLE_OPERATIONS') AND NOT EXISTS (SELECT 1 FROM users u WHERE u.role_id = r.id)"
+          psql postgresql://postgres:postgres@localhost:5432/postgres -Atc "SELECT count(*) FROM roles"
       - name: Démarrage du serveur
         run: |
           node dist/main.js > server.log 2>&1 &
@@ -102,6 +110,34 @@ jobs:
       - name: Test d'interface livraison et rôles terrain
         run: node scripts/ui-livraison.js
       - run: sleep 61
+      - run: sleep 61
+      - name: Tests multi-entreprises et multi-sites
+        run: node scripts/functional6.js
+      - run: sleep 61
+      - name: Modules sans test direct (transferts, rapports, recherche, QR codes, signalements)
+        run: node scripts/functional7.js
+      - run: sleep 61
+      - name: Recette des 15 profils (droits de consultation vérifiés côté serveur)
+        run: |
+          node scripts/profils15.js
+          cat profils15-matrice.md
+      - run: sleep 61
+      - name: Contrôle du script « démarrage sur copie restaurée » (sur la base de test, un compte par rôle)
+        run: |
+          psql "$DATABASE_URL" -AtF $'\t' -c "select u.id, u.email, r.name, u.organization_id, coalesce(u.site_id,''), coalesce(u.department,'') from users u join roles r on r.id = u.role_id where u.status = 'ACTIVE' and u.deleted_at is null and not u.must_change_password order by r.name, u.created_at" > /tmp/users.tsv
+          USERS_TSV=/tmp/users.tsv MAX_PAR_ROLE=1 node scripts/boot-copie.js
+      - run: sleep 61
       - run: node scripts/smoke.js
+      - name: Migrations — historique, retour arrière puis réapplication
+        run: |
+          node dist/migrations/cli.js status
+          node dist/migrations/cli.js down 0005
+          node dist/migrations/cli.js down 0004
+          node dist/migrations/cli.js down 0003
+          node dist/migrations/cli.js status
+          node dist/migrations/cli.js up
+          node dist/migrations/cli.js status
+      - name: Audit comptable (lecture seule)
+        run: node scripts/audit-comptable.js
       - if: failure()
         run: tail -80 server.log

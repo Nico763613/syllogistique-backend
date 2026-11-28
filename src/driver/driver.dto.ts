@@ -29,6 +29,8 @@ export class SyncOpDto {
   @IsString() @MinLength(8) @MaxLength(80) clientOpId: string;
   @IsOptional() @IsString() tripId?: string;
   @IsObject() payload: Record<string, any>;
+  // Version de la mission connue par l'appareil au moment de la saisie (contrôle des conflits)
+  @IsOptional() @IsInt() @Min(1) baseVersion?: number;
 }
 
 export class SyncDto {

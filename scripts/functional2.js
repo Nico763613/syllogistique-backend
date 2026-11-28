@@ -24,8 +24,20 @@ const is2 = (r) => r.s === 200 || r.s === 201, is4 = (r) => r.s >= 400 && r.s < 
   r = await mk('LECTEUR', 'lec'); ok(r.s === 201, 'création utilisateur lecteur', r);
   r = await mk('CAISSIER', 'cai'); ok(r.s === 201, 'création utilisateur caissier', r);
   r = await api('GET', '/users'); ok(r.s === 200 && rows(r.d).length >= 4, 'liste des utilisateurs');
-  const login = async (tag) => { const x = await api('POST', '/auth/login', { email: `${tag}${n}@test.gn`, password: PW }, ''); return x.d && x.d.accessToken; };
+  // Compte créé par un administrateur : mot de passe provisoire, à remplacer avant tout accès.
+  let provisoire = 0, bloque = 0;
+  const login = async (tag) => {
+    const x = await api('POST', '/auth/login', { email: `${tag}${n}@test.gn`, password: PW }, ''); const t = x.d && x.d.accessToken;
+    if (t && x.d.user && x.d.user.mustChangePassword) {
+      provisoire++;
+      if ((await api('GET', '/vehicles', undefined, t)).s === 403) bloque++;
+      await api('POST', '/auth/change-password', { currentPassword: PW, newPassword: PW + 'N' }, t);
+    }
+    return t;
+  };
   const mag = await login('mag'), lec = await login('lec'), cai = await login('cai'); ok(!!mag && !!lec && !!cai, 'connexion des trois nouveaux comptes');
+  ok(provisoire === 3, 'les comptes créés par le menu Utilisateurs ont un mot de passe provisoire', provisoire);
+  ok(bloque === 3, 'tant que le mot de passe provisoire n\'est pas changé, l\'accès aux données est refusé → 403', bloque);
   r = await api('POST', '/vehicles', { siteId: SITE, vehicleType: 'TRUCK', internalNumber: 'L' + n, registrationNumber: 'L' + n }, lec); ok(r.s === 403, 'lecteur ne peut pas créer un véhicule → 403', r.s);
   r = await api('GET', '/vehicles', undefined, lec); ok(r.s === 200, 'lecteur peut consulter les véhicules');
   r = await api('POST', '/users', { firstName: 'A', lastName: 'B', email: 'x' + n + '@test.gn', password: PW, role: 'LECTEUR' }, mag); ok(r.s === 403, 'magasinier ne peut pas créer un utilisateur → 403', r.s);

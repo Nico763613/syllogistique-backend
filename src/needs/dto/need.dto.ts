@@ -1,13 +1,14 @@
+import { MAX_QUANTITY, MAX_UNIT_PRICE_GNF } from '../../common/limits';
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested, ArrayMinSize } from 'class-validator';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested, ArrayMinSize, Max } from 'class-validator';
 
 export class NeedLineDto {
   @IsOptional() @IsString() itemId?: string;
   @IsOptional() @IsString() vehicleId?: string;
   @IsString() @MinLength(2) designation: string;
-  @IsNumber() @Min(0.01) quantity: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantity: number;
   @IsOptional() @IsString() unit?: string;
-  @IsOptional() @IsNumber() @Min(0) estimatedUnitPrice?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) estimatedUnitPrice?: number;
   @IsOptional() @IsString() note?: string;
 }
 

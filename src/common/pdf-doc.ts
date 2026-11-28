@@ -1,3 +1,5 @@
+import { readUpload } from '../uploads/file-links';
+import { currentOrganizationId } from './tenant-scope';
 import PDFDocument = require('pdfkit');
 import { readFile } from 'fs/promises';
 import { join, basename } from 'path';
@@ -10,13 +12,15 @@ export interface Issuer { name: string; phone: string; service: string }
 
 // Document A4 avec bandeau d'en-tête (organisation + titre) : socle commun des documents imprimables
 // Logo de l'entreprise cliente (fichier envoyé, image intégrée ou adresse web). Indisponible = document sans logo, jamais d'erreur.
+// L'entreprise est celle de l'utilisateur connecté (jamais la première entreprise de la plateforme).
 export async function orgLogo(prisma: { organization: { findFirst: (a: any) => Promise<{ logoUrl?: string | null } | null> } }): Promise<Buffer | null> {
   try {
-    const org = await prisma.organization.findFirst({ orderBy: { createdAt: 'asc' }, select: { logoUrl: true } });
+    const orgId = currentOrganizationId();
+    const org = await prisma.organization.findFirst({ where: orgId ? { id: orgId } : undefined, orderBy: { createdAt: 'asc' }, select: { logoUrl: true } });
     const url = org?.logoUrl;
     if (!url) return null;
     if (url.startsWith('data:image/')) return Buffer.from(url.split(',')[1] || '', 'base64');
-    if (url.startsWith('/uploads/')) return await readFile(join(__dirname, '..', '..', 'uploads', basename(url)));
+    if (url.includes('/uploads/')) return await readUpload(prisma, url);
     if (/^https?:\/\//i.test(url)) {
       const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
       return r.ok ? Buffer.from(await r.arrayBuffer()) : null;

@@ -1,0 +1,28 @@
+name: Paquet de démarrage (test sur copie restaurée)
+# Lancé uniquement par un envoi sur la branche « test/boot-restauration ».
+# Construit l'application (avec les moteurs Prisma pour Linux) et la publie comme artefact,
+# pour la démarrer ensuite dans l'environnement de recette contre une COPIE restaurée de la base.
+# Aucun secret ni aucune base réelle n'est utilisé ici.
+on:
+  push:
+    branches: [test/boot-restauration]
+jobs:
+  paquet:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install --no-audit --no-fund
+      - run: npx prisma generate
+      - run: npm run build
+      - name: Publication du paquet sur la branche test/paquet-demarrage (artefacts non téléchargeables depuis la recette)
+        run: |
+          mkdir /tmp/p && tar czf /tmp/p/paquet.tgz dist node_modules/.prisma node_modules/@prisma/client
+          ls -la /tmp/p
+          cd /tmp/p && git init -q && git checkout -q -b test/paquet-demarrage
+          git -c user.name=ci -c user.email=ci@local add paquet.tgz && git -c user.name=ci -c user.email=ci@local commit -qm "Paquet de démarrage ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" test/paquet-demarrage

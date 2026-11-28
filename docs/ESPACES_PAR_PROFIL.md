@@ -9,7 +9,7 @@ Source : `public/src/profils/14-espaces-par-profil.js` (assemblé en `public/pro
 - Sur téléphone, barre du bas : Accueil · Dossiers · Rapports · Profil.
 - Les anciens menus restent dans la page (masqués) : aucune fonction supprimée.
 - Les chiffres viennent uniquement des tableaux de bord serveur ; une donnée absente s'affiche « — ».
-- Une rubrique sans écran est affichée « bientôt disponible » (jamais de faux écran).
+- Une rubrique sans écran n'est pas affichée (jamais de faux écran ni de mention « bientôt disponible »).
 
 ## Profils couverts
 | Profil | Rôles | Dossiers |
@@ -23,16 +23,29 @@ Source : `public/src/profils/14-espaces-par-profil.js` (assemblé en `public/pro
 
 Non modifiés (gardent leur espace actuel) : Responsable des opérations, Comptabilité, Commercial, Caissier, Pointeur.
 
+## Les 15 profils (rôles techniques)
+SUPER_ADMIN (Super administrateur de l'entreprise), DIRECTEUR_GENERAL, ADMIN_LOGISTIQUE (Responsable logistique),
+GESTIONNAIRE_FLOTTE, MAGASINIER, CHAUFFEUR, LECTEUR, RESPONSABLE_COMMERCIAL, CAISSIER, GESTIONNAIRE_HSE, AGENT_HSE,
+MECANICIEN, POINTEUR, COMPTABLE, RESPONSABLE_OPERATIONS.
+Les quatre derniers ajoutés (Mécanicien, Pointeur, Comptable, Responsable des opérations) existent dans le code et sont
+testés ; en production, le rôle est enregistré automatiquement à la création du premier compte de ce profil
+(aucune création préalable nécessaire, aucune création faite sans accord).
+
+## Vérification des droits (recette)
+`scripts/profils15.js` (exécuté à chaque version par l'intégration continue) crée un compte de chaque profil sur une base de
+test, lit les droits réellement appliqués par le serveur, essaie chaque écran de consultation avec chaque profil et produit
+`profils15-matrice.md`. Un profil qui accède à un écran qui ne lui est pas réservé fait échouer la version.
+
 ## Droits
 Le filtrage par rôle de chaque rubrique est un confort d'affichage. La sécurité reste assurée par le serveur (`RolesGuard`, Directeur général en lecture seule).
 
-## Rubriques « bientôt disponibles »
+## Rubriques sans écran
 Aucune depuis le 27/11/2026 (fichier `19-journal-et-fournisseurs.js`) :
 - **Journal d'activité et décisions** (DG, lecture seule) : écran `journal`, données `/audit` filtrables par domaine, période et personne ; secrets masqués par le serveur, valeurs techniques traduites.
 - **Répertoire fournisseurs** (gestionnaire de stock) : écran `suppliers`, ajout et modification (droits serveur déjà en place).
 
 ## Ajouter une rubrique
-Dans `PROFILES`, ajouter `['Libellé', 'vue', 'aide', ['ROLE_OPTIONNEL']]`. Vue `null` = bientôt. Vues spéciales : `#stock-in`, `#stock-out`, `#history`, `#alerts`.
+Dans `PROFILES`, ajouter `['Libellé', 'vue', 'aide', ['ROLE_OPTIONNEL']]`. Vue `null` = rubrique masquée tant que son écran n'existe pas. Vues spéciales : `#stock-in`, `#stock-out`, `#history`, `#alerts`.
 
 ## Tableau de bord graphique (modèle unique)
 
@@ -102,3 +115,7 @@ Le composant commun `syTabs(onglets, actif, fonction)` affiche les onglets. Seul
 ## Un menu = un seul contenu
 
 Chaque rubrique du menu ouvre uniquement son contenu : « Entrées » montre la nouvelle entrée, l'historique des entrées et les réceptions ; « Sorties » montre la nouvelle sortie, l'historique des sorties et le bon de sortie ; « Chauffeurs camion » ne montre que les chauffeurs camion. Les barres d'onglets qui répétaient le menu ne s'affichent plus. Les indicateurs du stock ne montrent jamais « undefined ».
+
+## Compte Chauffeur : accès limité à l'application chauffeur (28/11/2026)
+
+Le serveur refuse désormais au compte Chauffeur tout écran de bureau (dépenses, carburant du bureau, stock, clients, comptes…), même si quelqu'un tape l'adresse à la main. Il garde : l'application chauffeur (`/driver`), sa connexion, l'envoi de photos, ses notifications, le signalement d'un problème, la déclaration d'un incident HSE, le logo et l'état de la licence. Vérifié par `functional4.js` et `profils15.js`.

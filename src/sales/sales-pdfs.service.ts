@@ -1,3 +1,5 @@
+import { currentOrganizationId } from '../common/tenant-scope';
+import { readUpload } from '../uploads/file-links';
 import { ForbiddenException, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import PDFDocument = require('pdfkit');
 import { readFile } from 'fs/promises';
@@ -20,7 +22,7 @@ export class SalesPdfsService {
   private async loadLogo(url?: string | null): Promise<Buffer | null> {
     try {
       if (url?.startsWith('data:image/')) return Buffer.from(url.split(',')[1] || '', 'base64');
-      if (url?.startsWith('/uploads/')) return await readFile(join(__dirname, '..', '..', 'uploads', basename(url)));
+      if (url?.includes('/uploads/')) { const b = await readUpload(this.prisma, url); if (b) return b; }
       if (url && /^https?:\/\//i.test(url)) { const r = await fetch(url, { signal: AbortSignal.timeout(5000) }); if (r.ok) return Buffer.from(await r.arrayBuffer()); }
     } catch { /* logo indisponible */ }
     return readFile(join(__dirname, '..', '..', 'public', 'logo-syl.png')).catch(() => null);
@@ -38,7 +40,8 @@ export class SalesPdfsService {
   }
 
   private async build(title: string, number: string, meta: string[], body: (doc: any, org: any) => void): Promise<Buffer> {
-    const org = (await this.prisma.organization.findFirst({ orderBy: { createdAt: 'asc' } })) as any;
+    const orgId = currentOrganizationId();
+    const org = (await this.prisma.organization.findFirst({ where: orgId ? { id: orgId } : undefined, orderBy: { createdAt: 'asc' } })) as any;
     const logo = await this.loadLogo(org?.logoUrl);
     const color = /^#[0-9a-f]{6}$/i.test(org?.brandColor || '') ? org.brandColor : '#163A5F';
     return new Promise((resolve, reject) => {

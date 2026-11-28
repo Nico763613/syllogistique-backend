@@ -9,6 +9,14 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { MessagingService } from '../messaging/messaging.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+// Vérifie la période demandée (dates AAAA-MM-JJ, début avant fin) avant tout calcul.
+function checkPeriod(from: string, to: string) {
+  const ok = (v: string) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) && !isNaN(new Date(v).getTime());
+  if (!ok(from) || !ok(to)) throw new BadRequestException('Indiquez une période valide : date de début et date de fin (AAAA-MM-JJ).');
+  if (new Date(from).getTime() > new Date(to).getTime()) throw new BadRequestException('La date de début doit précéder la date de fin.');
+}
+
+
 @ApiTags('reports')
 @ApiBearerAuth()
 @UseGuards(RolesGuard)
@@ -128,6 +136,7 @@ export class ReportsController {
 
   @Get('period')
   periodReport(@Query('siteId') siteId: string, @Query('from') from: string, @Query('to') to: string) {
+    checkPeriod(from, to);
     return this.reportsService.periodReport(siteId, from, to);
   }
 
@@ -138,6 +147,7 @@ export class ReportsController {
     @Query('to') to: string,
     @Res() res: Response,
   ) {
+    checkPeriod(from, to);
     const buffer = await this.exportService.periodReportExcel(siteId, from, to);
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -153,6 +163,7 @@ export class ReportsController {
     @Query('to') to: string,
     @Res() res: Response,
   ) {
+    checkPeriod(from, to);
     const buffer = await this.exportService.periodReportPdf(siteId, from, to);
     res.set({
       'Content-Type': 'application/pdf',
@@ -174,6 +185,7 @@ export class ReportsController {
     if (!list.length || list.length > 10 || list.some((x) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x))) {
       throw new BadRequestException('Adresse(s) e-mail invalide(s) (10 destinataires au maximum).');
     }
+    checkPeriod(from, to_date);
     const buffer = await this.exportService.periodReportPdf(siteId, from, to_date);
     return this.messaging.sendEmailWithAttachment({
       to,
@@ -188,6 +200,8 @@ export class ReportsController {
   // Lien WhatsApp pré-rempli pour partager le rapport (le PDF téléchargé est à joindre manuellement)
   @Get('period/whatsapp-link')
   whatsappLink(@Query('phone') phone: string, @Query('from') from: string, @Query('to') to: string) {
+    checkPeriod(from, to);
+    if (!phone || String(phone).replace(/[^\d]/g, '').length < 8) throw new BadRequestException('Indiquez un numéro WhatsApp valide.');
     const message = `Rapport SYL LOGISTIQUE — période du ${from} au ${to}. Voir le PDF joint.`;
     return { link: this.messaging.buildWhatsAppLink(phone, message) };
   }

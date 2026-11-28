@@ -9,6 +9,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { currentOrganizationId } from '../common/tenant-scope';
 
 class UpdateBrandingDto {
   @IsOptional() @IsString() @MinLength(2) @MaxLength(80) name?: string;
@@ -26,7 +27,9 @@ export class BrandingController {
   @Public()
   @Get()
   async get() {
-    const o = await this.prisma.organization.findFirst({ orderBy: { createdAt: 'asc' } });
+    // Utilisateur connecté : sa propre entreprise. Écran de connexion (sans compte) : entreprise principale.
+    const orgId = currentOrganizationId();
+    const o = await this.prisma.organization.findFirst({ where: orgId ? { id: orgId } : undefined, orderBy: { createdAt: 'asc' } });
     return { name: o?.name ?? 'SYL LOGISTIQUE', logoUrl: o?.logoUrl ?? null, brandColor: o?.brandColor ?? null };
   }
 

@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma.service';
+import { allowedSiteIds } from '../common/tenant-scope';
 import { AuditService } from '../audit/audit.service';
 import { PaymentsService } from './payments.service';
 
@@ -39,6 +40,8 @@ export class PendingPaymentsService {
     const siteId = actor.role !== 'SUPER_ADMIN' && actor.siteId ? actor.siteId : params.siteId;
     const where: string[] = [`p."status" = $1`]; const a: any[] = [params.status || 'EN_ATTENTE'];
     if (siteId) { a.push(siteId); where.push(`p."site_id" = $${a.length}`); }
+    const allowed = await allowedSiteIds(this.prisma);
+    if (allowed) { a.push(allowed); where.push(`p."site_id" = ANY($${a.length}::text[])`); }
     return this.q(`SELECT p.*, i."reference" AS invoice_reference, c."name" AS customer_name, i."total_amount" AS invoice_total, i."amount_paid" AS invoice_paid FROM "pending_payments" p JOIN "sales_invoices" i ON i."id" = p."sales_invoice_id" LEFT JOIN "customers" c ON c."id" = i."customer_id" WHERE ${where.join(' AND ')} ORDER BY p."declared_at" DESC LIMIT 200`, ...a);
   }
 
@@ -46,6 +49,8 @@ export class PendingPaymentsService {
     const row = (await this.q('SELECT * FROM "pending_payments" WHERE "id" = $1', id))[0];
     if (!row) throw new NotFoundException('Paiement en attente introuvable.');
     if (actor.role !== 'SUPER_ADMIN' && actor.siteId && row.site_id && row.site_id !== actor.siteId) throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
+    const allowed = await allowedSiteIds(this.prisma);
+    if (allowed && !allowed.includes(row.site_id)) throw new NotFoundException('Paiement introuvable.');
     if (row.status !== 'EN_ATTENTE') throw new BadRequestException('Ce paiement a déjà été traité.');
     // Séparation des tâches : celui qui a déclaré le paiement ne le confirme pas lui-même (sauf Administrateur Général)
     if (status === 'CONFIRME' && row.declared_by === actor.userId && actor.role !== 'SUPER_ADMIN') throw new ForbiddenException("La confirmation doit être faite par un autre responsable que celui qui a déclaré le paiement.");

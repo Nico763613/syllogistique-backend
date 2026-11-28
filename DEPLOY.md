@@ -1,3 +1,5 @@
+> **Document historique.** L'installation actuelle (Render + Neon) est décrite dans `docs/GUIDE_INSTALLATION_EXPLOITATION.md` et les mises à jour dans `docs/DEPLOIEMENT_ET_RETOUR_ARRIERE.md`. Ce guide ne sert plus que de référence pour une installation de démonstration.
+
 # Déploiement 100 % gratuit de SYLLOGISTIQUE
 
 Aucune carte bancaire nécessaire pour aucune de ces étapes. Temps estimé : 10-15 minutes.

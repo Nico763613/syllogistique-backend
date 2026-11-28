@@ -26,6 +26,14 @@ async function session(browser, email, pass, label, fn) {
   await page.fill('#login-email', email);
   await page.fill('#login-password', pass);
   await page.click('text=Se connecter');
+  // Compte créé par un administrateur : l'application impose d'abord un mot de passe personnel.
+  await page.waitForSelector('#app:visible, #force-pw', { timeout: 20000 }).catch(() => {});
+  if (await page.$('#force-pw')) {
+    if (await page.$('#fp-old')) await page.fill('#fp-old', pass);
+    await page.fill('#fp-new', pass + 'N'); await page.fill('#fp-new2', pass + 'N');
+    await page.click('#force-pw button');
+    check(label + ' : mot de passe provisoire remplacé à la première connexion', true);
+  }
   const logged = await page.waitForSelector('#app', { state: 'visible', timeout: 20000 }).then(() => true).catch(() => false);
   check(label + ' : connexion par l\'interface', logged, logged ? '' : await page.textContent('#login-msg').catch(() => ''));
   if (logged) {

@@ -137,6 +137,16 @@ export class MessagingService {
     });
   }
 
+  /** L'envoi d'e-mails est-il configuré (SMTP complet) ? */
+  get configured(): boolean {
+    return !!this.transporter;
+  }
+
+  /** E-mail texte simple (ex. code de récupération du mot de passe). Journalisé comme les autres envois. */
+  sendText(to: string, subject: string, text: string): Promise<MailResult> {
+    return this.deliver({ to, subject, text });
+  }
+
   // Route de test (administrateur)
   async sendTest(to: string): Promise<MailResult> {
     const r = await this.deliver({

@@ -206,7 +206,7 @@ async function drvHomeFill() {
 function drvQueueHtml() {
   const q = drvQueue();
   const label = { start: 'Départ', arrive: 'Arrêt', fuel: 'Carburant', breakdown: 'Panne', incident: 'Incident', maintenance: 'Maintenance / anomalie', expense: 'Dépense' };
-  const rows = q.map((o) => `<div class="drv-row"><span>${esc(label[o.type])} · ${drvDt(o.createdAt)}</span><b>${o.rejected ? `<span class="badge bad">Refusé</span> <a href="#" onclick="drvDrop('${esc(o.clientOpId)}');return false;">supprimer</a>` : '<span class="badge warn">En attente</span>'}</b></div>${o.rejected ? `<div class="drv-warn" style="margin:4px 0">${esc(o.error)}</div>` : ''}`).join('');
+  const rows = q.map((o) => `<div class="drv-row"><span>${esc(label[o.type])} · ${drvDt(o.createdAt)}</span><b>${o.conflict ? '<span class="badge warn">Arbitrage du responsable</span>' : o.rejected ? `<span class="badge bad">Refusé</span> <a href="#" onclick="drvDrop('${esc(o.clientOpId)}');return false;">supprimer</a>` : '<span class="badge warn">En attente</span>'}</b></div>${o.rejected ? `<div class="drv-warn" style="margin:4px 0">${esc(o.error)}</div>` : ''}`).join('');
   return `<div class="drv-card"><h4><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Envois vers le bureau</h4>
     <button class="drv-btn gold" style="font-size:20px;padding:16px" onclick="drvSyncNow()"><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> Synchroniser maintenant</button>
     <div style="font-size:12px;color:var(--muted);margin:6px 0 10px">Hors connexion, vos saisies restent sur le téléphone et partent dès le retour du réseau.</div>
@@ -313,6 +313,12 @@ async function drvSyncNow() { await drvLoad(); }
 /* ---------- File d'envoi hors ligne ---------- */
 function drvEnqueue(op) {
   const q = drvQueue();
+  // Version de la mission telle que l'appareil la connaît : si le bureau l'a modifiée entre-temps,
+  // le serveur ne l'écrase pas et la soumet à l'arbitrage d'un responsable.
+  if (op.tripId && ['start', 'pause', 'arrive'].includes(op.type) && op.baseVersion === undefined) {
+    const t = ((DRV.me && DRV.me.trips) || []).find((x) => x.id === op.tripId) || (DRV.me && DRV.me.activeTrip && DRV.me.activeTrip.id === op.tripId ? DRV.me.activeTrip : null);
+    if (t && t.version) op.baseVersion = t.version;
+  }
   q.push({ ...op, clientOpId: drvUid(), createdAt: new Date().toISOString() });
   if (!dset('queue', q)) { alert("Mémoire de l'appareil pleine : envoyez d'abord les saisies en attente."); return false; }
   drvRender();
@@ -344,9 +350,9 @@ async function drvFlush() {
     }
     const todo = q.filter((o) => !o.rejected).slice(0, 50);
     if (!todo.length) return;
-    const r = await api('/driver/sync', { method: 'POST', body: { ops: todo.map((o) => ({ type: o.type, clientOpId: o.clientOpId, tripId: o.tripId || undefined, payload: o.payload })) } });
+    const r = await api('/driver/sync', { method: 'POST', body: { ops: todo.map((o) => ({ type: o.type, clientOpId: o.clientOpId, tripId: o.tripId || undefined, baseVersion: o.baseVersion || undefined, payload: o.payload })) } });
     const byId = new Map(r.results.map((x) => [x.clientOpId, x]));
-    q = drvQueue().filter((o) => { const x = byId.get(o.clientOpId); if (x && x.ok) return false; if (x && !x.ok) { o.rejected = true; o.error = x.error; } return true; });
+    q = drvQueue().filter((o) => { const x = byId.get(o.clientOpId); if (x && x.ok) return false; if (x && !x.ok) { o.rejected = true; o.error = x.error; if (x.conflict) { o.conflict = true; o.conflictId = x.conflictId; } } return true; });
     dset('queue', q);
   } catch (e) {
     if (e.code === 'DEVICE_BLOCKED') DRV.blocked = e.message;

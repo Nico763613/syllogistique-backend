@@ -16,6 +16,9 @@ const api = async (method, path, body, ...rest) => {
 const rows = (d) => Array.isArray(d) ? d : (d && (d.items || d.data || d.rows)) || [];
 const n = Date.now().toString().slice(-7), PW = 'Test1234x', day = new Date().toISOString().slice(0, 10);
 const is2 = (r) => r.s === 200 || r.s === 201;
+// Envoi d'une vraie photo de reçu (le serveur refuse désormais une adresse de fichier inventée)
+const PNG = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a0b00000000049454e44ae426082', 'hex');
+const upload = async (token) => { const fd = new FormData(); fd.append('file', new Blob([PNG], { type: 'image/png' }), 'recu.png'); const x = await fetch(B + '/uploads?category=fuel_receipt', { method: 'POST', headers: { authorization: 'Bearer ' + token }, body: fd }); const d = await x.json().catch(() => ({})); return d.url; };
 
 (async () => {
   let r = await fetch(B + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'admin@syllogistique.local', password: 'ChangeMoi123!' }) }).then(async (x) => ({ s: x.status, d: await x.json() }));
@@ -33,7 +36,10 @@ const is2 = (r) => r.s === 200 || r.s === 201;
   for (let i = 0; i < tags.length; i++) {
     if (i === 4) { console.log('… pause de 61 s (limite de connexions)'); await new Promise((res) => setTimeout(res, 61000)); }
     const x = await fetch(B + '/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: `f4${tags[i]}${n}@test.gn`, password: PW }) });
-    T[tags[i]] = (await x.json().catch(() => ({}))).accessToken;
+    const d = await x.json().catch(() => ({}));
+    T[tags[i]] = d.accessToken;
+    // Mot de passe provisoire (compte créé par un administrateur) : on le remplace d'abord.
+    if (d.accessToken && d.user && d.user.mustChangePassword) await fetch(B + '/auth/change-password', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + d.accessToken }, body: JSON.stringify({ currentPassword: PW, newPassword: PW + 'N' }) });
     if (!T[tags[i]]) console.log('   connexion impossible pour', tags[i], x.status);
   }
   ok(Object.values(T).every(Boolean), 'connexion de chaque compte de test');
@@ -43,7 +49,7 @@ const is2 = (r) => r.s === 200 || r.s === 201;
     ['GET', '/audit?limit=5', 'dg', 200], ['GET', '/audit?limit=5', 'chf', 403], ['GET', '/audit?limit=5&entities=User', 'stock', 403], ['GET', '/audit?limit=5&entities=StockMovement', 'stock', 200], ['GET', '/audit?limit=5&entity=User', 'flotte', 403],
     ['GET', '/driver-admin/sheets/pending', 'ops', 200], ['GET', '/driver-admin/sheets/pending', 'compta', 403], ['GET', '/driver-admin/sheets/pending', 'chf', 403],
     ['GET', '/driver-admin/expenses', 'compta', 200], ['GET', '/driver-admin/expenses', 'stock', 403],
-    ['GET', '/hse/incidents', 'chf', 403], ['GET', '/users', 'chf', 403], ['GET', '/users', 'meca', 403],
+    ['GET', '/hse/incidents', 'chf', 403], ['GET', '/users', 'chf', 403], ['GET', '/expenses', 'chf', 403], ['GET', '/fuel', 'chf', 403], ['GET', '/inventory/valuation', 'chf', 403], ['GET', '/customers', 'chf', 403], ['GET', '/expenses', 'compta', 200], ['GET', '/users', 'meca', 403],
   ];
   for (const [m, p, who, want] of M) { r = await api(m, p, undefined, T[who]); ok(r.s === want, `${who} ${m} ${p} → ${want}`, r.s); }
   r = await api('POST', '/downtimes', { vehicleId: crypto.randomUUID(), reason: 'Essai' }, T.stock); ok(r.s === 403, 'le gestionnaire de stock ne déclare pas de panne → 403', r.s);
@@ -95,11 +101,20 @@ const is2 = (r) => r.s === 200 || r.s === 201;
   r = await api('POST', '/driver/sync', { ops: [start] }, T.chf, dev); ok(is2(r) && r.d.results[0].ok && r.d.results[0].duplicate, 'même départ renvoyé après coupure : pas de doublon', r.d);
   r = await api('POST', '/driver/sheet/send', { date: day }, T.chf, dev); ok(r.s === 400, 'fiche refusée tant que la mission est en cours → 400', r.s);
   r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: 50000 }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'dépense sans photo du reçu refusée', r.d);
-  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: 50000, receiptImageUrl: '/uploads/test-recu.jpg' }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && r.d.results[0].ok, 'dépense de péage avec reçu enregistrée', r.d); const exp = r.d && r.d.results[0].result && r.d.results[0].result.expenseId;
+  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: 50000, receiptImageUrl: '/uploads/00000000-0000-0000-0000-000000000000.jpg' }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'dépense avec un reçu inexistant (adresse inventée) refusée', r.d);
+  const recu1 = await upload(T.chf); ok(!!recu1, 'le chauffeur envoie la photo de son reçu', recu1);
+  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: 50000, receiptImageUrl: recu1 }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && r.d.results[0].ok, 'dépense de péage avec reçu enregistrée', r.d); const exp = r.d && r.d.results[0].result && r.d.results[0].result.expenseId;
+  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: 50000, receiptImageUrl: recu1 }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'même reçu présenté une seconde fois : refusé (pas de double remboursement)', r.d);
+  // Contrôle des montants de la fiche de bord
+  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: 150000000, receiptImageUrl: await upload(T.chf) }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'dépense de 150 millions GNF (au-delà du plafond) refusée', r.d);
+  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PEAGE', amount: -5000, receiptImageUrl: await upload(T.chf) }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'dépense de montant négatif refusée', r.d);
+  r = await api('POST', '/driver/sync', { ops: [op('fuel', { liters: 30, totalCost: 50000000, odometer: 12050, receiptImageUrl: await upload(T.chf) }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok && /incohérent/.test(r.d.results[0].error || ''), 'plein de 30 L déclaré à 50 millions GNF refusé (prix au litre incohérent)', r.d);
+  r = await api('POST', '/driver/sync', { ops: [op('fuel', { liters: 30, totalCost: 360000, odometer: 12050, receiptImageUrl: await upload(T.chf) }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && r.d.results[0].ok, 'plein de 30 L à 360 000 GNF (12 000 GNF/L) accepté', r.d);
+  r = await api('POST', '/driver/sync', { ops: [op('maintenance', { nature: 'VIDANGE', cost: -1000 }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'coût de maintenance négatif refusé', r.d);
   r = await api('POST', '/driver/sync', { ops: [op('arrive', { odometer: 11000 }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'arrivée avec kilométrage inférieur au départ refusée', r.d);
   r = await api('POST', '/driver/sync', { ops: [op('arrive', { odometer: 12150, endCondition: 'RAS' }, { tripId: trip })] }, T.chf, dev); ok(is2(r) && r.d.results[0].ok, 'arrivée enregistrée (150 km)', r.d);
   r = await api('POST', '/driver/sheet/send', { date: day }, T.chf, dev); ok(is2(r), 'le chauffeur envoie sa fiche de bord', r);
-  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PARKING', amount: 1000, receiptImageUrl: '/uploads/x.jpg' })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'fiche envoyée : plus aucune saisie possible ce jour-là', r.d);
+  r = await api('POST', '/driver/sync', { ops: [op('expense', { category: 'PARKING', amount: 1000, receiptImageUrl: await upload(T.chf) })] }, T.chf, dev); ok(is2(r) && !r.d.results[0].ok, 'fiche envoyée : plus aucune saisie possible ce jour-là', r.d);
   r = await api('POST', `/driver-admin/expenses/${exp}/decision`, { decision: 'APPROVED' }, T.compta); ok(r.s === 400, 'la comptabilité ne paie pas avant la validation de la fiche → 400', r.s);
   r = await api('POST', '/driver-admin/sheets/validate', { driverId: drv, date: day }, T.ops); ok(r.s === 400, 'les opérations ne valident pas avant la vérification logistique → 400', r.s);
   r = await api('POST', '/driver-admin/sheets/process', { driverId: drv, date: day, note: 'Conforme' }, T.ops); ok(r.s === 403, 'les opérations ne font pas la vérification logistique → 403', r.s);
@@ -112,6 +127,12 @@ const is2 = (r) => r.s === 200 || r.s === 201;
   r = await api('POST', `/driver-admin/expenses/${exp}/pay`, {}, T.compta); ok(is2(r), 'la comptabilité marque la dépense comme payée', r);
   r = await api('POST', `/driver-admin/expenses/${exp}/pay`, {}, T.compta); ok(r.s === 400, 'double paiement refusé → 400', r.s);
   r = await api('GET', '/audit?limit=200&entities=DriverExpense', undefined, T.dg); ok(r.s === 200 && JSON.stringify(r.d).includes(exp), 'le DG retrouve la dépense dans le journal', r.s);
+
+  // --- Plafonds des montants saisis au bureau : refus clair (400) au lieu d'une erreur serveur (500)
+  r = await api('POST', '/expenses', { category: 'OTHER', amount: 1e13, expenseDate: new Date().toISOString(), description: 'Essai plafond' }); ok(r.s === 400, 'dépense de bureau de 10 000 milliards GNF refusée → 400', r.s);
+  r = await api('POST', '/expenses', { category: 'OTHER', amount: -10, expenseDate: new Date().toISOString() }); ok(r.s === 400, 'dépense de bureau négative refusée → 400', r.s);
+  r = await api('POST', '/payments', { direction: 'IN', method: 'CASH', amount: 1e13, paymentDate: new Date().toISOString() }); ok(r.s === 400, 'paiement de 10 000 milliards GNF refusé → 400', r.s);
+  r = await api('POST', '/fuel', { vehicleId: vp, siteId: SITE, transactionDate: new Date().toISOString(), mileage: 5000, quantityLiters: 1e12 }); ok(r.s === 400, 'plein de mille milliards de litres refusé → 400', r.s);
 
   console.log(fails ? `\n${fails} échec(s)` : '\nTous les tests du circuit sont passés.');
   process.exit(fails ? 1 : 0);

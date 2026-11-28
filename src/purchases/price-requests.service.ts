@@ -1,7 +1,9 @@
+import { MAX_UNIT_PRICE_GNF } from '../common/limits';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import PDFDocument = require('pdfkit');
 import { PrismaService } from '../prisma.service';
+import { allowedSiteIds } from '../common/tenant-scope';
 import { AuditService } from '../audit/audit.service';
 import { PurchasesService } from './purchases.service';
 import { getIssuer } from '../common/issuer';
@@ -20,8 +22,11 @@ export class PriceRequestsService {
 
   private q(sql: string, ...a: any[]) { return this.prisma.$queryRawUnsafe(sql, ...a) as Promise<any[]>; }
 
-  private checkSite(actor: Actor, siteId: string) {
+  private async checkSite(actor: Actor, siteId: string) {
     if (actor.role !== 'SUPER_ADMIN' && actor.siteId && actor.siteId !== siteId) throw new ForbiddenException('Cette demande appartient à un autre site.');
+    // Cloisonnement entreprise : même le Super Admin ne voit que les sites de sa propre entreprise.
+    const allowed = await allowedSiteIds(this.prisma);
+    if (allowed && !allowed.includes(siteId)) throw new NotFoundException('Demande de prix introuvable.');
   }
 
   private async load(id: string) {
@@ -32,7 +37,7 @@ export class PriceRequestsService {
 
   // ---- Création : demande d'achat approuvée (ou lignes saisies) + fournisseurs consultés ----
   async create(dto: { siteId: string; title?: string; needRequestId?: string; notes?: string; supplierIds: string[]; lines?: { itemId: string; quantity: number }[] }, actor: Actor) {
-    this.checkSite(actor, dto.siteId);
+    await this.checkSite(actor, dto.siteId);
     const supplierIds = Array.from(new Set((dto.supplierIds || []).filter(Boolean)));
     if (supplierIds.length < 2) throw new BadRequestException('Consultez au moins 2 fournisseurs pour pouvoir comparer les prix.');
     const suppliers = await this.prisma.supplier.findMany({ where: { id: { in: supplierIds } }, select: { id: true } });
@@ -73,6 +78,8 @@ export class PriceRequestsService {
     const siteId = actor.role !== 'SUPER_ADMIN' && actor.siteId ? actor.siteId : params.siteId;
     const where: string[] = []; const a: any[] = [];
     if (siteId) { a.push(siteId); where.push(`r."site_id" = $${a.length}`); }
+    const allowed = await allowedSiteIds(this.prisma);
+    if (allowed) { a.push(allowed); where.push(`r."site_id" = ANY($${a.length}::text[])`); }
     if (params.status) { a.push(params.status); where.push(`r."status" = $${a.length}`); }
     const rows = await this.q(`SELECT r.*, (SELECT COUNT(*) FROM "price_quotes" q WHERE q."request_id" = r."id") AS suppliers, (SELECT COUNT(*) FROM "price_quotes" q WHERE q."request_id" = r."id" AND q."status" = 'RECUE') AS received FROM "price_requests" r ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY r."created_at" DESC LIMIT 200`, ...a);
     return rows.map((r) => ({ ...r, suppliers: Number(r.suppliers), received: Number(r.received), nextStep: this.nextStep(r.status, Number(r.received)) }));
@@ -89,7 +96,7 @@ export class PriceRequestsService {
   // Détail + tableau comparatif
   async get(id: string, actor: Actor) {
     const r = await this.load(id);
-    this.checkSite(actor, r.site_id);
+    await this.checkSite(actor, r.site_id);
     const lines = await this.q('SELECT l.*, i."sku", i."name", i."unit" FROM "price_request_lines" l JOIN "stock_items" i ON i."id" = l."item_id" WHERE l."request_id" = $1 ORDER BY l."position"', id);
     const quotes = await this.q('SELECT q.*, s."name" AS supplier_name, s."phone" AS supplier_phone FROM "price_quotes" q JOIN "suppliers" s ON s."id" = q."supplier_id" WHERE q."request_id" = $1 ORDER BY s."name"', id);
     const prices = await this.q('SELECT p.* FROM "price_quote_lines" p JOIN "price_quotes" q ON q."id" = p."quote_id" WHERE q."request_id" = $1', id);
@@ -116,7 +123,7 @@ export class PriceRequestsService {
   // ---- Saisie des prix reçus d'un fournisseur ----
   async saveQuote(id: string, supplierId: string, dto: { deliveryDays?: number; paymentTerms?: string; notes?: string; prices: { requestLineId: string; unitPrice: number }[] }, actor: Actor) {
     const r = await this.load(id);
-    this.checkSite(actor, r.site_id);
+    await this.checkSite(actor, r.site_id);
     if (r.status !== 'OUVERTE' && r.status !== 'COMPAREE') throw new BadRequestException('Cette demande est clôturée : les prix ne peuvent plus être modifiés.');
     const quote = (await this.q('SELECT * FROM "price_quotes" WHERE "request_id" = $1 AND "supplier_id" = $2', id, supplierId))[0];
     if (!quote) throw new NotFoundException("Ce fournisseur ne fait pas partie de la demande de prix.");
@@ -127,7 +134,7 @@ export class PriceRequestsService {
       if (!ids.has(p.requestLineId)) throw new BadRequestException('Ligne inconnue dans la demande de prix.');
       if (seen.has(p.requestLineId)) throw new BadRequestException('Une même ligne ne peut pas figurer deux fois.');
       seen.add(p.requestLineId);
-      if (!(Number(p.unitPrice) >= 0)) throw new BadRequestException('Prix unitaire invalide.');
+      if (!(Number(p.unitPrice) >= 0) || Number(p.unitPrice) > MAX_UNIT_PRICE_GNF) throw new BadRequestException('Prix unitaire invalide (négatif ou supérieur à 1 milliard GNF).');
     }
     if (seen.size !== lines.length) throw new BadRequestException('Saisissez le prix de chaque article (une offre incomplète ne peut pas être comparée).');
     const days = dto.deliveryDays == null || (dto.deliveryDays as any) === '' ? null : Math.max(0, Math.floor(Number(dto.deliveryDays)));
@@ -173,7 +180,7 @@ export class PriceRequestsService {
 
   async cancel(id: string, reason: string, actor: Actor) {
     const r = await this.load(id);
-    this.checkSite(actor, r.site_id);
+    await this.checkSite(actor, r.site_id);
     if (r.status === 'VALIDEE') throw new BadRequestException('Un bon de commande a déjà été créé : annulez-le depuis les bons de commande.');
     if (r.status === 'ANNULEE') throw new BadRequestException('Déjà annulée.');
     if (!(reason || '').trim() || reason.trim().length < 3) throw new BadRequestException("Indiquez le motif de l'annulation.");

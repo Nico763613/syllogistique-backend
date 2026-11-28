@@ -46,3 +46,31 @@ export class ChangePasswordDto {
   @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' })
   newPassword: string;
 }
+
+export class PasswordResetRequestDto {
+  @ApiProperty({ description: 'E-mail ou numéro de téléphone du compte' })
+  @IsString()
+  @MinLength(5)
+  @MaxLength(160)
+  identifier: string;
+}
+
+export class PasswordResetConfirmDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(5)
+  @MaxLength(160)
+  identifier: string;
+
+  @ApiProperty({ description: 'Code à 6 chiffres' })
+  @IsString()
+  @Matches(/^\s*\d{3}\s?\d{3}\s*$/, { message: 'Le code comporte 6 chiffres.' })
+  code: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8, { message: 'Le mot de passe doit contenir au moins 8 caractères.' })
+  @MaxLength(128)
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, { message: 'Le mot de passe doit contenir au moins une lettre et un chiffre.' })
+  newPassword: string;
+}

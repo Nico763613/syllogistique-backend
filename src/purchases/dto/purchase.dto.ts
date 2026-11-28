@@ -1,10 +1,11 @@
-import { IsArray, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested } from 'class-validator';
+import { MAX_AMOUNT_GNF, MAX_QUANTITY, MAX_UNIT_PRICE_GNF } from '../../common/limits';
+import { IsArray, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Min, MinLength, ValidateNested, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PurchaseOrderLineDto {
   @IsString() itemId: string;
-  @IsNumber() @Min(0.01) quantityOrdered: number;
-  @IsNumber() @Min(0) unitPrice: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantityOrdered: number;
+  @IsNumber() @Min(0) @Max(MAX_UNIT_PRICE_GNF) unitPrice: number;
 }
 
 export class CreatePurchaseOrderDto {
@@ -21,15 +22,15 @@ export class CreatePurchaseOrderDto {
 export class ReceiveLineDto {
   @IsString() lineId: string;
   // Quantité livrée (acceptée + rejetée)
-  @IsNumber() @Min(0.01) quantityReceived: number;
+  @IsNumber() @Min(0.01) @Max(MAX_QUANTITY) quantityReceived: number;
   // Quantité refusée à la réception (non conforme) : n'entre pas en stock
-  @IsOptional() @IsNumber() @Min(0) quantityRejected?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_QUANTITY) quantityRejected?: number;
   @IsOptional() @IsString() rejectReason?: string;
 }
 
 export class ReceivePurchaseOrderDto {
   @IsOptional() @IsString() deliveryNoteNo?: string;
-  @IsOptional() @IsNumber() @Min(0) freightCost?: number;
+  @IsOptional() @IsNumber() @Min(0) @Max(MAX_AMOUNT_GNF) freightCost?: number;
   @IsOptional() @IsString() notes?: string;
   @IsArray() @ValidateNested({ each: true }) @Type(() => ReceiveLineDto)
   lines: ReceiveLineDto[];

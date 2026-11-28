@@ -6,6 +6,7 @@ import { TransferStockDto, CorrectStockMovementDto, CreateInventoryItemDto, Stoc
 import { getIssuer } from '../common/issuer';
 import { startDoc, keyValues, signatures, NAVY, GOLD, fmtN, orgLogo } from '../common/pdf-doc';
 import { alertStockThresholds } from '../common/stock-alerts';
+import { withinOrganization } from '../common/tenant-scope';
 
 @Injectable()
 export class InventoryService {
@@ -423,6 +424,14 @@ export class InventoryService {
   // Transfert entre sites / entrepôts : sortie à la source + entrée à la destination, atomiques.
   // L'article est créé à destination (même code) s'il n'y existe pas encore ; les valeurs totales restent cohérentes.
   async transfer(dto: TransferStockDto, actorId: string) {
+    // L'article de départ doit être visible depuis le site de l'utilisateur (cloisonnement normal).
+    const own = await this.prisma.inventoryItem.findUnique({ where: { id: dto.itemId }, select: { id: true } });
+    if (!own) throw new NotFoundException('Article introuvable.');
+    // Le site d'arrivée appartient à la même entreprise : on élargit la portée à l'entreprise, jamais au-delà.
+    return withinOrganization(this.prisma, () => this.transferWithinOrganization(dto, actorId));
+  }
+
+  private async transferWithinOrganization(dto: TransferStockDto, actorId: string) {
     const result = await this.prisma.$transaction(async (tx) => {
       const source = await tx.inventoryItem.findUnique({ where: { id: dto.itemId }, include: { site: true } });
       if (!source) throw new NotFoundException('Article introuvable.');

@@ -463,12 +463,40 @@ async function saveDailyNumbers() {
 }
 
 /* ---------------- SYNC ---------------- */
+/* ---------- Conflits de synchronisation : arbitrage par un responsable ---------- */
+const CONFLICT_ENTITY = { Trip: 'Mission', Vehicle: 'Véhicule', Driver: 'Chauffeur', InventoryItem: 'Article', Customer: 'Client', Supplier: 'Fournisseur', DriverDailyReport: 'Fiche de bord', DriverExpense: 'Dépense chauffeur', SalesOrder: 'Commande client', PurchaseOrder: "Commande d'achat", NeedRequest: 'État de besoin' };
+const CONFLICT_SOURCE = { SYNC_CHAUFFEUR: 'Application chauffeur (hors ligne)', SYNC_BUREAU: 'Synchronisation du bureau', API: 'Modification au bureau' };
+async function conflictsPanel() {
+  let rows = [];
+  try { rows = await api('/sync/conflicts?status=OUVERT'); } catch (e) { return ''; }
+  const canDecide = ['SUPER_ADMIN', 'ADMIN_LOGISTIQUE', 'RESPONSABLE_OPERATIONS', 'GESTIONNAIRE_FLOTTE', 'MAGASINIER'].includes(state.user && state.user.role);
+  const body = rows.map((c) => {
+    const p = c.client_payload || {};
+    const what = p.type ? ({ start: 'Départ', pause: 'Arrêt intermédiaire', arrive: 'Arrivée' }[p.type] || p.type) : (p.operation || 'Modification');
+    return `<tr><td>${esc(CONFLICT_ENTITY[c.entity] || c.entity)}</td><td>${esc(what)}<div class="desc">${esc(CONFLICT_SOURCE[c.source] || c.source)}</div></td>
+      <td>${esc(((c.requester_first_name || '') + ' ' + (c.requester_last_name || '')).trim() || '—')}</td>
+      <td class="mono">v${esc(String(c.base_version))} → v${esc(String(c.server_version))}</td><td>${new Date(c.created_at).toLocaleString('fr-FR')}</td>
+      <td>${canDecide ? `<button class="btn ghost" onclick="resolveConflict('${esc(c.id)}','SERVEUR')">Garder la fiche actuelle</button>
+        ${c.source !== 'API' ? `<button class="btn" onclick="resolveConflict('${esc(c.id)}','SAISIE')">Appliquer la saisie</button>` : ''}` : '<span class="badge warn">En attente d\'arbitrage</span>'}</td></tr>`;
+  }).join('');
+  return `<div class="panel"><h3><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg> Conflits à arbitrer (${rows.length})</h3>
+    <div class="desc">Une saisie faite hors ligne visait une fiche modifiée entre-temps par une autre personne. Rien n'a été écrasé : choisissez la version à garder. Chaque décision est inscrite au journal.</div>
+    ${rows.length ? `<div class="table-wrap"><table><thead><tr><th>Fiche</th><th>Saisie</th><th>Auteur</th><th>Version</th><th>Date</th><th></th></tr></thead><tbody>${body}</tbody></table></div>` : '<div class="desc" style="margin-top:8px">Aucun conflit en attente.</div>'}</div>`;
+}
+async function resolveConflict(id, choice) {
+  const note = prompt(choice === 'SERVEUR' ? 'Garder la fiche actuelle et écarter la saisie. Motif (facultatif) :' : 'Appliquer la saisie en attente. Motif (facultatif) :');
+  if (note === null) return;
+  try { await api('/sync/conflicts/' + id + '/resolve', { method: 'POST', body: { choice, note } }); try { bellToast('Décision enregistrée.'); } catch (e) {} renderSync(); }
+  catch (e) { alert(e.message); }
+}
+
 async function renderSync() {
-  const pending = await api('/sync/pending-count');
-  const log = await api('/sync/log');
+  const conflicts = await conflictsPanel();
+  const pending = await api('/sync/pending-count').catch(() => 0);
+  const log = await api('/sync/log').catch(() => []);
   const rows = log.map(l => `<tr><td>${esc(l.entity)}</td><td>${esc(l.operation)}</td><td>${statusBadge(l.status === 'SUCCESS' ? 'AVAILABLE' : l.status === 'FAILED' ? 'IMMOBILIZED' : 'ON_MISSION')}</td><td>${new Date(l.createdAt).toLocaleString('fr-FR')}</td></tr>`).join('') || `<tr><td colspan="4" class="empty">Aucune opération de synchronisation.</td></tr>`;
 
-  root().innerHTML = `
+  root().innerHTML = conflicts + `
     <div class="panel">
       <h3><svg class="ic" aria-hidden="true"><use href="#i-refresh"/></svg> État de la synchronisation</h3>
       <div class="desc">Cette interface web fonctionne en ligne. Le mode Offline complet (file d'attente locale, synchronisation automatique au retour du réseau) est porté par l'application Flutter mobile/desktop — l'API expose déjà <code>/sync/push</code> pour cela.</div>
@@ -582,8 +610,17 @@ async function loadUsersPanel() {
     body.innerHTML = `<table><thead><tr><th>Nom</th><th>Rôle</th><th>Département</th><th>Session</th></tr></thead><tbody>${users.map(u => `
       <tr><td>${esc(u.firstName)} ${esc(u.lastName)}</td><td>${roleLabel(u.role.name)}</td>
       <td>${u.role.name === 'SUPER_ADMIN' ? 'Accès global' : `<select onchange="setUserDepartment('${esc(u.id)}', this.value)">${opts(u.department)}</select>`}</td>
-      <td>${u.id === (state.user && state.user.id) ? '—' : `<button class="btn small" onclick="revokeUserSessions('${esc(u.id)}')">Déconnecter</button>`}</td></tr>`).join('')}</tbody></table>${state.user && state.user.role === 'SUPER_ADMIN' ? `<div style="margin-top:12px"><button class="btn" onclick="revokeAllSessions()">Déconnecter tous les appareils</button><div class="desc" style="margin-top:4px">Ferme les sessions de tous les utilisateurs, sauf la vôtre. Aucun compte ni donnée n'est touché.</div></div>` : ''}`;
+      <td>${u.id === (state.user && state.user.id) ? '—' : `<button class="btn small" onclick="revokeUserSessions('${esc(u.id)}')">Déconnecter</button> <button class="btn small ghost" onclick="issueUserResetCode('${esc(u.id)}')">Code de récupération</button>`}</td></tr>`).join('')}</tbody></table>${state.user && state.user.role === 'SUPER_ADMIN' ? `<div style="margin-top:12px"><button class="btn" onclick="revokeAllSessions()">Déconnecter tous les appareils</button><div class="desc" style="margin-top:4px">Ferme les sessions de tous les utilisateurs, sauf la vôtre. Aucun compte ni donnée n'est touché.</div></div>` : ''}`;
   } catch (e) { body.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
+}
+// Procédure administrateur : code à usage unique remis en main propre après vérification d'identité.
+async function issueUserResetCode(id) {
+  const msg = document.getElementById('u-msg');
+  if (!confirm("Avez-vous vérifié l'identité de la personne (en personne ou par un appel au numéro connu) ? Le code ne sera affiché qu'une seule fois.")) return;
+  try {
+    const r = await api('/users/' + id + '/reset-code', { method: 'POST' });
+    msg.innerHTML = `<div class="msg ok"><div style="font-size:1.6em;letter-spacing:.2em;font-weight:700">${esc(r.code)}</div>${esc(r.message)}</div>`;
+  } catch (e) { msg.innerHTML = `<div class="msg err">${esc(e.message)}</div>`; }
 }
 async function revokeUserSessions(id) {
   const msg = document.getElementById('u-msg');

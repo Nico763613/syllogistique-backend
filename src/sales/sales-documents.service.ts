@@ -1,3 +1,5 @@
+import { currentOrganizationId } from '../common/tenant-scope';
+import { readUpload } from '../uploads/file-links';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import PDFDocument = require('pdfkit');
 import { readFile } from 'fs/promises';
@@ -15,7 +17,7 @@ export class SalesDocumentsService {
     if (!url) return null;
     try {
       if (url.startsWith('data:image/')) return Buffer.from(url.split(',')[1] || '', 'base64');
-      if (url.startsWith('/uploads/')) return await readFile(join(__dirname, '..', '..', 'uploads', basename(url)));
+      if (url.includes('/uploads/')) return await readUpload(this.prisma, url);
       if (/^https?:\/\//i.test(url)) {
         const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
         return r.ok ? Buffer.from(await r.arrayBuffer()) : null;
@@ -25,7 +27,8 @@ export class SalesDocumentsService {
   }
 
   async invoicePdf(invoiceId: string, orgName = 'SYL LOGISTIQUE'): Promise<Buffer> {
-    const org = await this.prisma.organization.findFirst({ orderBy: { createdAt: 'asc' }, select: { name: true, logoUrl: true } });
+    const orgId = currentOrganizationId();
+    const org = await this.prisma.organization.findFirst({ where: orgId ? { id: orgId } : undefined, orderBy: { createdAt: 'asc' }, select: { name: true, logoUrl: true } });
     // Sans logo propre au client : logo SYL LOGISTIQUE par défaut
     const logo = (await this.loadLogo(org?.logoUrl)) ?? (await readFile(join(__dirname, '..', '..', 'public', 'logo-syl.png')).catch(() => null));
     if (org?.name) orgName = org.name;

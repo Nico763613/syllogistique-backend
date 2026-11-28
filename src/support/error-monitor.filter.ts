@@ -1,4 +1,4 @@
-import { ArgumentsHost, Catch, HttpException, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, Catch, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { BaseExceptionFilter } from '@nestjs/core';
 import { PrismaService } from '../prisma.service';
 
@@ -10,6 +10,9 @@ export class ErrorMonitorFilter extends BaseExceptionFilter {
   constructor(private prisma: PrismaService) { super(); }
 
   catch(exception: unknown, host: ArgumentsHost) {
+    // Fiche absente ou hors du périmètre (autre entreprise / autre site) : « introuvable » (404),
+    // jamais une erreur serveur, et sans révéler si la fiche existe ailleurs.
+    if ((exception as any)?.code === 'P2025') exception = new NotFoundException('Élément introuvable.');
     try {
       const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
       if (status >= 500) {

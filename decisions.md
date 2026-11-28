@@ -51,3 +51,88 @@
 - Décision : (1) la base refuse l'accès par identifiant à un élément d'un autre site (contexte de requête + contrôle Prisma) ; (2) le site de l'utilisateur est réellement imposé dans les listes sans ?siteId (Express 5 recalculait req.query, l'ancienne affectation était perdue) ; (3) un compte suspendu ou supprimé perd l'accès en 20 s maximum ; (4) le changement du mot de passe provisoire est imposé par le serveur.
 - Raison : contrôle final de sécurité ; défauts prouvés par scripts/functional5.js sur base de test.
 - Risque accepté : les opérations dans une transaction Prisma ne passent pas par le contrôle par identifiant (elles restent protégées par les contrôles métier existants) ; cache d'état de compte de 20 s.
+
+## 2026-11-27 — Plateforme multi-entreprises : filtre central entreprise / site
+- Décision : un filtre unique (src/common/tenant-scope.ts) s'applique à toute requête Prisma d'un utilisateur connecté : lectures, comptages, modifications et suppressions groupées, créations (y compris imbriquées) et transactions. Toute référence donnée (véhicule, article, client…) doit appartenir au même périmètre. Une table non classée est refusée par défaut.
+- Décision : le Super administrateur est limité à SA propre entreprise (la supervision de toutes les entreprises reste dans la console Master, serveur séparé).
+- Décision : catégories de stock et types de maintenance sans entreprise = catalogue commun en lecture seule ; chaque entreprise modifie seulement les siennes.
+- Décision : requêtes SQL directes revues une à une (appareils, demandes de prix, paiements mobiles en attente, inscriptions chauffeur, numérotation, types de clients).
+- Raison : exigence « plateforme multi-entreprises et multi-sites sécurisée dès la conception ».
+- Risques acceptés : (1) numérotation des documents commune à la plateforme (réglable seulement par l'entreprise principale) — bloquant pour vendre la facturation à plusieurs entreprises sur un même serveur ; (2) inscriptions publiques de chauffeurs rattachées à l'entreprise principale ; (3) fichiers joints protégés par lien non devinable seulement.
+
+## 2026-11-27 — Conflits de synchronisation par numéro de version
+- Décision : 11 types de fiches portent un numéro de version. Une modification envoyée avec une version dépassée par la modification d'une AUTRE personne n'écrase rien : elle devient un conflit à arbitrer par un responsable (jamais par l'auteur, jamais par le DG). Un même compte sur deux appareils n'entre pas en conflit avec lui-même.
+- Risque accepté : un conflit venant de l'écran (et non d'une saisie hors ligne) ne peut être arbitré qu'en gardant la valeur du serveur : la personne ressaisit si besoin.
+
+## 2026-11-27 — Migrations numérotées
+- Décision : prisma/migrations-sql/NNNN_nom.up.sql / .down.sql, appliquées au démarrage avec verrou, sauvegarde préalable, transaction, historique (schema_migrations) et retour arrière de la dernière migration. Procédure : docs/MIGRATIONS.md.
+
+## 2026-11-27 — Récupération du mot de passe par code
+- Décision : code à 6 chiffres, 15 minutes, 5 essais, usage unique, stocké sous forme d'empreinte HMAC ; réponse identique que le compte existe ou non ; 3 demandes par compte et 10 par adresse IP par heure. Tant que l'envoi d'e-mails n'est pas disponible, les responsables sont prévenus et remettent le code en main propre après vérification d'identité (Utilisateurs → « Code de récupération »).
+- Risque accepté : la vérification d'identité par le responsable repose sur sa vigilance (rappel affiché à chaque remise de code).
+
+## 2026-11-27 — Accès plateforme pour créer une entreprise
+- Décision : POST /platform/organizations, protégé par la variable PLATFORM_ADMIN_KEY (comparaison en temps constant, 5 essais/minute). Sans la variable, la route répond « introuvable ».
+
+## 2026-11-27 — Synchronisation : déduplication stricte et modification partielle
+- **Décision** : une opération synchronisée n'est ignorée comme « déjà traitée » que si le même appareil renvoie exactement la même opération avec le même contenu. Une fiche existante est mise à jour avec les seuls champs envoyés (plus d'« upsert » exigeant tous les champs). Le champ `version` ne peut jamais venir du téléphone.
+- **Raison** : les tests ont montré qu'une 2e modification de la même fiche (ou une opération sans identifiant d'appareil) était perdue sans message, et qu'une modification partielle faite hors ligne était rejetée.
+- **Risque accepté** : la comparaison porte sur les 20 derniers envois réussis de l'appareil pour cette fiche ; au-delà, un renvoi très ancien serait rejoué (sans danger pour une mise à jour, la version empêche l'écrasement d'autrui).
+
+## 2026-11-27 — Accès plateforme : clé vérifiée avant tout
+- **Décision** : la clé `x-platform-key` est contrôlée par un garde qui passe avant la validation du contenu.
+- **Raison** : sans clé, aucune information (même un message de validation) ne doit être renvoyée.
+
+## 2026-11-27 — Numérotation des documents par entreprise (livraison 195)
+- **Décision** : chaque entreprise reçoit un code court unique (`organizations.doc_code`, 3 lettres tirées de son nom, ex. SYL, puis SYL1… en cas de doublon). Les nouveaux numéros prennent la forme `PRÉFIXE-CODE-AAAA-NNNN` (ex. `FAC-SYL-2026-0001`, `TRP-SYL-2026-0001`) avec un compteur propre à chaque entreprise. Chaque entreprise règle elle-même ses préfixes.
+- **Raison** : les références sont uniques sur toute la plateforme ; sans code d'entreprise, deux entreprises ne pouvaient pas avoir chacune leur propre suite de numéros (risque de collision ou de numéros partagés).
+- **Risque accepté** : les numéros déjà émis gardent leur ancienne forme (rien n'est renuméroté) ; la suite de l'entreprise principale change donc de forme à partir de la mise en production.
+
+## 2026-11-27 — Inscriptions de chauffeurs rattachées à l'entreprise du lien
+- **Décision** : le formulaire public accepte un code d'entreprise (`?entreprise=CODE` dans le lien partagé par WhatsApp). La demande est enregistrée dans cette entreprise (`driver_signups.organization_id`) et n'est visible et traitable que par ses responsables. Sans code, ou code inconnu : entreprise principale (comportement actuel). Les demandes existantes sont rattachées à l'entreprise principale.
+- **Risque accepté** : un chauffeur qui n'utilise pas le lien de son entreprise arrive dans l'entreprise principale ; un responsable peut alors la refuser.
+
+## 2026-11-27 — Fichiers protégés par lien signé et temporaire
+- **Décision** : photos, reçus et documents ne sont plus lisibles par leur seule adresse. Le serveur ajoute à chaque adresse renvoyée une expiration et une signature HMAC (clé `FILES_SIGNING_KEY`, sinon `JWT_ACCESS_SECRET`) ; un lien vaut 24 à 25 heures. La lecture libre du dossier `uploads` est supprimée. La base garde l'adresse nue (les signatures reçues sont retirées à l'entrée). Les logos des PDF et de l'écran sont désormais ceux de l'entreprise de l'utilisateur (auparavant : première entreprise de la plateforme).
+- **Raison** : exigence de cloisonnement des pièces jointes entre entreprises ; seules les réponses déjà filtrées par entreprise et site fournissent un lien valable.
+- **Risques acceptés** : (1) un lien transféré reste lisible jusqu'à son expiration ; (2) changer `JWT_ACCESS_SECRET` sans `FILES_SIGNING_KEY` invalide les liens en cours (il suffit de rouvrir la page) ; (3) une image gardée en cache hors ligne au-delà de 25 heures doit être rechargée.
+
+## 2026-11-27 — Profils enregistrés à la création de leur premier compte
+- **Constat** : la production ne contient que 11 des 15 profils ; créer un Mécanicien, un Pointeur, un Comptable ou un Responsable des opérations depuis « Utilisateurs » échouait (« Rôle introuvable »), alors que l'écran « Personnel » (/staff) les enregistrait déjà.
+- **Décision** : « Utilisateurs » (création et modification) enregistre lui aussi le profil s'il manque, uniquement parmi les 15 profils prévus par l'application. Aucun profil n'est créé en production par la mise en ligne elle-même : il l'est au moment où un responsable crée le premier compte concerné.
+- **Preuve** : l'intégration continue retire ces 4 profils de la base de test (situation de la production) avant tous les tests.
+
+## 2026-11-27 — Rapport de période : dates obligatoires
+- Décision : `/reports/period`, ses exports (Excel, PDF), l'envoi par e-mail et le lien WhatsApp vérifient la période (dates AAAA-MM-JJ, début avant fin) et répondent 400 avec un message en français.
+- Raison : sans dates, le serveur renvoyait une erreur 500 (trouvée par le contrôle des 15 profils).
+- Risque accepté : aucun pour l'interface actuelle, qui n'appelle pas ces adresses sans dates.
+
+## 28/11/2026 — Clôture : contrôle des montants et des justificatifs
+- **Décision** : plafonds communs des montants et quantités (`src/common/limits.ts`) appliqués à toutes les saisies ; prix au litre d'un plein déclaré par un chauffeur limité à 50 %–200 % du tarif central ; reçu obligatoire **présent sur le serveur** ; un même reçu ne justifie qu'une seule déclaration.
+- **Raison** : un montant démesuré provoquait une erreur 500 ; un chauffeur pouvait déclarer un plein à n'importe quel prix ou citer une adresse de reçu inventée ; un même reçu pouvait servir deux fois.
+- **Risque accepté** : la vérification du « reçu déjà utilisé » se fait dans le périmètre du site du chauffeur (les noms de fichiers sont aléatoires et non devinables). La fourchette de prix du carburant doit être revue si le tarif central n'est pas tenu à jour dans Paramètres.
+
+## 28/11/2026 — Rattachement des chauffeurs
+- **Décision** : un compte chauffeur ne peut être lié qu'à une fiche chauffeur du même site (et donc de la même entreprise).
+- **Raison** : un administrateur d'entreprise sans site pouvait lier le compte d'un site à la fiche d'un autre site.
+- **Risque accepté** : aucun.
+
+## 28/11/2026 — Requêtes SQL directes : relecture complète et contrôle automatique
+- **Décision** : relecture des 22 fichiers qui contiennent du SQL direct (non filtré par le cloisonnement automatique) ; correction de la recherche de doublons de clients, qui acceptait le site d'une autre entreprise et pouvait renvoyer les noms et téléphones de ses clients ; création de `scripts/check-raw-sql.js` (cité dans le code mais absent), exécuté en CI : tout nouveau fichier avec du SQL direct fait échouer la CI tant qu'il n'a pas été relu.
+- **Raison** : le cloisonnement entre entreprises est une exigence de sécurité majeure ; ce contrôle évite qu'une faille du même type réapparaisse.
+- **Risque accepté** : la liste des fichiers relus est tenue à la main ; une modification d'un fichier déjà relu n'est pas détectée automatiquement (relecture humaine nécessaire).
+
+## 28/11/2026 — Test des modules sans test direct (functional7)
+- **Décision** : ajout de `scripts/functional7.js` (transferts entre sites, rapports et exports, recherche, QR codes, signalements, licence, simulation, envoi d'e-mail de test).
+- **Raison** : ces modules n'étaient vérifiés par aucun test automatique.
+- **Risque accepté** : l'envoi réel d'e-mails et l'activation de licence auprès du serveur externe ne sont pas testables en CI.
+
+## 28/11/2026 — Démarrage sur copie restaurée : test isolé et lancé à la main
+- **Décision** : le test « Recette - démarrage de l'application sur copie restaurée » vit dans le dépôt privé de sauvegardes (lancement manuel uniquement). La copie est prise dans une session imposée en lecture seule par la base (`default_transaction_read_only=on`), restaurée dans une base jetable locale, et l'application démarre avec un environnement vide (pas d'e-mail, pas de licence, pas d'accès à la production). Le script `scripts/boot-copie.js` n'envoie que des lectures (GET) et n'affiche que des codes de réponse. Il est contrôlé à chaque intégration continue sur la base de test.
+- **Raison** : prouver que la version livrée démarre et fonctionne sur les données réelles sans jamais écrire en production.
+- **Risque accepté** : dans la copie seulement, l'obligation de changer un mot de passe provisoire est levée pour que ces comptes ouvrent leurs écrans ; la copie est détruite à la fin.
+
+## 28/11/2026 — Version 1.0.0 et rapport final de recette
+- **Décision** : la version de clôture porte le numéro 1.0.0 ; documentation finale ajoutée (guides administrateur, utilisateur, installation et exploitation, documentation technique, modules, matrice des 15 profils régénérée par la CI, rapport final de recette).
+- **Raison** : mandat de clôture définitive.
+- **Risque accepté** : la mise en production reste suspendue à l'accord écrit du propriétaire ; les réserves R1 à R10 du rapport final restent ouvertes.

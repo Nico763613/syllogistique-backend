@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { SiteScopeInterceptor } from './common/interceptors/site-scope.interceptor';
+import { FileLinkInterceptor } from './common/interceptors/file-link.interceptor';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 
@@ -26,6 +27,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { QrcodesModule } from './qrcodes/qrcodes.module';
 import { MessagingModule } from './messaging/messaging.module';
+import { PlatformModule } from './platform/platform.controller';
 import { StaffModule } from './staff/staff.module';
 import { SimulationModule } from './simulation/simulation.module';
 import { SettingsModule } from './settings/settings.module';
@@ -90,6 +92,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     SupportModule,
     SignupModule,
     LicenseModule,
+    PlatformModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -98,6 +101,8 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     // Cloisonnement par site de tout paramètre ?siteId= (voir SiteScopeInterceptor)
     { provide: APP_INTERCEPTOR, useClass: SiteScopeInterceptor },
+    // Liens signés et temporaires pour les fichiers renvoyés par l'API (voir src/uploads/file-links.ts)
+    { provide: APP_INTERCEPTOR, useClass: FileLinkInterceptor },
   ],
 })
 export class AppModule {}
