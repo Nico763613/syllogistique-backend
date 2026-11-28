@@ -14,6 +14,7 @@ export class CustomersService {
   async findDuplicates(siteId: string, name?: string, phone?: string, excludeId?: string) {
     // Requête SQL directe (non filtrée automatiquement) : le site doit appartenir au périmètre de l'utilisateur,
     // sinon on pourrait lire les noms et téléphones des clients d'une autre entreprise.
+    if (!siteId) return [];
     const allowed = await allowedSiteIds(this.prisma);
     if (allowed && !allowed.includes(siteId)) throw new ForbiddenException("Ce site n'est pas dans votre périmètre.");
     const nn = this.norm(name), pp = this.digits(phone);
