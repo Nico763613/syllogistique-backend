@@ -22,7 +22,7 @@ Date : 28/11/2026. Rédigé après relecture complète du dépôt, de son histor
 
 ## 2. Commit recommandé pour la production
 
-Le **dernier commit de la branche `fix/plateforme-multi-entreprises` dont la CI est entièrement verte** (voir § 5.1, qui donne le commit exact et le lien de la CI). Ne fusionnez pas un commit dont la CI n'est pas verte.
+**`4b24462`** (avec ce rapport à jour par-dessus, sans changement de code) — CI entièrement verte : https://github.com/Nico763613/syllogistique-backend/actions/runs/46091969977. Ne fusionnez pas un commit dont la CI n'est pas verte.
 
 Rappel : fusionner la PR #195 dans `main` **met en production automatiquement** (Render redéploie à chaque modification de `main`).
 
@@ -64,7 +64,7 @@ Fichier : `MATRICE_15_PROFILS.md`, produit par la CI (`scripts/profils15.js`).
 | 46084766008 | e2e831d | + compte Chauffeur limité | **Vert** (3 étapes) : 485 contrôles réussis, 0 échec |
 | 46085357928 | 5057775 | + faille des doublons corrigée, functional7 | Rouge : 17 échecs dans functional7, venant du test lui-même (comptes à mot de passe provisoire). Test corrigé. Tous les autres contrôles, y compris la faille corrigée, étaient verts |
 | 46087498721 | 52e508b | + functional7 corrigé, test de démarrage sur copie (base de test) | functional7 **vert** ; démarrage sur copie : 853 ouvertures d'écran par 15 comptes, 0 erreur serveur, 1 refus inattendu (recherche de doublons sans site, conséquence de la correction n°7). Corrigé dans 3eee77b |
-| à venir | dernier commit de la branche | Version finale 1.0.0 | Le commit recommandé et son lien de CI sont donnés dans le message de livraison |
+| 46091969977 | 4b24462 | Version finale 1.0.0 (dont correction de la recherche de doublons sans site) | **Vert** (3 étapes) : 568 contrôles réussis, 0 échec |
 
 Liens : `https://github.com/Nico763613/syllogistique-backend/actions/runs/<numéro>`.
 
@@ -78,7 +78,7 @@ Liens : `https://github.com/Nico763613/syllogistique-backend/actions/runs/<numé
 | Circuits complets, plafonds, reçus, compte chauffeur | functional4.js | Conforme et vérifié |
 | Sites, sessions, invitations, caisse | functional5.js | Conforme et vérifié |
 | Plusieurs entreprises et plusieurs sites, synchronisation, mot de passe | functional6.js | Conforme et vérifié |
-| Transferts entre sites, rapports, recherche, QR codes, signalements | functional7.js | Conforme sous réserve : vert une fois la dernière CI verte |
+| Transferts entre sites, rapports, recherche, QR codes, signalements | functional7.js | Conforme et vérifié (CI 46091969977) |
 | Interface (Chrome sans écran) : clics, profils, livraison | ui-click, ui-roles, ui-livraison | Conforme et vérifié (31 + 34 + 38 contrôles) |
 | 15 profils | profils15.js | Conforme et vérifié |
 | Migrations : retour arrière puis réapplication | CI | Conforme et vérifié |
