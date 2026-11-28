@@ -35,7 +35,7 @@ scripts/                  tests fonctionnels, tests d'interface, contrôle de d�
 docs/                     documentation
 ```
 
-La liste des 37 modules et de leurs tests est dans `MODULES.md`.
+La liste des 39 modules et de leurs tests est dans `MODULES.md`.
 
 ## 3. Sécurité
 

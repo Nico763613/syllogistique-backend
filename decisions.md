@@ -131,3 +131,8 @@
 - **Décision** : le test « Recette - démarrage de l'application sur copie restaurée » vit dans le dépôt privé de sauvegardes (lancement manuel uniquement). La copie est prise dans une session imposée en lecture seule par la base (`default_transaction_read_only=on`), restaurée dans une base jetable locale, et l'application démarre avec un environnement vide (pas d'e-mail, pas de licence, pas d'accès à la production). Le script `scripts/boot-copie.js` n'envoie que des lectures (GET) et n'affiche que des codes de réponse. Il est contrôlé à chaque intégration continue sur la base de test.
 - **Raison** : prouver que la version livrée démarre et fonctionne sur les données réelles sans jamais écrire en production.
 - **Risque accepté** : dans la copie seulement, l'obligation de changer un mot de passe provisoire est levée pour que ces comptes ouvrent leurs écrans ; la copie est détruite à la fin.
+
+## 28/11/2026 — Version 1.0.0 et rapport final de recette
+- **Décision** : la version de clôture porte le numéro 1.0.0 ; documentation finale ajoutée (guides administrateur, utilisateur, installation et exploitation, documentation technique, modules, matrice des 15 profils régénérée par la CI, rapport final de recette).
+- **Raison** : mandat de clôture définitive.
+- **Risque accepté** : la mise en production reste suspendue à l'accord écrit du propriétaire ; les réserves R1 à R10 du rapport final restent ouvertes.

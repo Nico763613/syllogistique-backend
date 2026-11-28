@@ -2,7 +2,7 @@
 
 Date : 28/11/2026. Version candidate : branche `fix/plateforme-multi-entreprises` (PR #195).
 
-Ce document liste les 37 modules du serveur, ce que fait chacun, le nombre de routes (adresses de l'API) et le test automatique qui le vérifie. Une « route » est une adresse que l'application appelle, par exemple `POST /transfers` pour créer un transfert.
+Ce document liste les 39 modules du serveur, ce que fait chacun, le nombre de routes (adresses de l'API) et le test automatique qui le vérifie. Une « route » est une adresse que l'application appelle, par exemple `POST /transfers` pour créer un transfert.
 
 Statuts utilisés (ceux du mandat de clôture) :
 
