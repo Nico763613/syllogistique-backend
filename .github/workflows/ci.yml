@@ -122,6 +122,11 @@ jobs:
           node scripts/profils15.js
           cat profils15-matrice.md
       - run: sleep 61
+      - name: Contrôle du script « démarrage sur copie restaurée » (sur la base de test, un compte par rôle)
+        run: |
+          psql "$DATABASE_URL" -AtF $'\t' -c "select u.id, u.email, r.name, u.organization_id, coalesce(u.site_id,''), coalesce(u.department,'') from users u join roles r on r.id = u.role_id where u.status = 'ACTIVE' and u.deleted_at is null and not u.must_change_password order by r.name, u.created_at" > /tmp/users.tsv
+          USERS_TSV=/tmp/users.tsv MAX_PAR_ROLE=1 node scripts/boot-copie.js
+      - run: sleep 61
       - run: node scripts/smoke.js
       - name: Migrations — historique, retour arrière puis réapplication
         run: |
