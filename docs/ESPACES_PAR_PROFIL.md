@@ -115,3 +115,7 @@ Le composant commun `syTabs(onglets, actif, fonction)` affiche les onglets. Seul
 ## Un menu = un seul contenu
 
 Chaque rubrique du menu ouvre uniquement son contenu : « Entrées » montre la nouvelle entrée, l'historique des entrées et les réceptions ; « Sorties » montre la nouvelle sortie, l'historique des sorties et le bon de sortie ; « Chauffeurs camion » ne montre que les chauffeurs camion. Les barres d'onglets qui répétaient le menu ne s'affichent plus. Les indicateurs du stock ne montrent jamais « undefined ».
+
+## Compte Chauffeur : accès limité à l'application chauffeur (28/11/2026)
+
+Le serveur refuse désormais au compte Chauffeur tout écran de bureau (dépenses, carburant du bureau, stock, clients, comptes…), même si quelqu'un tape l'adresse à la main. Il garde : l'application chauffeur (`/driver`), sa connexion, l'envoi de photos, ses notifications, le signalement d'un problème, la déclaration d'un incident HSE, le logo et l'état de la licence. Vérifié par `functional4.js` et `profils15.js`.

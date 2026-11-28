@@ -17,7 +17,15 @@ const api = async (method, path, body, token) => {
 const n = Date.now().toString().slice(-7), PW = 'Test1234x';
 const is2 = (r) => r.s === 200 || r.s === 201;
 const rows = (d) => (Array.isArray(d) ? d : (d && (d.items || d.data)) || []);
-const login = async (email, password) => (await api('POST', '/auth/login', { email, password })).d || {};
+// Connexion ; un mot de passe provisoire est remplacé aussitôt (sinon toutes les données sont refusées).
+const login = async (email, password) => {
+  const d = (await api('POST', '/auth/login', { email, password })).d || {};
+  if (d.accessToken && d.user && d.user.mustChangePassword) {
+    const c = await api('POST', '/auth/change-password', { currentPassword: password, newPassword: password + 'N' }, d.accessToken);
+    ok(is2(c), `${email} : mot de passe provisoire remplacé`, c);
+  }
+  return d;
+};
 
 (async () => {
   // ---------- Comptes (3 connexions, sous la limite de 5 par minute) ----------
@@ -85,11 +93,17 @@ const login = async (email, password) => (await api('POST', '/auth/login', { ema
   ok(r.s === 200, 'le lecteur consulte un transfert de son site', r.s);
 
   // ---------- Rapports et tableaux de bord ----------
-  for (const p of ['/reports/dashboard', '/reports/daily', '/reports/fleet-recap',
+  for (const p of ['/reports/dashboard', `/reports/daily?siteId=${SITE}`, '/reports/fleet-recap',
     '/dashboards/commercial', '/dashboards/logistics', '/dashboards/stock', '/dashboards/fleet',
-    '/dashboards/executive', '/dashboards/direction', '/dashboards/workspace', '/dashboards/hse']) {
+    '/dashboards/executive', '/dashboards/direction', '/dashboards/hse']) {
     r = await api('GET', p, undefined, T); ok(r.s === 200, `${p} → 200`, r.s);
   }
+  r = await api('GET', '/reports/daily', undefined, T);
+  ok(r.s === 400, 'rapport du jour sans site → 400 avec message clair', r.s);
+  r = await api('GET', '/dashboards/workspace', undefined, mag);
+  ok(r.s === 200, 'espace de travail du magasinier → 200', r.s);
+  r = await api('GET', '/dashboards/workspace', undefined, lec);
+  ok(r.s === 403, 'espace de travail réservé aux métiers de terrain (lecteur → 403)', r.s);
   const per = `from=2026-01-01&to=2026-12-31&siteId=${SITE}`;
   r = await api('GET', `/reports/period/export/excel?${per}`, undefined, T);
   ok(r.s === 200 && /sheet|excel|octet/.test(r.ct) && r.size > 1000, 'export Excel du rapport de période', { s: r.s, ct: r.ct, size: r.size });
