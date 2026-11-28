@@ -63,7 +63,8 @@ Fichier : `MATRICE_15_PROFILS.md`, produit par la CI (`scripts/profils15.js`).
 | 46084667881 | b5a74dd | Plafonds des montants, carburant, reçus, rattachement des chauffeurs | **Vert** (3 étapes) |
 | 46084766008 | e2e831d | + compte Chauffeur limité | **Vert** (3 étapes) : 485 contrôles réussis, 0 échec |
 | 46085357928 | 5057775 | + faille des doublons corrigée, functional7 | Rouge : 17 échecs dans functional7, venant du test lui-même (comptes à mot de passe provisoire). Test corrigé. Tous les autres contrôles, y compris la faille corrigée, étaient verts |
-| voir § 12 | dernier commit | Version finale | Voir le message de livraison |
+| 46087498721 | 52e508b | + functional7 corrigé, test de démarrage sur copie (base de test) | functional7 **vert** ; démarrage sur copie : 853 ouvertures d'écran par 15 comptes, 0 erreur serveur, 1 refus inattendu (recherche de doublons sans site, conséquence de la correction n°7). Corrigé dans 3eee77b |
+| à venir | dernier commit de la branche | Version finale 1.0.0 | Le commit recommandé et son lien de CI sont donnés dans le message de livraison |
 
 Liens : `https://github.com/Nico763613/syllogistique-backend/actions/runs/<numéro>`.
 
@@ -100,7 +101,7 @@ Liens : `https://github.com/Nico763613/syllogistique-backend/actions/runs/<numé
 | Essai | Statut |
 |---|---|
 | Android, iPhone, PC | **Non testé**. Le protocole est prêt (`PROTOCOLE_TEST_TELEPHONES.md`) ; l'essai doit être fait par vous ou un testeur. |
-| Démarrage de l'application sur une copie restaurée de la production | **Non testé**. Un test isolé et en lecture seule est préparé dans le dépôt de sauvegardes (`scripts/boot-copie.js`, décision du 28/11 dans `decisions.md`) ; il se lance à la main. |
+| Démarrage de l'application sur une copie restaurée de la production | **Non testé sur les données réelles**. Le script a été vérifié en CI sur la base de test (15 profils, 853 écrans, 0 erreur serveur). Un test isolé et en lecture seule est préparé dans le dépôt de sauvegardes (`scripts/boot-copie.js`, décision du 28/11 dans `decisions.md`) ; il se lance à la main. |
 
 ## 6. Preuves de sécurité et de cloisonnement entre entreprises
 
